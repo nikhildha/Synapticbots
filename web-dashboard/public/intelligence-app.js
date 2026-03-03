@@ -505,27 +505,29 @@
         }
 
         function buildConvictionHTML() {
+            const total = high.length + med.length + low.length || 1;
+            const hPct = Math.round(high.length / total * 100);
+            const mPct = Math.round(med.length / total * 100);
+            const lPct = 100 - hPct - mPct;
             return `
-            <div style="margin-bottom:6px;">
-                <div style="display:flex; justify-content:space-between; align-items:center; font-size:12px;">
-                    <span style="display:flex;align-items:center;gap:6px;"><span style="width:8px;height:8px;border-radius:50%;background:#22C55E;"></span>High (>98%)</span>
+            <div style="display:flex;flex-direction:column;gap:8px;">
+                <div style="display:flex;justify-content:space-between;align-items:center;font-size:12px;">
+                    <span style="display:flex;align-items:center;gap:6px;"><span style="width:8px;height:8px;border-radius:50%;background:#22C55E;"></span>High (&gt;98%)</span>
                     <span style="font-weight:700;color:#1A2332;">${high.length}</span>
                 </div>
-                ${formatList(high)}
-            </div>
-            <div style="margin-bottom:6px;">
-                <div style="display:flex; justify-content:space-between; align-items:center; font-size:12px;">
+                <div style="display:flex;justify-content:space-between;align-items:center;font-size:12px;">
                     <span style="display:flex;align-items:center;gap:6px;"><span style="width:8px;height:8px;border-radius:50%;background:#F59E0B;"></span>Medium (90-98%)</span>
                     <span style="font-weight:700;color:#1A2332;">${med.length}</span>
                 </div>
-                ${formatList(med)}
-            </div>
-            <div>
-                <div style="display:flex; justify-content:space-between; align-items:center; font-size:12px;">
-                    <span style="display:flex;align-items:center;gap:6px;"><span style="width:8px;height:8px;border-radius:50%;background:#94A3B8;"></span>Low (<90%)</span>
+                <div style="display:flex;justify-content:space-between;align-items:center;font-size:12px;">
+                    <span style="display:flex;align-items:center;gap:6px;"><span style="width:8px;height:8px;border-radius:50%;background:#94A3B8;"></span>Low (&lt;90%)</span>
                     <span style="font-weight:700;color:#1A2332;">${low.length}</span>
                 </div>
-                ${formatList(low)}
+                <div style="display:flex;height:6px;border-radius:3px;overflow:hidden;margin-top:2px;">
+                    <div style="width:${hPct}%;background:#22C55E;"></div>
+                    <div style="width:${mPct}%;background:#F59E0B;"></div>
+                    <div style="width:${lPct}%;background:#94A3B8;"></div>
+                </div>
             </div>
         `;
         }
@@ -788,14 +790,16 @@
         if (!tbody) return;
 
         if (!coins || coins.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;color:var(--text-secondary);padding:24px;">Waiting for bot analysis cycle…</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="12" style="text-align:center;color:var(--text-secondary);padding:24px;">Waiting for bot analysis cycle…</td></tr>';
             return;
         }
 
         const fmt = (val, dec = 2) => val !== undefined && val !== null ? val.toFixed(dec) : '—';
-        const fmtCurr = (val) => {
-            if (val === undefined || val === null) return '—';
-            return val.toLocaleString('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 });
+        const fmtUSD = (val) => {
+            if (val === undefined || val === null || val === 0) return '—';
+            if (val > 1e6) return '$' + (val / 1e6).toFixed(1) + 'M';
+            if (val > 1e3) return '$' + (val / 1e3).toFixed(0) + 'K';
+            return '$' + val.toFixed(0);
         };
         const col = (val) => {
             if (val === undefined || val === null) return '#64748B';
@@ -807,15 +811,18 @@
             const imbPct = d.imbalance !== undefined ? Math.round(d.imbalance * 100) : null;
             const takerPct = d.taker_buy_ratio !== undefined ? Math.round(d.taker_buy_ratio * 100) : null;
             const cumDelta = d.cumulative_delta;
-            const ls = d.long_short_ratio;
+            const exchCount = d.exchange_count || 1;
+            const aggBid = d.aggregated_bid_usd || 0;
+            const aggAsk = d.aggregated_ask_usd || 0;
             const bidWalls = (d.bid_walls || []);
             const askWalls = (d.ask_walls || []);
+            const orderBlocks = (d.order_blocks || []);
 
-            // Next upper wall: closest ask wall (lowest price from ask walls)
+            // Next upper wall: closest ask wall
             const sortedAskWalls = [...askWalls].sort((a, b) => (a.price || 0) - (b.price || 0));
             const nextUpper = sortedAskWalls.length > 0 ? sortedAskWalls[0] : null;
 
-            // Next lower wall: closest bid wall (highest price from bid walls)
+            // Next lower wall: closest bid wall
             const sortedBidWalls = [...bidWalls].sort((a, b) => (b.price || 0) - (a.price || 0));
             const nextLower = sortedBidWalls.length > 0 ? sortedBidWalls[0] : null;
 
@@ -823,8 +830,20 @@
                 if (!wall) return '—';
                 const price = wall.price !== undefined ? wall.price.toLocaleString('en-US', { maximumFractionDigits: 4 }) : '?';
                 const size = wall.size !== undefined ? '$' + (wall.size > 1e6 ? (wall.size / 1e6).toFixed(1) + 'M' : (wall.size > 1e3 ? (wall.size / 1e3).toFixed(0) + 'K' : wall.size.toFixed(0))) : '';
-                return `${price} <span style="font-size:9px;opacity:0.7;">${size}</span>`;
+                const exch = wall.exchange ? ` <span style="font-size:8px;opacity:0.5;">[${wall.exchange}]</span>` : '';
+                return `${price} <span style="font-size:9px;opacity:0.7;">${size}</span>${exch}`;
             };
+
+            // Order block summary
+            const bullOBs = orderBlocks.filter(ob => ob.type === 'bullish');
+            const bearOBs = orderBlocks.filter(ob => ob.type === 'bearish');
+            let obHTML = '—';
+            if (bullOBs.length || bearOBs.length) {
+                const parts = [];
+                if (bullOBs.length) parts.push(`<span style="color:#16A34A;">▲${bullOBs.length}</span>`);
+                if (bearOBs.length) parts.push(`<span style="color:#DC2626;">▼${bearOBs.length}</span>`);
+                obHTML = parts.join(' ');
+            }
 
             // Signal derivation
             let signal = 'Neutral';
@@ -839,17 +858,25 @@
             if (c.regime.includes('BEAR')) { regColor = '#B91C1C'; regBg = '#FEE2E2'; }
             if (c.regime.includes('CHOP')) { regColor = '#B45309'; regBg = '#FEF3C7'; }
 
+            // Exchange count badge color
+            const exchColor = exchCount >= 3 ? '#16A34A' : (exchCount >= 2 ? '#D97706' : '#64748B');
+
+            // Depth imbalance bar
+            const depthTotal = aggBid + aggAsk;
+            const bidPct = depthTotal > 0 ? Math.round(aggBid / depthTotal * 100) : 50;
+
             return `<tr style="border-bottom:1px solid #F1F5F9;font-size:11px;font-weight:600;">
             <td style="padding:10px 8px;font-weight:700;">${c.symbol.replace('USDT', '')}</td>
             <td style="padding:8px;text-align:center;"><span style="background:${regBg};color:${regColor};padding:2px 8px;border-radius:10px;font-size:10px;font-weight:700;">${c.regime}</span></td>
+            <td style="padding:8px;text-align:center;"><span style="background:#EEF2FF;color:${exchColor};padding:2px 6px;border-radius:8px;font-size:10px;font-weight:700;">${exchCount}</span></td>
             <td style="padding:8px;text-align:center;color:${col(imbPct)};">${imbPct !== null ? (imbPct > 0 ? '+' : '') + imbPct + '%' : '—'}</td>
             <td style="padding:8px;text-align:center;color:${takerPct !== null && takerPct > 55 ? '#16A34A' : (takerPct !== null && takerPct < 45 ? '#DC2626' : '#64748B')};">${takerPct !== null ? takerPct + '%' : '—'}</td>
-            <td style="padding:8px;text-align:center;color:${col(cumDelta)};">${fmtCurr(cumDelta)}</td>
-            <td style="padding:8px;text-align:center;">${ls !== undefined && ls !== null ? fmt(ls) : '—'}</td>
-            <td style="padding:8px;text-align:center;color:#16A34A;font-weight:700;">${bidWalls.length || '—'}</td>
-            <td style="padding:8px;text-align:center;color:#DC2626;font-weight:700;">${askWalls.length || '—'}</td>
+            <td style="padding:8px;text-align:center;color:${col(cumDelta)};">${cumDelta !== undefined && cumDelta !== null ? (cumDelta > 0 ? '+' : '') + fmt(cumDelta) : '—'}</td>
+            <td style="padding:8px;text-align:center;color:#16A34A;">${fmtUSD(aggBid)}</td>
+            <td style="padding:8px;text-align:center;color:#DC2626;">${fmtUSD(aggAsk)}</td>
             <td style="padding:8px;text-align:center;color:#DC2626;">${fmtWall(nextUpper)}</td>
             <td style="padding:8px;text-align:center;color:#16A34A;">${fmtWall(nextLower)}</td>
+            <td style="padding:8px;text-align:center;">${obHTML}</td>
             <td style="padding:8px;text-align:center;font-weight:700;color:${sigColor};">${signal}</td>
         </tr>`;
         }).join('');
@@ -1030,6 +1057,9 @@
 
         const tsEl = document.getElementById('newsFetchTs');
         if (tsEl) tsEl.textContent = 'Fetched ' + new Date().toLocaleTimeString();
+
+        // Update buzz chart with news timestamps
+        updateBuzzChart(items);
     }
 
     function getTimeAgo(date) {
@@ -1038,6 +1068,57 @@
         if (diff < 3600) return Math.floor(diff / 60) + 'm ago';
         if (diff < 86400) return Math.floor(diff / 3600) + 'h ago';
         return Math.floor(diff / 86400) + 'd ago';
+    }
+
+    // ─── Hourly Buzz Volume (text values) ──────────────────────────────────────
+    function updateBuzzChart(items) {
+        const container = document.getElementById('buzzChart');
+        if (!container) return;
+
+        // Replace canvas with div if needed
+        if (container.tagName === 'CANVAS') {
+            const div = document.createElement('div');
+            div.id = 'buzzChart';
+            container.parentNode.replaceChild(div, container);
+            updateBuzzChart(items); // recurse with the new div
+            return;
+        }
+
+        // Bucket articles into hourly slots (last 6 hours)
+        const now = new Date();
+        const hours = 6;
+        const buckets = new Array(hours).fill(0);
+        const labels = [];
+        for (let i = hours - 1; i >= 0; i--) {
+            const h = new Date(now.getTime() - i * 3600000);
+            labels.push(h.getHours().toString().padStart(2, '0') + ':00');
+        }
+
+        items.forEach(item => {
+            if (!item.published) return;
+            const pub = new Date(item.published);
+            const hoursAgo = (now - pub) / 3600000;
+            if (hoursAgo >= 0 && hoursAgo < hours) {
+                const idx = hours - 1 - Math.floor(hoursAgo);
+                if (idx >= 0 && idx < hours) buckets[idx]++;
+            }
+        });
+
+        const maxVal = Math.max(...buckets, 1);
+        container.innerHTML = `
+            <div style="display:flex;flex-direction:column;gap:4px;">
+                ${buckets.map((count, i) => `
+                    <div style="display:flex;align-items:center;gap:8px;font-size:11px;">
+                        <span style="width:36px;color:var(--text-secondary);font-family:monospace;">${labels[i]}</span>
+                        <div style="flex:1;height:8px;background:#F1F5F9;border-radius:4px;overflow:hidden;">
+                            <div style="width:${Math.round(count / maxVal * 100)}%;height:100%;background:linear-gradient(90deg,#6366F1,#818CF8);border-radius:4px;transition:width 0.3s;"></div>
+                        </div>
+                        <span style="width:20px;text-align:right;font-weight:600;color:#1A2332;">${count}</span>
+                    </div>
+                `).join('')}
+                <div style="margin-top:4px;font-size:10px;color:var(--text-secondary);text-align:right;">${items.length} articles total</div>
+            </div>
+        `;
     }
 
     // ─── Funding Rates & OI ─────────────────────────────────────────────────────

@@ -622,29 +622,30 @@
         </div>
         <div class="icard">
           <div class="icard-title">Order Flow — All Tracked Coins
-            <span style="font-size:10px;color:var(--text-secondary);margin-left:8px;">Data from last bot analysis
-              cycle</span>
+            <span style="font-size:10px;color:var(--text-secondary);margin-left:8px;">Aggregated from Binance + OKX +
+              Bybit</span>
           </div>
           <div style="overflow-x:auto;">
-            <table class="walls-table" id="orderFlowAllTable" style="width:100%;min-width:800px;">
+            <table class="walls-table" id="orderFlowAllTable" style="width:100%;min-width:1000px;">
               <thead>
                 <tr>
                   <th style="text-align:left;padding:10px 8px;">Coin</th>
                   <th>Regime</th>
+                  <th>Exch</th>
                   <th>Imbalance</th>
                   <th>Taker Buy%</th>
                   <th>Cum Delta</th>
-                  <th>L/S Ratio</th>
-                  <th>Bid Walls</th>
-                  <th>Ask Walls</th>
+                  <th>Agg Bid $</th>
+                  <th>Agg Ask $</th>
                   <th>Next Upper Wall</th>
                   <th>Next Lower Wall</th>
+                  <th>OB Zones</th>
                   <th>Signal</th>
                 </tr>
               </thead>
               <tbody id="orderFlowAllBody">
                 <tr>
-                  <td colspan="11" style="text-align:center;color:var(--text-secondary);padding:24px;">Waiting for bot
+                  <td colspan="12" style="text-align:center;color:var(--text-secondary);padding:24px;">Waiting for bot
                     analysis cycle…</td>
                 </tr>
               </tbody>
