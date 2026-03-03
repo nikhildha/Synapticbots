@@ -69,7 +69,7 @@ CONFIDENCE_LOW = 0.92    # 92–96% → 15x  (optimized from 0.85, below 92% = n
 # ─── Risk Management ────────────────────────────────────────────────────────────
 RISK_PER_TRADE = 0.04
 KILL_SWITCH_DRAWDOWN = 0.10   # Pause bot if 10% drawdown in 24h
-MAX_LOSS_PER_TRADE_PCT = -30
+MAX_LOSS_PER_TRADE_PCT = -15   # Force-close trade if loss exceeds 15%
 MIN_HOLD_MINUTES = 30         # Minimum hold time before regime-change exits
 DEFAULT_QUANTITY = 0.002      # BTC quantity (overridden by position sizer)
 MARGIN_TYPE = "ISOLATED"      # Never use CROSS for high leverage
@@ -111,6 +111,8 @@ VOL_MAX_ATR_PCT = 0.06
 # ─── Fees ────────────────────────────────────────────────────────────────────────
 TAKER_FEE = 0.0005            # 0.05% Binance futures taker per leg (0.1% round trip)
 MAKER_FEE = 0.0002            # 0.02% Binance futures maker
+FUNDING_INTERVAL_HOURS = 8    # Funding charged every 8 hours on futures
+DEFAULT_FUNDING_RATE = 0.0001 # 0.01% default if live rate unavailable
 
 # ─── Sideways Strategy ──────────────────────────────────────────────────────────
 BB_LENGTH = 20

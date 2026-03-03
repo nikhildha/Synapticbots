@@ -126,9 +126,10 @@ def open_trade(symbol, side, leverage, quantity, entry_price, atr,
         stop_loss = round(entry_price + atr * sl_mult, 6)
         take_profit = round(entry_price - atr * tp_mult, 6)
 
+    now_iso = datetime.utcnow().isoformat()
     trade = {
         "trade_id":         trade_id,
-        "entry_timestamp":  datetime.utcnow().isoformat(),
+        "entry_timestamp":  now_iso,
         "exit_timestamp":   None,
         "symbol":           symbol,
         "position":         position,
@@ -160,6 +161,9 @@ def open_trade(symbol, side, leverage, quantity, entry_price, atr,
         "duration_minutes":  0,
         "mode":             mode if mode else ("PAPER" if config.PAPER_TRADE else "LIVE"),
         "commission":       0,
+        "funding_cost":     0,
+        "funding_payments": 0,
+        "last_funding_check": now_iso,
     }
 
     book["trades"].append(trade)
@@ -277,8 +281,9 @@ def _close_trade_inline(trade, exit_price, reason):
     entry_notional = entry * qty
     exit_notional = px * qty
     commission = round((entry_notional + exit_notional) * config.TAKER_FEE, 4)
+    funding_cost = trade.get("funding_cost", 0)
 
-    leveraged_pnl = round(raw_pnl * lev - commission, 4)
+    leveraged_pnl = round(raw_pnl * lev - commission - funding_cost, 4)
     pnl_pct = round(leveraged_pnl / capital * 100, 2) if capital else 0
 
     entry_time = datetime.fromisoformat(trade["entry_timestamp"])
@@ -309,10 +314,11 @@ def _close_trade_inline(trade, exit_price, reason):
         pass
 
 
-def update_unrealized(prices=None):
+def update_unrealized(prices=None, funding_rates=None):
     """
     Update unrealized P&L for all active trades using live prices.
     Auto-closes trades that hit MAX_LOSS, SL, or TP thresholds.
+    Accumulates funding rate costs for positions held across 8h intervals.
 
     IMPORTANT: All closes happen INLINE on the same book object to avoid
     the race condition where close_trade() would save independently and
@@ -321,6 +327,7 @@ def update_unrealized(prices=None):
     Parameters
     ----------
     prices : dict (optional) — {symbol: price}. If None, fetches live.
+    funding_rates : dict (optional) — {symbol: rate}. Live funding rates per coin.
     """
     book = _load_book()
     changed = False
@@ -348,6 +355,34 @@ def update_unrealized(prices=None):
         else:
             raw_pnl = (entry - current) * qty
 
+        # ── Accumulate funding rate cost ──────────────────────────
+        # Initialize funding fields for legacy trades
+        if "funding_cost" not in trade:
+            trade["funding_cost"] = 0
+            trade["funding_payments"] = 0
+            trade["last_funding_check"] = trade["entry_timestamp"]
+
+        try:
+            last_check = datetime.fromisoformat(trade["last_funding_check"])
+            hours_since = (datetime.utcnow() - last_check).total_seconds() / 3600
+            intervals = int(hours_since / config.FUNDING_INTERVAL_HOURS)
+            if intervals > 0:
+                # Use live funding rate if available, else default
+                sym = trade["symbol"]
+                fr = config.DEFAULT_FUNDING_RATE
+                if funding_rates and sym in funding_rates:
+                    fr = abs(funding_rates[sym])  # always treat as cost
+                notional = entry * qty * lev
+                cost_per_interval = notional * fr
+                new_cost = round(cost_per_interval * intervals, 6)
+                trade["funding_cost"] = round(trade["funding_cost"] + new_cost, 6)
+                trade["funding_payments"] += intervals
+                trade["last_funding_check"] = datetime.utcnow().isoformat()
+        except Exception:
+            pass
+
+        funding_cost = trade.get("funding_cost", 0)
+
         # For LIVE trades: qty from CoinDCX IS the leveraged quantity,
         # so raw_pnl is already the full P&L — do NOT multiply by leverage.
         # Also skip commission estimation — CoinDCX handles actual fees.
@@ -355,12 +390,12 @@ def update_unrealized(prices=None):
         is_live = trade.get("mode") == "LIVE"
         if is_live:
             est_commission = 0
-            leveraged_pnl = round(raw_pnl, 4)
+            leveraged_pnl = round(raw_pnl - funding_cost, 4)
         else:
             entry_notional = entry * qty
             exit_notional = current * qty
             est_commission = (entry_notional + exit_notional) * config.TAKER_FEE
-            leveraged_pnl = round(raw_pnl * lev - est_commission, 4)
+            leveraged_pnl = round(raw_pnl * lev - est_commission - funding_cost, 4)
         pnl_pct = round(leveraged_pnl / capital * 100, 2) if capital else 0
 
         # Track max favorable / adverse excursion

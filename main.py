@@ -165,9 +165,19 @@ class RegimeMasterBot:
         # Always: sync positions (detect SL/TP auto-closes)
         self._sync_positions()
 
-        # Always: update unrealized P&L + trailing SL/TP
+        # Always: update unrealized P&L + trailing SL/TP (with live funding rates)
         try:
-            tradebook.update_unrealized()
+            # Build funding rates dict from live CoinDCX prices
+            funding_rates = {}
+            for cdx_pair, info in getattr(self, '_live_prices', {}).items():
+                try:
+                    sym = cdx.from_coindcx_pair(cdx_pair)
+                    fr = float(info.get("fr", 0)) or float(info.get("efr", 0))
+                    if fr != 0:
+                        funding_rates[sym] = fr
+                except Exception:
+                    pass
+            tradebook.update_unrealized(funding_rates=funding_rates)
         except Exception as e:
             logger.debug("Tradebook unrealized update error: %s", e)
 
