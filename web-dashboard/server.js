@@ -5,11 +5,25 @@
  */
 const express = require('express');
 const http = require('http');
+const https = require('https');
 const { Server } = require('socket.io');
 const cors = require('cors');
 const fs = require('fs');
 const path = require('path');
 const chokidar = require('chokidar');
+
+// Helper: fetch any HTTPS URL as text (used for RSS / external APIs)
+function httpsGet(url, timeoutMs = 8000) {
+    return new Promise((resolve, reject) => {
+        const req = https.get(url, { timeout: timeoutMs }, (res) => {
+            let data = '';
+            res.on('data', c => data += c);
+            res.on('end', () => resolve(data));
+        });
+        req.on('error', reject);
+        req.on('timeout', () => { req.destroy(); reject(new Error('timeout')); });
+    });
+}
 
 const app = express();
 const server = http.createServer(app);
@@ -1745,6 +1759,56 @@ app.post('/api/config/preset', (req, res) => {
     }
 });
 
+
+// ─── News Feed API (RSS proxy with 5-min cache) ───────────────────────────────
+const NEWS_CACHE = { data: null, ts: 0 };
+const NEWS_CACHE_MS = 5 * 60_000;
+
+function parseRSS(xml, sourceName) {
+    const items = [];
+    const itemRx = /<item>([\s\S]*?)<\/item>/g;
+    let m;
+    while ((m = itemRx.exec(xml)) !== null) {
+        const inner = m[1];
+        const get = (rx1, rx2) => ((inner.match(rx1) || inner.match(rx2) || [])[1] || '').trim();
+        const title   = get(/<title><!\[CDATA\[(.*?)\]\]><\/title>/, /<title>(.*?)<\/title>/);
+        const link    = get(/<link>(.*?)<\/link>/, /<guid>(.*?)<\/guid>/);
+        const pubDate = get(/<pubDate>(.*?)<\/pubDate>/, /<dc:date>(.*?)<\/dc:date>/);
+        const desc    = get(/<description><!\[CDATA\[(.*?)\]\]><\/description>/, /<description>(.*?)<\/description>/);
+        if (!title) continue;
+        const clean = s => s.replace(/<[^>]+>/g,'').replace(/&amp;/g,'&').replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/&#39;/g,"'").replace(/&quot;/g,'"').trim();
+        items.push({
+            title:   clean(title),
+            url:     link,
+            source:  sourceName,
+            time:    pubDate ? new Date(pubDate).toISOString() : new Date().toISOString(),
+            summary: clean(desc).substring(0, 220),
+        });
+    }
+    return items;
+}
+
+app.get('/api/news-feed', async (req, res) => {
+    if (NEWS_CACHE.data && (Date.now() - NEWS_CACHE.ts) < NEWS_CACHE_MS) {
+        return res.json(NEWS_CACHE.data);
+    }
+    const feeds = [
+        { url: 'https://cointelegraph.com/rss',                       name: 'CoinTelegraph' },
+        { url: 'https://www.coindesk.com/arc/outboundfeeds/rss/',     name: 'CoinDesk' },
+        { url: 'https://decrypt.co/feed',                             name: 'Decrypt' },
+        { url: 'https://cryptoslate.com/feed/',                       name: 'CryptoSlate' },
+    ];
+    const settled = await Promise.allSettled(feeds.map(async ({ url, name }) => {
+        try   { return parseRSS(await httpsGet(url, 9000), name); }
+        catch (e) { console.log(`[News] ${name} failed: ${e.message}`); return []; }
+    }));
+    const all = settled.flatMap(r => r.status === 'fulfilled' ? r.value : []);
+    all.sort((a, b) => new Date(b.time) - new Date(a.time));
+    const result = { items: all.slice(0, 40), fetched_at: new Date().toISOString() };
+    NEWS_CACHE.data = result;
+    NEWS_CACHE.ts   = Date.now();
+    res.json(result);
+});
 
 // ─── Intelligence API ─────────────────────────────────────────────────────────
 app.get('/api/intelligence', (req, res) => {

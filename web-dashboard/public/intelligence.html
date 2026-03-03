@@ -2,39 +2,41 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>SENTINEL — Market Intelligence</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/styles.css">
   <script src="https://cdn.socket.io/4.7.4/socket.io.min.js"></script>
-  <script src="/shared-ticker.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
   <style>
-    /* ── Intelligence Page Styles ─────────────────────────────── */
-    .intel-hero {
-      padding: 28px 32px 0;
-      display: flex;
-      align-items: center;
-      gap: 16px;
+    /* ── Intel Command Bar ────────────────────────────────────── */
+    .intel-cmdbar {
+      display: flex; align-items: center; gap: 0;
+      margin: 0 32px 20px;
+      background: var(--bg-secondary); border-radius: var(--radius-md);
+      box-shadow: var(--shadow-card); overflow: hidden;
     }
-    .intel-hero h1 {
-      font-size: 22px; font-weight: 800; color: var(--text-primary);
-      letter-spacing: -0.5px;
+    .cmdbar-item {
+      flex: 1; padding: 14px 16px; border-right: 1px solid #F0F4F8;
+      min-width: 0;
     }
-    .intel-hero .hero-sub {
-      font-size: 13px; color: var(--text-secondary); margin-top: 2px;
-    }
+    .cmdbar-item:last-child { border-right: none; }
+    .cmdbar-label { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.6px; color: var(--text-secondary); margin-bottom: 4px; }
+    .cmdbar-val   { font-size: 18px; font-weight: 800; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .cmdbar-sub   { font-size: 10px; color: var(--text-secondary); margin-top: 1px; }
+
+    /* ── Hero ─────────────────────────────────────────────────── */
+    .intel-hero { padding: 28px 32px 0; display: flex; align-items: center; gap: 16px; }
+    .intel-hero h1 { font-size: 26px; font-weight: 800; color: var(--text-primary); letter-spacing: -0.5px; }
+    .intel-hero .hero-sub { font-size: 13px; color: var(--text-secondary); margin-top: 2px; }
     .intel-badge {
       background: linear-gradient(135deg, #8B5CF6, #3B82F6);
       color: #fff; font-size: 10px; font-weight: 700;
       padding: 3px 9px; border-radius: 20px; letter-spacing: 0.5px; text-transform: uppercase;
     }
-    .refresh-row {
-      display: flex; align-items: center; gap: 10px;
-      padding: 10px 32px 20px;
-    }
-    .refresh-ts { font-size: 12px; color: var(--text-secondary); }
+    .refresh-row { display: flex; align-items: center; gap: 10px; padding: 10px 32px 20px; }
+    .refresh-ts  { font-size: 12px; color: var(--text-secondary); }
     .btn-refresh {
       background: var(--accent-blue); color: #fff; border: none;
       padding: 6px 14px; border-radius: 8px; font-size: 12px; font-weight: 600;
@@ -44,10 +46,8 @@
     .spinning { animation: spin 1s linear infinite; }
     @keyframes spin { to { transform: rotate(360deg); } }
 
-    /* ── Section Labels ──────────────────────────────────────── */
-    .intel-section {
-      padding: 0 32px 32px;
-    }
+    /* ── Section ──────────────────────────────────────────────── */
+    .intel-section { padding: 0 32px 32px; }
     .section-header {
       display: flex; align-items: center; gap: 10px;
       margin-bottom: 18px; padding-bottom: 12px;
@@ -55,36 +55,30 @@
     }
     .section-icon {
       width: 36px; height: 36px; border-radius: 10px;
-      display: flex; align-items: center; justify-content: center;
-      font-size: 18px;
+      display: flex; align-items: center; justify-content: center; font-size: 18px;
     }
     .section-icon.sent  { background: linear-gradient(135deg, #F59E0B22, #EF444422); }
+    .section-icon.fund  { background: linear-gradient(135deg, #06B6D422, #3B82F622); }
     .section-icon.flow  { background: linear-gradient(135deg, #3B82F622, #8B5CF622); }
     .section-title { font-size: 18px; font-weight: 800; color: var(--text-primary); }
     .section-sub   { font-size: 12px; color: var(--text-secondary); margin-top: 2px; }
 
-    /* ── Cards grid ──────────────────────────────────────────── */
+    /* ── Cards ────────────────────────────────────────────────── */
     .intel-grid { display: grid; gap: 16px; }
     .intel-grid-3 { grid-template-columns: 1fr 1fr 1fr; }
     .intel-grid-2 { grid-template-columns: 1.4fr 1fr; }
-    .intel-grid-wide { grid-template-columns: 1fr; }
     .icard {
       background: var(--bg-secondary); border-radius: var(--radius-md);
       box-shadow: var(--shadow-card); padding: 20px; position: relative; overflow: hidden;
-      min-width: 0; /* CRITICAL for Grid + Chart.js responsiveness */
     }
     .icard-title {
       font-size: 11px; font-weight: 700; text-transform: uppercase;
       letter-spacing: 0.6px; color: var(--text-secondary); margin-bottom: 14px;
     }
 
-    /* ── Fear & Greed ────────────────────────────────────────── */
-    .fg-wrap {
-      display: flex; flex-direction: column; align-items: center; gap: 8px;
-    }
-    .fg-arc {
-      position: relative; width: 160px; height: 80px; overflow: hidden;
-    }
+    /* ── Fear & Greed ─────────────────────────────────────────── */
+    .fg-wrap { display: flex; flex-direction: column; align-items: center; gap: 6px; }
+    .fg-arc  { position: relative; width: 160px; height: 80px; overflow: hidden; }
     .fg-arc svg { position: absolute; top: 0; left: 0; }
     .fg-needle {
       position: absolute; bottom: 0; left: 50%;
@@ -93,7 +87,7 @@
       background: linear-gradient(to top, #1A2332, #3B82F6);
       border-radius: 2px; transition: transform 1s cubic-bezier(.34,1.56,.64,1);
     }
-    .fg-value { font-size: 26px; font-weight: 800; color: var(--text-primary); }
+    .fg-value { font-size: 32px; font-weight: 800; color: var(--text-primary); }
     .fg-label { font-size: 13px; font-weight: 600; padding: 3px 12px; border-radius: 20px; }
     .fg-extreme-fear  { background: #FEE2E2; color: #DC2626; }
     .fg-fear          { background: #FEF3C7; color: #D97706; }
@@ -101,119 +95,106 @@
     .fg-greed         { background: #DCFCE7; color: #16A34A; }
     .fg-extreme-greed { background: #BBF7D0; color: #15803D; }
 
-    /* ── Market Bias ─────────────────────────────────────────── */
-    .bias-meter {
-      height: 6px; border-radius: 4px; overflow: hidden;
-      background: #F0F4F8; margin: 10px 0;
-    }
-    .bias-fill {
-      height: 100%; border-radius: 4px;
-      transition: width 0.8s ease, background 0.8s ease;
-    }
+    /* ── Market Bias ──────────────────────────────────────────── */
+    .bias-meter { height: 8px; border-radius: 4px; overflow: hidden; background: #F0F4F8; margin: 10px 0; }
+    .bias-fill  { height: 100%; border-radius: 4px; transition: width 0.8s ease, background 0.8s ease; }
     .bias-labels { display: flex; justify-content: space-between; font-size: 10px; color: var(--text-secondary); }
-    .bias-val {
-      font-size: 24px; font-weight: 800; text-align: center;
-      margin: 6px 0;
-    }
+    .bias-val { font-size: 28px; font-weight: 800; text-align: center; margin: 6px 0; }
 
-    /* ── Coin Sentiment Bars ─────────────────────────────────── */
-    .sent-bar-wrap { max-height: 280px; overflow-y: auto; }
-    .sent-bar-row {
-      display: grid; 
-      grid-template-columns: 50px 160px 50px 1fr; /* Grid Layout - Increased Bar Width */
-      align-items: center; gap: 12px; padding: 6px 0;
-      border-bottom: 1px solid #F8FAFC;
-    }
-    .sent-coin { font-size: 12px; font-weight: 700; color: var(--text-primary); }
-    .sent-bar-bg {
-      width: 100%; height: 6px; border-radius: 3px; 
-      background: linear-gradient(to right, #F0F4F8 49.8%, #CBD5E1 50%, #F0F4F8 50.2%);
-      position: relative; overflow: hidden;
-    }
-    .sent-bar-fill {
-      height: 100%; border-radius: 4px; position: absolute;
-      top: 0; transition: width 0.6s ease, background 0.6s ease;
-    }
-    .sent-score {
-      font-size: 12px; font-weight: 700; text-align: right;
-    }
-    .sent-action {
-      font-size: 10px; text-align: right; color: var(--text-secondary);
-      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-    }
+    /* ── Per-Coin Bars ────────────────────────────────────────── */
+    .sent-bar-wrap { max-height: 260px; overflow-y: auto; }
+    .sent-bar-row  { display: flex; align-items: center; gap: 10px; padding: 6px 0; border-bottom: 1px solid #F8FAFC; cursor: pointer; }
+    .sent-bar-row:hover { background: #F8FAFC; border-radius: 4px; }
+    .sent-coin  { font-size: 12px; font-weight: 700; color: var(--text-primary); width: 44px; flex-shrink: 0; }
+    .sent-bar-bg { flex: 1; height: 20px; border-radius: 4px; background: #F0F4F8; position: relative; overflow: hidden; }
+    .sent-bar-fill { height: 100%; border-radius: 4px; position: absolute; top: 0; transition: width 0.6s ease, background 0.6s ease; }
+    .sent-score  { font-size: 12px; font-weight: 700; width: 50px; text-align: right; flex-shrink: 0; }
+    .sent-action { font-size: 10px; width: 80px; text-align: right; color: var(--text-secondary); flex-shrink: 0; }
 
-    /* ── Alert Banner ────────────────────────────────────────── */
+    /* ── Alert Banner ─────────────────────────────────────────── */
     .alert-banner {
       background: linear-gradient(135deg, #FEF2F2, #FEE2E2);
       border: 1px solid #FECACA; border-radius: var(--radius-sm);
-      padding: 12px 16px; display: flex; align-items: center; gap: 10px;
-      margin-top: 12px;
+      padding: 12px 16px; display: flex; align-items: center; gap: 10px; margin-top: 12px;
     }
     .alert-banner.hidden { display: none; }
     .alert-icon { font-size: 20px; }
     .alert-text { font-size: 13px; font-weight: 600; color: #DC2626; }
 
-    /* ── Coin Selector Tabs ──────────────────────────────────── */
-    .coin-tabs {
-      display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 16px;
+    /* ── News Feed ────────────────────────────────────────────── */
+    .news-item {
+      display: flex; gap: 12px; padding: 12px 0;
+      border-bottom: 1px solid #F0F4F8; cursor: pointer;
+      transition: background 0.12s;
     }
+    .news-item:hover { background: #F8FAFC; border-radius: 4px; padding-left: 6px; }
+    .news-item:last-child { border-bottom: none; }
+    .news-src-pill {
+      flex-shrink: 0; align-self: flex-start;
+      font-size: 9px; font-weight: 800; padding: 2px 7px; border-radius: 20px;
+      background: #EEF2FF; color: #4F46E5; text-transform: uppercase; letter-spacing: 0.4px;
+      margin-top: 2px; white-space: nowrap;
+    }
+    .news-src-pill.ct  { background: #FFF7ED; color: #EA580C; }
+    .news-src-pill.cd  { background: #EFF6FF; color: #1D4ED8; }
+    .news-src-pill.dc  { background: #F0FDF4; color: #15803D; }
+    .news-src-pill.cs  { background: #FDF4FF; color: #9333EA; }
+    .news-body { flex: 1; min-width: 0; }
+    .news-title { font-size: 13px; font-weight: 600; color: var(--text-primary); line-height: 1.4; margin-bottom: 4px; }
+    .news-meta  { font-size: 11px; color: var(--text-secondary); }
+    .news-summary { font-size: 11px; color: var(--text-secondary); margin-top: 3px; line-height: 1.5; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+    .news-sentiment { flex-shrink: 0; align-self: center; }
+    .news-sent-dot { width: 8px; height: 8px; border-radius: 50%; }
+
+    /* ── Funding / OI tiles ───────────────────────────────────── */
+    .funding-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: 10px; margin-bottom: 16px; }
+    .funding-tile { background: var(--bg-secondary); border-radius: var(--radius-sm); box-shadow: var(--shadow-card); padding: 12px; text-align: center; }
+    .funding-tile-sym  { font-size: 12px; font-weight: 800; color: var(--text-primary); margin-bottom: 4px; }
+    .funding-tile-rate { font-size: 18px; font-weight: 800; }
+    .funding-tile-sub  { font-size: 10px; color: var(--text-secondary); margin-top: 2px; }
+    .funding-pos { color: #22C55E; }
+    .funding-neg { color: #EF4444; }
+    .funding-neu { color: #F59E0B; }
+
+    /* ── Coin Tabs ────────────────────────────────────────────── */
+    .coin-tabs { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 16px; }
     .coin-tab {
       padding: 5px 12px; border-radius: 20px; font-size: 12px; font-weight: 600;
       cursor: pointer; border: 1.5px solid #E2E8F0; background: #fff;
       color: var(--text-secondary); transition: all 0.15s;
     }
-    .coin-tab.active {
-      background: var(--accent-blue); color: #fff; border-color: var(--accent-blue);
-    }
+    .coin-tab.active { background: var(--accent-blue); color: #fff; border-color: var(--accent-blue); }
     .coin-tab:hover:not(.active) { border-color: var(--accent-blue); color: var(--accent-blue); }
 
-    /* ── Order Book Depth ────────────────────────────────────── */
-    .depth-legend {
-      display: flex; gap: 20px; justify-content: center;
-      font-size: 12px; margin-bottom: 8px;
-    }
+    /* ── Order Book Depth ─────────────────────────────────────── */
+    .depth-legend { display: flex; gap: 20px; justify-content: center; font-size: 12px; margin-bottom: 8px; }
     .depth-legend span { display: flex; align-items: center; gap: 6px; }
     .leg-dot { width: 10px; height: 10px; border-radius: 50%; }
 
-    /* ── Flow Metric Tiles ───────────────────────────────────── */
+    /* ── Flow Metrics ─────────────────────────────────────────── */
     .flow-metrics { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
-    .flow-tile {
-      background: #F8FAFC; border-radius: var(--radius-sm);
-      padding: 14px; text-align: center;
-    }
+    .flow-tile { background: #F8FAFC; border-radius: var(--radius-sm); padding: 14px; text-align: center; }
     .flow-tile-label { font-size: 10px; text-transform: uppercase; font-weight: 700; letter-spacing: 0.5px; color: var(--text-secondary); margin-bottom: 6px; }
-    .flow-tile-val   { font-size: 18px; font-weight: 800; }
+    .flow-tile-val   { font-size: 22px; font-weight: 800; }
     .flow-tile-sub   { font-size: 11px; color: var(--text-secondary); margin-top: 3px; }
     .positive { color: #22C55E; }
     .negative { color: #EF4444; }
     .neutral  { color: #F59E0B; }
 
-    /* ── Walls Table ─────────────────────────────────────────── */
-    .walls-table {
-      width: 100%; border-collapse: collapse; font-size: 13px;
-    }
-    .walls-table th {
-      text-align: left; font-size: 10px; text-transform: uppercase;
-      letter-spacing: 0.5px; color: var(--text-secondary); font-weight: 700;
-      padding: 0 10px 8px; border-bottom: 1px solid #E2E8F0;
-    }
-    .walls-table td {
-      padding: 10px; border-bottom: 1px solid #F8FAFC; font-weight: 500;
-    }
+    /* ── Walls Table ──────────────────────────────────────────── */
+    .walls-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    .walls-table th { text-align: left; font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-secondary); font-weight: 700; padding: 0 10px 8px; border-bottom: 1px solid #E2E8F0; }
+    .walls-table td { padding: 10px; border-bottom: 1px solid #F8FAFC; font-weight: 500; }
     .wall-bid { color: #22C55E; font-weight: 700; }
     .wall-ask { color: #EF4444; font-weight: 700; }
     .wall-mult { font-size: 11px; background: #F0F4F8; padding: 2px 6px; border-radius: 4px; }
     .no-walls { text-align: center; padding: 24px; color: var(--text-secondary); font-size: 13px; }
 
-    /* ── Flow Heatmap ────────────────────────────────────────── */
-    .flow-grid {
-      display: grid; grid-template-columns: repeat(auto-fill, minmax(90px, 1fr));
-      gap: 8px;
-    }
+    /* ── Flow Heatmap ─────────────────────────────────────────── */
+    .flow-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(90px, 1fr)); gap: 8px; }
     .flow-tile-coin {
       border-radius: var(--radius-sm); padding: 12px 8px; text-align: center;
-      font-size: 12px; font-weight: 700; cursor: pointer;
-      transition: transform 0.15s;
+      font-size: 12px; font-weight: 700; cursor: pointer; transition: transform 0.15s;
     }
     .flow-tile-coin:hover { transform: scale(1.05); }
     .flow-tile-coin .ftc-sym { font-size: 13px; font-weight: 800; }
@@ -224,32 +205,41 @@
     .fc-sell        { background: #FFF7ED; color: #C2410C; }
     .fc-strong-sell { background: #FEF2F2; color: #DC2626; }
 
-    /* ── Source Pills ────────────────────────────────────────── */
-    .source-pills { display: flex; gap: 6px; flex-wrap: wrap; }
-    .src-pill {
-      font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 20px;
-      background: #F0F4F8; color: var(--text-secondary);
-    }
+    /* ── Radar + Score ────────────────────────────────────────── */
+    .conv-factor-bar { display: flex; align-items: center; gap: 8px; padding: 4px 0; }
+    .conv-factor-name { font-size: 11px; font-weight: 600; color: var(--text-secondary); width: 100px; flex-shrink: 0; text-align: right; }
+    .conv-factor-bg { flex: 1; height: 10px; background: #F0F4F8; border-radius: 4px; overflow: hidden; }
+    .conv-factor-fill { height: 100%; border-radius: 4px; transition: width 0.6s ease; }
+    .conv-factor-pts { font-size: 11px; font-weight: 700; width: 36px; text-align: right; flex-shrink: 0; }
 
-    /* ── Responsive ──────────────────────────────────────────── */
+    /* ── Source Pills ─────────────────────────────────────────── */
+    .source-pills { display: flex; gap: 6px; flex-wrap: wrap; }
+    .src-pill { font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 20px; background: #F0F4F8; color: var(--text-secondary); }
+
+    /* ── Responsive ───────────────────────────────────────────── */
     @media (max-width: 900px) {
+      .intel-cmdbar { flex-wrap: wrap; }
+      .cmdbar-item  { min-width: calc(33% - 8px); border-right: none; border-bottom: 1px solid #F0F4F8; }
       .intel-grid-3 { grid-template-columns: 1fr 1fr; }
       .intel-grid-2 { grid-template-columns: 1fr; }
       .flow-metrics { grid-template-columns: repeat(2, 1fr); }
+      .funding-grid { grid-template-columns: repeat(auto-fill, minmax(90px, 1fr)); }
     }
     @media (max-width: 600px) {
       .intel-grid-3, .intel-grid-2 { grid-template-columns: 1fr; }
       .intel-section { padding: 0 16px 24px; }
-      .intel-hero { padding: 16px 16px 0; }
-      .intel-hero h1 { font-size: 18px; } /* Smaller font on mobile */
-      .refresh-row { padding: 8px 16px 16px; flex-wrap: wrap; }
-      .depth-legend { gap: 10px; }
-      /* Override ticker size on mobile */
-      .ticker-item { font-size: 11px !important; padding: 0 12px !important; }
+      .intel-hero    { padding: 16px 16px 0; }
+      .refresh-row   { padding: 8px 16px 16px; }
+      .intel-cmdbar  { margin: 0 16px 16px; }
     }
   </style>
 </head>
-<body style="overflow-x: hidden; width: 100%;">
+<body>
+
+  <!-- ═══ Ticker Tape ═══ -->
+  <div class="ticker-tape">
+    <div class="ticker-track" id="tickerTrack"></div>
+  </div>
 
   <!-- ═══ Header ═══ -->
   <header class="header">
@@ -260,13 +250,13 @@
       </div>
     </div>
     <nav class="header-nav">
-      <a href="/" class="nav-link">Dashboard</a>
-      <a href="/tradebook" class="nav-link">Tradebook</a>
-      <a href="/charts" class="nav-link">Charts</a>
-      <a href="/backtest" class="nav-link">Backtest</a>
-      <a href="/deploy" class="nav-link">Deploy</a>
+      <a href="/"            class="nav-link">Dashboard</a>
+      <a href="/tradebook"   class="nav-link">Tradebook</a>
+      <a href="/charts"      class="nav-link">Charts</a>
+      <a href="/backtest"    class="nav-link">Backtest</a>
+      <a href="/deploy"      class="nav-link">Deploy</a>
       <a href="/intelligence" class="nav-link active">Intelligence</a>
-      <a href="/settings" class="nav-link">Settings</a>
+      <a href="/settings"    class="nav-link">Settings</a>
     </nav>
     <div class="header-right">
       <span class="timestamp" id="lastUpdate">Loading...</span>
@@ -278,10 +268,56 @@
   </header>
 
   <!-- ═══ Page Hero ═══ -->
-  <div class="intel-hero" style="justify-content: flex-end; align-items: center;">
-    <!-- Refresh controls removed -->
+  <div class="intel-hero">
+    <div>
+      <div style="display:flex;align-items:center;gap:10px;">
+        <h1>Market Intelligence</h1>
+        <span class="intel-badge">LIVE</span>
+      </div>
+      <div class="hero-sub">Sentiment surveillance · Order flow microstructure · Funding rates · Live news — across all tracked coins</div>
+    </div>
   </div>
 
+  <div class="refresh-row">
+    <button class="btn-refresh" id="btnRefresh" onclick="refreshAll()">
+      <span id="refreshIcon">↻</span> Refresh Now
+    </button>
+    <span class="refresh-ts" id="refreshTs">Auto-refresh every 30s</span>
+  </div>
+
+  <!-- ═══ Intel Command Bar ═══ -->
+  <div class="intel-cmdbar" id="intelCmdBar">
+    <div class="cmdbar-item">
+      <div class="cmdbar-label">BTC Price</div>
+      <div class="cmdbar-val" id="cbBTC">$—</div>
+      <div class="cmdbar-sub" id="cbBTCRegime">Regime: —</div>
+    </div>
+    <div class="cmdbar-item">
+      <div class="cmdbar-label">Fear &amp; Greed</div>
+      <div class="cmdbar-val" id="cbFG">—</div>
+      <div class="cmdbar-sub" id="cbFGLabel">Loading…</div>
+    </div>
+    <div class="cmdbar-item">
+      <div class="cmdbar-label">Market Sentiment</div>
+      <div class="cmdbar-val" id="cbBias">—</div>
+      <div class="cmdbar-sub" id="cbBiasLabel">Avg across coins</div>
+    </div>
+    <div class="cmdbar-item">
+      <div class="cmdbar-label">Active Positions</div>
+      <div class="cmdbar-val" id="cbPositions">—</div>
+      <div class="cmdbar-sub" id="cbPosDetail">paper + live</div>
+    </div>
+    <div class="cmdbar-item">
+      <div class="cmdbar-label">Top Conviction</div>
+      <div class="cmdbar-val" id="cbTopConv">—</div>
+      <div class="cmdbar-sub" id="cbTopConvDetail">highest score</div>
+    </div>
+    <div class="cmdbar-item">
+      <div class="cmdbar-label">Sentiment Alerts</div>
+      <div class="cmdbar-val" id="cbAlert" style="color:#EF4444;">None</div>
+      <div class="cmdbar-sub" id="cbAlertDetail">hack/exploit/rug</div>
+    </div>
+  </div>
 
   <!-- ════════════════════════════════════════════════════════════ -->
   <!--  SECTION 1: SENTIMENT INTELLIGENCE                          -->
@@ -291,249 +327,255 @@
       <div class="section-icon sent">📰</div>
       <div>
         <div class="section-title">Sentiment Intelligence</div>
+        <div class="section-sub">VADER NLP · RSS · Reddit · CryptoPanic · Fear &amp; Greed Index</div>
       </div>
-      <!-- Alert Banner (Moved Here) -->
-
     </div>
 
-    <!-- Row 1: Fear & Greed + Market Bias + Per-Coin Scores -->
+    <!-- Row 1: F&G + Market Bias + Source -->
     <div class="intel-grid intel-grid-3" style="margin-bottom:16px;">
 
-      <!-- Column 1: Signals + Bias (Merged Full Height) -->
-      <div class="icard" style="grid-row: span 3; display: flex; flex-direction: column; min-height: 400px;">
-        <div class="icard-title">Market Sentiment &amp; Signals</div>
-        <div
-          style="display:flex; flex-direction:row; justify-content:space-between; align-items:flex-start; gap:8px; margin-bottom:16px;">
-          <!-- Left: Fear & Greed -->
-          <div style="flex:1; display:flex; flex-direction:column; align-items:center; min-width:0;">
-            <div style="font-size:10px; font-weight:600; color:#64748B; margin-bottom:6px; width:100%;">Fear & Greed</div>
-            <div class="fg-wrap" style="transform:scale(0.85); transform-origin:center top; margin-bottom:-10px;">
-              <div class="fg-arc">
-                    <svg viewBox="0 0 160 80" width="140" height="70">
-                      <path d="M 10 80 A 70 70 0 0 1 46 17" stroke="#DC2626" stroke-width="10" fill="none" stroke-linecap="round" />
-                      <path d="M 46 17 A 70 70 0 0 1 80 10" stroke="#F59E0B" stroke-width="10" fill="none" stroke-linecap="round" />
-                      <path d="M 80 10 A 70 70 0 0 1 114 17" stroke="#84CC16" stroke-width="10" fill="none" stroke-linecap="round" />
-                      <path d="M 114 17 A 70 70 0 0 1 150 80" stroke="#22C55E" stroke-width="10" fill="none" stroke-linecap="round" />
-                      <text x="12" y="72" font-size="8" fill="#DC2626" font-weight="700">Fear</text>
-                      <text x="128" y="72" font-size="8" fill="#22C55E" font-weight="700">Greed</text>
-                    </svg>
-                    <div class="fg-needle" id="fgNeedle"></div>
-                    </div>
-                    <div class="fg-value" id="fgValue">—</div>
-                    <div class="fg-label" id="fgLabel">Loading...</div>
-                  <div style="font-size:10px;color:var(--text-secondary);margin-top:2px;" id="fgSub"></div>
-                  </div>
-                  </div>
-                  <!-- Vertical Divider -->
-                  <div style="width:1px; background:#F1F5F9; align-self:stretch; margin:0 4px;"></div>
-                  
-                  <!-- Right: Signal Sources -->
-                  <div style="flex:1.2; min-width:0;">
-                    <div style="font-size:10px; font-weight:600; color:#64748B; margin-bottom:8px;">Signal Sources</div>
-                    <div id="sourceTable" style="display:flex; flex-direction:column; gap:6px;">
-                      <!-- Populated by JS -->
-                    </div>
-                    <div id="sourceStats" style="text-align:left; font-size:10px; color:var(--text-secondary); margin-top:8px;">
-                      Analyzing...
-                    </div>
-                    </div>
-                  </div>
-                  <!-- Divider -->
-                  <div style="height:1px; background:#F1F5F9; margin-bottom:16px;"></div>
-                  
-                  <!-- Market Bias Section -->
-                  <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
-                    <div class="icard-title" style="margin-bottom:0;">Market Sentiment Bias</div>
-                    <div class="bias-val" id="biasVal" style="margin-top:0;">—</div>
-                  </div>
-                  <div class="bias-labels"><span>Bearish -1</span><span>0</span><span>Bullish +1</span></div>
-                  <div class="bias-meter">
-                    <div class="bias-fill" id="biasFill" style="width:50%;background:#E2E8F0;"></div>
-                  </div>
-            <div style="margin-top:16px; border-top:1px solid #F1F5F9; padding-top:12px; flex:1;">
-              <div class="icard-title" style="margin-bottom:8px; font-size:10px;">AI Confidence Levels</div>
-              <div id="convictionTable" style="display:flex; flex-direction:column; gap:6px; overflow-y:auto; flex:1;">
-                <!-- Populated by JS -->
-              </div>
-            </div>
-
+      <!-- Fear & Greed Gauge -->
+      <div class="icard">
+        <div class="icard-title">Market Fear &amp; Greed Index</div>
+        <div class="fg-wrap">
+          <div class="fg-arc">
+            <svg viewBox="0 0 160 80" width="160" height="80">
+              <path d="M 10 80 A 70 70 0 0 1 46 17" stroke="#DC2626" stroke-width="10" fill="none" stroke-linecap="round"/>
+              <path d="M 46 17 A 70 70 0 0 1 80 10" stroke="#F59E0B" stroke-width="10" fill="none" stroke-linecap="round"/>
+              <path d="M 80 10 A 70 70 0 0 1 114 17" stroke="#84CC16" stroke-width="10" fill="none" stroke-linecap="round"/>
+              <path d="M 114 17 A 70 70 0 0 1 150 80" stroke="#22C55E" stroke-width="10" fill="none" stroke-linecap="round"/>
+              <text x="12" y="72" font-size="8" fill="#DC2626" font-weight="700">Fear</text>
+              <text x="128" y="72" font-size="8" fill="#22C55E" font-weight="700">Greed</text>
+            </svg>
+            <div class="fg-needle" id="fgNeedle"></div>
+          </div>
+          <div class="fg-value" id="fgValue">—</div>
+          <div class="fg-label" id="fgLabel">Loading...</div>
+          <div style="font-size:11px;color:var(--text-secondary);margin-top:4px;" id="fgSub"></div>
+          <!-- 7-day history mini-chart -->
+          <div style="margin-top:12px;width:100%;">
+            <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-secondary);margin-bottom:6px;text-align:center;">7-Day History</div>
+            <canvas id="fgHistChart" height="55"></canvas>
+          </div>
+        </div>
       </div>
-      <!-- Per-coin sentiment bars (Moved from Row 2, Spans 3 Rows) -->
-      <div class="icard" style="grid-row: span 3; display: flex; flex-direction: column; min-height: 400px;">
-        <div class="icard-title">Per-Coin Sentiment Scores</div>
-        <div class="sent-bar-wrap" id="sentBars" style="flex: 1; overflow-y: auto; max-height: 800px; height: 100%;">
-          <!-- Increased max-height -->
+
+      <!-- Market Bias -->
+      <div class="icard">
+        <div class="icard-title">Market Sentiment Bias</div>
+        <div class="bias-val" id="biasVal">—</div>
+        <div class="bias-labels"><span>Bearish -1</span><span>0</span><span>Bullish +1</span></div>
+        <div class="bias-meter">
+          <div class="bias-fill" id="biasFill" style="width:50%;background:#E2E8F0;"></div>
+        </div>
+        <div style="margin-top:16px;">
+          <div class="icard-title" style="margin-bottom:8px;">Conviction Distribution</div>
+          <canvas id="convictionDist" height="60"></canvas>
+        </div>
+        <div style="margin-top:16px;">
+          <div class="icard-title" style="margin-bottom:8px;">Sentiment vs Regime Quality</div>
+          <canvas id="sentVsRegime" height="80"></canvas>
+        </div>
+      </div>
+
+      <!-- Signal Sources -->
+      <div class="icard">
+        <div class="icard-title">Signal Sources</div>
+        <canvas id="sourceChart" height="130"></canvas>
+        <div class="source-pills" id="sourcePills" style="margin-top:12px;"></div>
+        <div style="margin-top:16px;">
+          <div class="icard-title" style="margin-bottom:8px;">Hourly Buzz Volume</div>
+          <canvas id="buzzChart" height="70"></canvas>
+        </div>
+      </div>
+    </div>
+
+    <!-- Alert Banner -->
+    <div class="alert-banner hidden" id="alertBanner">
+      <span class="alert-icon">🚨</span>
+      <div>
+        <div class="alert-text" id="alertText">SENTIMENT ALERT DETECTED</div>
+        <div style="font-size:11px;color:#991B1B;margin-top:2px;" id="alertDetail"></div>
+      </div>
+    </div>
+
+    <!-- Row 2: Per-coin bars + Sentiment Timeline -->
+    <div class="intel-grid intel-grid-2" style="margin-top:16px;">
+      <div class="icard">
+        <div class="icard-title">Per-Coin Sentiment Scores <span style="font-weight:400;color:var(--text-secondary);font-size:10px;">click to view order book</span></div>
+        <div class="sent-bar-wrap" id="sentBars">
           <div style="color:var(--text-secondary);font-size:13px;padding:20px 0;text-align:center;">
             Waiting for bot analysis cycle…
           </div>
         </div>
-        <div
-          style="margin-top:12px; font-size:10px; color:var(--text-secondary); text-align:center; padding-top:8px; border-top:1px solid #F8FAFC;">
-          Score: <span style="color:#EF4444">-1 (Bearish)</span> to <span style="color:#22C55E">+1 (Bullish)</span>
-        </div>
       </div>
-
-      <!-- Live Market Insights (Moved to Second Pos, Spans 3 Rows) -->
-      <div class="icard" style="grid-row: span 3; display: flex; flex-direction: column; min-height: 400px;">
-        <div class="icard-title">Live Market Insights</div>
-        <div id="insightsArea"
-          style="flex: 1; overflow-y:auto; font-size:12px; color:var(--text-primary); line-height:1.6; height: 100%;">
-          <div style="text-align:center; color:var(--text-secondary); padding-top:40px;">
-            Analyzing market structure...
-          </div>
-        </div>
+      <div class="icard">
+        <div class="icard-title">Sentiment Timeline (Last 24h)</div>
+        <canvas id="sentTimeline" height="150"></canvas>
         <div style="font-size:11px;color:var(--text-secondary);margin-top:8px;text-align:center;" id="timelineNote">
-          Generated from HMM Regime & Confidence Data
+          Accumulates from <code>sentiment_log.csv</code> as the bot runs
         </div>
-        </div>
-
-
       </div>
+    </div>
+
+    <!-- Row 3: Live News Feed -->
+    <div class="icard" style="margin-top:16px;">
+      <div class="icard-title">Live Crypto News Feed
+        <span style="font-weight:400;color:var(--text-secondary);font-size:10px;margin-left:8px;">
+          CoinTelegraph · CoinDesk · Decrypt · CryptoSlate — cached 5 min
+        </span>
+        <span style="float:right;font-size:10px;color:var(--text-secondary);" id="newsFetchTs"></span>
       </div>
+      <div id="newsFeed" style="max-height:360px;overflow-y:auto;">
+        <div style="text-align:center;color:var(--text-secondary);padding:28px;">Loading news…</div>
+      </div>
+    </div>
+  </div>
 
   <!-- ════════════════════════════════════════════════════════════ -->
+  <!--  SECTION 2: FUNDING RATES & OPEN INTEREST                   -->
   <!-- ════════════════════════════════════════════════════════════ -->
-  <!--  SECTION 2: ORDER FLOW INTELLIGENCE                         -->
+  <div class="intel-section">
+    <div class="section-header">
+      <div class="section-icon fund">💹</div>
+      <div>
+        <div class="section-title">Funding Rates &amp; Open Interest</div>
+        <div class="section-sub">Binance Futures perpetual swap rates · OI trend · Smart-money signals</div>
+      </div>
+    </div>
+
+    <!-- Funding rate tiles (all coins) -->
+    <div class="funding-grid" id="fundingGrid">
+      <div style="color:var(--text-secondary);font-size:13px;padding:16px;text-align:center;">Loading…</div>
+    </div>
+
+    <!-- OI trend + Funding history charts side-by-side -->
+    <div class="intel-grid intel-grid-2">
+      <div class="icard">
+        <div class="icard-title">Open Interest Trend — <span id="oiCoinLabel">BTCUSDT</span>
+          <span style="font-size:10px;color:var(--text-secondary);margin-left:6px;">last 4h × 15m bars</span>
+        </div>
+        <canvas id="oiChart" height="130"></canvas>
+        <div style="font-size:11px;color:var(--text-secondary);margin-top:6px;text-align:center;" id="oiNote">
+          Rising OI + price up = strong trend confirmation
+        </div>
+      </div>
+      <div class="icard">
+        <div class="icard-title">Funding Rate Insight</div>
+        <div id="fundingInsight" style="padding:8px 0;">
+          <div style="color:var(--text-secondary);font-size:13px;text-align:center;">Loading…</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ════════════════════════════════════════════════════════════ -->
+  <!--  SECTION 3: ORDER FLOW INTELLIGENCE                         -->
   <!-- ════════════════════════════════════════════════════════════ -->
   <div class="intel-section">
     <div class="section-header">
       <div class="section-icon flow">📊</div>
       <div>
         <div class="section-title">Order Flow Intelligence</div>
-        <div class="section-sub">Real-time L2 Data & Whale Activity (Values Only)</div>
+        <div class="section-sub">L2 Order Book · Taker Buy/Sell · Cumulative Delta · Long/Short Ratio · Binance Public API</div>
       </div>
     </div>
 
     <!-- Coin selector -->
     <div class="coin-tabs" id="coinTabs"></div>
 
-    <!-- Main Grid: Metrics + Walls + AI Analysis -->
-    <div class="intel-grid" style="display:grid; grid-template-columns: repeat(3, 1fr); gap:16px; margin-bottom:16px;">
-      <!-- 1. Text Metrics Card -->
+    <!-- Main row: depth chart + metrics -->
+    <div class="intel-grid intel-grid-2" style="margin-bottom:16px;">
+      <!-- Order book depth -->
       <div class="icard">
-          <div class="icard-title">Microstructure Values — <span id="metricsCoinLabel">BTCUSDT</span></div>
-          
-          <div style="display:grid; grid-template-columns: 1fr 1fr; gap:16px;">
-            <!-- Imbalance -->
-            <div
-              style="background:#F8FAFC; padding:12px; border-radius:6px; display:flex; flex-direction:column; justify-content:space-between;">
-              <div>
-                <div style="font-size:10px; color:#64748B; text-transform:uppercase; font-weight:700;">Book Imbalance</div>
-                <div id="mBookImb" style="font-size:20px; font-weight:800; margin-top:4px;">—</div>
-                <div style="font-size:11px; color:#64748B;">Bids vs Asks</div>
-              </div>
-                    <div
-                      style="margin-top:8px; padding-top:8px; border-top:1px solid #E2E8F0; font-size:10px; color:#64748B; line-height:1.4;">
-                      <strong>Pos (+):</strong> More Buy Limits (Support)<br>
-                      <strong>Neg (-):</strong> More Sell Limits (Resistance)
-                    </div>
-                    </div>
+        <div class="icard-title">Live Order Book Depth — <span id="depthCoinLabel">BTCUSDT</span></div>
+        <div class="depth-legend">
+          <span><span class="leg-dot" style="background:#22C55E;"></span>Bids (Buy orders)</span>
+          <span><span class="leg-dot" style="background:#EF4444;"></span>Asks (Sell orders)</span>
+        </div>
+        <canvas id="depthChart" height="200"></canvas>
+        <div style="font-size:11px;color:var(--text-secondary);margin-top:6px;text-align:center;" id="depthMidLabel"></div>
+      </div>
 
-                <!-- Delta -->
-                <div
-                  style="background:#F8FAFC; padding:12px; border-radius:6px; display:flex; flex-direction:column; justify-content:space-between;">
-                  <div>
-                    <div style="font-size:10px; color:#64748B; text-transform:uppercase; font-weight:700;">Cum Delta</div>
-                    <div id="mDelta" style="font-size:20px; font-weight:800; margin-top:4px;">—</div>
-                    <div style="font-size:11px; color:#64748B;">Net Buying (USD)</div>
-                  </div>
-                  <div
-                    style="margin-top:8px; padding-top:8px; border-top:1px solid #E2E8F0; font-size:10px; color:#64748B; line-height:1.4;">
-                    <strong>Green:</strong> Aggressive buying > selling.<br>
-                    Confirms upward price moves.
-                  </div>
-                </div>
+      <!-- Flow metrics -->
+      <div class="icard">
+        <div class="icard-title">Microstructure Metrics — <span id="metricsCoinLabel">BTCUSDT</span></div>
+        <div class="flow-metrics" id="flowMetrics">
+          <div class="flow-tile"><div class="flow-tile-label">Book Imbalance</div><div class="flow-tile-val" id="mBookImb">—</div><div class="flow-tile-sub">Bids vs Asks</div></div>
+          <div class="flow-tile"><div class="flow-tile-label">Taker Buy %</div><div class="flow-tile-val" id="mTaker">—</div><div class="flow-tile-sub">Aggressor side</div></div>
+          <div class="flow-tile"><div class="flow-tile-label">Cum Delta</div><div class="flow-tile-val" id="mDelta">—</div><div class="flow-tile-sub">Net buy flow</div></div>
+          <div class="flow-tile"><div class="flow-tile-label">L/S Ratio</div><div class="flow-tile-val" id="mLS">—</div><div class="flow-tile-sub">Longs vs Shorts</div></div>
+        </div>
 
-                <!-- Taker Flow -->
-                <div style="background:#F8FAFC; padding:12px; border-radius:6px; grid-column: span 2;">
-                  <div style="font-size:10px; color:#64748B; text-transform:uppercase; font-weight:700;">Taker Flow Distribution</div>
-                  <div style="display:flex; justify-content:space-between; align-items:flex-end; margin-top:4px;">
-                    <div style="text-align:left;">
-                      <div id="takerBuyPct" style="font-size:18px; font-weight:800; color:#22C55E;">—%</div>
-                      <div style="font-size:10px; color:#64748B;">Buy Volume</div>
-                    </div>
-                    <div style="text-align:right;">
-                      <div id="takerSellPct" style="font-size:18px; font-weight:800; color:#EF4444;">—%</div>
-                      <div style="font-size:10px; color:#64748B;">Sell Volume</div>
-                    </div>
-                  </div>
-                  <div
-                    style="margin-top:8px; padding-top:8px; border-top:1px solid #E2E8F0; font-size:10px; color:#64748B; line-height:1.4;">
-                    <strong>>50% Buy:</strong> Aggressors are lifting offers (Bullish).<br>
-                    <strong>>50% Sell:</strong> Aggressors are hitting bids (Bearish).
-                  </div>
-                </div>
-                </div>
-                </div>
-                  <!-- 2. Static Order Book Table -->
-                  <div class="icard">
-                    <div class="icard-title">High-Liquidity Levels — <span id="wallsCoinLabel">BTCUSDT</span></div>
-                    <div id="wallsBody" style="height:200px; overflow:hidden;">
-                      <!-- Populated by JS -->
-                      <div class="no-walls">Waiting for L2 data...</div>
-                    </div>
-                  <div
-                    style="margin-top:12px; padding-top:10px; border-top:1px solid var(--border-light); font-size:10px; color:var(--text-tertiary); display:flex; flex-direction:column; gap:6px;">
-                    <div style="display:flex; justify-content:space-between;">
-                      <span><strong>Static View</strong>: Top 5 Bids vs Asks</span>
-                      <span>Values exclude wash trades</span>
-                    </div>
-                <div style="font-size:10px; color:#64748B; background:#F8FAFC; padding:6px; border-radius:4px; line-height:1.4;">
-                  <strong>Insight:</strong> Large <span style="color:#22C55E;font-weight:700;">Bids</span> act as floors (bounces
-                  likely).
-                  Large <span style="color:#EF4444;font-weight:700;">Asks</span> are ceilings.
-                  Smashing a wall with volume = Breakout.
-                </div>
-                </div>
-                </div>
+        <!-- Taker flow bar -->
+        <div style="margin-top:20px;">
+          <div class="icard-title" style="margin-bottom:8px;">Taker Flow Balance</div>
+          <div style="height:24px;border-radius:6px;overflow:hidden;display:flex;position:relative;">
+            <div id="takerBuyBar"  style="height:100%;background:linear-gradient(90deg,#22C55E,#16A34A);border-radius:6px 0 0 6px;transition:width 0.6s ease;"></div>
+            <div id="takerSellBar" style="height:100%;background:linear-gradient(90deg,#F87171,#DC2626);border-radius:0 6px 6px 0;transition:width 0.6s ease;"></div>
+          </div>
+          <div style="display:flex;justify-content:space-between;font-size:11px;margin-top:4px;">
+            <span style="color:#22C55E;font-weight:700;" id="takerBuyPct">—% Buy</span>
+            <span style="color:#EF4444;font-weight:700;" id="takerSellPct">—% Sell</span>
+          </div>
+        </div>
 
-            <!-- AI Order Flow Analysis (Next to High-Liquidity) -->
-            <div class="icard">
-              <div class="icard-title">AI Order Flow Analysis — <span id="insightCoinLabel">BTCUSDT</span></div>
-              <div id="orderFlowInsights" style="font-size:13px; color:var(--text-primary); line-height:1.6;">
-                <div style="color:var(--text-secondary); font-style:italic;">Waiting for order flow data...</div>
-              </div>
-            </div>
-
+        <!-- L/S gauge -->
+        <div style="margin-top:18px;">
+          <div class="icard-title" style="margin-bottom:8px;">Long/Short Ratio History</div>
+          <canvas id="lsChart" height="80"></canvas>
+        </div>
+      </div>
     </div>
 
+    <!-- Bid/Ask Walls -->
+    <div class="icard" style="margin-bottom:16px;">
+      <div class="icard-title">Detected Order Walls — <span id="wallsCoinLabel">BTCUSDT</span>
+        <span style="font-size:10px;color:var(--text-secondary);margin-left:8px;">
+          Wall = resting order ≥ 3× average level size &amp; ≥ $50,000 notional
+        </span>
+      </div>
+      <div id="wallsBody">
+        <div class="no-walls">Select a coin and refresh to detect walls</div>
+      </div>
+    </div>
 
-      </div>
-      </div>
+    <!-- 8-Factor Conviction Radar + Score -->
+    <div class="intel-grid intel-grid-2" style="margin-bottom:16px;">
+      <div class="icard">
+        <div class="icard-title">8-Factor Conviction Radar — <span id="radarCoinLabel">—</span></div>
+        <canvas id="convictionRadar" height="240"></canvas>
+        <div style="font-size:10px;color:var(--text-secondary);margin-top:8px;text-align:center;line-height:1.6;">
+          HMM Confidence · BTC Macro · Funding Rate · S/R+VWAP · Open Interest · Volatility · Sentiment · Order Flow
         </div>
-        <!-- ════════════════════════════════════════════════════════════ -->
-        <!--  SECTION 3: SYSTEM KERNEL                                   -->
-        <!-- ════════════════════════════════════════════════════════════ -->
-        <div class="intel-section">
-          <div class="section-header">
-            <div class="section-icon kernel" style="background: linear-gradient(135deg, #10B98122, #05966922);">📟</div>
-            <div>
-              <div class="section-title">System Kernel</div>
-              <div class="section-sub">Live Bot Logs · HMM Training Status · Error Stream</div>
       </div>
+      <div class="icard">
+        <div class="icard-title">Composite Conviction Score — <span id="scoreCompLabel">—</span></div>
+        <div style="text-align:center;padding:16px 0 8px;">
+          <div style="font-size:60px;font-weight:900;line-height:1;" id="convScoreVal">—</div>
+          <div style="font-size:14px;color:var(--text-secondary);margin-top:6px;" id="convScoreLabel">No data</div>
+          <div style="font-size:16px;font-weight:800;margin-top:10px;" id="convLeverage">Leverage: —</div>
+        </div>
+        <div id="convFactorBars" style="margin-top:8px;"></div>
       </div>
+    </div>
 
-  <div class="icard" style="padding:0; overflow:hidden; background:#0F172A;">
-    <div class="icard-title" style="padding:16px 20px 0; color:#94A3B8;">Live Kernel Output</div>
-    <div id="kernelLog" style="
-                                                      height: 250px;
-                                                      overflow-y: auto;
-                                                      padding: 16px 20px;
-                                                      font-family: 'Courier New', Courier, monospace;
-                                                      font-size: 12px;
-                                                      color: #10B981;
-                                                      background: #0F172A;
-                                                      white-space: pre-wrap;
-                                                      line-height: 1.4;
-                                                    ">
-      <div style="color:#64748B;">// Waiting for kernel stream...</div>
+    <!-- All-coin flow heatmap -->
+    <div class="icard">
+      <div class="icard-title">Order Flow Heatmap — All Tracked Coins
+        <span style="font-size:10px;color:var(--text-secondary);margin-left:8px;">Updated from last bot analysis cycle</span>
+      </div>
+      <div class="flow-grid" id="flowHeatmap">
+        <div style="color:var(--text-secondary);font-size:13px;padding:16px;grid-column:1/-1;text-align:center;">
+          Waiting for bot analysis cycle…
+        </div>
+      </div>
     </div>
   </div>
-</div>
 
   <!-- Spacer -->
   <div style="height:40px;"></div>
 
-  <script src="/intelligence-app.js?v=5"></script>
+  <script src="/intelligence-app.js"></script>
 </body>
 </html>
