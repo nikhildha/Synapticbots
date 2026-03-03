@@ -271,20 +271,6 @@
                 </div>
             </div>
 
-            <!-- ─── Engine Controls ─── -->
-            <div class="section-header">
-                <h2>Engine Controls</h2>
-                <span class="line"></span>
-            </div>
-            <div class="controls-bar" style="margin-bottom:16px;">
-                <button class="btn" id="tbEngineToggleBtn" onclick="tbToggleEngine()"
-                    style="background:linear-gradient(135deg,#22C55E,#16A34A); min-width:160px; font-weight:700;">
-                    ▶️ Start Engine
-                </button>
-                <button class="btn btn-refresh" onclick="tbTriggerCycle()">⚡ Run Cycle</button>
-                <button class="btn btn-refresh" onclick="refreshData()">🔄 Refresh</button>
-            </div>
-
         </div> <!-- /paperSection -->
 
         <!-- ═══ LIVE TRADE SECTION (completely independent) ═══ -->
@@ -456,42 +442,12 @@
     <script src="/mode-toggle.js"></script>
     <script src="/tradebook-app.js"></script>
     <script>
-        // ─── Tradebook: Engine Controls ──────────────────────────
+        // ─── Tradebook: Socket Listeners ──────────────────────────
         (function () {
             const sock = typeof io !== 'undefined' ? io() : null;
             if (!sock) return;
 
-            let tbEngineRunning = true;
-
-            function updateTbEngineBtn() {
-                const btn = document.getElementById('tbEngineToggleBtn');
-                if (!btn) return;
-                if (tbEngineRunning) {
-                    btn.innerHTML = 'Pause Engine';
-                    btn.style.background = 'linear-gradient(135deg,#F59E0B,#D97706)';
-                } else {
-                    btn.innerHTML = 'Start Engine';
-                    btn.style.background = 'linear-gradient(135deg,#22C55E,#16A34A)';
-                }
-            }
-
-            window.tbToggleEngine = function () {
-                tbEngineRunning = !tbEngineRunning;
-                sock.emit('toggle-engine', tbEngineRunning);
-                updateTbEngineBtn();
-            };
-
-            window.tbTriggerCycle = function () {
-                sock.emit('trigger-cycle');
-            };
-
-            // Check initial pause state
-            fetch('/api/status').then(r => r.json()).then(d => {
-                tbEngineRunning = d.botActive !== false;
-                updateTbEngineBtn();
-            }).catch(() => { });
-
-            // Also re-render live tab when tradebook data updates via socket
+            // Re-render live tab when tradebook data updates via socket
             sock.on('multi-state', () => {
                 if (typeof activeTradeTab !== 'undefined' && activeTradeTab === 'LIVE') {
                     renderLiveTab();

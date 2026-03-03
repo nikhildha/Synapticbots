@@ -615,6 +615,23 @@
             </div>
         </div>
 
+        <!-- ────── Engine Controls ────── -->
+        <div class="settings-card">
+            <h3>Engine Controls</h3>
+            <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+                <button class="btn-save" id="engineToggleBtn" onclick="toggleEngine()"
+                    style="background:linear-gradient(135deg,#22C55E,#16A34A);color:#fff;min-width:160px;font-weight:700;border:none;padding:10px 20px;border-radius:10px;font-size:13px;cursor:pointer;">
+                    Start Engine
+                </button>
+                <button onclick="triggerCycle()"
+                    style="background:#F1F5F9;border:1px solid #E2E8F0;border-radius:10px;padding:10px 20px;font-size:13px;font-weight:600;color:#334155;cursor:pointer;">
+                    Run Cycle
+                </button>
+                <span id="engineStatusText" style="font-size:12px;color:#94A3B8;margin-left:8px;">Checking
+                    status…</span>
+            </div>
+        </div>
+
         <!-- ────── Bot Kernel Logs ────── -->
         <div class="settings-card">
             <h3><span class="icon">📋</span> Bot Kernel — Live Logs</h3>
@@ -664,7 +681,53 @@
                     if (all.length > 500) logArea.textContent = all.slice(-500).join('\n');
                     logArea.scrollTop = logArea.scrollHeight;
                 });
+
+                // Listen for engine status updates
+                sock.on('engine-status', (data) => {
+                    if (data.active !== undefined) {
+                        engineRunning = data.active;
+                        updateEngineBtn();
+                    }
+                });
             }
+
+            // ─── Engine Controls ──────────────────────────────────────
+            let engineRunning = true;
+            const engineBtn = document.getElementById('engineToggleBtn');
+            const engineStatus = document.getElementById('engineStatusText');
+
+            function updateEngineBtn() {
+                if (!engineBtn) return;
+                if (engineRunning) {
+                    engineBtn.textContent = 'Pause Engine';
+                    engineBtn.style.background = 'linear-gradient(135deg,#F59E0B,#D97706)';
+                    if (engineStatus) engineStatus.innerHTML = '<span style="color:#22C55E;">● Engine Running</span>';
+                } else {
+                    engineBtn.textContent = 'Start Engine';
+                    engineBtn.style.background = 'linear-gradient(135deg,#22C55E,#16A34A)';
+                    if (engineStatus) engineStatus.innerHTML = '<span style="color:#EF4444;">● Engine Paused</span>';
+                }
+            }
+
+            window.toggleEngine = function () {
+                engineRunning = !engineRunning;
+                if (sock) sock.emit('toggle-engine', engineRunning);
+                updateEngineBtn();
+            };
+
+            window.triggerCycle = function () {
+                if (sock) sock.emit('trigger-cycle');
+                if (engineStatus) {
+                    engineStatus.innerHTML = '<span style="color:#3B82F6;">⚡ Cycle triggered!</span>';
+                    setTimeout(() => updateEngineBtn(), 2000);
+                }
+            };
+
+            // Check initial engine state
+            fetch('/api/status').then(r => r.json()).then(d => {
+                engineRunning = d.botActive !== false;
+                updateEngineBtn();
+            }).catch(() => { updateEngineBtn(); });
 
             // Load current settings from server
             fetch('/api/config').then(r => r.json()).then(cfg => {
