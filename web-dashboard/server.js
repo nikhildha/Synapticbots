@@ -2074,5 +2074,22 @@ server.listen(PORT, () => {
     console.log(`  📂 Watching data directory: ${DATA_DIR}`);
     console.log(`  🔌 WebSocket ready for real-time updates`);
     console.log(`  ⚡ Live price ticker: 10-second updates\n`);
+
+    // Auto-start the Python engine in production (Railway)
+    const isProduction = process.env.RAILWAY_ENVIRONMENT || process.env.RAILWAY_SERVICE_ID;
+    if (isProduction) {
+        const currentState = getEngineState();
+        if (currentState.status !== 'running') {
+            console.log('[Engine] 🚀 Auto-starting engine (production environment detected)...');
+            const result = startEngine();
+            if (result.success) {
+                console.log(`[Engine] ✅ Engine auto-started (PID: ${result.state.pid})`);
+            } else {
+                console.error(`[Engine] ❌ Auto-start failed: ${result.error}`);
+            }
+        } else {
+            console.log('[Engine] ℹ️ Engine already running, skipping auto-start');
+        }
+    }
 });
 

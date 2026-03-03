@@ -501,42 +501,42 @@
             }
 
             window.toggleEngine = function () {
-                engineRunning = !engineRunning;
-                updateEngineBtn();
-                // Use HTTP API (reliable on prod) + socket (fallback)
-                fetch('/api/bot/toggle', {
+                if (engineStatus) engineStatus.innerHTML = '<span style="color:#3B82F6;">⏳ Toggling…</span>';
+                // Use /api/engine/toggle which actually spawns/kills main.py
+                fetch('/api/engine/toggle', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ active: engineRunning })
+                    headers: { 'Content-Type': 'application/json' }
                 }).then(r => r.json()).then(d => {
-                    if (d.success) {
-                        if (engineStatus) engineStatus.innerHTML = engineRunning
-                            ? '<span style="color:#22C55E;">● Engine Running</span>'
-                            : '<span style="color:#EF4444;">● Engine Paused</span>';
+                    if (d.success && d.state) {
+                        engineRunning = d.state.status === 'running';
+                    } else {
+                        engineRunning = !engineRunning;
                     }
+                    updateEngineBtn();
                 }).catch(err => {
                     console.error('Toggle failed:', err);
                     if (engineStatus) engineStatus.innerHTML = '<span style="color:#EF4444;">⚠ Toggle failed</span>';
                 });
-                if (sock) sock.emit('toggle-engine', engineRunning);
             };
 
             window.triggerCycle = function () {
-                fetch('/api/bot/toggle', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ active: true })
-                }).catch(() => { });
+                if (engineStatus) engineStatus.innerHTML = '<span style="color:#3B82F6;">⚡ Triggering cycle…</span>';
+                fetch('/api/engine/toggle', { method: 'POST' })
+                    .then(r => r.json())
+                    .then(d => {
+                        if (d.state) engineRunning = d.state.status === 'running';
+                        updateEngineBtn();
+                        if (engineStatus) {
+                            engineStatus.innerHTML = '<span style="color:#3B82F6;">⚡ Cycle triggered!</span>';
+                            setTimeout(() => updateEngineBtn(), 2000);
+                        }
+                    }).catch(() => { });
                 if (sock) sock.emit('trigger-cycle');
-                if (engineStatus) {
-                    engineStatus.innerHTML = '<span style="color:#3B82F6;">⚡ Cycle triggered!</span>';
-                    setTimeout(() => updateEngineBtn(), 2000);
-                }
             };
 
-            // Check initial engine state
-            fetch('/api/status').then(r => r.json()).then(d => {
-                engineRunning = d.botActive !== false;
+            // Check initial engine state from the real process tracker
+            fetch('/api/engine/state').then(r => r.json()).then(d => {
+                engineRunning = d.status === 'running';
                 updateEngineBtn();
             }).catch(() => { updateEngineBtn(); });
 
