@@ -55,9 +55,10 @@ export async function GET() {
 
         return NextResponse.json({
             state: {
-                regime: multi.macro_regime || 'WAITING',
-                confidence: 0,
+                regime: multi.macro_regime || coinStates?.BTCUSDT?.regime || 'WAITING',
+                confidence: coinStates?.BTCUSDT?.confidence || 0,
                 symbol: 'BTCUSDT',
+                btc_price: coinStates?.BTCUSDT?.price || null,
                 timestamp: multi.last_analysis_time || null,
             },
             multi: {

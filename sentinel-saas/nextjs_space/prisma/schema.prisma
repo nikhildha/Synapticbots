@@ -22,6 +22,7 @@ model User {
   updatedAt         DateTime           @updatedAt
   role              String             @default("user")
   referralCode      String?
+  phone             String?
   
   subscription      Subscription?
   bots              Bot[]

@@ -11,7 +11,7 @@ interface Trade {
   confidence: number; leverage: number; capital: number;
   entryPrice: number; currentPrice?: number | null;
   exitPrice?: number | null; stopLoss: number; takeProfit: number;
-  slType: string; targetType: string; status: string; mode?: string;
+  slType: string; targetType?: string | null; status: string; mode?: string;
   activePnl: number; activePnlPercent: number;
   totalPnl: number; totalPnlPercent: number;
   exitPercent?: number | null; exitReason?: string | null;
@@ -51,8 +51,8 @@ function mapTrade(t: any): Trade {
     totalPnlPercent: t.realized_pnl_pct || t.pnl_pct || t.totalPnlPercent || 0,
     exitPercent: t.exit_percent || null,
     exitReason: t.exit_reason || t.exitReason || null,
-    entryTime: t.entry_time || t.entryTime || t.timestamp || new Date().toISOString(),
-    exitTime: t.exit_time || t.exitTime || null,
+    entryTime: t.entry_time || t.entry_timestamp || t.entryTime || t.timestamp || new Date().toISOString(),
+    exitTime: t.exit_time || t.exit_timestamp || t.exitTime || null,
     botName: 'SM-Standard',
   };
 }
@@ -296,120 +296,6 @@ export function TradesClient({ trades: initialTrades }: TradesClientProps) {
             </div>
           </motion.div>
 
-          {/* ═══ P&L Timeline + BTC Price ═══ */}
-          {(() => {
-            const closed = (trades ?? [])
-              .filter(t => (t.status || '').toLowerCase() !== 'active' && t.exitTime)
-              .sort((a, b) => new Date(a.exitTime!).getTime() - new Date(b.exitTime!).getTime());
-            if (closed.length < 2) return null;
-
-            let cum = 0;
-            const pnlData = closed.map(t => {
-              cum += t.totalPnl || 0;
-              return { time: new Date(t.exitTime!).getTime(), value: cum, trade: t };
-            });
-            const minV = Math.min(0, ...pnlData.map(p => p.value));
-            const maxV = Math.max(0, ...pnlData.map(p => p.value));
-            const pnlRange = maxV - minV || 1;
-
-            // BTC price data aligned to the trade timeline
-            const timeStart = pnlData[0].time;
-            const timeEnd = pnlData[pnlData.length - 1].time;
-            const btcInRange = btcPrices.filter(b => b.time >= timeStart - 86400000 && b.time <= timeEnd + 86400000);
-            const btcMin = btcInRange.length > 0 ? Math.min(...btcInRange.map(b => b.price)) : 0;
-            const btcMax = btcInRange.length > 0 ? Math.max(...btcInRange.map(b => b.price)) : 1;
-            const btcRange = btcMax - btcMin || 1;
-
-            const W = 900, H = 200, PADL = 55, PADR = 65, PADT = 20, PADB = 30;
-            const chartW = W - PADL - PADR;
-            const chartH = H - PADT - PADB;
-
-            const toX = (time: number) => PADL + ((time - timeStart) / (timeEnd - timeStart || 1)) * chartW;
-            const toYPnl = (v: number) => PADT + (1 - (v - minV) / pnlRange) * chartH;
-            const toYBtc = (v: number) => PADT + (1 - (v - btcMin) / btcRange) * chartH;
-            const zeroY = toYPnl(0);
-
-            const pnlLine = pnlData.map((p, i) => `${toX(p.time)},${toYPnl(p.value)}`).join(' ');
-            const areaPath = `M${toX(pnlData[0].time)},${zeroY} L${pnlData.map(p => `${toX(p.time)},${toYPnl(p.value)}`).join(' L')} L${toX(pnlData[pnlData.length - 1].time)},${zeroY} Z`;
-            const btcLine = btcInRange.length > 1 ? btcInRange.map(b => `${toX(b.time)},${toYBtc(b.price)}`).join(' ') : '';
-
-            const lastPnl = pnlData[pnlData.length - 1].value;
-            const pnlColor2 = lastPnl >= 0 ? '#22C55E' : '#EF4444';
-
-            // Date labels
-            const dateLabels = [pnlData[0], pnlData[Math.floor(pnlData.length / 2)], pnlData[pnlData.length - 1]];
-
-            // Gridlines
-            const gridLines = [minV, minV + pnlRange * 0.25, minV + pnlRange * 0.5, minV + pnlRange * 0.75, maxV];
-
-            return (
-              <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.08 }} className="mb-6">
-                <Card>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-                      <div style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '1px', color: '#6B7280' }}>
-                        P&L Timeline
-                      </div>
-                      <div style={{ display: 'flex', gap: '16px', fontSize: '10px' }}>
-                        <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                          <span style={{ width: '12px', height: '3px', background: pnlColor2, borderRadius: '2px', display: 'inline-block' }} />
-                          <span style={{ color: '#9CA3AF' }}>Cumulative P&L</span>
-                        </span>
-                        {btcLine && (
-                          <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                            <span style={{ width: '12px', height: '3px', background: '#06B6D4', borderRadius: '2px', display: 'inline-block' }} />
-                            <span style={{ color: '#9CA3AF' }}>BTC Price</span>
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                    <div style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
-                      <div style={{ fontSize: '14px', fontWeight: 700, color: pnlColor2 }}>{fmt$(lastPnl)} USD</div>
-                      {btcInRange.length > 0 && (
-                        <div style={{ fontSize: '12px', fontWeight: 600, color: '#06B6D4' }}>
-                          BTC ${btcInRange[btcInRange.length - 1].price.toLocaleString()}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                  <svg viewBox={`0 0 ${W} ${H}`} style={{ width: '100%', height: '200px' }}>
-                    {/* Gridlines */}
-                    {gridLines.map((v, i) => (
-                      <line key={i} x1={PADL} y1={toYPnl(v)} x2={W - PADR} y2={toYPnl(v)} stroke="rgba(255,255,255,0.05)" strokeDasharray="3,3" />
-                    ))}
-                    {/* Zero line */}
-                    <line x1={PADL} y1={zeroY} x2={W - PADR} y2={zeroY} stroke="rgba(255,255,255,0.15)" strokeDasharray="4,4" />
-                    {/* PNL area + line */}
-                    <path d={areaPath} fill={pnlColor2} fillOpacity="0.06" />
-                    <polyline points={pnlLine} fill="none" stroke={pnlColor2} strokeWidth="2" strokeLinejoin="round" />
-                    <circle cx={toX(pnlData[pnlData.length - 1].time)} cy={toYPnl(lastPnl)} r="3.5" fill={pnlColor2} />
-                    {/* BTC price line (right axis) */}
-                    {btcLine && (
-                      <polyline points={btcLine} fill="none" stroke="#06B6D4" strokeWidth="1.5" strokeLinejoin="round" strokeOpacity="0.6" />
-                    )}
-                    {/* Left Y-axis labels (PNL) */}
-                    <text x={PADL - 6} y={toYPnl(maxV) + 4} fontSize="9" fill="#6B7280" textAnchor="end">{fmt$(maxV)}</text>
-                    <text x={PADL - 6} y={zeroY + 4} fontSize="9" fill="#9CA3AF" textAnchor="end">$0</text>
-                    <text x={PADL - 6} y={toYPnl(minV) + 4} fontSize="9" fill="#6B7280" textAnchor="end">{fmt$(minV)}</text>
-                    {/* Right Y-axis labels (BTC) */}
-                    {btcInRange.length > 0 && (
-                      <>
-                        <text x={W - PADR + 6} y={toYBtc(btcMax) + 4} fontSize="9" fill="#06B6D4" textAnchor="start">${(btcMax / 1000).toFixed(1)}k</text>
-                        <text x={W - PADR + 6} y={toYBtc(btcMin) + 4} fontSize="9" fill="#06B6D4" textAnchor="start">${(btcMin / 1000).toFixed(1)}k</text>
-                      </>
-                    )}
-                    {/* Date labels */}
-                    {dateLabels.map((p, i) => (
-                      <text key={i} x={toX(p.time)} y={H - 6} fontSize="9" fill="#6B7280" textAnchor="middle">
-                        {new Date(p.time).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                      </text>
-                    ))}
-                  </svg>
-                </Card>
-              </motion.div>
-            );
-          })()}
-
           {/* ═══ Filter Bar ═══ */}
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className="mb-6">
             <Card>
@@ -518,7 +404,7 @@ export function TradesClient({ trades: initialTrades }: TradesClientProps) {
 
                         return (
                           <tr key={t.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
-                            <td style={{ padding: '10px', color: '#8B5CF6', fontWeight: 600, fontSize: '12px' }}>
+                            <td style={{ padding: '10px', color: '#0891B2', fontWeight: 600, fontSize: '12px' }}>
                               SM-Standard
                             </td>
                             <td style={{ padding: '10px', textAlign: 'center' }}>
@@ -655,7 +541,7 @@ export function TradesClient({ trades: initialTrades }: TradesClientProps) {
                 background: 'linear-gradient(135deg, rgba(139,92,246,0.08) 0%, rgba(6,182,212,0.06) 100%)',
                 borderBottom: '1px solid rgba(255,255,255,0.06)',
               }}>
-                <h2 style={{ fontSize: '20px', fontWeight: 700, color: '#8B5CF6', margin: 0 }}>Bot Performance</h2>
+                <h2 style={{ fontSize: '20px', fontWeight: 700, color: '#0891B2', margin: 0 }}>Bot Performance</h2>
                 <p style={{ fontSize: '13px', color: '#6B7280', marginTop: '4px' }}>Performance metrics and risk analysis</p>
               </div>
               <div style={{ padding: '20px 24px' }}>
@@ -689,7 +575,7 @@ export function TradesClient({ trades: initialTrades }: TradesClientProps) {
                       };
                       return (
                         <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
-                          <td style={{ padding: '14px', color: '#8B5CF6', fontWeight: 700, fontSize: '14px' }}>SM-Standard</td>
+                          <td style={{ padding: '14px', color: '#0891B2', fontWeight: 700, fontSize: '14px' }}>SM-Standard</td>
                           <td style={{ padding: '14px', textAlign: 'center', color: '#D1D5DB', fontSize: '12px' }}>{fmtDate(firstEntry)}</td>
                           <td style={{ padding: '14px', textAlign: 'center', color: '#D1D5DB', fontSize: '12px' }}>{fmtDate(lastClosed)}</td>
                           <td style={{ padding: '14px', textAlign: 'center', fontWeight: 700, color: '#F0F4F8', fontSize: '15px' }}>{stats.total}</td>
@@ -717,6 +603,106 @@ export function TradesClient({ trades: initialTrades }: TradesClientProps) {
               </div>
             </div>
           </motion.div>
+
+          {/* ═══ P&L Timeline + BTC Price ═══ */}
+          {(() => {
+            const closed = (trades ?? [])
+              .filter(t => (t.status || '').toLowerCase() !== 'active' && t.exitTime)
+              .sort((a, b) => new Date(a.exitTime!).getTime() - new Date(b.exitTime!).getTime());
+            if (closed.length < 1) return null;
+
+            let cum = 0;
+            const pnlData = closed.map(t => {
+              cum += t.totalPnl || 0;
+              return { time: new Date(t.exitTime!).getTime(), value: cum, trade: t };
+            });
+            const minV = Math.min(0, ...pnlData.map(p => p.value));
+            const maxV = Math.max(0, ...pnlData.map(p => p.value));
+            const pnlRange = maxV - minV || 1;
+
+            const timeStart = pnlData[0].time;
+            const timeEnd = pnlData[pnlData.length - 1].time;
+            const btcInRange = btcPrices.filter(b => b.time >= timeStart - 86400000 && b.time <= timeEnd + 86400000);
+            const btcMin = btcInRange.length > 0 ? Math.min(...btcInRange.map(b => b.price)) : 0;
+            const btcMax = btcInRange.length > 0 ? Math.max(...btcInRange.map(b => b.price)) : 1;
+            const btcRange = btcMax - btcMin || 1;
+
+            const W = 900, H = 200, PADL = 55, PADR = 65, PADT = 20, PADB = 30;
+            const chartW = W - PADL - PADR;
+            const chartH = H - PADT - PADB;
+
+            const toX = (time: number) => PADL + ((time - timeStart) / (timeEnd - timeStart || 1)) * chartW;
+            const toYPnl = (v: number) => PADT + (1 - (v - minV) / pnlRange) * chartH;
+            const toYBtc = (v: number) => PADT + (1 - (v - btcMin) / btcRange) * chartH;
+            const zeroY = toYPnl(0);
+
+            const pnlLine = pnlData.map((p) => `${toX(p.time)},${toYPnl(p.value)}`).join(' ');
+            const areaPath = `M${toX(pnlData[0].time)},${zeroY} L${pnlData.map(p => `${toX(p.time)},${toYPnl(p.value)}`).join(' L')} L${toX(pnlData[pnlData.length - 1].time)},${zeroY} Z`;
+            const btcLine = btcInRange.length > 1 ? btcInRange.map(b => `${toX(b.time)},${toYBtc(b.price)}`).join(' ') : '';
+
+            const lastPnl = pnlData[pnlData.length - 1].value;
+            const pnlColor2 = lastPnl >= 0 ? '#22C55E' : '#EF4444';
+            const dateLabels = [pnlData[0], pnlData[Math.floor(pnlData.length / 2)], pnlData[pnlData.length - 1]];
+            const gridLines = [minV, minV + pnlRange * 0.25, minV + pnlRange * 0.5, minV + pnlRange * 0.75, maxV];
+
+            return (
+              <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.25 }} className="mt-8">
+                <Card>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+                      <div style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '1px', color: '#6B7280' }}>P&L Timeline</div>
+                      <div style={{ display: 'flex', gap: '16px', fontSize: '10px' }}>
+                        <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                          <span style={{ width: '12px', height: '3px', background: pnlColor2, borderRadius: '2px', display: 'inline-block' }} />
+                          <span style={{ color: '#9CA3AF' }}>Cumulative P&L</span>
+                        </span>
+                        {btcLine && (
+                          <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                            <span style={{ width: '12px', height: '3px', background: '#06B6D4', borderRadius: '2px', display: 'inline-block' }} />
+                            <span style={{ color: '#9CA3AF' }}>BTC Price</span>
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    <div style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
+                      <div style={{ fontSize: '14px', fontWeight: 700, color: pnlColor2 }}>{fmt$(lastPnl)} USD</div>
+                      {btcInRange.length > 0 && (
+                        <div style={{ fontSize: '12px', fontWeight: 600, color: '#06B6D4' }}>
+                          BTC ${btcInRange[btcInRange.length - 1].price.toLocaleString()}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  <svg viewBox={`0 0 ${W} ${H}`} style={{ width: '100%', height: '200px' }}>
+                    {gridLines.map((v, i) => (
+                      <line key={i} x1={PADL} y1={toYPnl(v)} x2={W - PADR} y2={toYPnl(v)} stroke="rgba(255,255,255,0.05)" strokeDasharray="3,3" />
+                    ))}
+                    <line x1={PADL} y1={zeroY} x2={W - PADR} y2={zeroY} stroke="rgba(255,255,255,0.15)" strokeDasharray="4,4" />
+                    <path d={areaPath} fill={pnlColor2} fillOpacity="0.06" />
+                    <polyline points={pnlLine} fill="none" stroke={pnlColor2} strokeWidth="2" strokeLinejoin="round" />
+                    <circle cx={toX(pnlData[pnlData.length - 1].time)} cy={toYPnl(lastPnl)} r="3.5" fill={pnlColor2} />
+                    {btcLine && (
+                      <polyline points={btcLine} fill="none" stroke="#06B6D4" strokeWidth="1.5" strokeLinejoin="round" strokeOpacity="0.6" />
+                    )}
+                    <text x={PADL - 6} y={toYPnl(maxV) + 4} fontSize="9" fill="#6B7280" textAnchor="end">{fmt$(maxV)}</text>
+                    <text x={PADL - 6} y={zeroY + 4} fontSize="9" fill="#9CA3AF" textAnchor="end">$0</text>
+                    <text x={PADL - 6} y={toYPnl(minV) + 4} fontSize="9" fill="#6B7280" textAnchor="end">{fmt$(minV)}</text>
+                    {btcInRange.length > 0 && (
+                      <>
+                        <text x={W - PADR + 6} y={toYBtc(btcMax) + 4} fontSize="9" fill="#06B6D4" textAnchor="start">${(btcMax / 1000).toFixed(1)}k</text>
+                        <text x={W - PADR + 6} y={toYBtc(btcMin) + 4} fontSize="9" fill="#06B6D4" textAnchor="start">${(btcMin / 1000).toFixed(1)}k</text>
+                      </>
+                    )}
+                    {dateLabels.map((p, i) => (
+                      <text key={i} x={toX(p.time)} y={H - 6} fontSize="9" fill="#6B7280" textAnchor="middle">
+                        {new Date(p.time).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                      </text>
+                    ))}
+                  </svg>
+                </Card>
+              </motion.div>
+            );
+          })()}
 
         </div>
       </main>

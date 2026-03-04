@@ -63,8 +63,8 @@ export default async function TradesPage() {
         totalPnlPercent: t.realized_pnl_pct || t.pnl_pct || t.totalPnlPercent || 0,
         exitPercent: t.exit_percent || null,
         exitReason: t.exit_reason || t.exitReason || null,
-        entryTime: t.entry_time || t.entryTime || t.timestamp || new Date().toISOString(),
-        exitTime: t.exit_time || t.exitTime || null,
+        entryTime: t.entry_time || t.entry_timestamp || t.entryTime || t.timestamp || new Date().toISOString(),
+        exitTime: t.exit_time || t.exit_timestamp || t.exitTime || null,
         botName: 'Sentinel Marshal',
         targetType: t.target_type || t.targetType || null,
       }))}

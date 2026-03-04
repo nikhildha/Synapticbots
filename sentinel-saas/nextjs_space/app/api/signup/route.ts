@@ -8,7 +8,7 @@ export const dynamic = 'force-dynamic';
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { email, password, confirmPassword, name, referralCode } = body;
+    const { email, password, confirmPassword, name, referralCode, phone } = body;
 
     if (!email || !password || !name) {
       return NextResponse.json(
@@ -44,6 +44,7 @@ export async function POST(request: Request) {
         name,
         password: hashedPassword,
         referralCode: referralCode || null,
+        phone: phone || null,
       },
     });
 

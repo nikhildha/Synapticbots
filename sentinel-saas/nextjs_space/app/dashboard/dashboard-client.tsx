@@ -48,6 +48,7 @@ export function DashboardClient({ user, stats, bots, recentTrades }: DashboardCl
   const [botState, setBotState] = useState<BotState | null>(null);
   const [lastRefresh, setLastRefresh] = useState('');
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [feedHealth, setFeedHealth] = useState<any>(null);
 
   const fetchBotState = useCallback(async () => {
     try {
@@ -69,6 +70,30 @@ export function DashboardClient({ user, stats, bots, recentTrades }: DashboardCl
     setMounted(true);
     fetchBotState();
     const interval = setInterval(fetchBotState, 15000); // refresh every 15s
+
+    // Fetch feed health for admin
+    if ((user as any)?.role === 'admin') {
+      const fetchHealth = async () => {
+        try {
+          const [liveRes, fgRes] = await Promise.all([
+            fetch('/api/live-market', { cache: 'no-store' }),
+            fetch('https://api.alternative.me/fng/?limit=1'),
+          ]);
+          setFeedHealth({
+            liveMarket: liveRes.ok ? 'ok' : 'error',
+            liveMarketTime: new Date().toISOString(),
+            fearGreed: fgRes.ok ? 'ok' : 'error',
+            fearGreedTime: new Date().toISOString(),
+          });
+        } catch {
+          setFeedHealth({ liveMarket: 'error', fearGreed: 'error' });
+        }
+      };
+      fetchHealth();
+      const healthInterval = setInterval(fetchHealth, 60000);
+      return () => { clearInterval(interval); clearInterval(healthInterval); };
+    }
+
     return () => clearInterval(interval);
   }, [fetchBotState]);
 
@@ -297,7 +322,7 @@ export function DashboardClient({ user, stats, bots, recentTrades }: DashboardCl
               </div>
 
               {liveTrades.length > 0 ? (
-                <div style={{ overflowX: 'auto', maxHeight: '620px', overflowY: 'auto', padding: '0' }}>
+                <div style={{ overflowX: 'auto', maxHeight: '480px', overflowY: 'auto', padding: '0' }}>
                   <table style={{ width: '100%', minWidth: '1200px', borderCollapse: 'collapse', fontSize: '12px' }}>
                     <thead>
                       <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
@@ -319,7 +344,7 @@ export function DashboardClient({ user, stats, bots, recentTrades }: DashboardCl
                           const tb = b.entry_time || b.entryTime || b.timestamp || '';
                           return tb.localeCompare(ta); // latest first
                         })
-                        .slice(0, 50)
+                        .slice(0, 10)
                         .map((trade: any, i: number) => {
                           const sym = (trade.symbol || trade.coin || '').replace('USDT', '');
                           const side = (trade.side || trade.position || '').toUpperCase();
@@ -347,7 +372,7 @@ export function DashboardClient({ user, stats, bots, recentTrades }: DashboardCl
                               onMouseEnter={(e) => (e.currentTarget.style.background = 'rgba(6,182,212,0.04)')}
                               onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
                             >
-                              <td style={{ padding: '10px 14px', color: '#8B5CF6', fontWeight: 600, fontSize: '11px' }}>
+                              <td style={{ padding: '10px 14px', color: '#0891B2', fontWeight: 600, fontSize: '11px' }}>
                                 SM-Standard
                               </td>
                               <td style={{ padding: '10px 14px', fontWeight: 700, color: '#F0F4F8' }}>{sym}</td>
@@ -434,6 +459,79 @@ export function DashboardClient({ user, stats, bots, recentTrades }: DashboardCl
           </motion.div>
         </div>
       </main>
+
+      {/* ═══ Admin: Data Feed Health ═══ */}
+      {(user as any)?.role === 'admin' && (
+        <div className="max-w-7xl mx-auto px-4 pb-12">
+          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.4 }}>
+            <div style={{
+              background: 'rgba(17, 24, 39, 0.85)', backdropFilter: 'blur(16px)',
+              border: '1px solid rgba(245,158,11,0.2)', borderRadius: '16px', overflow: 'hidden',
+            }}>
+              <div style={{
+                padding: '16px 24px',
+                background: 'linear-gradient(135deg, rgba(245,158,11,0.08) 0%, rgba(239,68,68,0.04) 100%)',
+                borderBottom: '1px solid rgba(255,255,255,0.06)',
+              }}>
+                <h2 style={{ fontSize: '18px', fontWeight: 700, color: '#F59E0B', margin: 0 }}>🛡️ Data Feed Health</h2>
+                <p style={{ fontSize: '12px', color: '#6B7280', marginTop: '2px' }}>Admin-only monitoring of external data sources</p>
+              </div>
+              <div style={{ padding: '20px 24px', display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '16px' }}>
+                {[
+                  {
+                    name: 'Engine Cycle',
+                    status: botState?.multi?.cycle ? 'ok' : 'waiting',
+                    detail: botState?.multi?.cycle ? `Cycle #${botState.multi.cycle}` : 'No cycles yet',
+                    sub: botState?.multi?.timestamp ? `Last: ${new Date(botState.multi.timestamp).toLocaleTimeString()}` : 'Waiting…',
+                  },
+                  {
+                    name: 'Binance API',
+                    status: feedHealth?.liveMarket || 'checking',
+                    detail: feedHealth?.liveMarket === 'ok' ? 'Connected' : 'Error',
+                    sub: 'Funding rates & prices',
+                  },
+                  {
+                    name: 'Fear & Greed',
+                    status: feedHealth?.fearGreed || 'checking',
+                    detail: feedHealth?.fearGreed === 'ok' ? 'Connected' : 'Error',
+                    sub: 'alternative.me API',
+                  },
+                  {
+                    name: 'Coin Scanner',
+                    status: (botState?.multi?.coins_scanned || 0) > 0 ? 'ok' : 'waiting',
+                    detail: `${botState?.multi?.coins_scanned || 0} coins`,
+                    sub: `${botState?.multi?.eligible_count || 0} eligible`,
+                  },
+                  {
+                    name: 'Tradebook',
+                    status: (botState?.tradebook?.trades?.length || 0) > 0 ? 'ok' : 'waiting',
+                    detail: `${botState?.tradebook?.trades?.length || 0} trades`,
+                    sub: 'tradebook.json',
+                  },
+                ].map(feed => {
+                  const color = feed.status === 'ok' ? '#22C55E' : feed.status === 'error' ? '#EF4444' : '#F59E0B';
+                  return (
+                    <div key={feed.name} style={{
+                      background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)',
+                      borderRadius: '12px', padding: '16px', textAlign: 'center',
+                    }}>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', marginBottom: '8px' }}>
+                        <div style={{
+                          width: '8px', height: '8px', borderRadius: '50%', background: color,
+                          boxShadow: `0 0 8px ${color}44`,
+                        }} />
+                        <span style={{ fontSize: '11px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.8px', color: '#9CA3AF' }}>{feed.name}</span>
+                      </div>
+                      <div style={{ fontSize: '16px', fontWeight: 700, color }}>{feed.detail}</div>
+                      <div style={{ fontSize: '10px', color: '#6B7280', marginTop: '4px' }}>{feed.sub}</div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </motion.div>
+        </div>
+      )}
     </div>
   );
 }

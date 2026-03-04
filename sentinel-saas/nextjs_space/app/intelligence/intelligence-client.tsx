@@ -59,6 +59,7 @@ function SectionHeader({ icon, title, sub }: { icon: React.ReactNode; title: str
 export function IntelligenceClient() {
     const [data, setData] = useState<any>(null);
     const [fearGreed, setFearGreed] = useState<any>(null);
+    const [liveMarket, setLiveMarket] = useState<any>(null);
     const [lastRefresh, setLastRefresh] = useState('');
     const [isRefreshing, setIsRefreshing] = useState(false);
 
@@ -84,27 +85,64 @@ export function IntelligenceClient() {
         } catch { /* silent */ }
     }, []);
 
+    const fetchLiveMarket = useCallback(async () => {
+        try {
+            const res = await fetch('/api/live-market', { cache: 'no-store' });
+            if (res.ok) {
+                const d = await res.json();
+                setLiveMarket(d);
+            }
+        } catch { /* silent */ }
+    }, []);
+
     useEffect(() => {
         fetchData();
         fetchFearGreed();
+        fetchLiveMarket();
         const interval = setInterval(fetchData, 15000);
-        return () => clearInterval(interval);
-    }, [fetchData, fetchFearGreed]);
+        const liveInterval = setInterval(fetchLiveMarket, 30000);
+        return () => { clearInterval(interval); clearInterval(liveInterval); };
+    }, [fetchData, fetchFearGreed, fetchLiveMarket]);
 
     const multi = data?.multi || {};
     const state = data?.state || {};
     const coinStates = multi?.coin_states || {};
-    const coins = Object.values(coinStates) as any[];
+    const liveFunding = liveMarket?.funding || {};
+
+    // Merge live Binance data into coin states
+    const coins = Object.values(coinStates).map((c: any) => {
+        const sym = c.symbol || '';
+        const live = liveFunding[sym] || {};
+        return {
+            ...c,
+            // Merge live funding rate if engine data missing/zero
+            features: {
+                ...c.features,
+                funding: c.features?.funding || live.funding_rate || 0,
+                oi_change: c.features?.oi_change || 0,
+            },
+            // Use engine sentiment if available, else 0
+            sentiment: c.sentiment ?? 0,
+            // Use engine orderflow if available, else derive from live data
+            orderflow: c.orderflow ?? 0,
+            // Enrich with live mark/index price
+            mark_price: live.mark_price || c.price || 0,
+        };
+    }) as any[];
     const trades = data?.tradebook?.trades || [];
     const activePositions = multi?.active_positions || {};
     const activeCount = Object.keys(activePositions).length;
 
     // Compute aggregates
     const avgSentiment = coins.length > 0
-        ? coins.reduce((s: number, c: any) => s + (c.sentiment_score || 0), 0) / coins.length
+        ? coins.reduce((s: number, c: any) => s + (c.sentiment || c.sentiment_score || 0), 0) / coins.length
         : 0;
     const topConviction = coins.length > 0
-        ? coins.reduce((best: any, c: any) => (!best || (c.confidence || 0) > (best.confidence || 0)) ? c : best, null)
+        ? coins.reduce((best: any, c: any) => {
+            const conf = c.confidence || c.conviction || 0;
+            const bestConf = best ? (best.confidence || best.conviction || 0) : 0;
+            return conf > bestConf ? c : best;
+        }, null)
         : null;
 
     return (
@@ -118,7 +156,7 @@ export function IntelligenceClient() {
                         <div className="flex items-center justify-between">
                             <div>
                                 <div className="flex items-center gap-3">
-                                    <h1 className="text-3xl font-bold">Market Intelligence</h1>
+                                    <h1 className="text-3xl font-bold" style={{ color: '#0891B2' }}>Market Intelligence</h1>
                                     <span style={{
                                         fontSize: '10px', fontWeight: 700, padding: '3px 10px',
                                         borderRadius: '20px', background: 'rgba(34, 197, 94, 0.2)',
@@ -205,7 +243,10 @@ function CommandBar({ state, fearGreed, avgSentiment, activeCount, topConviction
     const biasColor = avgSentiment > 0.1 ? '#22C55E' : avgSentiment < -0.1 ? '#EF4444' : '#F59E0B';
 
     const topConvVal = topConviction
-        ? (topConviction.confidence <= 1 ? (topConviction.confidence * 100).toFixed(0) : topConviction.confidence.toFixed(0)) + '%'
+        ? (() => {
+            const c = topConviction.confidence || topConviction.conviction || 0;
+            return (c <= 1 ? (c * 100).toFixed(0) : c.toFixed(0)) + '%';
+        })()
         : '—';
     const topConvName = topConviction?.symbol?.replace('USDT', '') || '';
 
@@ -327,7 +368,7 @@ function PerCoinSentiment({ coins }: { coins: any[] }) {
                         Waiting for bot analysis cycle…
                     </div>
                 ) : sorted.map((c: any) => {
-                    const score = c.sentiment_score || 0;
+                    const score = c.sentiment || c.sentiment_score || 0;
                     const pct = ((score + 1) / 2) * 100;
                     const color = score > 0.1 ? '#22C55E' : score < -0.1 ? '#EF4444' : '#F59E0B';
                     return (
@@ -442,9 +483,11 @@ function OrderFlowTable({ coins }: { coins: any[] }) {
                         {sorted.map((c: any) => {
                             const of = c.order_flow || {};
                             const fmt = (v: any, d = 3) => v != null ? Number(v).toFixed(d) : '—';
-                            const takerBuy = of.taker_buy_pct != null ? (of.taker_buy_pct * 100).toFixed(1) : '—';
-                            const takerColor = (of.taker_buy_pct || 0.5) > 0.55 ? '#22C55E' : (of.taker_buy_pct || 0.5) < 0.45 ? '#EF4444' : '#6B7280';
-                            const signal = of.signal || c.order_flow_signal || '—';
+                            // Use top-level orderflow if order_flow obj is empty
+                            const takerBuyRaw = of.taker_buy_pct || null;
+                            const takerBuy = takerBuyRaw != null ? (takerBuyRaw * 100).toFixed(1) : '—';
+                            const takerColor = (takerBuyRaw || 0.5) > 0.55 ? '#22C55E' : (takerBuyRaw || 0.5) < 0.45 ? '#EF4444' : '#6B7280';
+                            const signal = of.signal || c.order_flow_signal || (c.orderflow != null ? (c.orderflow > 0.05 ? 'BULLISH' : c.orderflow < -0.05 ? 'BEARISH' : 'NEUTRAL') : '—');
                             const sigColor = signal.toLowerCase().includes('bull') ? '#22C55E' : signal.toLowerCase().includes('bear') ? '#EF4444' : '#6B7280';
 
                             return (
