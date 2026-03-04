@@ -49,6 +49,9 @@ export function Header() {
                 <Link href="/intelligence" className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)] transition-colors">
                   Intelligence
                 </Link>
+                <Link href="/howto" className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)] transition-colors">
+                  How To?
+                </Link>
                 <Link href="/account" className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)] transition-colors">
                   Account
                 </Link>
@@ -104,6 +107,9 @@ export function Header() {
                 </Link>
                 <Link href="/intelligence" className="block text-[var(--color-text-secondary)] hover:text-[var(--color-primary)] transition-colors">
                   Intelligence
+                </Link>
+                <Link href="/howto" className="block text-[var(--color-text-secondary)] hover:text-[var(--color-primary)] transition-colors">
+                  How To?
                 </Link>
                 <Link href="/account" className="block text-[var(--color-text-secondary)] hover:text-[var(--color-primary)] transition-colors">
                   Account
