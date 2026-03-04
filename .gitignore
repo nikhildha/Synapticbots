@@ -22,3 +22,5 @@ data/
 .vscode/
 .idea/
 web/node_modules/
+sentinel-saas/nextjs_space/node_modules/
+sentinel-saas/nextjs_space/.next/

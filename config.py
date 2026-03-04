@@ -137,7 +137,7 @@ SIDEWAYS_POSITION_REDUCTION = 0.30  # 30% smaller positions in chop
 
 # ─── Bot Loop ────────────────────────────────────────────────────────────────────
 LOOP_INTERVAL_SECONDS = 60        # 1-minute heartbeat (checks commands, updates state)
-ANALYSIS_INTERVAL_SECONDS = 900   # 15-minute full analysis cycle (HMM scan, trades)
+ANALYSIS_INTERVAL_SECONDS = 300   # 5-minute full analysis cycle (HMM scan, trades)
 ERROR_RETRY_SECONDS = 60          # Retry after error
 
 # ─── Multi-Coin Trading ──────────────────────────────────────────────────────────
