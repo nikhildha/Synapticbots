@@ -58,7 +58,9 @@ function formatDateTime(ts) {
     if (!ts) return '—';
     if (typeof ts === 'string' && !ts.endsWith('Z') && !ts.includes('+')) ts += 'Z';
     const d = new Date(ts);
-    return d.toLocaleDateString('en-IN', { month: 'short', day: 'numeric', timeZone: 'Asia/Kolkata' }) + ' ' + formatTime(ts);
+    const dd = d.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', timeZone: 'Asia/Kolkata' });
+    const tt = d.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'Asia/Kolkata' });
+    return `${dd} ${tt}`;
 }
 
 function pnlClass(val) {
@@ -531,25 +533,23 @@ function renderTable(trades) {
     let html = `<table class="tradebook-table" id="mainTradeTable">
     <thead><tr>
       <th style="width:32px"><input type="checkbox" id="selectAllTrades" onchange="toggleSelectAll(this)" title="Select All"></th>
-      <th data-col="1" onclick="sortTradeTable(1)" style="cursor:pointer;">Symbol ⇅</th>
+      <th data-col="1" onclick="sortTradeTable(1)" style="cursor:pointer;">Coin ⇅</th>
       <th data-col="2" onclick="sortTradeTable(2)" style="cursor:pointer;">Position ⇅</th>
       <th data-col="3" onclick="sortTradeTable(3)" style="cursor:pointer;">Regime ⇅</th>
-      <th data-col="4" onclick="sortTradeTable(4)" style="cursor:pointer;">Confidence ⇅</th>
-      <th data-col="5" onclick="sortTradeTable(5)" style="cursor:pointer;">Leverage ⇅</th>
+      <th data-col="4" onclick="sortTradeTable(4)" style="cursor:pointer;">Conf. ⇅</th>
+      <th data-col="5" onclick="sortTradeTable(5)" style="cursor:pointer;">Lev. X ⇅</th>
       <th data-col="6" onclick="sortTradeTable(6)" style="cursor:pointer;">Capital ⇅</th>
       <th data-col="7" onclick="sortTradeTable(7)" style="cursor:pointer;">Entry Price ⇅</th>
-      <th data-col="8" onclick="sortTradeTable(8)" style="cursor:pointer;">Current ⇅</th>
+      <th data-col="8" onclick="sortTradeTable(8)" style="cursor:pointer;">CMP ⇅</th>
       <th>SL / TP</th>
       <th data-col="10" onclick="sortTradeTable(10)" style="cursor:pointer;">Status ⇅</th>
-      <th data-col="11" onclick="sortTradeTable(11)" style="cursor:pointer;">Unrealized P&L ⇅</th>
-      <th data-col="12" onclick="sortTradeTable(12)" style="cursor:pointer;">Realized P&L ⇅</th>
+      <th data-col="11" onclick="sortTradeTable(11)" style="cursor:pointer;">Active PnL ⇅</th>
+      <th data-col="12" onclick="sortTradeTable(12)" style="cursor:pointer;">Total PnL ⇅</th>
       <th data-col="13" onclick="sortTradeTable(13)" style="cursor:pointer;">Duration ⇅</th>
-      <th data-col="14" onclick="sortTradeTable(14)" style="cursor:pointer;">Exit Reason ⇅</th>
+      <th data-col="14" onclick="sortTradeTable(14)" style="cursor:pointer;">Exit R ⇅</th>
       <th data-col="15" onclick="sortTradeTable(15)" style="cursor:pointer;">Exit Price ⇅</th>
-      <th data-col="16" onclick="sortTradeTable(16)" style="cursor:pointer;">Time ⇅</th>
-
-      <th data-col="18" onclick="sortTradeTable(18)" style="cursor:pointer;">Commission ⇅</th>
-      <th>Actions</th>
+      <th data-col="16" onclick="sortTradeTable(16)" style="cursor:pointer;">Entry Time ⇅</th>
+      <th data-col="17" onclick="sortTradeTable(17)" style="cursor:pointer;">Exit Time ⇅</th>
     </tr></thead><tbody>`;
 
     // For cumulative P&L
@@ -627,9 +627,7 @@ function renderTable(trades) {
       <td>${exitBadge || '—'}</td>
       <td class="col-price">${t.exit_price ? formatPrice(t.exit_price) : '—'}</td>
       <td>${formatDateTime(t.entry_timestamp)}</td>
-
-      <td class="col-price">$${(t.commission || ((t.entry_price || 0) * (t.quantity || 0) + ((t.current_price || t.entry_price || 0) * (t.quantity || 0))) * 0.0005).toFixed(2)}</td>
-      <td><button class="btn-delete-trade" onclick="deleteTrade('${t.trade_id}')" title="Delete trade">Delete</button></td>
+      <td>${t.exit_timestamp ? formatDateTime(t.exit_timestamp) : '—'}</td>
     </tr>`;
     });
 
@@ -790,11 +788,11 @@ function renderLiveTable(trades) {
     });
     let html = `<table class="tradebook-table">
     <thead><tr>
-      <th>Symbol</th><th>Position</th><th>Regime</th><th>Confidence</th>
-      <th>Leverage</th><th>Capital</th><th>Entry Price</th><th>Current</th>
-      <th>SL / TP</th><th>Status</th><th>Unrealized P&L</th><th>Realized P&L</th>
-      <th>Duration</th><th>Exit Reason</th><th>Exit Price</th><th>Time</th>
-      <th>Commission</th>
+      <th>Coin</th><th>Position</th><th>Regime</th><th>Conf.</th>
+      <th>Lev. X</th><th>Capital</th><th>Entry Price</th><th>CMP</th>
+      <th>SL / TP</th><th>Status</th><th>Active PnL</th><th>Total PnL</th>
+      <th>Duration</th><th>Exit R</th><th>Exit Price</th><th>Entry Time</th>
+      <th>Exit Time</th>
     </tr></thead><tbody>`;
     sorted.forEach(t => {
         const posClass = t.position === 'LONG' ? 'side-buy' : 'side-sell';
@@ -832,7 +830,7 @@ function renderLiveTable(trades) {
       <td>${exitBadge || '—'}</td>
       <td class="col-price">${t.exit_price ? formatPrice(t.exit_price) : '—'}</td>
       <td>${formatDateTime(t.entry_timestamp)}</td>
-      <td class="col-price">$${(t.commission || 0).toFixed(2)}</td>
+      <td>${t.exit_timestamp ? formatDateTime(t.exit_timestamp) : '—'}</td>
     </tr>`;
     });
     html += '</tbody></table>';
