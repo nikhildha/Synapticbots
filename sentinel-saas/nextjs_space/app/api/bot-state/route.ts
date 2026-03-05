@@ -105,6 +105,11 @@ export async function GET() {
                 console.error('[bot-state] getUserTrades failed:', err);
                 trades = [];
             }
+
+            // Fallback for admin: if Prisma has no trades but engine does, use engine trades directly
+            if (isAdmin && trades.length === 0 && engineTradesRaw.length > 0) {
+                trades = engineTradesRaw;
+            }
         }
 
         const activeTrades = trades.filter((t: any) => (t.status || '').toUpperCase() === 'ACTIVE');

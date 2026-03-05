@@ -24,13 +24,14 @@ export async function POST(request: Request) {
 
         // ─── Find the trade in Prisma ────────────────────────────────────
         let trade = null;
+        const activeStatuses = ['active', 'ACTIVE', 'Active'];
 
         if (tradeId) {
             // Try direct ID match first
             trade = await prisma.trade.findFirst({
                 where: {
                     id: tradeId,
-                    status: 'active',
+                    status: { in: activeStatuses },
                     bot: isAdmin ? {} : { userId },
                 },
                 include: { bot: true },
@@ -41,7 +42,7 @@ export async function POST(request: Request) {
                 trade = await prisma.trade.findFirst({
                     where: {
                         exchangeOrderId: tradeId,
-                        status: 'active',
+                        status: { in: activeStatuses },
                         bot: isAdmin ? {} : { userId },
                     },
                     include: { bot: true },
@@ -53,7 +54,7 @@ export async function POST(request: Request) {
                 trade = await prisma.trade.findFirst({
                     where: {
                         id: { contains: tradeId },
-                        status: 'active',
+                        status: { in: activeStatuses },
                         bot: isAdmin ? {} : { userId },
                     },
                     include: { bot: true },
@@ -65,7 +66,7 @@ export async function POST(request: Request) {
             trade = await prisma.trade.findFirst({
                 where: {
                     coin: symbol.toUpperCase(),
-                    status: 'active',
+                    status: { in: activeStatuses },
                     bot: isAdmin ? {} : { userId },
                 },
                 include: { bot: true },
