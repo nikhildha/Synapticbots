@@ -33,7 +33,7 @@ export async function GET() {
             }),
         ]);
 
-        const totalPnl = trades.reduce((sum, t) => sum + (t.totalPnl || 0), 0);
+        const totalPnl = trades.reduce((sum: number, t: any) => sum + (t.totalPnl || 0), 0);
 
         // Revenue estimate: count pro ($999) and ultra ($2499) subscriptions
         const proCount = await prisma.subscription.count({ where: { tier: 'pro', status: 'active' } });
