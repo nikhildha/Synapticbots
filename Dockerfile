@@ -15,7 +15,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 # ── Node.js dependencies ─────────────────────────────────────────────
 COPY sentinel-saas/nextjs_space/package*.json ./sentinel-saas/nextjs_space/
-RUN cd sentinel-saas/nextjs_space && npm install
+RUN cd sentinel-saas/nextjs_space && npm install --legacy-peer-deps
 
 # ── Copy all source code (ARG busts Docker cache on each deploy) ─────
 ARG CACHEBUST=1
