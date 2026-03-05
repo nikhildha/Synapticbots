@@ -27,7 +27,7 @@ export async function GET() {
 
         // Get trade counts per bot
         const botsWithCounts = await Promise.all(
-            bots.map(async (bot) => {
+            bots.map(async (bot: any) => {
                 const tradeCount = await prisma.trade.count({ where: { botId: bot.id } });
                 return { ...bot, _count: { trades: tradeCount } };
             })
