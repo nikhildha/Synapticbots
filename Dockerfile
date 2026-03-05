@@ -21,6 +21,9 @@ RUN cd sentinel-saas/nextjs_space && npm install --legacy-peer-deps
 ARG CACHEBUST=1
 COPY . .
 
+# ── Generate Prisma client ───────────────────────────────────────────
+RUN cd sentinel-saas/nextjs_space && npx prisma generate
+
 # ── Build Next.js production bundle ──────────────────────────────────
 RUN cd sentinel-saas/nextjs_space && npm run build
 
