@@ -5,7 +5,7 @@ import { Header } from '@/components/header';
 import { StatsCard } from '@/components/stats-card';
 import { BotCard } from '@/components/bot-card';
 import { RegimeCard, PnlCard, ActivePositionsCard, SignalSummaryTable } from '@/components/dashboard/command-center';
-import { Bot, TrendingUp, Activity, DollarSign, RefreshCw } from 'lucide-react';
+import { Bot, TrendingUp, Activity, DollarSign, RefreshCw, Zap } from 'lucide-react';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
 
@@ -178,11 +178,58 @@ export function DashboardClient({ user, stats, bots, recentTrades }: DashboardCl
                   AI Trading Command Center — Monitor your bots and market signals
                 </p>
               </div>
-              {lastRefresh && (
-                <span className="text-xs text-[var(--color-text-secondary)]">
-                  Updated: {lastRefresh}
-                </span>
-              )}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+                {/* Engine Status Indicator */}
+                {(() => {
+                  const engineTs = botState?.multi?.timestamp || botState?.state?.timestamp;
+                  const cycle = botState?.multi?.cycle || 0;
+                  const coinsScanned = botState?.multi?.coins_scanned || 0;
+                  const isEngineRunning = engineTs && (Date.now() - new Date(engineTs).getTime()) < 600000; // 10 min
+                  return (
+                    <div style={{
+                      display: 'flex', alignItems: 'center', gap: '10px',
+                      padding: '8px 16px', borderRadius: '12px',
+                      background: isEngineRunning ? 'rgba(34,197,94,0.08)' : 'rgba(239,68,68,0.08)',
+                      border: `1px solid ${isEngineRunning ? 'rgba(34,197,94,0.2)' : 'rgba(239,68,68,0.2)'}`,
+                    }}>
+                      <div style={{
+                        width: '8px', height: '8px', borderRadius: '50%',
+                        background: isEngineRunning ? '#22C55E' : '#EF4444',
+                        boxShadow: isEngineRunning ? '0 0 8px rgba(34,197,94,0.6)' : 'none',
+                        animation: isEngineRunning ? 'pulse 2s ease-in-out infinite' : 'none',
+                      }} />
+                      <div>
+                        <div style={{ fontSize: '12px', fontWeight: 700, color: isEngineRunning ? '#22C55E' : '#EF4444' }}>
+                          <Zap size={11} style={{ display: 'inline', marginRight: '4px', verticalAlign: '-1px' }} />
+                          {isEngineRunning ? 'Engine ON' : 'Engine OFF'}
+                        </div>
+                        {isEngineRunning && (
+                          <div style={{ fontSize: '10px', color: '#6B7280', marginTop: '1px' }}>
+                            Cycle #{cycle} · {coinsScanned} coins scanned
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })()}
+                {(() => {
+                  const engineTs = botState?.multi?.timestamp || botState?.state?.timestamp;
+                  if (!engineTs) return null;
+                  const lastRun = new Date(engineTs).getTime();
+                  const intervalMs = 300000; // 5 minutes
+                  const nextRun = new Date(lastRun + intervalMs);
+                  const now = Date.now();
+                  const diff = nextRun.getTime() - now;
+                  const nextLabel = diff > 0
+                    ? `Next cycle: ${nextRun.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit', timeZone: 'Asia/Kolkata' })} IST`
+                    : 'Cycle running...';
+                  return (
+                    <span className="text-xs text-[var(--color-text-secondary)]">
+                      {nextLabel}
+                    </span>
+                  );
+                })()}
+              </div>
             </div>
           </motion.div>
 
@@ -199,7 +246,7 @@ export function DashboardClient({ user, stats, bots, recentTrades }: DashboardCl
               gap: '20px',
             }}>
               <RegimeCard regime={regime} confidence={confidence} symbol={symbol} macroRegime={macroRegime} trend15m={trend15m} coinStates={multi?.coin_states} />
-              <PnlCard trades={trades} />
+              <PnlCard trades={trades} btcPrice={btcState?.price || multi?.coin_states?.['BTCUSDT']?.price} />
             </div>
           </motion.div>
 
@@ -359,9 +406,12 @@ export function DashboardClient({ user, stats, bots, recentTrades }: DashboardCl
                           const entryTime = trade.entry_time || trade.entryTime || trade.timestamp || '';
                           const fmtTime = (() => {
                             try {
-                              const d = new Date(entryTime);
-                              return d.toLocaleDateString('en-IN', { day: '2-digit', month: 'short' }) + ' ' +
-                                d.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true });
+                              // Trim Python microsecond precision (.123456 → .123) for cross-browser compat
+                              const sanitized = String(entryTime).replace(/(\.\d{3})\d+/, '$1');
+                              const d = new Date(sanitized);
+                              if (isNaN(d.getTime())) return '—';
+                              return d.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', timeZone: 'Asia/Kolkata' }) + ' ' +
+                                d.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true, timeZone: 'Asia/Kolkata' });
                             } catch { return '—'; }
                           })();
                           return (
@@ -373,7 +423,7 @@ export function DashboardClient({ user, stats, bots, recentTrades }: DashboardCl
                               onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
                             >
                               <td style={{ padding: '10px 14px', color: '#0891B2', fontWeight: 600, fontSize: '11px' }}>
-                                SM-Standard
+                                {trade.bot_name || trade.profile_id || 'SM-Standard'}
                               </td>
                               <td style={{ padding: '10px 14px', fontWeight: 700, color: '#F0F4F8' }}>{sym}</td>
                               <td style={{ padding: '10px 14px' }}>

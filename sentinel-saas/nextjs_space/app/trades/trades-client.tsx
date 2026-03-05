@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { Header } from '@/components/header';
-import { Download, TrendingUp, TrendingDown, Clock, Search, X, BarChart3, RefreshCw } from 'lucide-react';
+import { Download, TrendingUp, TrendingDown, Clock, Search, X, BarChart3, RefreshCw, Trash2 } from 'lucide-react';
 import { motion } from 'framer-motion';
 
 /* ═══ Types ═══ */
@@ -96,6 +96,7 @@ export function TradesClient({ trades: initialTrades }: TradesClientProps) {
   const [modeFilter, setModeFilter] = useState<'all' | 'paper' | 'live'>('all');
   const [lastRefresh, setLastRefresh] = useState<string>('');
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [isClearing, setIsClearing] = useState(false);
 
   useEffect(() => { setMounted(true); }, []);
 
@@ -245,6 +246,24 @@ export function TradesClient({ trades: initialTrades }: TradesClientProps) {
 
   const uniqueRegimes = useMemo(() => [...new Set(trades?.map(t => t.regime?.toLowerCase()).filter(Boolean))], [trades]);
 
+  const clearAllTrades = async () => {
+    if (!confirm('⚠️ Clear ALL trades from the tradebook? This cannot be undone.')) return;
+    setIsClearing(true);
+    try {
+      const res = await fetch('/api/reset-trades', { method: 'POST' });
+      if (res.ok) {
+        setTrades([]);
+      } else {
+        const err = await res.json();
+        alert(err.error || 'Failed to clear trades');
+      }
+    } catch {
+      alert('Network error');
+    } finally {
+      setIsClearing(false);
+    }
+  };
+
   if (!mounted) return null;
 
   return (
@@ -279,6 +298,15 @@ export function TradesClient({ trades: initialTrades }: TradesClientProps) {
                   fontSize: '13px', fontWeight: 600, cursor: 'pointer',
                 }}>
                   <Download size={14} /> Export CSV
+                </button>
+                <button onClick={clearAllTrades} disabled={isClearing} style={{
+                  display: 'flex', alignItems: 'center', gap: '6px',
+                  padding: '10px 14px', borderRadius: '12px', border: 'none',
+                  background: 'rgba(239,68,68,0.1)', color: '#EF4444',
+                  fontSize: '13px', fontWeight: 600, cursor: 'pointer',
+                  opacity: isClearing ? 0.5 : 1,
+                }}>
+                  <Trash2 size={14} /> {isClearing ? 'Clearing...' : 'Clear Trades'}
                 </button>
               </div>
             </div>

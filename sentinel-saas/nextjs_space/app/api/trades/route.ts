@@ -1,26 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth-options';
-import * as fs from 'fs';
-import * as path from 'path';
+import { getUserTrades } from '@/lib/sync-engine-trades';
 
 export const dynamic = 'force-dynamic';
 
-// Sentinelbot reads from its own data/ folder
-const DATA_DIR = path.resolve(process.cwd(), '..', '..', 'data');
-
-function readJSON(filename: string, fallback: any = {}) {
-    try {
-        const filepath = path.join(DATA_DIR, filename);
-        if (fs.existsSync(filepath)) {
-            return JSON.parse(fs.readFileSync(filepath, 'utf-8'));
-        }
-    } catch { /* silent */ }
-    return fallback;
-}
-
 /**
- * Tradebook API — reads from local data/tradebook.json
+ * Tradebook API — reads from Prisma (per-user isolated)
  * GET /api/trades?status=active&coin=BTC&page=1&limit=50
  */
 export async function GET(request: NextRequest) {
@@ -30,28 +16,26 @@ export async function GET(request: NextRequest) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
         }
 
+        const userId = (session.user as any).id;
         const { searchParams } = new URL(request.url);
-        const statusFilter = searchParams.get('status');
+        const statusFilter = searchParams.get('status') || undefined;
         const coinFilter = searchParams.get('coin');
         const page = parseInt(searchParams.get('page') || '1');
         const limit = Math.min(parseInt(searchParams.get('limit') || '50'), 100);
 
-        const tradebook = readJSON('tradebook.json', { trades: [] });
-        let trades: any[] = tradebook.trades || [];
+        // Read from Prisma — already user-isolated
+        let trades = await getUserTrades(userId, statusFilter);
 
-        // Apply filters
-        if (statusFilter) {
-            trades = trades.filter((t: any) => (t.status || '').toUpperCase() === statusFilter.toUpperCase());
-        }
+        // Apply coin filter
         if (coinFilter) {
             const cf = coinFilter.toUpperCase();
             trades = trades.filter((t: any) => (t.symbol || t.coin || '').toUpperCase().includes(cf));
         }
 
-        // Sort by entry time descending
+        // Sort by entry time descending (already sorted from Prisma, but ensure)
         trades.sort((a: any, b: any) => {
-            const ta = a.entry_time || a.entryTime || a.timestamp || '';
-            const tb = b.entry_time || b.entryTime || b.timestamp || '';
+            const ta = a.entry_time || '';
+            const tb = b.entry_time || '';
             return tb.localeCompare(ta);
         });
 
@@ -61,7 +45,7 @@ export async function GET(request: NextRequest) {
 
         return NextResponse.json({
             trades: paged.map((t: any) => ({
-                id: t.trade_id || t.id || `T-${Math.random().toString(36).slice(2, 8)}`,
+                id: t.trade_id || `T-${Math.random().toString(36).slice(2, 8)}`,
                 coin: (t.symbol || t.coin || '').replace('USDT', ''),
                 symbol: t.symbol || t.coin || '',
                 position: (t.side || t.position || '').toLowerCase(),
@@ -84,7 +68,7 @@ export async function GET(request: NextRequest) {
                 exitPercent: t.exit_percent || null,
                 entryTime: t.entry_time || t.entryTime || t.timestamp || new Date().toISOString(),
                 exitTime: t.exit_time || t.exitTime || null,
-                botName: 'Sentinel Marshal',
+                botName: t.bot_name || 'SM-Standard',
                 exchange: t.exchange || 'binance_testnet',
                 mode: t.mode || 'paper',
             })),
@@ -107,7 +91,7 @@ export async function DELETE(request: Request) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
         }
         // For now, trades from JSON are read-only
-        return NextResponse.json({ error: 'Trade deletion from engine tradebook not supported yet' }, { status: 400 });
+        return NextResponse.json({ error: 'Use /api/reset-trades to clear your trades' }, { status: 400 });
     } catch (error: any) {
         console.error('Tradebook DELETE error:', error);
         return NextResponse.json({ error: 'Failed to delete trade' }, { status: 500 });

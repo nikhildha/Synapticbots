@@ -413,3 +413,45 @@ class RiskManager:
             return 25
         else:
             return 35
+
+    @staticmethod
+    def get_conviction_leverage_for_profile(conviction_score: float, profile: dict) -> int:
+        """
+        Map conviction score (0–100) to leverage using a strategy profile's tiers.
+
+        Profile must contain:
+          confidence_tiers: {threshold: leverage, ...}  — sorted desc by threshold
+          confidence_min: float — minimum HMM confidence (not used here, but for reference)
+
+        The conviction_score is compared against the tiers. The first tier
+        whose threshold is <= conviction_score wins.
+
+        Example: tiers = {0.99: 35, 0.96: 25, 0.92: 15}, conviction = 72
+          → 72 >= 15 threshold but we use conviction bands:
+          Bands: <40→0, else use tiers sorted high-to-low.
+        """
+        if conviction_score < 40:
+            return 0
+
+        # confidence_tiers keys are HMM confidence thresholds (0.92, 0.96, 0.99)
+        # but we map conviction_score (0-100) to leverage similarly:
+        # Map conviction ranges to tier leverage values
+        tiers = profile.get("confidence_tiers", {})
+        if not tiers:
+            return 0
+
+        # Sort tiers descending by leverage value
+        sorted_tiers = sorted(tiers.items(), key=lambda x: x[1], reverse=True)
+
+        # Map conviction bands: >=85 → highest, 70-84 → second, 55-69 → third, 40-54 → lowest
+        bands = [85, 70, 55, 40]
+        leverage_values = [lev for _, lev in sorted_tiers]
+
+        for i, band_min in enumerate(bands):
+            if conviction_score >= band_min and i < len(leverage_values):
+                return leverage_values[i]
+
+        # Below all bands but >= 40: use lowest tier
+        if leverage_values:
+            return leverage_values[-1]
+        return 0

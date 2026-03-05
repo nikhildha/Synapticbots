@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 
 const REGIME_MAP: Record<string, { emoji: string; color: string; bgGlow: string }> = {
     'BULLISH': { emoji: '🟢', color: '#22C55E', bgGlow: 'rgba(34, 197, 94, 0.15)' },
@@ -168,9 +168,12 @@ export function RegimeCard({ regime, confidence, symbol, macroRegime, trend15m, 
 
 interface PnlCardProps {
     trades: any[];
+    btcPrice?: number;
 }
 
-export function PnlCard({ trades }: PnlCardProps) {
+export function PnlCard({ trades, btcPrice }: PnlCardProps) {
+    const canvasRef = useRef<HTMLCanvasElement>(null);
+    const chartRef = useRef<any>(null);
     const MAX_CAPITAL = 2500;
     const CAPITAL_PER_TRADE = 100;
 
@@ -198,11 +201,110 @@ export function PnlCard({ trades }: PnlCardProps) {
     const livePnl = calcPnl(liveTrades);
     const totalPnl = paperPnl.total + livePnl.total;
     const totalActiveCount = paperPnl.activeCount + livePnl.activeCount;
-    const deployedCapital = totalActiveCount * CAPITAL_PER_TRADE;
     const totalRoi = MAX_CAPITAL > 0 ? (totalPnl / MAX_CAPITAL * 100) : 0;
-
     const sign = totalPnl >= 0 ? '+' : '';
     const mainColor = totalPnl >= 0 ? '#22C55E' : '#EF4444';
+
+    // Build 1-hour buckets for P&L timeline
+    useEffect(() => {
+        const canvas = canvasRef.current;
+        if (!canvas || allTrades.length === 0) return;
+
+        // Dynamic import of Chart.js
+        import('chart.js').then(({ Chart, LineController, LineElement, PointElement, LinearScale, CategoryScale, Filler, Tooltip }) => {
+            Chart.register(LineController, LineElement, PointElement, LinearScale, CategoryScale, Filler, Tooltip);
+
+            // Parse trades with valid times, sort by entry_time
+            const parsed = allTrades
+                .map((t: any) => {
+                    const raw = t.entry_time || t.entryTime || t.timestamp || '';
+                    const sanitized = String(raw).replace(/(\.\d{3})\d+/, '$1');
+                    const d = new Date(sanitized);
+                    const pnl = (t.status || '').toUpperCase() === 'CLOSED'
+                        ? (t.pnl || t.realized_pnl || t.total_pnl || 0)
+                        : (t.unrealized_pnl || t.active_pnl || 0);
+                    return { time: d, pnl, valid: !isNaN(d.getTime()) };
+                })
+                .filter(t => t.valid)
+                .sort((a, b) => a.time.getTime() - b.time.getTime());
+
+            if (parsed.length === 0) return;
+
+            // Group into 1-hour buckets
+            const bucketMap = new Map<string, number>();
+            let cumPnl = 0;
+            parsed.forEach(t => {
+                const hr = new Date(t.time);
+                hr.setMinutes(0, 0, 0);
+                const key = hr.toISOString();
+                cumPnl += t.pnl;
+                bucketMap.set(key, cumPnl);
+            });
+
+            const labels = Array.from(bucketMap.keys()).map(iso => {
+                const d = new Date(iso);
+                return d.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true, timeZone: 'Asia/Kolkata' });
+            });
+            const pnlData = Array.from(bucketMap.values());
+
+            // Destroy previous chart
+            if (chartRef.current) chartRef.current.destroy();
+
+            const ctx = canvas.getContext('2d');
+            if (!ctx) return;
+
+            // Gradient fill
+            const gradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
+            const isPositive = pnlData[pnlData.length - 1] >= 0;
+            gradient.addColorStop(0, isPositive ? 'rgba(34,197,94,0.25)' : 'rgba(239,68,68,0.25)');
+            gradient.addColorStop(1, 'rgba(0,0,0,0)');
+
+            chartRef.current = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels,
+                    datasets: [{
+                        label: 'Total PNL ($)',
+                        data: pnlData,
+                        borderColor: isPositive ? '#22C55E' : '#EF4444',
+                        backgroundColor: gradient,
+                        borderWidth: 2,
+                        pointRadius: 3,
+                        pointBackgroundColor: isPositive ? '#22C55E' : '#EF4444',
+                        fill: true,
+                        tension: 0.3,
+                    }],
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        tooltip: {
+                            callbacks: {
+                                label: (ctx: any) => `PNL: $${ctx.parsed.y.toFixed(2)}`,
+                            },
+                        },
+                    },
+                    scales: {
+                        x: {
+                            ticks: { color: '#6B7280', font: { size: 9 }, maxRotation: 0 },
+                            grid: { color: 'rgba(255,255,255,0.04)' },
+                        },
+                        y: {
+                            position: 'left' as const,
+                            ticks: {
+                                color: '#6B7280', font: { size: 10 },
+                                callback: (v: any) => `$${v}`,
+                            },
+                            grid: { color: 'rgba(255,255,255,0.04)' },
+                        },
+                    },
+                },
+            });
+        });
+
+        return () => { if (chartRef.current) chartRef.current.destroy(); };
+    }, [allTrades]);
 
     const PnlRow = ({ label, pnl, color: labelColor, count }: { label: string; pnl: { total: number; realized: number; unrealized: number; activeCount: number; count: number }; color: string; count: number }) => {
         const capital = pnl.activeCount * CAPITAL_PER_TRADE;
@@ -243,19 +345,33 @@ export function PnlCard({ trades }: PnlCardProps) {
             borderRadius: '16px',
             padding: '24px 28px',
         }}>
-            <div style={{
-                fontSize: '11px', fontWeight: 600, textTransform: 'uppercase' as const,
-                letterSpacing: '1.5px', color: '#9CA3AF', marginBottom: '12px',
-            }}>Total PNL</div>
+            {/* Header: PNL headline */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '12px' }}>
+                <div>
+                    <div style={{
+                        fontSize: '11px', fontWeight: 600, textTransform: 'uppercase' as const,
+                        letterSpacing: '1.5px', color: '#9CA3AF', marginBottom: '4px',
+                    }}>P&L Timeline</div>
+                    <div style={{ fontSize: '32px', fontWeight: 700, color: mainColor }}>
+                        {sign}${totalPnl.toFixed(2)}
+                    </div>
+                    <div style={{ fontSize: '11px', color: '#9CA3AF', marginTop: '2px' }}>
+                        {sign}{totalRoi.toFixed(2)}% ROI on ${MAX_CAPITAL}
+                    </div>
+                </div>
+                {btcPrice && (
+                    <div style={{ textAlign: 'right' }}>
+                        <div style={{ fontSize: '9px', textTransform: 'uppercase' as const, letterSpacing: '1px', color: '#6B7280' }}>BTC Price</div>
+                        <div style={{ fontSize: '18px', fontWeight: 700, color: '#F59E0B', fontFamily: 'monospace' }}>
+                            ${Number(btcPrice).toLocaleString('en-US', { maximumFractionDigits: 0 })}
+                        </div>
+                    </div>
+                )}
+            </div>
 
-            {/* Headline number */}
-            <div style={{ textAlign: 'center', marginBottom: '16px' }}>
-                <div style={{ fontSize: '42px', fontWeight: 700, color: mainColor }}>
-                    {sign}${totalPnl.toFixed(2)}
-                </div>
-                <div style={{ fontSize: '13px', color: '#9CA3AF', marginTop: '4px' }}>
-                    {sign}{totalRoi.toFixed(2)}% ROI on ${MAX_CAPITAL}
-                </div>
+            {/* Chart Canvas */}
+            <div style={{ height: '160px', marginBottom: '12px' }}>
+                <canvas ref={canvasRef} />
             </div>
 
             {/* Paper / Live breakdown */}
@@ -449,25 +565,47 @@ export function SignalSummaryTable({ coinStates, multi }: SignalSummaryProps) {
         <div>
             {/* Header */}
             <div style={{ marginBottom: '16px' }}>
-                <h2 style={{ fontSize: '20px', fontWeight: 700, color: '#06B6D4', margin: 0 }}>Bot Scan Summary</h2>
+                <h2 style={{ fontSize: '20px', fontWeight: 700, color: '#06B6D4', margin: 0 }}>Bot Scan Summary <span style={{ fontSize: '13px', fontWeight: 600, color: '#6B7280' }}>· Cycle #{liveMulti?.cycle || 0}</span></h2>
                 <p style={{ fontSize: '12px', color: '#6B7280', marginTop: '4px' }}>SM-Standard · Auto-refreshes every {Math.round(refreshMs / 1000)}s</p>
             </div>
 
             {/* Stats Bar */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '8px', marginBottom: '12px' }}>
-                {[
+            {(() => {
+                const engineTs = liveMulti?.last_analysis_time || liveMulti?.timestamp || null;
+                const isEngineOn = engineTs && (Date.now() - new Date(String(engineTs).replace(/Z$/, '')).getTime()) < 600000;
+                const nextCycleLabel = (() => {
+                    if (!engineTs || !intervalSec) return '—';
+                    try {
+                        const clean = String(engineTs).replace(/Z$/, '');
+                        const lastMs = new Date(clean).getTime();
+                        const nextMs = lastMs + (intervalSec * 1000);
+                        const now = Date.now();
+                        if (nextMs <= now) return 'Running…';
+                        return new Date(nextMs).toLocaleTimeString('en-IN', {
+                            hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true, timeZone: 'Asia/Kolkata',
+                        }) + ' IST';
+                    } catch { return '—'; }
+                })();
+                const statsItems = [
+                    { label: 'Engine', value: isEngineOn ? '🟢 ON' : '🔴 OFF', color: isEngineOn ? '#22C55E' : '#EF4444', isText: true },
+                    { label: 'Next Cycle', value: nextCycleLabel, color: '#A78BFA', isText: true },
                     { label: 'Coins Scanned', value: coins.length, color: '#06B6D4' },
                     { label: 'Eligible', value: eligible.length, color: '#22C55E' },
                     { label: 'Filtered Out', value: skipped.length, color: '#EF4444' },
                     { label: 'Last Cycle (IST)', value: formatIST(lastCycle), color: '#9CA3AF', isText: true },
                     { label: 'Interval', value: intervalSec ? `${Math.round(intervalSec / 60)}m` : '—', color: '#9CA3AF', isText: true },
-                ].map((s, i) => (
-                    <div key={i} style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '10px', padding: '10px 12px', textAlign: 'center' }}>
-                        <div style={{ fontSize: '9px', textTransform: 'uppercase', letterSpacing: '1px', color: '#6B7280', marginBottom: '4px' }}>{s.label}</div>
-                        <div style={{ fontSize: (s as any).isText ? '12px' : '20px', fontWeight: 700, color: s.color, fontFamily: (s as any).isText ? 'monospace' : 'inherit' }}>{s.value}</div>
+                ];
+                return (
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '8px', marginBottom: '12px' }}>
+                        {statsItems.map((s, i) => (
+                            <div key={i} style={{ background: 'rgba(255,255,255,0.03)', border: `1px solid ${s.label === 'Engine' ? (isEngineOn ? 'rgba(34,197,94,0.2)' : 'rgba(239,68,68,0.2)') : 'rgba(255,255,255,0.06)'}`, borderRadius: '10px', padding: '10px 12px', textAlign: 'center' }}>
+                                <div style={{ fontSize: '9px', textTransform: 'uppercase', letterSpacing: '1px', color: '#6B7280', marginBottom: '4px' }}>{s.label}</div>
+                                <div style={{ fontSize: (s as any).isText ? '12px' : '20px', fontWeight: 700, color: s.color, fontFamily: (s as any).isText ? 'monospace' : 'inherit' }}>{s.value}</div>
+                            </div>
+                        ))}
                     </div>
-                ))}
-            </div>
+                );
+            })()}
 
             {/* Coin Filter Dropdown */}
             <div style={{ marginBottom: '12px', position: 'relative' }}>

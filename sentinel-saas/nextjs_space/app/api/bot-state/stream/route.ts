@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth-options';
+import { prisma } from '@/lib/prisma';
+import { getUserTrades } from '@/lib/sync-engine-trades';
 import * as fs from 'fs';
 import * as path from 'path';
 
@@ -21,7 +23,7 @@ function readJSON(filename: string, fallback: any = {}) {
 
 /**
  * SSE endpoint for real-time bot state
- * Reads from local data files every 3s and pushes via Server-Sent Events
+ * Reads engine state from local files, but trades from Prisma (per-user)
  */
 export async function GET() {
     const session = await getServerSession(authOptions);
@@ -29,6 +31,7 @@ export async function GET() {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    const userId = (session.user as any)?.id;
     const encoder = new TextEncoder();
     let closed = false;
 
@@ -45,9 +48,15 @@ export async function GET() {
                 if (closed) return;
                 try {
                     const multi = readJSON('multi_bot_state.json', { coin_states: {} });
-                    const tradebook = readJSON('tradebook.json', { trades: [] });
                     const coinStates = multi.coin_states || {};
-                    const trades = tradebook.trades || [];
+
+                    // Read trades from Prisma per-user (isolated)
+                    let trades: any[] = [];
+                    if (userId) {
+                        try {
+                            trades = await getUserTrades(userId);
+                        } catch { trades = []; }
+                    }
 
                     send({
                         type: 'state',
@@ -67,7 +76,7 @@ export async function GET() {
                             coin_states: coinStates,
                             cycle: multi.cycle || 0,
                         },
-                        tradebook: { trades, summary: tradebook.stats || {} },
+                        tradebook: { trades, summary: {} },
                         timestamp: new Date().toISOString(),
                     });
                 } catch {

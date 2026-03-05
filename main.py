@@ -59,6 +59,13 @@ class RegimeMasterBot:
         self.risk = RiskManager()
         self._trade_count = 0
         self._cycle_count = 0
+        self._last_cycle_duration = 0
+        # Active profiles from config
+        self._active_profiles = {pid: config.STRATEGY_PROFILES[pid]
+                                 for pid in config.ACTIVE_PROFILES
+                                 if pid in config.STRATEGY_PROFILES}
+        logger.info("🔧 Active strategy profiles: %s",
+                    ", ".join(f"{p['label']}" for p in self._active_profiles.values()))
         self._last_analysis_time = 0.0  # epoch — triggers immediate first run
 
         # Multi-coin state
@@ -281,26 +288,25 @@ class RegimeMasterBot:
         # SOLE SOURCE OF TRUTH: tradebook active count
         tradebook_active = tradebook.get_active_trades()
         tradebook_active_count = len(tradebook_active)
-        tradebook_active_symbols = {t["symbol"] for t in tradebook_active}
-        eligible_trades = []
+        # Build set of profile:symbol keys for active trades
+        tradebook_active_keys = set()
+        for t in tradebook_active:
+            pid = t.get("profile_id", "standard")
+            tradebook_active_keys.add(f"{pid}:{t['symbol']}")
+        raw_results = []
 
         for symbol in symbols:
             try:
                 result = self._analyze_coin(symbol, balance)
                 if result:
-                    eligible_trades.append(result)
+                    raw_results.append(result)
             except Exception as e:
                 logger.debug("Error analyzing %s: %s", symbol, e)
                 continue
 
-        # ── 5. Deploy eligible trades (respect position limit) ───
-        slots_available = max(0, config.MAX_CONCURRENT_POSITIONS - tradebook_active_count)
-
-        if slots_available == 0:
-            logger.info(
-                "📊 Position limit reached (%d/%d). No new deployments this cycle.",
-                tradebook_active_count, config.MAX_CONCURRENT_POSITIONS,
-            )
+        # ── 5. Deploy across all active profiles ─────────────────
+        # Sort raw results by conviction (highest first)
+        raw_results.sort(key=lambda x: x.get("conviction", 0), reverse=True)
 
         # ── Loss streak cooldown: pause 30 min after 5 consecutive losses ──
         LOSS_STREAK_LIMIT = 5
@@ -323,95 +329,110 @@ class RegimeMasterBot:
             except Exception:
                 pass  # If timestamp parse fails, don't block
 
-        # Sort by confidence (highest first)
-        eligible_trades.sort(key=lambda x: x["confidence"], reverse=True)
-
         deployed = 0
         deployed_trades = []  # Collect for batch Telegram alert
-        for trade in eligible_trades:
-            if deployed >= slots_available:
-                logger.info("📊 Position limit reached (%d/%d). Queuing rest.",
-                            tradebook_active_count + deployed, config.MAX_CONCURRENT_POSITIONS)
-                break
+        eligible_trades = []  # For backward compat with _save_multi_state
 
-            # Re-check hard limit from tradebook EVERY iteration (bulletproof)
-            current_total = len(tradebook.get_active_trades())
-            if current_total >= config.MAX_CONCURRENT_POSITIONS:
-                logger.warning(
-                    "🛑 Hard limit reached: %d active trades in tradebook (max %d). Halting deployment.",
-                    current_total, config.MAX_CONCURRENT_POSITIONS,
+        for profile_id, profile in self._active_profiles.items():
+            profile_deployed = 0
+            for raw in raw_results:
+                sym = raw["symbol"]
+                pos_key = f"{profile_id}:{sym}"
+
+                # Skip if already have active trade for this profile:symbol
+                if pos_key in tradebook_active_keys:
+                    continue
+
+                # Evaluate raw analysis through this profile's lens
+                trade = self._evaluate_for_profile(raw, profile_id, profile, balance)
+                if not trade:
+                    continue
+
+                eligible_trades.append(trade)
+
+                # Re-check hard limit from tradebook
+                current_total = len(tradebook.get_active_trades())
+                if current_total >= config.MAX_CONCURRENT_POSITIONS * len(self._active_profiles):
+                    logger.warning(
+                        "🛑 Global hard limit reached: %d active trades. Halting deployment.",
+                        current_total,
+                    )
+                    break
+
+                # Execute the trade
+                logger.info(
+                    "🔥 DEPLOYING [%s]: %s %s @ %dx | Regime: %s (%.0f%%) | Qty: %.6f",
+                    profile["label"], trade["side"], sym, trade["leverage"],
+                    trade["regime_name"], trade["confidence"] * 100, trade["quantity"],
                 )
-                break
+                result = self.executor.execute_trade(
+                    symbol=sym,
+                    side=trade["side"],
+                    leverage=trade["leverage"],
+                    quantity=trade["quantity"],
+                    atr=trade["atr"],
+                    regime=trade["regime"],
+                    confidence=trade["confidence"],
+                    reason=trade["reason"],
+                )
 
-            sym = trade["symbol"]
-            # Check tradebook (not dict!) for duplicate active positions on this symbol
-            if sym in tradebook_active_symbols:
-                continue  # Already have an active trade on this coin
+                # Record in tradebook — use CoinDCX-confirmed values for live mode
+                entry_price = result.get("entry_price", 0) if result else 0
+                fill_qty    = result.get("quantity", trade["quantity"]) if result else trade["quantity"]
+                fill_lev    = result.get("leverage", trade["leverage"]) if result else trade["leverage"]
+                fill_capital = result.get("capital", 100.0) if result else 100.0
+                fill_sl     = result.get("stop_loss", 0) if result else 0
+                fill_tp     = result.get("take_profit", 0) if result else 0
 
-            # Execute the trade
-            logger.info(
-                "🔥 DEPLOYING: %s %s @ %dx | Regime: %s (%.0f%%) | Qty: %.6f",
-                trade["side"], sym, trade["leverage"],
-                trade["regime_name"], trade["confidence"] * 100, trade["quantity"],
-            )
-            result = self.executor.execute_trade(
-                symbol=sym,
-                side=trade["side"],
-                leverage=trade["leverage"],
-                quantity=trade["quantity"],
-                atr=trade["atr"],
-                regime=trade["regime"],
-                confidence=trade["confidence"],
-                reason=trade["reason"],
-            )
+                tradebook.open_trade(
+                    symbol=sym,
+                    side=trade["side"],
+                    leverage=fill_lev,
+                    quantity=fill_qty,
+                    entry_price=entry_price,
+                    atr=trade["atr"],
+                    regime=trade["regime_name"],
+                    confidence=trade["confidence"],
+                    reason=trade["reason"],
+                    capital=fill_capital,
+                    user_id=getattr(config, 'ENGINE_USER_ID', None),
+                    profile_id=profile_id,
+                    bot_name=profile["label"],
+                )
 
-            # Record in tradebook — use CoinDCX-confirmed values for live mode
-            entry_price = result.get("entry_price", 0) if result else 0
-            fill_qty    = result.get("quantity", trade["quantity"]) if result else trade["quantity"]
-            fill_lev    = result.get("leverage", trade["leverage"]) if result else trade["leverage"]
-            fill_capital = result.get("capital", 100.0) if result else 100.0
-            fill_sl     = result.get("stop_loss", 0) if result else 0
-            fill_tp     = result.get("take_profit", 0) if result else 0
+                self._active_positions[pos_key] = {
+                    "profile_id": profile_id,
+                    "bot_name": profile["label"],
+                    "regime": trade["regime_name"],
+                    "confidence": trade["confidence"],
+                    "side": trade["side"],
+                    "entry_time": datetime.now(IST).replace(tzinfo=None).isoformat(),
+                    "leverage": fill_lev,
+                    "entry_price": entry_price,
+                    "quantity": fill_qty,
+                    "exchange": result.get("exchange", "binance") if result else "binance",
+                    "position_id": result.get("position_id") if result else None,
+                }
+                tradebook_active_keys.add(pos_key)
+                self._trade_count += 1
+                deployed += 1
+                profile_deployed += 1
 
-            tradebook.open_trade(
-                symbol=sym,
-                side=trade["side"],
-                leverage=fill_lev,
-                quantity=fill_qty,
-                entry_price=entry_price,
-                atr=trade["atr"],
-                regime=trade["regime_name"],
-                confidence=trade["confidence"],
-                reason=trade["reason"],
-                capital=fill_capital,
-                user_id=getattr(config, 'ENGINE_USER_ID', None),
-            )
+                # Collect trade info for batch alert
+                deployed_trades.append({
+                    "symbol": sym,
+                    "position": "LONG" if trade["side"] == "BUY" else "SHORT",
+                    "regime": trade["regime_name"],
+                    "confidence": trade["confidence"],
+                    "leverage": fill_lev,
+                    "entry_price": entry_price,
+                    "stop_loss": fill_sl,
+                    "take_profit": fill_tp,
+                    "profile": profile["label"],
+                })
 
-            self._active_positions[sym] = {
-                "regime": trade["regime_name"],
-                "confidence": trade["confidence"],
-                "side": trade["side"],
-                "entry_time": datetime.now(IST).replace(tzinfo=None).isoformat(),
-                "leverage": fill_lev,
-                "entry_price": entry_price,
-                "quantity": fill_qty,
-                "exchange": result.get("exchange", "binance") if result else "binance",
-                "position_id": result.get("position_id") if result else None,
-            }
-            self._trade_count += 1
-            deployed += 1
-
-            # Collect trade info for batch alert
-            deployed_trades.append({
-                "symbol": sym,
-                "position": "LONG" if trade["side"] == "BUY" else "SHORT",
-                "regime": trade["regime_name"],
-                "confidence": trade["confidence"],
-                "leverage": fill_lev,
-                "entry_price": entry_price,
-                "stop_loss": fill_sl,
-                "take_profit": fill_tp,
-            })
+            if profile_deployed:
+                logger.info("   [%s] deployed %d trades", profile["label"], profile_deployed)
 
         # ── Batch Telegram notification for all deployed trades ──
         if deployed_trades:
@@ -431,9 +452,9 @@ class RegimeMasterBot:
         self._save_multi_state(symbols, eligible_trades, deployed)
 
         logger.info(
-            "📊 Cycle #%d complete | Scanned: %d | Eligible: %d | Deployed: %d | Active: %d/%d",
+            "📊 Cycle #%d complete | Scanned: %d | Eligible: %d | Deployed: %d | Active: %d | Profiles: %d",
             self._cycle_count, len(symbols), len(eligible_trades), deployed,
-            len(tradebook.get_active_trades()), config.MAX_CONCURRENT_POSITIONS,
+            len(tradebook.get_active_trades()), len(self._active_profiles),
         )
 
     # ─── Per-Coin Analysis ───────────────────────────────────────────────────
@@ -770,15 +791,10 @@ class RegimeMasterBot:
             sentiment_score=sentiment_score,
             orderflow_score=orderflow_score,
         )
-        leverage = self.risk.get_conviction_leverage(conviction)
-        if leverage == 0:
+        # Basic conviction floor — no profile will deploy below 40
+        if conviction < 40:
             self._coin_states[symbol]["action"] = f"LOW_CONVICTION:{conviction:.1f}"
             return None
-
-        # 6. Position sizing (per-coin budget)
-        coin_budget = balance * config.CAPITAL_PER_COIN_PCT
-        quantity    = self.risk.calculate_position_size(coin_budget, current_price, current_atr, leverage)
-        quantity    = round(quantity, 6)
 
         of_note = f" | OF={orderflow_score:+.2f}" if orderflow_score is not None else ""
         sn_note = f" | sent={sentiment_score:+.2f}" if sentiment_score is not None else ""
@@ -791,14 +807,60 @@ class RegimeMasterBot:
         return {
             "symbol": symbol,
             "side": side,
-            "leverage": leverage,
-            "quantity": quantity,
             "atr": current_atr,
             "regime": regime,
             "regime_name": regime_name,
             "confidence": conf,
             "conviction": conviction,
-            "reason": f"Trend {regime_name} | conf={conf:.0%} | conv={conviction:.1f} | lev={leverage}x{sn_note}{of_note}",
+            "reason": f"Trend {regime_name} | conf={conf:.0%} | conv={conviction:.1f}{sn_note}{of_note}",
+        }
+
+    # ─── Profile Evaluation ──────────────────────────────────────────────────
+
+    def _evaluate_for_profile(self, raw, profile_id, profile, balance):
+        """
+        Take a raw coin analysis result and apply a strategy profile's
+        conviction → leverage mapping + position sizing.
+        Returns a trade dict ready for deployment, or None if filtered out.
+        """
+        conviction = raw["conviction"]
+        symbol = raw["symbol"]
+
+        # Profile-specific leverage mapping
+        leverage = self.risk.get_conviction_leverage_for_profile(conviction, profile)
+        if leverage == 0:
+            return None
+
+        # Check profile's max position limit
+        profile_prefix = f"{profile_id}:"
+        profile_active = sum(1 for k in self._active_positions if k.startswith(profile_prefix))
+        max_pos = profile.get("max_positions", config.MAX_CONCURRENT_POSITIONS)
+        if profile_active >= max_pos:
+            return None
+
+        # Position sizing
+        coin_budget = balance * config.CAPITAL_PER_COIN_PCT
+        current_price = self._coin_states.get(symbol, {}).get("price", 0)
+        if current_price <= 0:
+            return None
+        quantity = self.risk.calculate_position_size(
+            coin_budget, current_price, raw["atr"], leverage
+        )
+        quantity = round(quantity, 6)
+
+        return {
+            "symbol": symbol,
+            "side": raw["side"],
+            "leverage": leverage,
+            "quantity": quantity,
+            "atr": raw["atr"],
+            "regime": raw["regime"],
+            "regime_name": raw["regime_name"],
+            "confidence": raw["confidence"],
+            "conviction": conviction,
+            "profile_id": profile_id,
+            "bot_name": profile["label"],
+            "reason": f"{profile['label']} | {raw['reason']} | lev={leverage}x",
         }
 
     # ─── Exit & Sync Logic ────────────────────────────────────────────────────
@@ -1091,6 +1153,10 @@ class RegimeMasterBot:
             "orderflow_stats":  self._get_orderflow_stats(),
             "paper_mode":       config.PAPER_TRADE,
             "cycle_execution_time_seconds": getattr(self, '_last_cycle_duration', 0),
+            "analysis_interval_seconds": config.ANALYSIS_INTERVAL_SECONDS,
+            "active_profiles":  {pid: {"label": p["label"], "confidence_min": p["confidence_min"],
+                                       "max_positions": p["max_positions"]}
+                                 for pid, p in self._active_profiles.items()},
         }
         try:
             with open(config.MULTI_STATE_FILE, "w") as f:

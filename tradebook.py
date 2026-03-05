@@ -84,7 +84,8 @@ def _compute_summary(book):
 # ═══════════════════════════════════════════════════════════════════════════════
 
 def open_trade(symbol, side, leverage, quantity, entry_price, atr,
-               regime, confidence, reason="", capital=100.0, mode=None, user_id=None):
+               regime, confidence, reason="", capital=100.0, mode=None, user_id=None,
+               profile_id="standard", bot_name="SM-Standard"):
     """
     Record a new trade entry in the tradebook.
 
@@ -107,11 +108,14 @@ def open_trade(symbol, side, leverage, quantity, entry_price, atr,
     """
     book = _load_book()
 
-    # Guard: prevent duplicate ACTIVE trades for the same symbol
-    existing = [t for t in book["trades"] if t["symbol"] == symbol and t["status"] == "ACTIVE"]
+    # Guard: prevent duplicate ACTIVE trades for the same symbol+profile
+    existing = [t for t in book["trades"]
+                if t["symbol"] == symbol
+                and t.get("profile_id", "standard") == profile_id
+                and t["status"] == "ACTIVE"]
     if existing:
-        logger.warning("⚠️ Skipping duplicate trade for %s — already have ACTIVE trade %s",
-                       symbol, existing[0]["trade_id"])
+        logger.warning("⚠️ Skipping duplicate trade for %s [%s] — already have ACTIVE trade %s",
+                       symbol, bot_name, existing[0]["trade_id"])
         return existing[0]["trade_id"]
 
     trade_id = _next_id(book)
@@ -194,6 +198,8 @@ def open_trade(symbol, side, leverage, quantity, entry_price, atr,
         "funding_cost":     0,
         "funding_payments": 0,
         "last_funding_check": now_iso,
+        "profile_id":       profile_id,
+        "bot_name":         bot_name,
     }
 
     book["trades"].append(trade)

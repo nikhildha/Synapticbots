@@ -395,8 +395,18 @@ export function BotsClient({ bots: initialBots }: BotsClientProps) {
                     </div>
                     <BotCard bot={bot} onToggle={handleBotToggle} liveTradeCount={liveTradeCount} />
                     <button onClick={() => handleDeleteBot(bot?.id)}
-                      className="absolute top-4 right-4 p-2 bg-[var(--color-danger)] text-white rounded-lg hover:opacity-80 transition-opacity">
-                      <Trash2 className="w-4 h-4" />
+                      title="Delete bot"
+                      style={{
+                        position: 'absolute', top: '56px', right: '16px', zIndex: 10,
+                        padding: '6px', borderRadius: '8px',
+                        background: 'rgba(239,68,68,0.15)', border: '1px solid rgba(239,68,68,0.3)',
+                        color: '#EF4444', cursor: 'pointer',
+                        transition: 'all 0.2s',
+                      }}
+                      onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(239,68,68,0.3)'; }}
+                      onMouseLeave={(e) => { e.currentTarget.style.background = 'rgba(239,68,68,0.15)'; }}
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
                     </button>
                   </div>
                 );

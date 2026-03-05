@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth-options';
+import { prisma } from '@/lib/prisma';
+import { syncEngineTrades, getUserTrades } from '@/lib/sync-engine-trades';
 import * as fs from 'fs';
 import * as path from 'path';
 
@@ -46,12 +48,12 @@ export async function GET() {
         // Try fetching from engine API first (production), fall back to local files
         const engineData = await fetchEngineData();
 
-        let multi: any, tradebook: any, engineState: any;
+        let multi: any, engineTradebook: any, engineState: any;
 
         if (engineData) {
             // Production: data from engine Express API
             multi = engineData.multi || {};
-            tradebook = engineData.tradebook || { trades: [], summary: {} };
+            engineTradebook = engineData.tradebook || { trades: [], summary: {} };
             engineState = engineData.engine || { status: 'running' };
         } else {
             // Local dev: read from filesystem
@@ -61,22 +63,45 @@ export async function GET() {
                 analysis_interval_seconds: 300,
                 deployed_count: 0,
             });
-            tradebook = readJSON('tradebook.json', { trades: [], stats: {} });
+            engineTradebook = readJSON('tradebook.json', { trades: [], stats: {} });
             engineState = readJSON('engine_state.json', { status: 'stopped' });
         }
 
-        // Build the response shape that the dashboard expects
+        // Build the engine state part of the response (shared — not per-user)
         const coinStates = multi.coin_states || {};
-        const allTrades = tradebook.trades || [];
+        const engineTradesRaw = engineTradebook.trades || [];
 
-        // Filter trades by user: for now, single-engine setup — all authenticated users see all trades
-        // Engine-side user_ids don't match SaaS Prisma user IDs, so we can't filter by userId
-        let trades: any[];
-        if (session) {
-            // Authenticated user sees all engine trades
-            trades = allTrades;
-        } else {
-            trades = [];
+        // ─── Per-User Trade Isolation ────────────────────────────────
+        let trades: any[] = [];
+
+        if (session && userId) {
+            // Find user's active bot to sync engine trades against
+            const userBot = await prisma.bot.findFirst({
+                where: { userId },
+                orderBy: { updatedAt: 'desc' },
+            });
+
+            if (userBot && engineTradesRaw.length > 0) {
+                // Sync engine trades into Prisma for this user's bot
+                // Only syncs trades whose entry_time >= bot.startedAt
+                try {
+                    await syncEngineTrades(
+                        engineTradesRaw,
+                        userBot.id,
+                        userBot.startedAt || userBot.createdAt
+                    );
+                } catch (err) {
+                    console.error('[bot-state] Trade sync failed:', err);
+                }
+            }
+
+            // Read this user's trades from Prisma (isolated)
+            try {
+                trades = await getUserTrades(userId);
+            } catch (err) {
+                console.error('[bot-state] getUserTrades failed:', err);
+                trades = [];
+            }
         }
 
         const activeTrades = trades.filter((t: any) => (t.status || '').toUpperCase() === 'ACTIVE');
@@ -105,7 +130,7 @@ export async function GET() {
             scanner: { coins: Object.keys(coinStates) },
             tradebook: {
                 trades,
-                summary: tradebook.stats || tradebook.summary || {},
+                summary: engineTradebook.stats || engineTradebook.summary || {},
             },
             engine: engineState,
         });

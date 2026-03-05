@@ -68,6 +68,37 @@ CONFIDENCE_HIGH = 0.99   # Above 99% → 35x  (optimized from 0.95)
 CONFIDENCE_MEDIUM = 0.96 # 96–99% → 25x  (optimized from 0.91)
 CONFIDENCE_LOW = 0.92    # 92–96% → 15x  (optimized from 0.85, below 92% = no deploy)
 
+# ─── Strategy Profiles ──────────────────────────────────────────────────────────
+# Each profile defines its own conviction thresholds, leverage mapping, risk params.
+# The HMM analysis runs ONCE; each profile then applies its own lens to the raw scores.
+STRATEGY_PROFILES = {
+    "standard": {
+        "label": "SM-Standard",
+        "confidence_min": 0.92,
+        "confidence_tiers": {0.99: 35, 0.96: 25, 0.92: 15},
+        "max_positions": 15,
+        "capital_per_trade": 100,
+        "atr_sl_mult": 1.5,
+        "atr_tp_mult": 3.0,
+        "trailing_sl": True,
+        "multi_target": True,
+        "mt_rr_ratio": 5,
+    },
+    "conservative": {
+        "label": "SM-Conservative",
+        "confidence_min": 0.97,
+        "confidence_tiers": {0.99: 10, 0.97: 5},
+        "max_positions": 5,
+        "capital_per_trade": 100,
+        "atr_sl_mult": 1.0,
+        "atr_tp_mult": 2.0,
+        "trailing_sl": True,
+        "multi_target": False,
+        "mt_rr_ratio": 3,
+    },
+}
+ACTIVE_PROFILES = list(STRATEGY_PROFILES.keys())  # Which profiles to run
+
 # ─── Risk Management ────────────────────────────────────────────────────────────
 RISK_PER_TRADE = 0.04
 KILL_SWITCH_DRAWDOWN = 0.10   # Pause bot if 10% drawdown in 24h
