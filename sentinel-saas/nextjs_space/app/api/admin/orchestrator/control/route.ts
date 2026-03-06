@@ -10,6 +10,9 @@ export async function POST(request: Request) {
         if (!session?.user) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
         }
+        if ((session.user as any)?.role !== 'admin') {
+            return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+        }
 
         const { botId, action } = await request.json();
         if (!botId || !['start', 'stop', 'restart'].includes(action)) {

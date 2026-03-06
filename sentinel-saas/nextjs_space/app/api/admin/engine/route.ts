@@ -1,4 +1,6 @@
 import { NextResponse } from 'next/server';
+import { getServerSession } from 'next-auth';
+import { authOptions } from '@/lib/auth-options';
 import { spawn, execSync } from 'child_process';
 import * as path from 'path';
 import * as fs from 'fs';
@@ -71,6 +73,11 @@ function getPythonBin(): string {
 // ─── GET: Engine status ─────────────────────────────────────────────────────
 
 export async function GET() {
+    const session = await getServerSession(authOptions);
+    if (!session?.user || (session.user as any)?.role !== 'admin') {
+        return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
+
     const pid = getStoredPid();
     const running = pid !== null;
 
@@ -85,6 +92,11 @@ export async function GET() {
 // ─── POST: Start / Stop engine ──────────────────────────────────────────────
 
 export async function POST(request: Request) {
+    const session = await getServerSession(authOptions);
+    if (!session?.user || (session.user as any)?.role !== 'admin') {
+        return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
+
     try {
         const { action } = await request.json();
 

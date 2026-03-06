@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth-options';
+import { clearUserTrades } from '@/lib/sync-engine-trades';
 import * as fs from 'fs';
 import * as path from 'path';
 
@@ -16,9 +17,22 @@ export async function POST() {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
         }
 
+        const userId = (session.user as any)?.id;
+        const isAdmin = (session.user as any)?.role === 'admin';
+
+        // Non-admin: clear only their own Prisma trades (isolated)
+        if (!isAdmin) {
+            const deletedCount = await clearUserTrades(userId);
+            return NextResponse.json({
+                success: true,
+                message: `Cleared ${deletedCount} trades`,
+                deletedCount,
+            });
+        }
+
+        // Admin: clear global engine tradebook.json + engine API
         let deletedCount = 0;
 
-        // ─── Clear tradebook.json (the actual data source) ───────────────
         const tbPath = path.join(DATA_DIR, 'tradebook.json');
         if (fs.existsSync(tbPath)) {
             try {
@@ -42,7 +56,6 @@ export async function POST() {
             }
         }
 
-        // ─── Also try engine API (production) ────────────────────────────
         if (ENGINE_API_URL) {
             try {
                 await fetch(`${ENGINE_API_URL}/api/reset-trades`, {
