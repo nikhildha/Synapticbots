@@ -5,7 +5,7 @@ import { Header } from '@/components/header';
 import { BotCard } from '@/components/bot-card';
 import {
   Plus, Trash2, Shield, TrendingUp, FlaskConical, Play, Rocket,
-  ChevronDown, ChevronUp, Power, PowerOff, Zap, Activity, Radio
+  ChevronDown, ChevronUp, Activity
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useSession } from 'next-auth/react';
@@ -66,8 +66,7 @@ export function BotsClient({ bots: initialBots }: BotsClientProps) {
   const [showDeployModal, setShowDeployModal] = useState(false);
   const [bots, setBots] = useState(initialBots);
   const [loading, setLoading] = useState(false);
-  const [engineOn, setEngineOn] = useState(false);
-  const [engineLoading, setEngineLoading] = useState(false);
+
 
   // Deploy modal state
   const [deployModel, setDeployModel] = useState('standard');
@@ -102,30 +101,7 @@ export function BotsClient({ bots: initialBots }: BotsClientProps) {
     return () => clearInterval(timer);
   }, [fetchLiveCount]);
 
-  // Check engine status on load
-  useEffect(() => {
-    checkEngineStatus();
-  }, []);
 
-  const checkEngineStatus = async () => {
-    try {
-      const res = await fetch('/api/admin/orchestrator/health');
-      setEngineOn(res.ok);
-    } catch {
-      setEngineOn(false);
-    }
-  };
-
-  const toggleEngine = async () => {
-    setEngineLoading(true);
-    try {
-      // Just toggle local state for now — will connect to orchestrator later
-      setEngineOn(!engineOn);
-    } catch (error) {
-      console.error('Engine toggle error:', error);
-    }
-    setEngineLoading(false);
-  };
 
   const handleBotToggle = async (botId: string, currentStatus: boolean) => {
     try {
@@ -226,51 +202,7 @@ export function BotsClient({ bots: initialBots }: BotsClientProps) {
       <main className="pt-24 pb-12 px-4">
         <div className="max-w-7xl mx-auto">
 
-          {/* ═══ ENGINE STATUS BAR (visible to admin, read-only for users) ═══ */}
-          <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }}
-            style={{
-              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-              padding: '14px 20px', borderRadius: '14px', marginBottom: '24px',
-              background: engineOn
-                ? 'linear-gradient(135deg, rgba(34,197,94,0.08), rgba(16,185,129,0.04))'
-                : 'linear-gradient(135deg, rgba(239,68,68,0.06), rgba(249,115,22,0.03))',
-              border: `1px solid ${engineOn ? 'rgba(34,197,94,0.2)' : 'rgba(239,68,68,0.15)'}`,
-            }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-              <div style={{
-                width: '10px', height: '10px', borderRadius: '50%',
-                background: engineOn ? '#22C55E' : '#EF4444',
-                boxShadow: engineOn ? '0 0 12px rgba(34,197,94,0.6)' : 'none',
-                animation: engineOn ? 'pulse 2s infinite' : 'none',
-              }} />
-              <div>
-                <div style={{ fontSize: '14px', fontWeight: 700, color: '#E5E7EB' }}>
-                  {engineOn ? '🟢 Engine Online' : '🔴 Engine Offline'}
-                </div>
-                <div style={{ fontSize: '11px', color: '#6B7280' }}>
-                  {engineOn
-                    ? 'Sentinel Marshal — HMM analysis active, ready for deployments'
-                    : 'Engine is not running. Start the engine to enable bot deployment.'}
-                </div>
-              </div>
-            </div>
-            <button
-              onClick={toggleEngine}
-              disabled={engineLoading}
-              style={{
-                display: 'flex', alignItems: 'center', gap: '6px',
-                padding: '8px 16px', borderRadius: '10px', border: 'none',
-                background: engineOn
-                  ? 'rgba(239,68,68,0.15)'
-                  : 'linear-gradient(135deg, #22C55E, #16A34A)',
-                color: engineOn ? '#EF4444' : '#fff',
-                fontSize: '12px', fontWeight: 700, cursor: 'pointer',
-                transition: 'all 0.2s',
-              }}>
-              {engineOn ? <PowerOff size={14} /> : <Power size={14} />}
-              {engineLoading ? 'Processing...' : engineOn ? 'Stop Engine' : 'Start Engine'}
-            </button>
-          </motion.div>
+
 
           {/* ═══ SECTION 1: BOT MANAGEMENT ═══ */}
           <div className="flex items-center justify-between mb-6">
@@ -297,19 +229,7 @@ export function BotsClient({ bots: initialBots }: BotsClientProps) {
             </button>
           </div>
 
-          {/* ── Engine offline info (informational only, doesn't block bot creation) ── */}
-          {!engineOn && (
-            <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
-              style={{
-                background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.2)',
-                borderRadius: '12px', padding: '16px 20px', marginBottom: '24px',
-                display: 'flex', alignItems: 'center', gap: '12px',
-                fontSize: '13px', color: '#F59E0B',
-              }}>
-              <Activity size={18} />
-              <span>Engine is offline. You can still create bots — they will start receiving trades once the engine comes online.</span>
-            </motion.div>
-          )}
+
 
           {/* ── Sentinel Marshal Card (shows when no bots yet) ── */}
           {bots.length === 0 && (
@@ -337,10 +257,10 @@ export function BotsClient({ bots: initialBots }: BotsClientProps) {
               <div style={{
                 display: 'inline-flex', alignItems: 'center', gap: '6px',
                 padding: '4px 12px', borderRadius: '20px', fontSize: '11px',
-                background: engineOn ? 'rgba(34,197,94,0.1)' : 'rgba(245,158,11,0.1)',
-                color: engineOn ? '#22C55E' : '#F59E0B', fontWeight: 600,
+                background: 'rgba(34,197,94,0.1)',
+                color: '#22C55E', fontWeight: 600,
               }}>
-                <Activity size={12} /> {engineOn ? 'Engine Ready — Deploy your first bot' : 'Deploy a bot — it will activate when engine starts'}
+                <Activity size={12} /> Deploy your first bot to start trading
               </div>
               <div style={{ marginTop: '20px' }}>
                 <button

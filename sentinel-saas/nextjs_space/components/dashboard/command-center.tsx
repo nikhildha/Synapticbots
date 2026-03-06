@@ -83,7 +83,7 @@ export function RegimeCard({ regime, confidence, symbol, macroRegime, trend15m, 
             backdropFilter: 'blur(12px)',
             border: `1px solid ${info.color}33`,
             borderRadius: '16px',
-            padding: '20px 24px',
+            padding: '14px 20px',
             position: 'relative',
             overflow: 'hidden',
         }}>
@@ -168,9 +168,11 @@ export function RegimeCard({ regime, confidence, symbol, macroRegime, trend15m, 
 
 interface PnlCardProps {
     trades: any[];
+    coinDcxBalance?: number | null;
+    binanceBalance?: number | null;
 }
 
-export function PnlCard({ trades }: PnlCardProps) {
+export function PnlCard({ trades, coinDcxBalance, binanceBalance }: PnlCardProps) {
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const chartRef = useRef<any>(null);
     const MAX_CAPITAL = 2500;
@@ -345,12 +347,12 @@ export function PnlCard({ trades }: PnlCardProps) {
             padding: '20px 24px',
         }}>
             {/* Header: PNL headline */}
-            <div style={{ marginBottom: '12px' }}>
+            <div style={{ marginBottom: '12px', textAlign: 'center' }}>
                 <div style={{
                     fontSize: '11px', fontWeight: 600, textTransform: 'uppercase' as const,
                     letterSpacing: '1.5px', color: '#9CA3AF', marginBottom: '4px',
                 }}>P&L Timeline</div>
-                <div style={{ fontSize: '32px', fontWeight: 700, color: mainColor }}>
+                <div style={{ fontSize: '38px', fontWeight: 700, color: mainColor }}>
                     {sign}${totalPnl.toFixed(2)}
                 </div>
                 <div style={{ fontSize: '11px', color: '#9CA3AF', marginTop: '2px' }}>
@@ -377,6 +379,40 @@ export function PnlCard({ trades }: PnlCardProps) {
                     </div>
                 )}
             </div>
+
+            {/* Wallet Balances */}
+            {(coinDcxBalance != null || binanceBalance != null) && (
+                <div style={{ marginTop: '12px', borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: '10px' }}>
+                    <div style={{
+                        fontSize: '9px', fontWeight: 600, textTransform: 'uppercase' as const,
+                        letterSpacing: '1px', color: '#6B7280', marginBottom: '6px',
+                    }}>Wallet Balances</div>
+                    <div style={{ display: 'flex', gap: '8px' }}>
+                        {binanceBalance != null && (
+                            <div style={{
+                                flex: 1, padding: '8px 10px', borderRadius: '10px',
+                                background: 'rgba(245,158,11,0.06)', border: '1px solid rgba(245,158,11,0.15)',
+                            }}>
+                                <div style={{ fontSize: '9px', fontWeight: 600, color: '#F59E0B', marginBottom: '2px' }}>🔶 Binance</div>
+                                <div style={{ fontSize: '16px', fontWeight: 700, color: '#F0F4F8', fontFamily: 'monospace' }}>
+                                    ${binanceBalance.toFixed(2)}
+                                </div>
+                            </div>
+                        )}
+                        {coinDcxBalance != null && (
+                            <div style={{
+                                flex: 1, padding: '8px 10px', borderRadius: '10px',
+                                background: 'rgba(14,165,233,0.06)', border: '1px solid rgba(14,165,233,0.15)',
+                            }}>
+                                <div style={{ fontSize: '9px', fontWeight: 600, color: '#0EA5E9', marginBottom: '2px' }}>🇮🇳 CoinDCX</div>
+                                <div style={{ fontSize: '16px', fontWeight: 700, color: '#F0F4F8', fontFamily: 'monospace' }}>
+                                    ${coinDcxBalance.toFixed(2)}
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            )}
         </div>
     );
 }
