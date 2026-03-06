@@ -191,7 +191,17 @@ export function PnlCard({ trades, coinDcxBalance, binanceBalance }: PnlCardProps
             if (status === 'CLOSED') {
                 realized += (t.pnl || t.realized_pnl || t.total_pnl || 0);
             } else if (status === 'ACTIVE') {
-                unrealized += (t.unrealized_pnl || t.active_pnl || 0);
+                // Compute unrealized PnL from prices (avoids stale engine values)
+                const entry = t.entry_price || t.entryPrice || 0;
+                const current = t.current_price || t.currentPrice || entry;
+                const lev = t.leverage || 1;
+                const cap = t.capital || t.position_size || 100;
+                const pos = (t.side || t.position || '').toUpperCase();
+                const isLong = pos === 'BUY' || pos === 'LONG';
+                if (entry > 0) {
+                    const diff = isLong ? (current - entry) : (entry - current);
+                    unrealized += Math.round(diff / entry * lev * cap * 10000) / 10000;
+                }
                 activeCount++;
             }
         });
@@ -221,9 +231,18 @@ export function PnlCard({ trades, coinDcxBalance, binanceBalance }: PnlCardProps
                     const raw = t.entry_time || t.entryTime || t.timestamp || '';
                     const sanitized = String(raw).replace(/(\.\d{3})\d+/, '$1');
                     const d = new Date(sanitized);
-                    const pnl = (t.status || '').toUpperCase() === 'CLOSED'
-                        ? (t.pnl || t.realized_pnl || t.total_pnl || 0)
-                        : (t.unrealized_pnl || t.active_pnl || 0);
+                    let pnl: number;
+                    if ((t.status || '').toUpperCase() === 'CLOSED') {
+                        pnl = t.pnl || t.realized_pnl || t.total_pnl || 0;
+                    } else {
+                        const entry = t.entry_price || t.entryPrice || 0;
+                        const current = t.current_price || t.currentPrice || entry;
+                        const lev = t.leverage || 1;
+                        const cap = t.capital || t.position_size || 100;
+                        const pos = (t.side || t.position || '').toUpperCase();
+                        const isLong = pos === 'BUY' || pos === 'LONG';
+                        pnl = entry > 0 ? Math.round((isLong ? current - entry : entry - current) / entry * lev * cap * 10000) / 10000 : 0;
+                    }
                     return { time: d, pnl, valid: !isNaN(d.getTime()) };
                 })
                 .filter(t => t.valid)

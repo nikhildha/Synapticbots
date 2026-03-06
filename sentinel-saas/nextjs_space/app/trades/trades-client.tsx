@@ -241,7 +241,17 @@ export function TradesClient({ trades: initialTrades }: TradesClientProps) {
     const losses = closed.filter(t => t.totalPnl <= 0);
     const winRate = closed.length > 0 ? (wins.length / closed.length) * 100 : 0;
     const realizedPnl = closed.reduce((s, t) => s + (t.totalPnl || 0), 0);
-    const unrealizedPnl = active.reduce((s, t) => s + (t.activePnl || 0), 0);
+    // Recalculate unrealized PnL from live prices (matches table P&L formula)
+    const unrealizedPnl = active.reduce((s, t) => {
+      const sym = (t.symbol || t.coin + 'USDT').toUpperCase();
+      const cp = livePrices[sym] || t.currentPrice || t.entryPrice;
+      if (!cp || !t.entryPrice || t.entryPrice === 0) return s;
+      const pos = (t.position || '').toLowerCase();
+      const isLong = pos === 'long' || pos === 'buy';
+      const diff = isLong ? (cp - t.entryPrice) : (t.entryPrice - cp);
+      const pnl = Math.round(diff / t.entryPrice * t.leverage * t.capital * 10000) / 10000;
+      return s + pnl;
+    }, 0);
     const combinedPnl = realizedPnl + unrealizedPnl;
 
     const allPnlPcts = [
@@ -283,7 +293,7 @@ export function TradesClient({ trades: initialTrades }: TradesClientProps) {
       bestTrade, worstTrade,
       maxDD, maxDDPct, profitFactor, riskReward,
     };
-  }, [trades]);
+  }, [trades, livePrices]);
 
   /* ── CSV Export ── */
   const exportCSV = () => {
