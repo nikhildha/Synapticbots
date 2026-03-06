@@ -45,34 +45,33 @@ export async function GET() {
         let trades: any[] = [];
 
         if (session && userId) {
-            // Find user's active bot to sync engine trades against
-            const userBot = await prisma.bot.findFirst({
-                where: { userId },
-                orderBy: { updatedAt: 'desc' },
-            });
+            if (isAdmin) {
+                // Admin: see all engine trades directly (same as tradebook page)
+                trades = engineTradesRaw;
+            } else {
+                // Regular user: sync engine trades into their bot, then read from DB
+                const userBot = await prisma.bot.findFirst({
+                    where: { userId },
+                    orderBy: { updatedAt: 'desc' },
+                });
 
-            // Sync engine trades for ANY user with an active bot.
-            // This is a copy-trade model: the single engine produces trades
-            // and all users with a running bot mirror them.
-            if (userBot && engineTradesRaw.length > 0) {
-                // Sync engine trades into Prisma for this user's bot
-                // Only syncs trades whose entry_time >= bot.startedAt
+                if (userBot && engineTradesRaw.length > 0) {
+                    try {
+                        // Pass null so ALL engine positions sync regardless of when the bot was started.
+                        // This ensures users see pre-existing engine positions immediately after deployment.
+                        await syncEngineTrades(engineTradesRaw, userBot.id, null);
+                    } catch (err) {
+                        console.error('[bot-state] Trade sync failed:', err);
+                    }
+                }
+
                 try {
-                    await syncEngineTrades(engineTradesRaw, userBot.id, userBot.startedAt ?? null);
+                    trades = await getUserTrades(userId);
                 } catch (err) {
-                    console.error('[bot-state] Trade sync failed:', err);
+                    console.error('[bot-state] getUserTrades failed:', err);
+                    trades = [];
                 }
             }
-
-            // Read this user's trades from Prisma (isolated)
-            try {
-                trades = await getUserTrades(userId);
-            } catch (err) {
-                console.error('[bot-state] getUserTrades failed:', err);
-                trades = [];
-            }
-
-            // NOTE: No fallback to raw engine trades — that would expose all users' data to everyone
         }
 
         const activeTrades = trades.filter((t: any) => (t.status || '').toUpperCase() === 'ACTIVE');

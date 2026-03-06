@@ -7,7 +7,7 @@ import { syncEngineTrades, getUserTrades } from '@/lib/sync-engine-trades';
 export const dynamic = 'force-dynamic';
 
 // ─── Engine API URL (Railway internal) or local fallback ────────────────
-const ENGINE_API_URL = process.env.ENGINE_API_URL;
+const ENGINE_API_URL = process.env.ENGINE_API_URL || process.env.PYTHON_ENGINE_URL;
 
 async function fetchEngineTrades(): Promise<any[]> {
     if (!ENGINE_API_URL) return [];
@@ -54,7 +54,7 @@ export async function GET(request: NextRequest) {
             try {
                 const engineTrades = await fetchEngineTrades();
                 if (engineTrades.length > 0) {
-                    await syncEngineTrades(engineTrades, userBot.id, userBot.startedAt ?? null);
+                    await syncEngineTrades(engineTrades, userBot.id, null);
                 }
             } catch (err) {
                 console.error('[trades] Sync failed:', err);

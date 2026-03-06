@@ -7,7 +7,7 @@ import { syncEngineTrades, getUserTrades } from '@/lib/sync-engine-trades';
 
 export const dynamic = 'force-dynamic';
 
-const ENGINE_API_URL = process.env.ENGINE_API_URL;
+const ENGINE_API_URL = process.env.ENGINE_API_URL || process.env.PYTHON_ENGINE_URL;
 
 async function fetchEngineTradesAll(): Promise<any[]> {
   if (!ENGINE_API_URL) return [];
@@ -86,7 +86,7 @@ export default async function TradesPage() {
     if (userBot && engineTrades.length > 0) {
       try {
         // Pass null to sync ALL engine trades regardless of bot start time
-        await syncEngineTrades(engineTrades, userBot.id, userBot.startedAt ?? null);
+        await syncEngineTrades(engineTrades, userBot.id, null);
       } catch (err) {
         console.error('[trades-page] Sync failed:', err);
       }
