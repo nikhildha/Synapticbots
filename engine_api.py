@@ -152,6 +152,8 @@ def api_reset_trades():
         book = tb._load_book()
         count = len(book.get("trades", []))
         book["trades"] = []
+        book["summary"] = {}
+        tb._compute_summary(book)
         tb._save_book(book)
         return jsonify({"success": True, "deletedCount": count})
     except Exception as e:

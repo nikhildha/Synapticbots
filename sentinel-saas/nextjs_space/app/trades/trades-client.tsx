@@ -141,10 +141,9 @@ export function TradesClient({ trades: initialTrades }: TradesClientProps) {
       if (res.ok) {
         const data = await res.json();
         const raw = data?.tradebook?.trades || [];
-        if (raw.length > 0) {
-          setTrades(raw.map(mapTrade));
-          setLastRefresh(new Date().toLocaleTimeString());
-        }
+        // Always update — even if empty — so stale trades get cleared
+        setTrades(raw.map(mapTrade));
+        setLastRefresh(new Date().toLocaleTimeString());
       }
     } catch {
       // silent

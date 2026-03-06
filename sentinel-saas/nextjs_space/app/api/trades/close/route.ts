@@ -92,17 +92,24 @@ export async function POST(request: Request) {
                     const engineRes = await fetch(`${ENGINE_API_URL}/api/close-trade`, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ trade_id: tradeId, symbol }),
+                        body: JSON.stringify({ trade_id: tradeId, symbol, reason: 'MANUAL_CLOSE' }),
                         signal: AbortSignal.timeout(10000),
                     });
-                    if (engineRes.ok) {
-                        const engineData = await engineRes.json();
+                    const engineData = await engineRes.json();
+                    if (engineRes.ok && engineData.success) {
                         return NextResponse.json({
                             success: true, source: 'engine',
                             closed: engineData.closed || [{ trade_id: tradeId, symbol }],
                         });
                     }
-                } catch { /* engine close failed */ }
+                    // Engine returned an error — pass it through
+                    return NextResponse.json(
+                        { error: engineData.error || 'Engine failed to close trade' },
+                        { status: engineRes.status || 404 }
+                    );
+                } catch (err) {
+                    console.error('[trades/close] Engine close failed:', err);
+                }
             }
 
             return NextResponse.json({ error: 'No matching active trade found' }, { status: 404 });
