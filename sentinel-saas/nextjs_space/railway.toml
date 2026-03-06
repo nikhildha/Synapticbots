@@ -1,2 +1,5 @@
+[build]
+buildCommand = "npm run build"
+
 [deploy]
-startCommand = "npx next start -p ${PORT:-8080}"
+startCommand = "npx prisma db push --accept-data-loss || true && npx next start -p 8080"
