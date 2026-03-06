@@ -37,52 +37,6 @@ export async function POST(request: Request) {
       },
     });
 
-    // Send notification to admin
-    try {
-      const user = await prisma.user.findUnique({
-        where: { id: session.user.id },
-      });
-
-      const appUrl = process.env.NEXTAUTH_URL || '';
-      const appName = appUrl ? new URL(appUrl).hostname.split('.')[0] : 'Sentinel';
-
-      const htmlBody = `
-        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-          <h2 style="color: #0891B2; border-bottom: 2px solid #0891B2; padding-bottom: 10px;">
-            Subscription Update - Sentinel
-          </h2>
-          <div style="background: #f0f9ff; padding: 20px; border-radius: 8px; margin: 20px 0;">
-            <p style="margin: 10px 0;"><strong>User:</strong> ${user?.name ?? 'N/A'}</p>
-            <p style="margin: 10px 0;"><strong>Email:</strong> ${user?.email ?? 'N/A'}</p>
-            <p style="margin: 10px 0;"><strong>New Tier:</strong> ${tier.toUpperCase()}</p>
-            <p style="margin: 10px 0;"><strong>Coin Scans:</strong> ${coinScans}</p>
-            ${razorpayPaymentId ? `<p style="margin: 10px 0;"><strong>Payment ID:</strong> ${razorpayPaymentId}</p>` : ''}
-          </div>
-          <p style="color: #666; font-size: 12px;">
-            Updated at: ${new Date().toLocaleString()}
-          </p>
-        </div>
-      `;
-
-      await fetch('https://apps.abacus.ai/api/sendNotificationEmail', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          deployment_token: process.env.ABACUSAI_API_KEY,
-          app_id: process.env.WEB_APP_ID,
-          notification_id: process.env.NOTIF_ID_SUBSCRIPTION_CHANGE,
-          subject: `Subscription Update: ${user?.name ?? 'User'} - ${tier.toUpperCase()}`,
-          body: htmlBody,
-          is_html: true,
-          recipient_email: 'nikhildha@gmail.com',
-          sender_email: `noreply@${appUrl ? new URL(appUrl).hostname : 'sentinel.app'}`,
-          sender_alias: appName,
-        }),
-      });
-    } catch (emailError) {
-      console.error('Failed to send subscription notification:', emailError);
-    }
-
     return NextResponse.json({ success: true, subscription });
   } catch (error: any) {
     console.error('Subscription update error:', error);

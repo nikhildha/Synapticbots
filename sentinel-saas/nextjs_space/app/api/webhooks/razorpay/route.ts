@@ -118,37 +118,6 @@ export async function POST(request: Request) {
                 `[Razorpay Webhook] Updated subscription for ${email}: tier=${tier}, ends=${periodEnd.toISOString()}`
             );
 
-            // Notify admin via email
-            try {
-                const appUrl = process.env.NEXTAUTH_URL || '';
-                const appName = appUrl ? new URL(appUrl).hostname.split('.')[0] : 'Sentinel';
-
-                await fetch('https://apps.abacus.ai/api/sendNotificationEmail', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        deployment_token: process.env.ABACUSAI_API_KEY,
-                        app_id: process.env.WEB_APP_ID,
-                        notification_id: process.env.NOTIF_ID_SUBSCRIPTION_CHANGE,
-                        subject: `💰 Payment: ${user.name ?? email} upgraded to ${tier.toUpperCase()}`,
-                        body: `<div style="font-family: Arial, sans-serif;">
-              <h2 style="color: #10b981;">Payment Received</h2>
-              <p><b>User:</b> ${user.name} (${email})</p>
-              <p><b>Tier:</b> ${tier.toUpperCase()}</p>
-              <p><b>Amount:</b> ₹${payment.amount / 100}</p>
-              <p><b>Payment ID:</b> ${razorpayPaymentId}</p>
-              <p><b>Period End:</b> ${periodEnd.toLocaleDateString()}</p>
-            </div>`,
-                        is_html: true,
-                        recipient_email: process.env.ADMIN_EMAIL || 'admin@sentinel.app',
-                        sender_email: `noreply@${appUrl ? new URL(appUrl).hostname : 'sentinel.app'}`,
-                        sender_alias: appName,
-                    }),
-                });
-            } catch (emailError) {
-                console.error('Failed to send payment notification:', emailError);
-            }
-
             return NextResponse.json({ success: true, tier, userId: user.id });
         }
 
