@@ -97,27 +97,36 @@ def api_health():
 
 @app.route("/api/close-trade", methods=["POST"])
 def api_close_trade():
-    """Write a close command for the engine to pick up."""
+    """Directly close a trade in the tradebook."""
+    import tradebook as tb
+
     data = request.get_json() or {}
     trade_id = data.get("trade_id")
     symbol = data.get("symbol")
+    reason = data.get("reason", "MANUAL_CLOSE")
 
     if not trade_id and not symbol:
         return jsonify({"error": "trade_id or symbol required"}), 400
 
-    # Write close command to commands.json
-    cmd = {
-        "command": "CLOSE_TRADE",
-        "trade_id": trade_id,
-        "symbol": symbol,
-        "timestamp": datetime.now(IST).isoformat(),
-    }
     try:
-        cmd_path = config.COMMANDS_FILE
-        with open(cmd_path, "w") as f:
-            json.dump(cmd, f)
-        return jsonify({"success": True, "command": cmd})
+        result = tb.close_trade(trade_id=trade_id, symbol=symbol, reason=reason)
+        if result is None:
+            return jsonify({"error": "No matching active trade found"}), 404
+
+        # Normalize to list
+        closed = result if isinstance(result, list) else [result]
+        return jsonify({
+            "success": True,
+            "closed": [{
+                "trade_id": t.get("trade_id"),
+                "symbol": t.get("symbol"),
+                "exit_price": t.get("exit_price"),
+                "realized_pnl": t.get("realized_pnl"),
+                "realized_pnl_pct": t.get("realized_pnl_pct"),
+            } for t in closed],
+        })
     except Exception as e:
+        logger.error("Close trade error: %s", e)
         return jsonify({"error": str(e)}), 500
 
 
