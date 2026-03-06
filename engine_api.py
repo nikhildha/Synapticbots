@@ -57,7 +57,19 @@ def api_all():
         "coin_states": {},
         "last_analysis_time": None,
     })
-    tradebook = _read_json("tradebook.json", {"trades": [], "stats": {}})
+    tradebook = _read_json("tradebook.json", {"trades": [], "summary": {}})
+    # ── Safeguard: auto-fix stale summary if trades array is empty ──
+    tb_trades = tradebook.get("trades", [])
+    tb_summary = tradebook.get("summary", {})
+    if len(tb_trades) == 0 and tb_summary.get("active_trades", 0) > 0:
+        logger.warning("Stale summary detected: trades=[] but active_trades=%d. Auto-fixing.",
+                       tb_summary.get("active_trades", 0))
+        import tradebook as tb
+        book = tb._load_book()
+        book["trades"] = []
+        tb._compute_summary(book)
+        tb._save_book(book)
+        tradebook = book
     engine = _read_json("engine_state.json", {"status": "running"})
 
     return jsonify({
