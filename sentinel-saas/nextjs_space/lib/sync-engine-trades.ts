@@ -24,10 +24,10 @@ export async function syncEngineTrades(
 
     for (const t of engineTrades) {
         try {
-            // Parse entry_time safely (handle Python microsecond precision)
-            const rawTime = t.entry_time || t.entryTime || t.timestamp || '';
+            // Parse entry time — engine uses "entry_timestamp", fallback to other names
+            const rawTime = t.entry_timestamp || t.entry_time || t.entryTime || t.timestamp || '';
             const sanitized = String(rawTime).replace(/(\.\d{3})\d+/, '$1');
-            const entryTime = new Date(sanitized);
+            const entryTime = rawTime ? new Date(sanitized) : new Date();
             if (isNaN(entryTime.getTime())) continue;
 
             // Only sync trades after bot was started
@@ -39,11 +39,12 @@ export async function syncEngineTrades(
             const status = (t.status || 'active').toLowerCase();
             const side = (t.side || t.position || '').toLowerCase();
 
-            // Parse exit time if exists
+            // Parse exit time — engine uses "exit_timestamp", fallback to other names
             let exitTime: Date | null = null;
-            if (t.exit_time || t.exitTime) {
-                const rawExit = String(t.exit_time || t.exitTime).replace(/(\.\d{3})\d+/, '$1');
-                const d = new Date(rawExit);
+            const rawExit = t.exit_timestamp || t.exit_time || t.exitTime || null;
+            if (rawExit) {
+                const sanitizedExit = String(rawExit).replace(/(\.\d{3})\d+/, '$1');
+                const d = new Date(sanitizedExit);
                 if (!isNaN(d.getTime())) exitTime = d;
             }
 
