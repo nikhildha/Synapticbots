@@ -3,26 +3,11 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth-options';
 import { prisma } from '@/lib/prisma';
 import { syncEngineTrades, getUserTrades } from '@/lib/sync-engine-trades';
-import * as fs from 'fs';
-import * as path from 'path';
 
 export const dynamic = 'force-dynamic';
 
-// ─── Engine API URL (Railway internal) or local file fallback ────────────────
+// ─── Engine API URL (Railway) ────────────────────────────────────────────────
 const ENGINE_API_URL = process.env.ENGINE_API_URL || process.env.PYTHON_ENGINE_URL;
-
-// Sentinelbot reads directly from its own data/ folder (local dev)
-const DATA_DIR = path.resolve(process.cwd(), '..', '..', 'data');
-
-function readJSON(filename: string, fallback: any = {}) {
-    try {
-        const filepath = path.join(DATA_DIR, filename);
-        if (fs.existsSync(filepath)) {
-            return JSON.parse(fs.readFileSync(filepath, 'utf-8'));
-        }
-    } catch { /* silent */ }
-    return fallback;
-}
 
 async function fetchEngineData() {
     if (!ENGINE_API_URL) return null;
@@ -45,27 +30,12 @@ export async function GET() {
         const userId = (session?.user as any)?.id;
         const isAdmin = (session?.user as any)?.role === 'admin';
 
-        // Try fetching from engine API first (production), fall back to local files
+        // Fetch from engine API (production)
         const engineData = await fetchEngineData();
 
-        let multi: any, engineTradebook: any, engineState: any;
-
-        if (engineData) {
-            // Production: data from engine Express API
-            multi = engineData.multi || {};
-            engineTradebook = engineData.tradebook || { trades: [], summary: {} };
-            engineState = engineData.engine || { status: 'running' };
-        } else {
-            // Local dev: read from filesystem
-            multi = readJSON('multi_bot_state.json', {
-                coin_states: {},
-                last_analysis_time: null,
-                analysis_interval_seconds: 300,
-                deployed_count: 0,
-            });
-            engineTradebook = readJSON('tradebook.json', { trades: [], stats: {} });
-            engineState = readJSON('engine_state.json', { status: 'stopped' });
-        }
+        const multi = engineData?.multi || { coin_states: {}, last_analysis_time: null, deployed_count: 0 };
+        const engineTradebook = engineData?.tradebook || { trades: [], summary: {} };
+        const engineState = engineData?.engine || { status: ENGINE_API_URL ? 'unknown' : 'not_configured' };
 
         // Build the engine state part of the response (shared — not per-user)
         const coinStates = multi.coin_states || {};

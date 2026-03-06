@@ -2,8 +2,6 @@ import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth-options';
 import { prisma } from '@/lib/prisma';
-import * as fs from 'fs';
-import * as path from 'path';
 
 export const dynamic = 'force-dynamic';
 
@@ -87,9 +85,8 @@ export async function POST(request: Request) {
             });
         }
 
-        // ─── Fallback: close via engine or local tradebook.json ─────────
+        // ─── Fallback: close via engine API ──────────────────────────────
         if (!trade) {
-            // Try engine API first (production)
             if (ENGINE_API_URL) {
                 try {
                     const engineRes = await fetch(`${ENGINE_API_URL}/api/close-trade`, {
@@ -105,77 +102,7 @@ export async function POST(request: Request) {
                             closed: engineData.closed || [{ trade_id: tradeId, symbol }],
                         });
                     }
-                } catch { /* fall through to local */ }
-            }
-
-            // Local dev fallback: close directly in tradebook.json
-            const dataDir = path.resolve(process.cwd(), '..', '..', 'data');
-            const tbPath = path.join(dataDir, 'tradebook.json');
-            if (fs.existsSync(tbPath)) {
-                try {
-                    const tbData = JSON.parse(fs.readFileSync(tbPath, 'utf-8'));
-                    const allTrades: any[] = tbData.trades || [];
-
-                    // Parse composite IDs like "T-0030-BTCUSDT" → trade_id="T-0030", symbol="BTCUSDT"
-                    let searchTradeId = tradeId;
-                    let searchSymbol = symbol;
-                    if (tradeId && tradeId.match(/^T-\d+-\w+/)) {
-                        const parts = tradeId.match(/^(T-\d+)-(.+)$/);
-                        if (parts) {
-                            searchTradeId = parts[1];
-                            searchSymbol = searchSymbol || parts[2];
-                        }
-                    }
-
-                    const idx = allTrades.findIndex((t: any) => {
-                        const tid = t.trade_id || t.id || '';
-                        const sym = t.symbol || t.coin || '';
-                        const st = (t.status || '').toUpperCase();
-                        if (st !== 'ACTIVE') return false;
-                        // Match by both trade_id AND symbol for exact identification
-                        if (searchTradeId && searchSymbol) {
-                            return tid === searchTradeId && sym.toUpperCase() === searchSymbol.toUpperCase();
-                        }
-                        if (searchTradeId && tid === searchTradeId) return true;
-                        if (searchSymbol && sym.toUpperCase() === searchSymbol.toUpperCase()) return true;
-                        return false;
-                    });
-
-                    if (idx >= 0) {
-                        const raw = allTrades[idx];
-                        const entry = raw.entry_price || raw.entryPrice || 0;
-                        const curPrice = raw.current_price || raw.currentPrice || entry;
-                        const cap = raw.capital || raw.position_size || 0;
-                        const lev = raw.leverage || 1;
-                        const isLong = ['buy', 'long'].includes((raw.side || raw.position || '').toLowerCase());
-                        const diff = isLong ? (curPrice - entry) : (entry - curPrice);
-                        const pnl = Math.round(diff / entry * lev * cap * 10000) / 10000;
-                        const pnlPct = cap > 0 ? Math.round(pnl / cap * 100 * 100) / 100 : 0;
-
-                        allTrades[idx] = {
-                            ...raw,
-                            status: 'CLOSED',
-                            exit_price: curPrice,
-                            exit_time: new Date().toISOString(),
-                            exit_reason: 'MANUAL_CLOSE',
-                            realized_pnl: pnl,
-                            realized_pnl_pct: pnlPct,
-                        };
-                        tbData.trades = allTrades;
-                        fs.writeFileSync(tbPath, JSON.stringify(tbData, null, 2));
-
-                        return NextResponse.json({
-                            success: true, source: 'tradebook',
-                            closed: [{
-                                trade_id: raw.trade_id || raw.id,
-                                symbol: raw.symbol || raw.coin,
-                                pnl, pnl_pct: pnlPct,
-                            }],
-                        });
-                    }
-                } catch (err) {
-                    console.error('Tradebook JSON close failed:', err);
-                }
+                } catch { /* engine close failed */ }
             }
 
             return NextResponse.json({ error: 'No matching active trade found' }, { status: 404 });
