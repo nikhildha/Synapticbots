@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { TrendingUp, TrendingDown, BarChart2, Trophy, Activity, ChevronDown, ChevronUp } from 'lucide-react';
+import { Header } from '@/components/header';
 
 interface BotSession {
     id: string;
@@ -90,7 +91,9 @@ export function PerformanceClient({ sessions, summary, activeSessionId }: Props)
     const toggle = (id: string) => setExpanded(prev => prev === id ? null : id);
 
     return (
-        <div className="min-h-screen bg-[var(--color-bg)] text-[var(--color-text)] px-4 py-8 max-w-6xl mx-auto">
+        <div className="min-h-screen bg-[var(--color-bg)] text-[var(--color-text)]">
+            <Header />
+            <div className="px-4 py-8 max-w-6xl mx-auto">
             <h1 className="text-2xl font-bold mb-1">Performance History</h1>
             <p className="text-sm text-[var(--color-text-secondary)] mb-6">All-time bot run records, session by session.</p>
 
@@ -211,6 +214,7 @@ export function PerformanceClient({ sessions, summary, activeSessionId }: Props)
                     ))}
                 </div>
             )}
+            </div>
         </div>
     );
 }
