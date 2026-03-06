@@ -627,13 +627,7 @@ class RegimeMasterBot:
         except Exception as e:
             logger.debug("Multi-TF TA failed for %s: %s", symbol, e)
 
-        # ── CRASH on either timeframe → skip ──
-        if regime == config.REGIME_CRASH:
-            self._coin_states[symbol]["action"] = "CRASH_SKIP"
-            return None
-        if macro_regime_name == "CRASH":
-            self._coin_states[symbol]["action"] = "MACRO_CRASH_SKIP"
-            return None
+        # NOTE: With HMM_N_STATES=3, CRASH is merged into BEAR. No separate CRASH check needed.
 
         # ── Multi-TF conflict filter (1h vs 4h must agree on direction) ──
         if macro_regime_name:

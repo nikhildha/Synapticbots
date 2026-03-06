@@ -81,11 +81,11 @@ export async function GET() {
                 orderBy: { updatedAt: 'desc' },
             });
 
-            // Only sync engine trades for ADMIN users.
-            // Regular users only read their own Prisma trades — they never
-            // inherit trades from the shared engine tradebook.
-            if (isAdmin && userBot && engineTradesRaw.length > 0) {
-                // Sync engine trades into Prisma for admin's bot
+            // Sync engine trades for ANY user with an active bot.
+            // This is a copy-trade model: the single engine produces trades
+            // and all users with a running bot mirror them.
+            if (userBot && engineTradesRaw.length > 0) {
+                // Sync engine trades into Prisma for this user's bot
                 // Only syncs trades whose entry_time >= bot.startedAt
                 try {
                     await syncEngineTrades(

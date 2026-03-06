@@ -50,9 +50,7 @@ class RiskManager:
         -------
         int : leverage value (0 = skip trade)
         """
-        # Crash regime → stay out completely
-        if regime == config.REGIME_CRASH:
-            return 0
+        # NOTE: With HMM_N_STATES=3, CRASH is merged into BEAR — no separate check needed.
 
         # Chop regime → low leverage for mean reversion (still requires 85%+ confidence)
         if regime == config.REGIME_CHOP:
@@ -225,13 +223,12 @@ class RiskManager:
 
     @staticmethod
     def _score_btc_macro(btc_regime, regime: int, side: str) -> float:
-        """Factor 2: BTC macro regime alignment (max 18 pts).
-        Penalises trading against macro trend or during crash."""
+        """Factor 2: BTC macro regime alignment (max pts).
+        Penalises trading against macro trend."""
         w = config.CONVICTION_WEIGHT_BTC_MACRO
         if btc_regime is None:
             return w * 0.50  # no BTC data — neutral half
-        if btc_regime == config.REGIME_CRASH:
-            return -config.CONVICTION_CRASH_PENALTY
+        # NOTE: With HMM_N_STATES=3, CRASH is merged into BEAR — no separate crash penalty
         if (side == "BUY"  and btc_regime == config.REGIME_BULL) or \
            (side == "SELL" and btc_regime == config.REGIME_BEAR):
             return w           # aligned with macro
