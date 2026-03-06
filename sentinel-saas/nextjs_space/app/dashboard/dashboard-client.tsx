@@ -227,23 +227,7 @@ export function DashboardClient({ user, stats, bots, recentTrades }: DashboardCl
                     </div>
                   );
                 })()}
-                {(() => {
-                  const engineTs = botState?.multi?.timestamp || botState?.state?.timestamp;
-                  if (!engineTs) return null;
-                  const lastRun = new Date(engineTs).getTime();
-                  const intervalMs = 300000; // 5 minutes
-                  const nextRun = new Date(lastRun + intervalMs);
-                  const now = Date.now();
-                  const diff = nextRun.getTime() - now;
-                  const nextLabel = diff > 0
-                    ? `Next cycle: ${nextRun.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit', timeZone: 'Asia/Kolkata' })} IST`
-                    : 'Cycle running...';
-                  return (
-                    <span className="text-xs text-[var(--color-text-secondary)]">
-                      {nextLabel}
-                    </span>
-                  );
-                })()}
+
               </div>
             </div>
           </motion.div>

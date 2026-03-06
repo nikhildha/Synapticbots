@@ -115,6 +115,8 @@ export function TradesClient({ trades: initialTrades }: TradesClientProps) {
   const [trades, setTrades] = useState<Trade[]>(initialTrades);
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'closed'>('active');
   const [closingTradeId, setClosingTradeId] = useState<string | null>(null);
+  const [confirmingTradeId, setConfirmingTradeId] = useState<string | null>(null); // two-click Book Profit
+  const [confirmingClear, setConfirmingClear] = useState(false); // two-click Clear Trades
   const [btcPrices, setBtcPrices] = useState<{ time: number; price: number }[]>([]);
   const [livePrices, setLivePrices] = useState<Record<string, number>>({});
   const [posFilter, setPosFilter] = useState<string>('all');
@@ -254,9 +256,20 @@ export function TradesClient({ trades: initialTrades }: TradesClientProps) {
     }, 0);
     const combinedPnl = realizedPnl + unrealizedPnl;
 
+    // Compute P&L % from live prices for active trades (avoids stale engine values)
+    const activePnlPcts = active.map(t => {
+      const sym = (t.symbol || t.coin + 'USDT').toUpperCase();
+      const cp = livePrices[sym] || t.currentPrice || t.entryPrice;
+      if (!cp || !t.entryPrice || t.entryPrice === 0 || !t.capital || t.capital === 0) return 0;
+      const pos = (t.position || '').toLowerCase();
+      const isLong = pos === 'long' || pos === 'buy';
+      const diff = isLong ? (cp - t.entryPrice) : (t.entryPrice - cp);
+      const pnl = Math.round(diff / t.entryPrice * t.leverage * t.capital * 10000) / 10000;
+      return Math.round(pnl / t.capital * 100 * 100) / 100;
+    });
     const allPnlPcts = [
       ...closed.map(t => t.totalPnlPercent || 0),
-      ...active.map(t => t.activePnlPercent || 0),
+      ...activePnlPcts,
     ];
     const bestTrade = allPnlPcts.length > 0 ? Math.max(...allPnlPcts) : 0;
     const worstTrade = allPnlPcts.length > 0 ? Math.min(...allPnlPcts) : 0;
@@ -328,7 +341,13 @@ export function TradesClient({ trades: initialTrades }: TradesClientProps) {
   }, [trades]);
 
   const clearAllTrades = async () => {
-    if (!confirm('⚠️ Clear ALL trades from the tradebook? This cannot be undone.')) return;
+    // Two-click pattern: first click sets confirmingClear, second executes
+    if (!confirmingClear) {
+      setConfirmingClear(true);
+      setTimeout(() => setConfirmingClear(false), 5000); // auto-cancel after 5s
+      return;
+    }
+    setConfirmingClear(false);
     setIsClearing(true);
     setClearSuccess(null);
     try {
@@ -343,10 +362,12 @@ export function TradesClient({ trades: initialTrades }: TradesClientProps) {
         setTimeout(() => setClearSuccess(null), 8000);
       } else {
         const err = await res.json();
-        alert(err.error || 'Failed to clear trades');
+        setClearSuccess(`❌ ${err.error || 'Failed to clear trades'}`);
+        setTimeout(() => setClearSuccess(null), 5000);
       }
     } catch {
-      alert('Network error');
+      setClearSuccess('❌ Network error');
+      setTimeout(() => setClearSuccess(null), 5000);
     } finally {
       setIsClearing(false);
     }
@@ -383,11 +404,13 @@ export function TradesClient({ trades: initialTrades }: TradesClientProps) {
                 <button onClick={clearAllTrades} disabled={isClearing} style={{
                   display: 'flex', alignItems: 'center', gap: '6px',
                   padding: '10px 14px', borderRadius: '12px', border: 'none',
-                  background: 'rgba(239,68,68,0.1)', color: '#EF4444',
+                  background: confirmingClear ? 'rgba(239,68,68,0.3)' : 'rgba(239,68,68,0.1)',
+                  color: '#EF4444',
                   fontSize: '13px', fontWeight: 600, cursor: 'pointer',
                   opacity: isClearing ? 0.5 : 1,
+                  ...(confirmingClear ? { animation: 'pulse 1s infinite', border: '1px solid #EF4444' } : {}),
                 }}>
-                  <Trash2 size={14} /> {isClearing ? 'Clearing...' : 'Clear Trades'}
+                  <Trash2 size={14} /> {isClearing ? 'Clearing...' : confirmingClear ? '⚠️ Click again to confirm' : 'Clear Trades'}
                 </button>
               </div>
             </div>
@@ -615,7 +638,13 @@ export function TradesClient({ trades: initialTrades }: TradesClientProps) {
                                 <button
                                   disabled={closingTradeId === t.id}
                                   onClick={async () => {
-                                    if (!confirm(`Close ${t.coin} trade at current price?`)) return;
+                                    // Two-click pattern: first click shows confirm, second executes
+                                    if (confirmingTradeId !== t.id) {
+                                      setConfirmingTradeId(t.id);
+                                      setTimeout(() => setConfirmingTradeId(prev => prev === t.id ? null : prev), 5000);
+                                      return;
+                                    }
+                                    setConfirmingTradeId(null);
                                     setClosingTradeId(t.id);
                                     try {
                                       const res = await fetch('/api/trades/close', {
@@ -624,19 +653,23 @@ export function TradesClient({ trades: initialTrades }: TradesClientProps) {
                                         body: JSON.stringify({ tradeId: t.id, symbol: t.symbol }),
                                       });
                                       if (res.ok) {
-                                        window.location.reload();
+                                        // Remove from local state immediately
+                                        setTrades(prev => prev.filter(tr => tr.id !== t.id));
                                       } else {
                                         const err = await res.json();
-                                        alert(err.error || 'Failed to close trade');
+                                        setClearSuccess(`❌ ${err.error || 'Failed to close trade'}`);
+                                        setTimeout(() => setClearSuccess(null), 5000);
                                       }
                                     } catch {
-                                      alert('Network error');
+                                      setClearSuccess('❌ Network error');
+                                      setTimeout(() => setClearSuccess(null), 5000);
                                     } finally {
                                       setClosingTradeId(null);
                                     }
                                   }}
                                   style={{
-                                    padding: '4px 10px', borderRadius: '6px', border: 'none',
+                                    padding: '4px 10px', borderRadius: '6px',
+                                    border: confirmingTradeId === t.id ? '1px solid #22C55E' : 'none',
                                     fontSize: '10px', fontWeight: 700, cursor: 'pointer',
                                     background: pnl >= 0 ? 'rgba(34,197,94,0.2)' : 'rgba(239,68,68,0.2)',
                                     color: pnl >= 0 ? '#22C55E' : '#EF4444',
@@ -644,7 +677,7 @@ export function TradesClient({ trades: initialTrades }: TradesClientProps) {
                                     opacity: closingTradeId === t.id ? 0.5 : 1,
                                   }}
                                 >
-                                  {closingTradeId === t.id ? '...' : pnl >= 0 ? '💰 Book Profit' : '✕ Close'}
+                                  {closingTradeId === t.id ? '...' : confirmingTradeId === t.id ? '⚡ Confirm?' : pnl >= 0 ? '💰 Book Profit' : '✕ Close'}
                                 </button>
                               )}
                             </td>
