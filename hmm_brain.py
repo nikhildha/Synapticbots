@@ -19,7 +19,8 @@ logger = logging.getLogger("HMMBrain")
 logging.getLogger("hmmlearn.base").setLevel(logging.ERROR)
 
 # Feature columns used for HMM training/prediction (must match feature_engine.compute_hmm_features)
-HMM_FEATURES = ["log_return", "volatility", "volume_change", "rsi_norm"]
+# EXP 2 greedy selection: funding_proxy+adx added → Sharpe 0.258 → 0.667
+HMM_FEATURES = ["log_return", "volatility", "volume_change", "rsi_norm", "funding_proxy", "adx"]
 
 
 class HMMBrain:

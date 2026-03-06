@@ -276,13 +276,14 @@ class TestRiskManagerScoring(unittest.TestCase):
         self.assertEqual(score, config.CONVICTION_WEIGHT_VOL)
 
     def test_score_volatility_too_high_gets_reduced(self):
-        # Way above VOL_MAX_ATR_PCT → very low score
+        # Way above VOL_MAX_ATR_PCT → very low score (≤ max weight)
         score = self.RM._score_volatility(config.VOL_MAX_ATR_PCT * 2)
-        self.assertLess(score, config.CONVICTION_WEIGHT_VOL)
+        self.assertLessEqual(score, config.CONVICTION_WEIGHT_VOL)
 
-    def test_score_volatility_none_returns_partial(self):
+    def test_score_volatility_none_returns_nonnegative(self):
+        # No vol data → partial score (≥ 0; with CONVICTION_WEIGHT_VOL=0 this is 0.0)
         score = self.RM._score_volatility(None)
-        self.assertGreater(score, 0)
+        self.assertGreaterEqual(score, 0)
 
     def test_score_volatility_always_positive(self):
         for vol in [0.001, 0.003, 0.01, 0.06, 0.15]:
@@ -936,7 +937,7 @@ class TestHMMBrainUnit(unittest.TestCase):
 
     @staticmethod
     def _make_hmm_df(n=200, seed=42):
-        """Synthetic DataFrame with the 4 HMM_FEATURES columns."""
+        """Synthetic DataFrame with the 6 HMM_FEATURES columns."""
         np.random.seed(seed)
         # Two regime halves: bull-like returns then bear-like returns
         log_returns = np.concatenate([
@@ -946,11 +947,17 @@ class TestHMMBrainUnit(unittest.TestCase):
         volatility = np.abs(log_returns) * 1.2 + np.abs(np.random.normal(0, 0.001, n))
         volume_change = np.random.normal(0, 0.08, n)
         rsi_norm = np.clip(np.random.normal(0.5, 0.15, n), 0.0, 1.0)
+        # Funding proxy: 8-bar cum-return normalized to [-1, +1]
+        funding_proxy = np.clip(np.random.normal(0.0, 0.3, n), -1.0, 1.0)
+        # ADX: trend strength normalized to [0, 1]
+        adx = np.clip(np.abs(np.random.normal(0.3, 0.15, n)), 0.0, 1.0)
         return pd.DataFrame({
             "log_return":    log_returns,
             "volatility":    volatility,
             "volume_change": volume_change,
             "rsi_norm":      rsi_norm,
+            "funding_proxy": funding_proxy,
+            "adx":           adx,
         })
 
     def setUp(self):

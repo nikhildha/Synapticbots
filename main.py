@@ -14,7 +14,7 @@ IST = timezone(timedelta(hours=5, minutes=30))
 import config
 from hmm_brain import HMMBrain
 from data_pipeline import fetch_klines, get_multi_timeframe_data, _get_binance_client
-from feature_engine import compute_all_features, compute_hmm_features, compute_trend, compute_support_resistance, compute_ema
+from feature_engine import compute_all_features, compute_hmm_features, compute_trend, compute_support_resistance, compute_sr_position, compute_ema
 from execution_engine import ExecutionEngine
 from risk_manager import RiskManager
 from sideways_strategy import evaluate_mean_reversion
@@ -498,6 +498,8 @@ class RegimeMasterBot:
             self._coin_brains[macro_key] = macro_brain
 
         macro_regime_name = None
+        sr_pos_4h   = None
+        vwap_pos_4h = None
         try:
             df_4h = fetch_klines(symbol, config.TIMEFRAME_MACRO, limit=config.HMM_LOOKBACK)
             if df_4h is not None and len(df_4h) >= 60:
@@ -508,6 +510,8 @@ class RegimeMasterBot:
                 if macro_brain.is_trained:
                     macro_regime, macro_conf = macro_brain.predict(df_4h_feat)
                     macro_regime_name = macro_brain.get_regime_name(macro_regime)
+                # 4h S/R: 50-bar lookback = ~200h / 8 days — structural swing levels
+                sr_pos_4h, vwap_pos_4h = compute_sr_position(df_4h_feat, lookback=50)
         except Exception as e:
             logger.debug("4h macro analysis failed for %s: %s", symbol, e)
 
@@ -788,6 +792,8 @@ class RegimeMasterBot:
             funding_rate=funding,
             oi_change=oi_chg,
             volatility=volatility,
+            sr_position=sr_pos_4h,
+            vwap_position=vwap_pos_4h,
             sentiment_score=sentiment_score,
             orderflow_score=orderflow_score,
         )

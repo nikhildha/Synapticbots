@@ -16,17 +16,19 @@ logger = logging.getLogger("FeatureEngine")
 def compute_hmm_features(df):
     """
     Add HMM-ready features to an OHLCV DataFrame.
-    
+
     Adds:
-      - log_return : log(close / prev_close)
-      - volatility : intraday range = (high - low) / close
-      - volume_change : log(volume / prev_volume), clamped [-3, 3]
-      - rsi_norm : (RSI_14 - 50) / 50, range [-1, +1]
-    
+      - log_return     : log(close / prev_close)
+      - volatility     : intraday range = (high - low) / close
+      - volume_change  : log(volume / prev_volume), clamped [-3, 3]
+      - rsi_norm       : (RSI_14 - 50) / 50, range [-1, +1]
+      - funding_proxy  : 8-bar cum-return clipped to [-1, +1] (crowding proxy)
+      - adx            : ADX(14) / 100, range [0, 1] (trend strength)
+
     Parameters
     ----------
     df : pd.DataFrame with columns ['open', 'high', 'low', 'close', 'volume']
-    
+
     Returns
     -------
     pd.DataFrame with added feature columns (NaN rows NOT dropped)
@@ -41,6 +43,12 @@ def compute_hmm_features(df):
     rsi = compute_rsi(df["close"], length=14)
     df["rsi_norm"] = (rsi - 50) / 50  # Range: -1 to +1
     df["rsi_norm"] = df["rsi_norm"].fillna(0)
+    # Funding-rate proxy: 8-bar cum-return normalized → crowding signal
+    df["funding_proxy"] = df["close"].pct_change(8).clip(-0.3, 0.3) / 0.3
+    df["funding_proxy"] = df["funding_proxy"].fillna(0)
+    # ADX trend strength normalized to [0, 1]
+    df["adx"] = compute_adx(df, length=14)
+    df["adx"] = df["adx"].fillna(0)
     return df
 
 
@@ -117,12 +125,56 @@ def compute_atr(df, length=14):
     return atr
 
 
+def compute_adx(df, length=14):
+    """
+    Compute Average Directional Index (ADX), normalized to [0, 1].
+
+    Parameters
+    ----------
+    df : pd.DataFrame with 'high', 'low', 'close'
+    length : int — smoothing period (default 14)
+
+    Returns
+    -------
+    pd.Series in range [0, 1] (raw ADX / 100)
+    """
+    high = df["high"]
+    low = df["low"]
+    prev_high = high.shift(1)
+    prev_low = low.shift(1)
+    prev_close = df["close"].shift(1)
+
+    dm_plus_raw = high - prev_high
+    dm_minus_raw = prev_low - low
+
+    dm_plus = dm_plus_raw.where((dm_plus_raw > dm_minus_raw) & (dm_plus_raw > 0), 0.0)
+    dm_minus = dm_minus_raw.where((dm_minus_raw > dm_plus_raw) & (dm_minus_raw > 0), 0.0)
+
+    tr = pd.concat([
+        high - low,
+        (high - prev_close).abs(),
+        (low - prev_close).abs(),
+    ], axis=1).max(axis=1)
+
+    atr_s = tr.ewm(alpha=1 / length, min_periods=length, adjust=False).mean()
+    sm_plus = dm_plus.ewm(alpha=1 / length, min_periods=length, adjust=False).mean()
+    sm_minus = dm_minus.ewm(alpha=1 / length, min_periods=length, adjust=False).mean()
+
+    di_plus = 100 * sm_plus / atr_s.replace(0, np.nan)
+    di_minus = 100 * sm_minus / atr_s.replace(0, np.nan)
+    di_sum = (di_plus + di_minus).replace(0, np.nan)
+
+    dx = 100 * (di_plus - di_minus).abs() / di_sum
+    adx = dx.ewm(alpha=1 / length, min_periods=length, adjust=False).mean()
+    return adx / 100  # normalize to [0, 1]
+
+
 def compute_indicators(df):
     """
     Add all technical indicators to an OHLCV DataFrame.
-    
+
     Adds: rsi, bb_upper, bb_middle, bb_lower, atr
-    
+
     Returns
     -------
     pd.DataFrame (copy with new columns)
