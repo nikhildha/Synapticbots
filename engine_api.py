@@ -1,5 +1,5 @@
 """
-Engine API — Lightweight Flask server that wraps main.py.
+Engine API v2.1 — Lightweight Flask server that wraps main.py.
 Runs the trading bot in a background thread and exposes REST endpoints
 for the Next.js dashboard to consume.
 
@@ -7,7 +7,8 @@ Endpoints:
   GET  /api/all          — returns multi_bot_state, tradebook, engine_state
   GET  /api/health       — engine status, uptime, cycle info
   POST /api/close-trade  — write close command for a specific trade
-  POST /api/reset-trades — clear tradebook
+  POST /api/close-all    — close all open positions
+  POST /api/reset-trades — clear tradebook (both JSON + in-memory)
 """
 import json
 import os
