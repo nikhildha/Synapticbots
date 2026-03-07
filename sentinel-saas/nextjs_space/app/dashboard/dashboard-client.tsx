@@ -318,26 +318,96 @@ export function DashboardClient({ user, stats, bots, recentTrades }: DashboardCl
                 const cycle = botState?.multi?.cycle || 0;
                 const coinsScanned = botState?.multi?.coins_scanned || 0;
                 const isOn = engineTs && (Date.now() - new Date(engineTs).getTime()) < 600000;
+                const bc = '#F0B90B'; // Binance yellow
 
                 return (
                   <div style={{
-                    background: 'rgba(10,14,26,0.95)',
-                    border: `1px solid ${isOn ? 'rgba(34,197,94,0.1)' : 'rgba(239,68,68,0.1)'}`,
-                    borderRadius: '20px', padding: '20px',
+                    background: 'transparent',
+                    borderRadius: '20px', padding: '12px 20px',
                     display: 'flex', flexDirection: 'column' as const, alignItems: 'center',
                     justifyContent: 'center', minHeight: '180px',
+                    position: 'relative' as const,
                   }}>
-                    {/* Large translucent blinking brain */}
-                    <div style={{
-                      fontSize: '72px', lineHeight: 1,
-                      opacity: isOn ? 1 : 0.3,
-                      filter: isOn ? `drop-shadow(0 0 20px ${isOn ? 'rgba(34,197,94,0.4)' : 'rgba(239,68,68,0.3)'})` : 'none',
-                      animation: isOn ? 'pulse 2s ease-in-out infinite' : 'none',
-                      marginBottom: '8px',
-                    }}>
-                      🧠
-                    </div>
-                    <div style={{ fontSize: '10px', fontWeight: 800, letterSpacing: '3px', textTransform: 'uppercase' as const, color: '#F0B90B' }}>
+                    {/* SVG Wireframe Brain */}
+                    <svg viewBox="0 0 200 180" style={{ width: '220px', height: '160px' }}>
+                      <defs>
+                        <filter id="brainGlow2">
+                          <feGaussianBlur stdDeviation="3" result="blur" />
+                          <feComposite in="SourceGraphic" in2="blur" operator="over" />
+                        </filter>
+                        <filter id="outerGlow">
+                          <feGaussianBlur stdDeviation="6" result="blur" />
+                          <feMerge>
+                            <feMergeNode in="blur" />
+                            <feMergeNode in="blur" />
+                            <feMergeNode in="SourceGraphic" />
+                          </feMerge>
+                        </filter>
+                        <radialGradient id="bgGlow2" cx="50%" cy="50%">
+                          <stop offset="0%" stopColor={bc} stopOpacity="0.12" />
+                          <stop offset="70%" stopColor={bc} stopOpacity="0.03" />
+                          <stop offset="100%" stopColor={bc} stopOpacity="0" />
+                        </radialGradient>
+                      </defs>
+
+                      {/* Radial background glow */}
+                      <circle cx="100" cy="80" r="80" fill="url(#bgGlow2)">
+                        {isOn && <animate attributeName="r" values="70;85;70" dur="3s" repeatCount="indefinite" />}
+                      </circle>
+
+                      {/* Brain outline — side profile */}
+                      <g filter="url(#outerGlow)" opacity={isOn ? 1 : 0.3}>
+                        {isOn && <animate attributeName="opacity" values="0.7;1;0.7" dur="2s" repeatCount="indefinite" />}
+                        {/* Left hemisphere outline */}
+                        <path d="M100,30 C65,30 40,50 38,75 C36,95 45,110 55,120 C60,125 62,132 65,140 L75,140 C72,130 68,120 60,115 C50,108 44,95 45,80 C46,60 65,42 95,40"
+                          fill="none" stroke={bc} strokeWidth="1.5" strokeLinecap="round" />
+                        {/* Right hemisphere outline */}
+                        <path d="M100,30 C135,30 160,50 162,75 C164,95 155,110 145,120 C140,125 138,132 135,140 L125,140 C128,130 132,120 140,115 C150,108 156,95 155,80 C154,60 135,42 105,40"
+                          fill="none" stroke={bc} strokeWidth="1.5" strokeLinecap="round" />
+                        {/* Top curve */}
+                        <path d="M72,38 C80,28 90,25 100,25 C110,25 120,28 128,38"
+                          fill="none" stroke={bc} strokeWidth="1.2" strokeLinecap="round" />
+                        {/* Brain folds — left */}
+                        <path d="M55,65 C65,60 80,62 90,58" fill="none" stroke={bc} strokeWidth="0.8" opacity="0.6" />
+                        <path d="M50,80 C62,75 78,78 92,72" fill="none" stroke={bc} strokeWidth="0.8" opacity="0.6" />
+                        <path d="M52,95 C64,90 76,93 88,88" fill="none" stroke={bc} strokeWidth="0.8" opacity="0.5" />
+                        {/* Brain folds — right */}
+                        <path d="M145,65 C135,60 120,62 110,58" fill="none" stroke={bc} strokeWidth="0.8" opacity="0.6" />
+                        <path d="M150,80 C138,75 122,78 108,72" fill="none" stroke={bc} strokeWidth="0.8" opacity="0.6" />
+                        <path d="M148,95 C136,90 124,93 112,88" fill="none" stroke={bc} strokeWidth="0.8" opacity="0.5" />
+                        {/* Central fissure */}
+                        <path d="M100,30 L100,105" fill="none" stroke={bc} strokeWidth="0.6" opacity="0.4" strokeDasharray="4,3" />
+                        {/* Brain stem */}
+                        <path d="M92,120 C95,130 98,138 100,145 C102,138 105,130 108,120"
+                          fill="none" stroke={bc} strokeWidth="1.2" opacity="0.7" />
+                      </g>
+
+                      {/* Neural network dots — scattered across brain */}
+                      {isOn && [
+                        [60, 55], [75, 45], [85, 65], [70, 85], [58, 100],
+                        [140, 55], [125, 45], [115, 65], [130, 85], [142, 100],
+                        [100, 50], [95, 75], [105, 75], [100, 95], [80, 105], [120, 105],
+                      ].map(([x, y], i) => (
+                        <circle key={i} cx={x} cy={y} r="1.5" fill={bc} opacity="0">
+                          <animate attributeName="opacity" values="0;0.8;0" dur={`${1.5 + (i % 5) * 0.4}s`} begin={`${i * 0.2}s`} repeatCount="indefinite" />
+                          <animate attributeName="r" values="1;2.5;1" dur={`${1.5 + (i % 5) * 0.4}s`} begin={`${i * 0.2}s`} repeatCount="indefinite" />
+                        </circle>
+                      ))}
+
+                      {/* Connection lines between neural dots */}
+                      {isOn && [
+                        [60, 55, 85, 65], [75, 45, 100, 50], [85, 65, 100, 95],
+                        [140, 55, 115, 65], [125, 45, 100, 50], [115, 65, 100, 95],
+                        [70, 85, 95, 75], [130, 85, 105, 75], [80, 105, 100, 95], [120, 105, 100, 95],
+                      ].map(([x1, y1, x2, y2], i) => (
+                        <line key={`l${i}`} x1={x1} y1={y1} x2={x2} y2={y2}
+                          stroke={bc} strokeWidth="0.4" opacity="0">
+                          <animate attributeName="opacity" values="0;0.3;0" dur={`${2 + i * 0.3}s`} begin={`${i * 0.15}s`} repeatCount="indefinite" />
+                        </line>
+                      ))}
+                    </svg>
+
+                    <div style={{ fontSize: '10px', fontWeight: 800, letterSpacing: '3px', textTransform: 'uppercase' as const, color: bc }}>
                       Synaptic Core Brain
                     </div>
                     {isOn && (
