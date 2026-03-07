@@ -169,6 +169,22 @@ function ExchangeBlock({ exchange, label, accentColor, placeholder }: {
   const [saving, setSaving] = useState(false);
   const [testResult, setTestResult] = useState<TestResult>(null);
   const [saveMsg, setSaveMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  const [savedBalance, setSavedBalance] = useState<number | null | undefined>(undefined); // undefined=loading, null=not connected
+  const [savedConnected, setSavedConnected] = useState(false);
+
+  // Load existing connection status on mount
+  useEffect(() => {
+    fetch('/api/wallet-balance', { cache: 'no-store' })
+      .then(r => r.ok ? r.json() : null)
+      .then(d => {
+        if (!d) { setSavedBalance(null); return; }
+        const bal = exchange === 'binance' ? d.binance : d.coindcx;
+        const connected = exchange === 'binance' ? d.binanceConnected : d.coindcxConnected;
+        setSavedBalance(bal);
+        setSavedConnected(connected);
+      })
+      .catch(() => setSavedBalance(null));
+  }, [exchange]);
 
   const handleTest = async () => {
     if (!apiKey || !apiSecret) {
@@ -210,8 +226,21 @@ function ExchangeBlock({ exchange, label, accentColor, placeholder }: {
         body: JSON.stringify({ exchange, apiKey, apiSecret }),
       });
       if (res.ok) {
-        setSaveMsg({ ok: true, text: 'API keys saved — balance will update on dashboard' });
+        setSaveMsg({ ok: true, text: 'Saved! Balance updating…' });
         setTimeout(() => setSaveMsg(null), 5000);
+        // Refresh the connection status pill after save
+        setSavedBalance(undefined);
+        setSavedConnected(false);
+        fetch('/api/wallet-balance', { cache: 'no-store' })
+          .then(r => r.ok ? r.json() : null)
+          .then(d => {
+            if (!d) { setSavedBalance(null); return; }
+            const bal = exchange === 'binance' ? d.binance : d.coindcx;
+            const connected = exchange === 'binance' ? d.binanceConnected : d.coindcxConnected;
+            setSavedBalance(bal);
+            setSavedConnected(connected);
+          })
+          .catch(() => setSavedBalance(null));
       } else {
         const d = await res.json();
         setSaveMsg({ ok: false, text: d.error || 'Failed to save' });
@@ -232,29 +261,52 @@ function ExchangeBlock({ exchange, label, accentColor, placeholder }: {
     }}>
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px' }}>
-        <div style={{ fontSize: '13px', fontWeight: 700, color: accentColor }}>{label}</div>
-        {testResult?.ok && (
-          <div style={{
-            display: 'flex', alignItems: 'center', gap: '6px',
-            fontSize: '12px', fontWeight: 700,
-            color: '#22C55E',
-            background: 'rgba(34,197,94,0.12)',
-            padding: '4px 10px', borderRadius: '8px',
-          }}>
-            <CheckCircle size={12} />
-            {testResult.balance != null ? `$${testResult.balance.toFixed(2)} USDT` : testResult.email || 'Connected'}
-          </div>
-        )}
-        {testResult && !testResult.ok && (
-          <div style={{
-            display: 'flex', alignItems: 'center', gap: '6px',
-            fontSize: '12px', color: '#EF4444',
-            background: 'rgba(239,68,68,0.1)',
-            padding: '4px 10px', borderRadius: '8px',
-          }}>
-            <AlertCircle size={12} /> {testResult.error}
-          </div>
-        )}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <div style={{ fontSize: '13px', fontWeight: 700, color: accentColor }}>{label}</div>
+          {/* Saved connection status (loaded on mount) */}
+          {savedBalance === undefined && (
+            <span style={{ fontSize: '10px', color: '#6B7280' }}>checking…</span>
+          )}
+          {savedBalance === null && savedConnected && (
+            <span style={{
+              fontSize: '10px', fontWeight: 600, color: '#F59E0B',
+              background: 'rgba(245,158,11,0.1)', padding: '2px 8px', borderRadius: '6px',
+            }}>🔑 Keys saved · balance unavailable</span>
+          )}
+          {savedBalance != null && (
+            <span style={{
+              fontSize: '11px', fontWeight: 700, color: '#22C55E',
+              background: 'rgba(34,197,94,0.1)', padding: '2px 8px', borderRadius: '6px',
+              display: 'flex', alignItems: 'center', gap: '4px',
+            }}>
+              <CheckCircle size={10} /> Connected · ${savedBalance.toFixed(2)} USDT
+            </span>
+          )}
+          {savedBalance === null && !savedConnected && (
+            <span style={{ fontSize: '10px', color: '#6B7280', fontStyle: 'italic' }}>Not connected</span>
+          )}
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+          {testResult?.ok && (
+            <div style={{
+              display: 'flex', alignItems: 'center', gap: '6px',
+              fontSize: '12px', fontWeight: 700, color: '#22C55E',
+              background: 'rgba(34,197,94,0.12)', padding: '4px 10px', borderRadius: '8px',
+            }}>
+              <CheckCircle size={12} />
+              {testResult.balance != null ? `$${testResult.balance.toFixed(2)} USDT` : testResult.email || 'Connected'}
+            </div>
+          )}
+          {testResult && !testResult.ok && (
+            <div style={{
+              display: 'flex', alignItems: 'center', gap: '6px',
+              fontSize: '12px', color: '#EF4444',
+              background: 'rgba(239,68,68,0.1)', padding: '4px 10px', borderRadius: '8px',
+            }}>
+              <AlertCircle size={12} /> {testResult.error}
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Inputs */}

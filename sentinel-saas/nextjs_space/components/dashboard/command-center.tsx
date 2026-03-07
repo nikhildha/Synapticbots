@@ -293,6 +293,9 @@ export function PnlCard({ trades, coinDcxBalance, binanceBalance }: PnlCardProps
         return () => { if (chartRef.current) chartRef.current.destroy(); };
     }, [allTrades]);
 
+    const totalBalance = (binanceBalance ?? 0) + (coinDcxBalance ?? 0);
+    const hasAnyBalance = binanceBalance != null || coinDcxBalance != null;
+
     return (
         <div style={{
             background: 'rgba(17, 24, 39, 0.8)',
@@ -300,49 +303,77 @@ export function PnlCard({ trades, coinDcxBalance, binanceBalance }: PnlCardProps
             border: '1px solid rgba(255,255,255,0.06)',
             borderRadius: '16px',
             padding: '16px 20px',
+            position: 'relative' as const,
+            overflow: 'hidden',
         }}>
-            {/* Header */}
-            <div style={{ marginBottom: '10px' }}>
-                <div style={{
-                    fontSize: '11px', fontWeight: 600, textTransform: 'uppercase' as const,
-                    letterSpacing: '1.5px', color: '#9CA3AF',
-                }}>Wallet Balance</div>
+            {/* Top accent line matching P&L direction */}
+            <div style={{
+                position: 'absolute' as const, top: 0, left: 0, right: 0, height: '3px',
+                background: `linear-gradient(90deg, ${mainColor}, transparent)`,
+            }} />
+
+            {/* Header row: label + combined P&L */}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
+                <div style={{ fontSize: '11px', fontWeight: 600, textTransform: 'uppercase' as const, letterSpacing: '1.5px', color: '#9CA3AF' }}>
+                    Wallet Balance
+                </div>
+                <div style={{ textAlign: 'right' as const }}>
+                    <div style={{ fontSize: '16px', fontWeight: 700, color: mainColor, fontFamily: 'monospace' }}>
+                        {sign}${Math.abs(totalPnl).toFixed(2)}
+                        <span style={{ fontSize: '10px', color: '#6B7280', marginLeft: '6px' }}>{sign}{Math.abs(totalRoi).toFixed(2)}% ROI</span>
+                    </div>
+                    <div style={{ fontSize: '9px', color: '#6B7280', textTransform: 'uppercase' as const, letterSpacing: '0.8px' }}>Session P&L</div>
+                </div>
             </div>
 
-            {/* Wallet Balances */}
-
-            {/* Always show both exchanges */}
-            <div style={{ display: 'flex', gap: '8px' }}>
+            {/* Exchange balances */}
+            <div style={{ display: 'flex', gap: '8px', marginBottom: hasAnyBalance ? '10px' : '0' }}>
                 {/* Binance */}
                 <div style={{
-                    flex: 1, padding: '8px 10px', borderRadius: '10px',
+                    flex: 1, padding: '10px 12px', borderRadius: '10px',
                     background: 'rgba(245,158,11,0.06)', border: '1px solid rgba(245,158,11,0.15)',
                 }}>
-                    <div style={{ fontSize: '9px', fontWeight: 600, color: '#F59E0B', marginBottom: '3px' }}>🔶 Binance</div>
+                    <div style={{ fontSize: '9px', fontWeight: 600, color: '#F59E0B', marginBottom: '4px', letterSpacing: '0.5px' }}>🔶 BINANCE</div>
                     {binanceBalance != null ? (
-                        <div style={{ fontSize: '15px', fontWeight: 700, color: '#F0F4F8', fontFamily: 'monospace' }}>
+                        <div style={{ fontSize: '16px', fontWeight: 700, color: '#F0F4F8', fontFamily: 'monospace' }}>
                             ${binanceBalance.toFixed(2)}
+                            <span style={{ fontSize: '9px', color: '#6B7280', marginLeft: '4px' }}>USDT</span>
                         </div>
                     ) : (
-                        <div style={{ fontSize: '11px', color: '#6B7280', fontStyle: 'italic' }}>Not Connected</div>
+                        <div style={{ fontSize: '11px', color: '#4B5563', fontStyle: 'italic' }}>Not Connected</div>
                     )}
                 </div>
 
                 {/* CoinDCX */}
                 <div style={{
-                    flex: 1, padding: '8px 10px', borderRadius: '10px',
+                    flex: 1, padding: '10px 12px', borderRadius: '10px',
                     background: 'rgba(14,165,233,0.06)', border: '1px solid rgba(14,165,233,0.15)',
                 }}>
-                    <div style={{ fontSize: '9px', fontWeight: 600, color: '#0EA5E9', marginBottom: '3px' }}>🇮🇳 CoinDCX</div>
+                    <div style={{ fontSize: '9px', fontWeight: 600, color: '#0EA5E9', marginBottom: '4px', letterSpacing: '0.5px' }}>🇮🇳 COINDCX</div>
                     {coinDcxBalance != null ? (
-                        <div style={{ fontSize: '15px', fontWeight: 700, color: '#F0F4F8', fontFamily: 'monospace' }}>
+                        <div style={{ fontSize: '16px', fontWeight: 700, color: '#F0F4F8', fontFamily: 'monospace' }}>
                             ${coinDcxBalance.toFixed(2)}
+                            <span style={{ fontSize: '9px', color: '#6B7280', marginLeft: '4px' }}>USDT</span>
                         </div>
                     ) : (
-                        <div style={{ fontSize: '11px', color: '#6B7280', fontStyle: 'italic' }}>Not Connected</div>
+                        <div style={{ fontSize: '11px', color: '#4B5563', fontStyle: 'italic' }}>Not Connected</div>
                     )}
                 </div>
             </div>
+
+            {/* Total combined balance bar */}
+            {hasAnyBalance && (
+                <div style={{
+                    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                    padding: '6px 10px', borderRadius: '8px',
+                    background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.05)',
+                }}>
+                    <span style={{ fontSize: '10px', color: '#6B7280' }}>Total Portfolio</span>
+                    <span style={{ fontSize: '13px', fontWeight: 700, color: '#F0F4F8', fontFamily: 'monospace' }}>
+                        ${totalBalance.toFixed(2)} USDT
+                    </span>
+                </div>
+            )}
         </div>
     );
 }

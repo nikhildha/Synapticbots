@@ -468,13 +468,19 @@ export function DashboardClient({ user, stats, bots, recentTrades }: DashboardCl
                           const pnl = status === 'ACTIVE' ? computePnlFromPrices(trade) : (trade.realized_pnl || trade.pnl || 0);
                           const cap = trade.capital || trade.position_size || 100;
                           const pnlPct = cap > 0 ? (pnl / cap * 100) : 0;
+                          const rowBg = status === 'ACTIVE'
+                            ? pnl >= 0
+                              ? 'rgba(34,197,94,0.04)'
+                              : 'rgba(239,68,68,0.04)'
+                            : 'transparent';
                           return (
                             <tr key={trade.trade_id || i} style={{
                               borderBottom: '1px solid rgba(255,255,255,0.04)',
+                              background: rowBg,
                               transition: 'background 0.2s',
                             }}
-                              onMouseEnter={(e) => (e.currentTarget.style.background = 'rgba(6,182,212,0.04)')}
-                              onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
+                              onMouseEnter={(e) => (e.currentTarget.style.background = 'rgba(6,182,212,0.06)')}
+                              onMouseLeave={(e) => (e.currentTarget.style.background = rowBg)}
                             >
                               <td style={{ padding: '10px 14px', color: '#0891B2', fontWeight: 600, fontSize: '11px' }}>
                                 {trade.bot_name || trade.profile_id || 'SM-Standard'}
