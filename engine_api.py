@@ -56,6 +56,14 @@ def _restore_mode_on_startup():
 
 _restore_mode_on_startup()
 
+# ── Startup diagnostics: verify mode ─────────────────────────────────
+logger.info(
+    "🔧 ENGINE MODE DIAGNOSTIC: PAPER_TRADE env=%s | config.PAPER_TRADE=%s | EXCHANGE_LIVE=%s",
+    os.getenv("PAPER_TRADE", "<NOT SET>"),
+    config.PAPER_TRADE,
+    config.EXCHANGE_LIVE,
+)
+
 
 # ─── Helper: read JSON file safely ───────────────────────────────────
 def _read_json(filename, default=None):

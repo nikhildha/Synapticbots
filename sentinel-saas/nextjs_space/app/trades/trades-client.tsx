@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { Header } from '@/components/header';
+import { BtcCandlestickChart } from '@/components/btc-candlestick-chart';
 import { Download, TrendingUp, TrendingDown, Clock, Search, X, BarChart3, RefreshCw, Trash2 } from 'lucide-react';
 import { motion } from 'framer-motion';
 
@@ -119,7 +120,7 @@ export function TradesClient({ trades: initialTrades }: TradesClientProps) {
   const [closingTradeId, setClosingTradeId] = useState<string | null>(null);
   const [confirmingTradeId, setConfirmingTradeId] = useState<string | null>(null); // two-click Book Profit
   const [confirmingClear, setConfirmingClear] = useState(false); // two-click Clear Trades
-  const [btcPrices, setBtcPrices] = useState<{ time: number; price: number }[]>([]);
+
   const [livePrices, setLivePrices] = useState<Record<string, number>>({});
   const [posFilter, setPosFilter] = useState<string>('all');
   const [regimeFilter, setRegimeFilter] = useState<string>('all');
@@ -156,20 +157,6 @@ export function TradesClient({ trades: initialTrades }: TradesClientProps) {
     } finally {
       setIsRefreshing(false);
     }
-  }, []);
-
-  // Fetch BTC price history for chart overlay
-  useEffect(() => {
-    async function fetchBtcHistory() {
-      try {
-        const res = await fetch('https://api.binance.com/api/v3/klines?symbol=BTCUSDT&interval=1d&limit=90');
-        if (res.ok) {
-          const data = await res.json();
-          setBtcPrices(data.map((k: any) => ({ time: k[0], price: parseFloat(k[4]) })));
-        }
-      } catch { /* silent */ }
-    }
-    fetchBtcHistory();
   }, []);
 
   // Live price polling from Binance every 5s for active trade symbols
@@ -772,7 +759,7 @@ export function TradesClient({ trades: initialTrades }: TradesClientProps) {
             )}
           </motion.div>
 
-          {/* ═══ P&L Timeline + BTC Price (Enhanced) ═══ */}
+          {/* ═══ P&L Timeline ═══ */}
           {(() => {
             const allTrades = modeFiltered;
             if (allTrades.length < 1) return null;
@@ -821,11 +808,7 @@ export function TradesClient({ trades: initialTrades }: TradesClientProps) {
             const timeEnd = allPoints[allPoints.length - 1].time;
             const timeRange = timeEnd - timeStart || 1;
 
-            // BTC data
-            const btcInRange = btcPrices.filter(b => b.time >= timeStart - 86400000 && b.time <= timeEnd + 86400000);
-            const btcMin = btcInRange.length > 0 ? Math.min(...btcInRange.map(b => b.price)) : 0;
-            const btcMax = btcInRange.length > 0 ? Math.max(...btcInRange.map(b => b.price)) : 1;
-            const btcRange = btcMax - btcMin || 1;
+
 
             // SVG dimensions
             const W = 960, H = 280, PADL = 60, PADR = 70, PADT = 25, PADB = 40;
@@ -834,17 +817,13 @@ export function TradesClient({ trades: initialTrades }: TradesClientProps) {
 
             const toX = (t: number) => PADL + ((t - timeStart) / timeRange) * chartW;
             const toY = (v: number) => PADT + (1 - (v - yMin) / yRange) * chartH;
-            const toYBtc = (v: number) => PADT + (1 - (v - btcMin) / btcRange) * chartH;
             const zeroY = toY(0);
 
             // PnL line + area
             const pnlLine = allPoints.map(p => `${toX(p.time)},${toY(p.total)}`).join(' ');
             const areaPath = `M${toX(allPoints[0].time)},${zeroY} L${allPoints.map(p => `${toX(p.time)},${toY(p.total)}`).join(' L')} L${toX(allPoints[allPoints.length - 1].time)},${zeroY} Z`;
 
-            // BTC line
-            const btcLine = btcInRange.length > 1
-              ? btcInRange.map(b => `${toX(b.time)},${toYBtc(b.price)}`).join(' ')
-              : '';
+
 
             // Grid lines (5)
             const gridValues = Array.from({ length: 5 }, (_, i) => yMin + (yRange * i) / 4);
@@ -887,12 +866,6 @@ export function TradesClient({ trades: initialTrades }: TradesClientProps) {
                         <span style={{ width: '14px', height: '3px', background: pnlColor, borderRadius: '2px', display: 'inline-block' }} />
                         <span style={{ color: '#9CA3AF' }}>Cumulative PnL</span>
                       </span>
-                      {btcLine && (
-                        <span style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-                          <span style={{ width: '14px', height: '3px', background: '#F59E0B', borderRadius: '2px', display: 'inline-block', opacity: 0.7 }} />
-                          <span style={{ color: '#9CA3AF' }}>BTC Price</span>
-                        </span>
-                      )}
                     </div>
                   </div>
 
@@ -907,7 +880,6 @@ export function TradesClient({ trades: initialTrades }: TradesClientProps) {
                       { label: 'Active', value: `${stats.active}`, color: '#06B6D4' },
                       { label: 'Closed', value: `${stats.closed}`, color: '#8B5CF6' },
                       { label: 'Win Rate', value: `${stats.winRate.toFixed(0)}%`, color: stats.winRate >= 50 ? '#22C55E' : '#EF4444' },
-                      ...(btcInRange.length > 0 ? [{ label: 'BTC', value: `$${btcInRange[btcInRange.length - 1].price.toLocaleString()}`, color: '#F59E0B' }] : []),
                     ].map((chip, i) => (
                       <div key={i} style={{
                         padding: '6px 14px', borderRadius: '10px',
@@ -929,10 +901,7 @@ export function TradesClient({ trades: initialTrades }: TradesClientProps) {
                           <stop offset="0%" stopColor={pnlColor} stopOpacity="0.20" />
                           <stop offset="100%" stopColor={pnlColor} stopOpacity="0.01" />
                         </linearGradient>
-                        <linearGradient id="btcGradient" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="0%" stopColor="#F59E0B" stopOpacity="0.08" />
-                          <stop offset="100%" stopColor="#F59E0B" stopOpacity="0" />
-                        </linearGradient>
+
                         <filter id="pnlGlow">
                           <feGaussianBlur stdDeviation="3" result="blur" />
                           <feMerge>
@@ -958,22 +927,7 @@ export function TradesClient({ trades: initialTrades }: TradesClientProps) {
                         stroke="rgba(255,255,255,0.12)" strokeDasharray="6,4" />
                       <text x={PADL - 8} y={zeroY + 3.5} fontSize="9" fill="#9CA3AF" textAnchor="end" fontWeight="600" fontFamily="monospace">$0</text>
 
-                      {/* BTC area + line */}
-                      {btcLine && btcInRange.length > 1 && (
-                        <>
-                          <path
-                            d={`M${toX(btcInRange[0].time)},${PADT + chartH} L${btcInRange.map(b => `${toX(b.time)},${toYBtc(b.price)}`).join(' L')} L${toX(btcInRange[btcInRange.length - 1].time)},${PADT + chartH} Z`}
-                            fill="url(#btcGradient)" />
-                          <polyline points={btcLine} fill="none" stroke="#F59E0B" strokeWidth="1.5" strokeLinejoin="round" strokeOpacity="0.5" />
-                          {/* BTC right axis labels */}
-                          <text x={W - PADR + 8} y={toYBtc(btcMax) + 4} fontSize="9" fill="#F59E0B" textAnchor="start" fontFamily="monospace" opacity="0.7">
-                            ${(btcMax / 1000).toFixed(1)}k
-                          </text>
-                          <text x={W - PADR + 8} y={toYBtc(btcMin) + 4} fontSize="9" fill="#F59E0B" textAnchor="start" fontFamily="monospace" opacity="0.7">
-                            ${(btcMin / 1000).toFixed(1)}k
-                          </text>
-                        </>
-                      )}
+
 
                       {/* PnL area fill */}
                       <path d={areaPath} fill="url(#pnlGradient)" />
@@ -1012,6 +966,11 @@ export function TradesClient({ trades: initialTrades }: TradesClientProps) {
               </motion.div>
             );
           })()}
+
+          {/* ═══ BTC/USDT Candlestick Chart ═══ */}
+          <div className="mt-8">
+            <BtcCandlestickChart />
+          </div>
 
         </div>
       </main>
