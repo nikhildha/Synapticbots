@@ -7,9 +7,6 @@ import { motion } from 'framer-motion';
 
 /* ═══ Default Config (mirrors config.py defaults) ═══ */
 const DEFAULT_CONFIG = {
-  // Exchange
-  binanceKey: '', binanceSecret: '',
-  coindcxKey: '', coindcxSecret: '',
   // Coin Selection
   topCoinsToScan: 15,
   maxConcurrentPositions: 10,
@@ -157,6 +154,155 @@ function Row3({ children }: { children: React.ReactNode }) {
 /*  MAIN COMPONENT                                                   */
 /* ═══════════════════════════════════════════════════════════════════ */
 
+/* ═══ Exchange Block — per-exchange test + save ═══ */
+type TestResult = { ok: boolean; balance?: number; email?: string; error?: string } | null;
+
+function ExchangeBlock({ exchange, label, accentColor, placeholder }: {
+  exchange: 'binance' | 'coindcx';
+  label: string;
+  accentColor: string;
+  placeholder: { key: string; secret: string };
+}) {
+  const [apiKey, setApiKey] = useState('');
+  const [apiSecret, setApiSecret] = useState('');
+  const [testing, setTesting] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [testResult, setTestResult] = useState<TestResult>(null);
+  const [saveMsg, setSaveMsg] = useState<{ ok: boolean; text: string } | null>(null);
+
+  const handleTest = async () => {
+    if (!apiKey || !apiSecret) {
+      setTestResult({ ok: false, error: 'Enter API key and secret first' });
+      return;
+    }
+    setTesting(true);
+    setTestResult(null);
+    try {
+      const res = await fetch('/api/exchange/validate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ exchange, apiKey, apiSecret }),
+      });
+      const data = await res.json();
+      if (data.valid) {
+        setTestResult({ ok: true, balance: data.balance ?? data.availableBalance, email: data.email });
+      } else {
+        setTestResult({ ok: false, error: data.error || 'Connection failed' });
+      }
+    } catch {
+      setTestResult({ ok: false, error: 'Network error' });
+    } finally {
+      setTesting(false);
+    }
+  };
+
+  const handleSave = async () => {
+    if (!apiKey || !apiSecret) {
+      setSaveMsg({ ok: false, text: 'Enter API key and secret first' });
+      return;
+    }
+    setSaving(true);
+    setSaveMsg(null);
+    try {
+      const res = await fetch('/api/settings/api-keys', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ exchange, apiKey, apiSecret }),
+      });
+      if (res.ok) {
+        setSaveMsg({ ok: true, text: 'API keys saved — balance will update on dashboard' });
+        setTimeout(() => setSaveMsg(null), 5000);
+      } else {
+        const d = await res.json();
+        setSaveMsg({ ok: false, text: d.error || 'Failed to save' });
+      }
+    } catch {
+      setSaveMsg({ ok: false, text: 'Network error' });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div style={{
+      padding: '18px', borderRadius: '12px',
+      background: 'rgba(255,255,255,0.02)',
+      border: `1px solid ${accentColor}22`,
+      marginBottom: '16px',
+    }}>
+      {/* Header */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px' }}>
+        <div style={{ fontSize: '13px', fontWeight: 700, color: accentColor }}>{label}</div>
+        {testResult?.ok && (
+          <div style={{
+            display: 'flex', alignItems: 'center', gap: '6px',
+            fontSize: '12px', fontWeight: 700,
+            color: '#22C55E',
+            background: 'rgba(34,197,94,0.12)',
+            padding: '4px 10px', borderRadius: '8px',
+          }}>
+            <CheckCircle size={12} />
+            {testResult.balance != null ? `$${testResult.balance.toFixed(2)} USDT` : testResult.email || 'Connected'}
+          </div>
+        )}
+        {testResult && !testResult.ok && (
+          <div style={{
+            display: 'flex', alignItems: 'center', gap: '6px',
+            fontSize: '12px', color: '#EF4444',
+            background: 'rgba(239,68,68,0.1)',
+            padding: '4px 10px', borderRadius: '8px',
+          }}>
+            <AlertCircle size={12} /> {testResult.error}
+          </div>
+        )}
+      </div>
+
+      {/* Inputs */}
+      <Row2>
+        <Field label="API Key">
+          <input type="text" value={apiKey} onChange={e => { setApiKey(e.target.value); setTestResult(null); }}
+            style={inputStyle} placeholder={placeholder.key} />
+        </Field>
+        <Field label="API Secret">
+          <input type="password" value={apiSecret} onChange={e => { setApiSecret(e.target.value); setTestResult(null); }}
+            style={inputStyle} placeholder={placeholder.secret} />
+        </Field>
+      </Row2>
+
+      {/* Action buttons */}
+      <div style={{ display: 'flex', gap: '10px', alignItems: 'center', marginTop: '4px' }}>
+        <button onClick={handleTest} disabled={testing} style={{
+          padding: '8px 18px', borderRadius: '10px', border: `1px solid ${accentColor}44`,
+          background: 'rgba(255,255,255,0.04)', color: accentColor,
+          fontSize: '12px', fontWeight: 700, cursor: testing ? 'wait' : 'pointer',
+          opacity: testing ? 0.6 : 1, transition: 'all 0.2s',
+        }}>
+          {testing ? 'Testing...' : '⚡ Test Connection'}
+        </button>
+
+        <button onClick={handleSave} disabled={saving} style={{
+          padding: '8px 18px', borderRadius: '10px', border: 'none',
+          background: `linear-gradient(135deg, ${accentColor}cc, ${accentColor})`,
+          color: '#fff', fontSize: '12px', fontWeight: 700,
+          cursor: saving ? 'wait' : 'pointer',
+          opacity: saving ? 0.6 : 1, display: 'flex', alignItems: 'center', gap: '6px',
+        }}>
+          <Save size={12} /> {saving ? 'Saving...' : 'Save API Keys'}
+        </button>
+
+        {saveMsg && (
+          <span style={{
+            fontSize: '12px', fontWeight: 600,
+            color: saveMsg.ok ? '#22C55E' : '#EF4444',
+          }}>
+            {saveMsg.ok ? '✓ ' : '✗ '}{saveMsg.text}
+          </span>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export function SettingsClient() {
   const [mounted, setMounted] = useState(false);
   const [config, setConfig] = useState<Config>(DEFAULT_CONFIG);
@@ -171,19 +317,7 @@ export function SettingsClient() {
     setSaving(true);
     setMessage({ type: '', text: '' });
     try {
-      // Save API keys if provided
-      if (config.binanceKey && config.binanceSecret) {
-        await fetch('/api/settings/api-keys', {
-          method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ exchange: 'binance', apiKey: config.binanceKey, apiSecret: config.binanceSecret }),
-        });
-      }
-      if (config.coindcxKey && config.coindcxSecret) {
-        await fetch('/api/settings/api-keys', {
-          method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ exchange: 'coindcx', apiKey: config.coindcxKey, apiSecret: config.coindcxSecret }),
-        });
-      }
+      // Bot config settings — API keys are saved per-exchange via their own Save buttons
       setMessage({ type: 'success', text: 'Settings saved successfully!' });
       setTimeout(() => setMessage({ type: '', text: '' }), 4000);
     } catch {
@@ -224,20 +358,21 @@ export function SettingsClient() {
 
           {/* ═══ 6.1 Exchange Connection ═══ */}
           <Section icon={<Key size={18} color="#0EA5E9" />} title="Exchange Connection"
-            sub="Binance & CoinDCX API keys · Encrypted AES-256-GCM" delay={0.05}>
-            <div style={{ marginBottom: '20px' }}>
-              <div style={{ fontSize: '13px', fontWeight: 700, color: '#D1D5DB', marginBottom: '12px' }}>Binance</div>
-              <Row2>
-                <Field label="API Key"><input type="text" value={config.binanceKey} onChange={e => update({ binanceKey: e.target.value })} style={inputStyle} placeholder="Enter Binance API key" /></Field>
-                <Field label="API Secret"><input type="password" value={config.binanceSecret} onChange={e => update({ binanceSecret: e.target.value })} style={inputStyle} placeholder="Enter Binance API secret" /></Field>
-              </Row2>
-            </div>
-            <div>
-              <div style={{ fontSize: '13px', fontWeight: 700, color: '#D1D5DB', marginBottom: '12px' }}>CoinDCX</div>
-              <Row2>
-                <Field label="API Key"><input type="text" value={config.coindcxKey} onChange={e => update({ coindcxKey: e.target.value })} style={inputStyle} placeholder="Enter CoinDCX API key" /></Field>
-                <Field label="API Secret"><input type="password" value={config.coindcxSecret} onChange={e => update({ coindcxSecret: e.target.value })} style={inputStyle} placeholder="Enter CoinDCX API secret" /></Field>
-              </Row2>
+            sub="Binance & CoinDCX API keys · Encrypted AES-256-GCM · Test before saving" delay={0.05}>
+            <ExchangeBlock
+              exchange="binance"
+              label="🔶 Binance Futures"
+              accentColor="#F59E0B"
+              placeholder={{ key: 'Enter Binance API key', secret: 'Enter Binance API secret' }}
+            />
+            <ExchangeBlock
+              exchange="coindcx"
+              label="🇮🇳 CoinDCX"
+              accentColor="#0EA5E9"
+              placeholder={{ key: 'Enter CoinDCX API key', secret: 'Enter CoinDCX API secret' }}
+            />
+            <div style={{ fontSize: '11px', color: '#6B7280', marginTop: '4px' }}>
+              🔒 Keys are encrypted with AES-256-GCM before storage. Balances appear on your dashboard after saving.
             </div>
           </Section>
 
