@@ -228,11 +228,13 @@ export function BotsClient({ bots: initialBots }: BotsClientProps) {
     setVerifyStatus('idle');
     setVerifyBalance(null);
     try {
-      const res = await fetch(`/api/engine/validate-exchange?exchange=${deployExchange}`);
+      // Use the user's saved API keys (from SaaS DB) — same as the balance shown in Settings
+      const res = await fetch('/api/wallet-balance');
       const data = await res.json();
-      if (data.valid) {
+      const balance = deployExchange === 'coindcx' ? data.coindcx : data.binance;
+      if (balance !== null && balance !== undefined) {
         setVerifyStatus('ok');
-        setVerifyBalance(data.balance ?? null);
+        setVerifyBalance(balance);
       } else {
         setVerifyStatus('fail');
       }
