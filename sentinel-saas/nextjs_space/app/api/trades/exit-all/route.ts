@@ -2,10 +2,9 @@ import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth-options';
 import { prisma } from '@/lib/prisma';
+import { getEngineUrl } from '@/lib/engine-url';
 
 export const dynamic = 'force-dynamic';
-
-const ENGINE_API_URL = process.env.ENGINE_API_URL;
 
 /**
  * POST /api/trades/exit-all
@@ -82,11 +81,12 @@ export async function POST(request: Request) {
                     pnl_pct: pnlPct,
                 });
 
-                // Best-effort close on engine
-                if (ENGINE_API_URL) {
+                // Best-effort close on correct engine (paper or live) based on trade mode
+                const engineUrl = getEngineUrl(trade.mode === 'live' ? 'live' : 'paper');
+                if (engineUrl) {
                     try {
                         const engineTradeId = trade.exchangeOrderId || trade.id;
-                        await fetch(`${ENGINE_API_URL}/api/close-trade`, {
+                        await fetch(`${engineUrl}/api/close-trade`, {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify({

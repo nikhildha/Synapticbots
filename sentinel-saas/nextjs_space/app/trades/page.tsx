@@ -4,15 +4,15 @@ import { authOptions } from '@/lib/auth-options';
 import { TradesClient } from './trades-client';
 import { prisma } from '@/lib/prisma';
 import { syncEngineTrades, getUserTrades } from '@/lib/sync-engine-trades';
+import { getEngineUrl, type EngineMode } from '@/lib/engine-url';
 
 export const dynamic = 'force-dynamic';
 
-const ENGINE_API_URL = process.env.ENGINE_API_URL || process.env.PYTHON_ENGINE_URL;
-
-async function fetchEngineTradesAll(): Promise<any[]> {
-  if (!ENGINE_API_URL) return [];
+async function fetchEngineTradesAll(mode: EngineMode = 'paper'): Promise<any[]> {
+  const url = getEngineUrl(mode);
+  if (!url) return [];
   try {
-    const res = await fetch(`${ENGINE_API_URL}/api/all`, {
+    const res = await fetch(`${url}/api/all`, {
       cache: 'no-store',
       signal: AbortSignal.timeout(8000),
     });
@@ -70,20 +70,24 @@ export default async function TradesPage() {
   const userId = (session.user as any)?.id;
   const isAdmin = (session.user as any)?.role === 'admin';
 
-  const engineTrades = await fetchEngineTradesAll();
+  // Determine correct engine based on user's active bot mode
+  const userBot = await prisma.bot.findFirst({
+    where: { userId },
+    orderBy: { updatedAt: 'desc' },
+    include: { config: true },
+  });
+  const botMode = (userBot?.config as any)?.mode || 'paper';
+  const engineMode: EngineMode = botMode.toLowerCase().includes('live') ? 'live' : 'paper';
+
+  const engineTrades = await fetchEngineTradesAll(engineMode);
 
   let trades: ReturnType<typeof mapTrade>[];
 
   if (isAdmin) {
-    // Admin sees all engine trades directly
+    // Admin sees all engine trades directly (from live engine)
     trades = engineTrades.map(mapTrade);
   } else {
     // Regular user: sync engine trades into their Prisma bot, then read back
-    const userBot = await prisma.bot.findFirst({
-      where: { userId },
-      orderBy: { updatedAt: 'desc' },
-    });
-
     if (userBot && userBot.startedAt && engineTrades.length > 0) {
       try {
         // Only sync trades opened AFTER the user started their bot (next-cycle-only)

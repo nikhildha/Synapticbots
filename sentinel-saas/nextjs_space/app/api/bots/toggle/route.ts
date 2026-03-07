@@ -4,11 +4,11 @@ import { authOptions } from '@/lib/auth-options';
 import prisma from '@/lib/prisma';
 import { checkSubscription } from '@/lib/subscription';
 import { createBotSession, closeBotSession } from '@/lib/bot-session';
+import { getEngineUrl } from '@/lib/engine-url';
 
 export const dynamic = 'force-dynamic';
 
 const ORCHESTRATOR_URL = process.env.ORCHESTRATOR_URL || 'http://localhost:5000';
-const ENGINE_API_URL = process.env.ENGINE_API_URL || process.env.PYTHON_ENGINE_URL;
 
 export async function POST(request: Request) {
   try {
@@ -96,11 +96,13 @@ export async function POST(request: Request) {
 
     // ─── Live mode: switch engine mode + validate exchange pre-flight ────────
     const botMode = bot.config?.mode ?? 'paper';
-    if (ENGINE_API_URL) {
+    // Route all engine signals to the correct engine (paper or live)
+    const engineUrl = getEngineUrl(botMode === 'live' ? 'live' : 'paper');
+    if (engineUrl) {
       if (isActive && botMode === 'live') {
         const exchange = bot.exchange || 'coindcx';
         // Switch engine to live mode
-        await fetch(`${ENGINE_API_URL}/api/set-mode`, {
+        await fetch(`${engineUrl}/api/set-mode`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ mode: 'live', exchange }),
@@ -110,7 +112,7 @@ export async function POST(request: Request) {
         // Validate exchange connectivity — block start if keys are broken
         try {
           const vRes = await fetch(
-            `${ENGINE_API_URL}/api/validate-exchange?exchange=${encodeURIComponent(exchange)}`,
+            `${engineUrl}/api/validate-exchange?exchange=${encodeURIComponent(exchange)}`,
             { signal: AbortSignal.timeout(10000) }
           );
           const vData = await vRes.json();
@@ -128,7 +130,7 @@ export async function POST(request: Request) {
         // ── LIVE MODE STOP: close all CoinDCX positions FIRST ────────────
         if (botMode === 'live') {
           try {
-            const exitRes = await fetch(`${ENGINE_API_URL}/api/exit-all-live`, {
+            const exitRes = await fetch(`${engineUrl}/api/exit-all-live`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               signal: AbortSignal.timeout(15000), // 15s — closing positions can take time
@@ -147,7 +149,7 @@ export async function POST(request: Request) {
         }
 
         // Revert engine to paper mode on stop (best-effort, don't block)
-        fetch(`${ENGINE_API_URL}/api/set-mode`, {
+        fetch(`${engineUrl}/api/set-mode`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ mode: 'paper', exchange: '' }),

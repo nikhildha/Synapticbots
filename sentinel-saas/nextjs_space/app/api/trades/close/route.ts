@@ -2,10 +2,9 @@ import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth-options';
 import { prisma } from '@/lib/prisma';
+import { getEngineUrl } from '@/lib/engine-url';
 
 export const dynamic = 'force-dynamic';
-
-const ENGINE_API_URL = process.env.ENGINE_API_URL;
 
 export async function POST(request: Request) {
     try {
@@ -87,9 +86,13 @@ export async function POST(request: Request) {
 
         // ─── Fallback: close via engine API ──────────────────────────────
         if (!trade) {
-            if (ENGINE_API_URL) {
+            // No trade in DB — try the user's bot-mode engine
+            const userBot = await prisma.bot.findFirst({ where: { userId }, select: { config: true } });
+            const fallbackMode = (userBot?.config as any)?.mode?.includes('live') ? 'live' : 'paper';
+            const fallbackUrl = getEngineUrl(fallbackMode);
+            if (fallbackUrl) {
                 try {
-                    const engineRes = await fetch(`${ENGINE_API_URL}/api/close-trade`, {
+                    const engineRes = await fetch(`${fallbackUrl}/api/close-trade`, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ trade_id: tradeId, symbol, reason: 'MANUAL_CLOSE' }),
@@ -143,10 +146,11 @@ export async function POST(request: Request) {
         });
 
         // ─── Also try to close on engine (best-effort) ───────────────────
-        if (ENGINE_API_URL) {
+        const engineUrl = getEngineUrl(trade.mode === 'live' ? 'live' : 'paper');
+        if (engineUrl) {
             try {
                 const engineTradeId = trade.exchangeOrderId || trade.id;
-                await fetch(`${ENGINE_API_URL}/api/close-trade`, {
+                await fetch(`${engineUrl}/api/close-trade`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
