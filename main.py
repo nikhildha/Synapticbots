@@ -18,7 +18,9 @@ from feature_engine import compute_all_features, compute_hmm_features, compute_t
 from execution_engine import ExecutionEngine
 from risk_manager import RiskManager
 from sideways_strategy import evaluate_mean_reversion
-from coin_scanner import get_top_coins_by_volume
+from coin_scanner import get_top_coins_by_volume, reload_coin_tiers
+from tools.weekly_reclassify import needs_reclassify, run_reclassify
+import threading
 import tradebook
 import telegram as tg
 import sentiment_engine as _sent_mod
@@ -74,6 +76,9 @@ class RegimeMasterBot:
         self._coin_brains = {}       # symbol → HMMBrain (cached per coin)
         self._coin_states = {}       # symbol → latest state dict (for dashboard)
         self._live_prices = {}       # symbol → {ls, fr, ...} (fetched each cycle)
+
+        # Weekly tier re-classification state
+        self._reclassify_thread: threading.Thread | None = None
 
         # ── Startup: sync _active_positions from tradebook ──────────
         self._load_positions_from_tradebook()
@@ -223,6 +228,40 @@ class RegimeMasterBot:
             remaining = config.ANALYSIS_INTERVAL_SECONDS - elapsed
             logger.debug("💤 Next analysis in %.0fs...", remaining)
 
+    def _maybe_reclassify_tiers(self):
+        """
+        Spawn a background thread to re-classify coin tiers if TIER_RECLASSIFY_DAYS
+        have elapsed since the last run. Non-blocking — bot continues trading while
+        calibration runs. On completion, reloads the updated coin_tiers.csv.
+        """
+        # Skip if a reclassify thread is already running
+        t = self._reclassify_thread
+        if t is not None and t.is_alive():
+            return
+
+        if not needs_reclassify():
+            return
+
+        logger.info(
+            "📊 Weekly coin tier re-classification due — starting background thread "
+            "(~5–8 min, trading continues normally)."
+        )
+
+        def _worker():
+            try:
+                run_reclassify()
+                reload_coin_tiers()
+                logger.info("✅ Coin tiers refreshed and reloaded into memory.")
+                tg.send_message(
+                    "📊 *Weekly Tier Update*\nCoin tier re-classification complete. "
+                    "Tiers reloaded — new Tier A/C lists now active."
+                )
+            except Exception as exc:
+                logger.error("Weekly reclassify failed: %s", exc)
+
+        self._reclassify_thread = threading.Thread(target=_worker, daemon=True, name="TierReclassify")
+        self._reclassify_thread.start()
+
     def _save_timing(self):
         """Persist last/next analysis timestamps for the dashboard."""
         try:
@@ -243,6 +282,9 @@ class RegimeMasterBot:
         """Full analysis cycle — runs every ANALYSIS_INTERVAL_SECONDS."""
         cycle_start = time.time()
         self._cycle_count += 1
+
+        # ── 0. Weekly coin tier re-classification (background) ───
+        self._maybe_reclassify_tiers()
 
         # ── 1. Refresh coin list periodically ────────────────────
         if config.MULTI_COIN_MODE:

@@ -49,7 +49,7 @@ export function DashboardClient({ user, stats, bots, recentTrades }: DashboardCl
   const [lastRefresh, setLastRefresh] = useState('');
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [feedHealth, setFeedHealth] = useState<any>(null);
-  const [pnlScope, setPnlScope] = useState<'session' | 'all'>('session');
+  const [pnlScope, setPnlScope] = useState<'session' | 'all'>('all');
   const [walletBalance, setWalletBalance] = useState<{ binance: number | null; coindcx: number | null }>({ binance: null, coindcx: null });
   const [livePrices, setLivePrices] = useState<Record<string, number>>({});
 
@@ -312,102 +312,37 @@ export function DashboardClient({ user, stats, bots, recentTrades }: DashboardCl
             }}>
               <RegimeCard regime={regime} confidence={confidence} symbol={symbol} macroRegime={macroRegime} trend15m={trend15m} coinStates={multi?.coin_states} />
 
-              {/* ═══ Neural Network Brain — Engine Status ═══ */}
+              {/* ═══ Synaptic Core Brain — Engine Status ═══ */}
               {(() => {
                 const engineTs = botState?.multi?.timestamp || botState?.state?.timestamp;
                 const cycle = botState?.multi?.cycle || 0;
                 const coinsScanned = botState?.multi?.coins_scanned || 0;
                 const isOn = engineTs && (Date.now() - new Date(engineTs).getTime()) < 600000;
-                const sc = isOn ? '#22C55E' : '#EF4444';
-                const gc = isOn ? 'rgba(34,197,94,' : 'rgba(239,68,68,';
-
-                // 10 satellite nodes arranged in a circle
-                const cx = 120, cy = 95, r = 70;
-                const nodes = Array.from({ length: 10 }, (_, i) => {
-                  const angle = (i / 10) * Math.PI * 2 - Math.PI / 2;
-                  return { x: cx + Math.cos(angle) * r, y: cy + Math.sin(angle) * r };
-                });
 
                 return (
                   <div style={{
                     background: 'rgba(10,14,26,0.95)',
-                    border: `1px solid ${gc}0.15)`,
-                    borderRadius: '20px', padding: '16px 20px',
-                    position: 'relative' as const, overflow: 'hidden',
+                    border: `1px solid ${isOn ? 'rgba(34,197,94,0.1)' : 'rgba(239,68,68,0.1)'}`,
+                    borderRadius: '20px', padding: '20px',
                     display: 'flex', flexDirection: 'column' as const, alignItems: 'center',
                     justifyContent: 'center', minHeight: '180px',
                   }}>
-
-                    {/* SVG Neural Network */}
-                    <svg viewBox="0 0 240 190" style={{ width: '280px', height: '180px' }}>
-                      <defs>
-                        <radialGradient id="brainGlow">
-                          <stop offset="0%" stopColor={sc} stopOpacity="0.6" />
-                          <stop offset="100%" stopColor={sc} stopOpacity="0" />
-                        </radialGradient>
-                        <filter id="nGlow">
-                          <feGaussianBlur stdDeviation="2" result="blur" />
-                          <feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge>
-                        </filter>
-                      </defs>
-
-                      {/* Background glow behind brain */}
-                      <circle cx={cx} cy={cy} r="45" fill="url(#brainGlow)">
-                        {isOn && <animate attributeName="r" values="38;50;38" dur="3s" repeatCount="indefinite" />}
-                      </circle>
-
-                      {/* Connection lines (synapses) */}
-                      {nodes.map((n, i) => (
-                        <g key={`line-${i}`}>
-                          <line x1={cx} y1={cy} x2={n.x} y2={n.y}
-                            stroke={sc} strokeWidth="0.8" opacity="0.2">
-                            {isOn && <animate attributeName="opacity" values="0.1;0.4;0.1" dur={`${1.5 + i * 0.2}s`} repeatCount="indefinite" />}
-                          </line>
-                          {/* Traveling signal dot on each connection */}
-                          {isOn && (
-                            <circle r="1.5" fill={sc} opacity="0.8">
-                              <animateMotion
-                                dur={`${1 + i * 0.15}s`}
-                                repeatCount="indefinite"
-                                path={`M${cx},${cy} L${n.x},${n.y}`}
-                              />
-                              <animate attributeName="opacity" values="0;1;0" dur={`${1 + i * 0.15}s`} repeatCount="indefinite" />
-                            </circle>
-                          )}
-                        </g>
-                      ))}
-
-                      {/* Satellite nodes */}
-                      {nodes.map((n, i) => (
-                        <g key={`node-${i}`}>
-                          <circle cx={n.x} cy={n.y} r="4" fill={sc} opacity="0.2">
-                            {isOn && <animate attributeName="opacity" values="0.15;0.6;0.15" dur={`${1.2 + i * 0.25}s`} repeatCount="indefinite" />}
-                          </circle>
-                          <circle cx={n.x} cy={n.y} r="2" fill={sc} opacity="0.6">
-                            {isOn && <animate attributeName="opacity" values="0.3;1;0.3" dur={`${1.2 + i * 0.25}s`} repeatCount="indefinite" />}
-                          </circle>
-                        </g>
-                      ))}
-
-                      {/* Central brain node */}
-                      <circle cx={cx} cy={cy} r="14" fill={sc} opacity="0.15" filter="url(#nGlow)">
-                        {isOn && <animate attributeName="r" values="12;18;12" dur="2s" repeatCount="indefinite" />}
-                      </circle>
-                      <circle cx={cx} cy={cy} r="9" fill={sc} opacity="0.6" filter="url(#nGlow)">
-                        {isOn && <animate attributeName="opacity" values="0.4;1;0.4" dur="1.5s" repeatCount="indefinite" />}
-                      </circle>
-                      {/* Brain emoji — blinking */}
-                      <text x={cx} y={cy + 6} textAnchor="middle" fontSize="16" style={{ animation: 'blink 2s ease-in-out infinite' }}>🧠</text>
-                    </svg>
-
-                    {/* Title */}
-                    <div style={{ fontSize: '10px', fontWeight: 800, letterSpacing: '3px', textTransform: 'uppercase' as const, color: '#F0B90B', marginTop: '2px' }}>
+                    {/* Large translucent blinking brain */}
+                    <div style={{
+                      fontSize: '72px', lineHeight: 1,
+                      opacity: isOn ? 1 : 0.3,
+                      filter: isOn ? `drop-shadow(0 0 20px ${isOn ? 'rgba(34,197,94,0.4)' : 'rgba(239,68,68,0.3)'})` : 'none',
+                      animation: isOn ? 'pulse 2s ease-in-out infinite' : 'none',
+                      marginBottom: '8px',
+                    }}>
+                      🧠
+                    </div>
+                    <div style={{ fontSize: '10px', fontWeight: 800, letterSpacing: '3px', textTransform: 'uppercase' as const, color: '#F0B90B' }}>
                       Synaptic Core Brain
                     </div>
-                    {/* Subtitle: Cycle + Scanned */}
                     {isOn && (
                       <div style={{ fontSize: '11px', color: '#6B7280', marginTop: '4px', fontFamily: 'monospace' }}>
-                        Cycle #{cycle} · {coinsScanned} coins scanned
+                        Cycle #{cycle} · {coinsScanned} scanned
                       </div>
                     )}
                   </div>
@@ -459,7 +394,7 @@ export function DashboardClient({ user, stats, bots, recentTrades }: DashboardCl
             className="mb-12"
           >
             <div className="flex items-center justify-between mb-6">
-              <h2 className="text-xl font-bold text-cyan-400">Your AI Bots</h2>
+              <h2 className="text-xl font-bold text-cyan-400">Your Synaptic AI Bots</h2>
               <Link
                 href="/bots"
                 className="px-4 py-2 bg-[var(--color-primary)] text-white rounded-lg hover:bg-[var(--color-primary-dark)] transition-colors"

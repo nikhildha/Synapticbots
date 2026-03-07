@@ -52,6 +52,14 @@ def _load_coin_tiers():
         logger.warning("Could not load coin tiers from %s: %s", config.COIN_TIER_FILE, e)
 
 
+def reload_coin_tiers():
+    """Force-reload coin tiers from disk (clears cache first). Called after weekly reclassify."""
+    global _coin_tiers
+    _coin_tiers = {}
+    _load_coin_tiers()
+    logger.info("Coin tiers reloaded from disk.")
+
+
 def get_tier_a_whitelist() -> list:
     """Return list of Tier A symbols (stable forward Sharpe ≥ 1.0)."""
     _load_coin_tiers()

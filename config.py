@@ -222,6 +222,8 @@ SENTIMENT_LOG_FILE       = os.path.join(DATA_DIR, "sentiment_log.csv")
 
 # ─── Coin Tiers (from experiment_3state_calibration.py evaluation) ────────────
 COIN_TIER_FILE = os.path.join(DATA_DIR, "coin_tiers.csv")  # Tier A/B/C classification
+TIER_RECLASSIFY_DAYS = 7                                    # Re-run calibration every N days
+TIER_RECLASSIFY_STATE_FILE = os.path.join(DATA_DIR, "tier_reclassify_state.json")
 
 # ─── Order Flow Engine ────────────────────────────────────────────────────────
 ORDERFLOW_ENABLED          = True

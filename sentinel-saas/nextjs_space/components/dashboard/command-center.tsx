@@ -118,22 +118,17 @@ export function RegimeCard({ regime, confidence, symbol, macroRegime, trend15m, 
                 </div>
             </div>
 
-            {/* Row 2: BTC Price + 24h Change — prominent */}
+            {/* Row 2: BTC Price + 24h Change — clean, centered */}
             <div style={{
-                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                padding: '10px 14px', borderRadius: '12px',
-                background: 'rgba(255,255,255,0.03)',
-                border: '1px solid rgba(255,255,255,0.06)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                gap: '10px', marginTop: '2px',
             }}>
-                <div style={{ display: 'flex', alignItems: 'baseline', gap: '6px' }}>
-                    <span style={{ fontSize: '11px', color: '#6B7280', fontWeight: 600 }}>BTC</span>
-                    <span style={{
-                        fontSize: '28px', fontWeight: 800, fontFamily: 'monospace',
-                        color: '#F0F4F8', letterSpacing: '-1px',
-                    }}>
-                        {btcPrice ? `$${btcPrice.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}` : '...'}
-                    </span>
-                </div>
+                <span style={{
+                    fontSize: '32px', fontWeight: 800, fontFamily: 'monospace',
+                    color: '#F0F4F8', letterSpacing: '-1px',
+                }}>
+                    {btcPrice ? `$${btcPrice.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}` : '...'}
+                </span>
                 {btcPrice && (
                     <span style={{
                         fontSize: '14px', fontWeight: 700,
