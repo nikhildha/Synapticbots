@@ -296,7 +296,7 @@ export function DashboardClient({ user, stats, bots, recentTrades }: DashboardCl
                 const gc = isOn ? 'rgba(34,197,94,' : 'rgba(239,68,68,';
 
                 // 10 satellite nodes arranged in a circle
-                const cx = 100, cy = 85, r = 55;
+                const cx = 120, cy = 95, r = 70;
                 const nodes = Array.from({ length: 10 }, (_, i) => {
                   const angle = (i / 10) * Math.PI * 2 - Math.PI / 2;
                   return { x: cx + Math.cos(angle) * r, y: cy + Math.sin(angle) * r };
@@ -313,7 +313,7 @@ export function DashboardClient({ user, stats, bots, recentTrades }: DashboardCl
                   }}>
 
                     {/* SVG Neural Network */}
-                    <svg viewBox="0 0 200 170" style={{ width: '200px', height: '140px' }}>
+                    <svg viewBox="0 0 240 190" style={{ width: '280px', height: '180px' }}>
                       <defs>
                         <radialGradient id="brainGlow">
                           <stop offset="0%" stopColor={sc} stopOpacity="0.6" />
@@ -326,8 +326,8 @@ export function DashboardClient({ user, stats, bots, recentTrades }: DashboardCl
                       </defs>
 
                       {/* Background glow behind brain */}
-                      <circle cx={cx} cy={cy} r="35" fill="url(#brainGlow)">
-                        {isOn && <animate attributeName="r" values="30;40;30" dur="3s" repeatCount="indefinite" />}
+                      <circle cx={cx} cy={cy} r="45" fill="url(#brainGlow)">
+                        {isOn && <animate attributeName="r" values="38;50;38" dur="3s" repeatCount="indefinite" />}
                       </circle>
 
                       {/* Connection lines (synapses) */}
@@ -364,36 +364,24 @@ export function DashboardClient({ user, stats, bots, recentTrades }: DashboardCl
                       ))}
 
                       {/* Central brain node */}
-                      <circle cx={cx} cy={cy} r="10" fill={sc} opacity="0.15" filter="url(#nGlow)">
-                        {isOn && <animate attributeName="r" values="8;12;8" dur="2s" repeatCount="indefinite" />}
+                      <circle cx={cx} cy={cy} r="14" fill={sc} opacity="0.15" filter="url(#nGlow)">
+                        {isOn && <animate attributeName="r" values="12;18;12" dur="2s" repeatCount="indefinite" />}
                       </circle>
-                      <circle cx={cx} cy={cy} r="6" fill={sc} opacity="0.6" filter="url(#nGlow)">
+                      <circle cx={cx} cy={cy} r="9" fill={sc} opacity="0.6" filter="url(#nGlow)">
                         {isOn && <animate attributeName="opacity" values="0.4;1;0.4" dur="1.5s" repeatCount="indefinite" />}
                       </circle>
-                      {/* Brain emoji as text */}
-                      <text x={cx} y={cy + 4} textAnchor="middle" fontSize="10">🧠</text>
+                      {/* Brain emoji — blinking */}
+                      <text x={cx} y={cy + 6} textAnchor="middle" fontSize="16" style={{ animation: 'blink 2s ease-in-out infinite' }}>🧠</text>
                     </svg>
 
-                    {/* Status text */}
-                    <div style={{ fontSize: '10px', fontWeight: 800, letterSpacing: '3px', textTransform: 'uppercase' as const, color: '#F0B90B', marginTop: '4px' }}>
-                      Synaptic Core
+                    {/* Title */}
+                    <div style={{ fontSize: '10px', fontWeight: 800, letterSpacing: '3px', textTransform: 'uppercase' as const, color: '#F0B90B', marginTop: '2px' }}>
+                      Synaptic Core Brain
                     </div>
-                    <div style={{ fontSize: '18px', fontWeight: 800, color: sc }}>
-                      {isOn ? 'THINKING' : 'DORMANT'}
-                    </div>
-
-                    {/* Stats */}
+                    {/* Subtitle: Cycle + Scanned */}
                     {isOn && (
-                      <div style={{ display: 'flex', gap: '14px', marginTop: '8px' }}>
-                        {[
-                          { label: 'Cycle', value: `#${cycle}` },
-                          { label: 'Scanned', value: coinsScanned },
-                        ].map((s, i) => (
-                          <div key={i} style={{ textAlign: 'center' as const, padding: '3px 10px', borderRadius: '8px', background: `${gc}0.08)`, border: `1px solid ${gc}0.12)` }}>
-                            <div style={{ fontSize: '13px', fontWeight: 700, color: '#E5E7EB', fontFamily: 'monospace' }}>{s.value}</div>
-                            <div style={{ fontSize: '8px', fontWeight: 600, color: '#6B7280', textTransform: 'uppercase' as const, letterSpacing: '0.5px' }}>{s.label}</div>
-                          </div>
-                        ))}
+                      <div style={{ fontSize: '11px', color: '#6B7280', marginTop: '4px', fontFamily: 'monospace' }}>
+                        Cycle #{cycle} · {coinsScanned} coins scanned
                       </div>
                     )}
                   </div>
