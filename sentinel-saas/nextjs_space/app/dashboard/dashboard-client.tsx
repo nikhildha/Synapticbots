@@ -5,6 +5,7 @@ import { Header } from '@/components/header';
 import { StatsCard } from '@/components/stats-card';
 import { BotCard } from '@/components/bot-card';
 import { RegimeCard, PnlCard, ActivePositionsCard, SignalSummaryTable } from '@/components/dashboard/command-center';
+import { EngineConsole } from '@/components/dashboard/engine-console';
 import { Bot, TrendingUp, Activity, DollarSign, Zap } from 'lucide-react';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
@@ -829,6 +830,15 @@ export function DashboardClient({ user, stats, bots, recentTrades }: DashboardCl
                 })}
               </div>
             </div>
+          </motion.div>
+        </div>
+      )}
+
+      {/* ═══ Admin: Engine Console (live logs) ═══ */}
+      {(user as any)?.role === 'admin' && (
+        <div className="max-w-7xl mx-auto px-4 pb-12">
+          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.45 }}>
+            <EngineConsole />
           </motion.div>
         </div>
       )}

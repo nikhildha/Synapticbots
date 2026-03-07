@@ -35,6 +35,27 @@ _engine_bot = None
 
 logger = logging.getLogger("EngineAPI")
 
+# ─── In-memory log buffer (circular, last 500 lines) ─────────────────
+from collections import deque
+_log_buffer = deque(maxlen=500)
+_log_lock = threading.Lock()
+
+class _BufferHandler(logging.Handler):
+    """Captures all log output into an in-memory ring buffer."""
+    def emit(self, record):
+        try:
+            ts = datetime.fromtimestamp(record.created, tz=IST).strftime("%H:%M:%S")
+            msg = f"[{ts}] {record.getMessage()}"
+            with _log_lock:
+                _log_buffer.append(msg)
+        except Exception:
+            pass
+
+# Install buffer handler on root logger so ALL engine output is captured
+_buf_handler = _BufferHandler()
+_buf_handler.setLevel(logging.INFO)
+logging.getLogger().addHandler(_buf_handler)
+
 
 def _restore_mode_on_startup():
     """On startup: restore live mode from engine_mode.json if Railway PAPER_TRADE is still true.
@@ -365,6 +386,18 @@ def start_engine():
     _engine_thread = threading.Thread(target=_run_engine, daemon=True, name="EngineThread")
     _engine_thread.start()
     _engine_start_time = time.time()
+
+
+# ─── Log viewer ───────────────────────────────────────────────────────
+
+@app.route("/api/logs", methods=["GET"])
+def api_logs():
+    """Return recent engine log lines from the in-memory buffer."""
+    n = request.args.get("n", 200, type=int)
+    with _log_lock:
+        lines = list(_log_buffer)
+    # Return last n lines
+    return jsonify({"lines": lines[-n:], "total": len(lines)})
 
 
 # ─── Entry Point ──────────────────────────────────────────────────────
