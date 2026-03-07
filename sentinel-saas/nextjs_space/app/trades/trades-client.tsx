@@ -131,6 +131,8 @@ export function TradesClient({ trades: initialTrades }: TradesClientProps) {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isClearing, setIsClearing] = useState(false);
   const [clearSuccess, setClearSuccess] = useState<string | null>(null);
+  const [isExitingAll, setIsExitingAll] = useState(false);
+  const [confirmExitAll, setConfirmExitAll] = useState(false);
   const clearPauseRef = useRef(false); // blocks auto-refresh after clearing
 
   useEffect(() => { setMounted(true); }, []);
@@ -409,6 +411,56 @@ export function TradesClient({ trades: initialTrades }: TradesClientProps) {
                   fontSize: '13px', fontWeight: 600, cursor: 'pointer',
                 }}>
                   <Download size={14} /> Export CSV
+                </button>
+                {/* Exit All — two-click confirmation */}
+                <button
+                  onClick={async () => {
+                    if (!confirmExitAll) {
+                      setConfirmExitAll(true);
+                      setTimeout(() => setConfirmExitAll(false), 5000);
+                      return;
+                    }
+                    setIsExitingAll(true);
+                    setConfirmExitAll(false);
+                    try {
+                      const res = await fetch('/api/trades/exit-all', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ mode: modeFilter }),
+                      });
+                      const data = await res.json();
+                      if (data.success) {
+                        setClearSuccess(`Exited ${data.totalClosed} trades · PnL: $${(data.totalPnl || 0).toFixed(2)}`);
+                        setTimeout(() => setClearSuccess(null), 8000);
+                        // Refresh
+                        const refreshRes = await fetch('/api/bot-state', { cache: 'no-store' });
+                        if (refreshRes.ok) {
+                          const rd = await refreshRes.json();
+                          setTrades((rd?.tradebook?.trades || []).map(mapTrade));
+                        }
+                      } else {
+                        setClearSuccess(`Error: ${data.error}`);
+                        setTimeout(() => setClearSuccess(null), 5000);
+                      }
+                    } catch {
+                      setClearSuccess('Exit all failed');
+                      setTimeout(() => setClearSuccess(null), 5000);
+                    } finally {
+                      setIsExitingAll(false);
+                    }
+                  }}
+                  disabled={isExitingAll}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: '6px',
+                    padding: '10px 14px', borderRadius: '12px', border: 'none',
+                    background: confirmExitAll ? 'rgba(245,158,11,0.3)' : 'rgba(245,158,11,0.1)',
+                    color: '#F59E0B',
+                    fontSize: '13px', fontWeight: 600, cursor: 'pointer',
+                    opacity: isExitingAll ? 0.5 : 1,
+                    ...(confirmExitAll ? { border: '1px solid #F59E0B' } : {}),
+                  }}
+                >
+                  ⚡ {isExitingAll ? 'Exiting...' : confirmExitAll ? '⚠️ Confirm Exit All' : `Exit All${modeFilter !== 'all' ? ` (${modeFilter})` : ''}`}
                 </button>
                 <button onClick={clearAllTrades} disabled={isClearing} style={{
                   display: 'flex', alignItems: 'center', gap: '6px',

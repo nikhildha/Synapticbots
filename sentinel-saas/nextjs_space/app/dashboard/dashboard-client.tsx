@@ -451,11 +451,32 @@ export function DashboardClient({ user, stats, bots, recentTrades }: DashboardCl
               value={`${liveStats.activeTrades} · $${liveStats.usedCapital} of $${MAX_CAPITAL}`}
               animated
             />
-            <StatsCard
-              title="Capital Deployed"
-              value={`$${liveStats.totalCapitalDeployed}`}
-              subtitle={`Paper: $${liveStats.paperCapitalDeployed} · Live: $${liveStats.liveCapitalDeployed}`}
-            />
+            {/* Capital Deployed — custom card with used/max bar */}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="card-gradient rounded-xl p-5 glow-hover hover-lift"
+            >
+              <h3 className="text-sm text-[var(--color-text-secondary)] mb-1">Capital Deployed</h3>
+              <p className="text-2xl font-bold">${liveStats.totalCapitalDeployed} <span className="text-sm font-normal text-[var(--color-text-secondary)]">/ ${MAX_CAPITAL}</span></p>
+              {/* Paper / Live split */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '8px', fontSize: '11px' }}>
+                <span style={{ color: '#22C55E' }}>🟢 Paper: ${liveStats.paperCapitalDeployed}</span>
+                <span style={{ color: '#EF4444' }}>🔴 Live: ${liveStats.liveCapitalDeployed}</span>
+              </div>
+              {/* Progress bar */}
+              <div style={{
+                marginTop: '6px', height: '4px', borderRadius: '2px',
+                background: 'rgba(255,255,255,0.06)', overflow: 'hidden',
+              }}>
+                <div style={{
+                  height: '100%', borderRadius: '2px',
+                  background: 'linear-gradient(90deg, #22C55E, #06B6D4)',
+                  width: `${Math.min(100, (liveStats.totalCapitalDeployed / MAX_CAPITAL) * 100)}%`,
+                  transition: 'width 0.5s ease',
+                }} />
+              </div>
+            </motion.div>
             <StatsCard
               title="Total Paper PnL"
               value={formatCurrency(liveStats.paperTotalPnl)}
