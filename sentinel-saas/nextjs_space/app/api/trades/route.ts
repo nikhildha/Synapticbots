@@ -50,11 +50,12 @@ export async function GET(request: NextRequest) {
             orderBy: { updatedAt: 'desc' },
         });
 
-        if (userBot) {
+        if (userBot && userBot.startedAt) {
             try {
                 const engineTrades = await fetchEngineTrades();
                 if (engineTrades.length > 0) {
-                    await syncEngineTrades(engineTrades, userBot.id, null);
+                    // Only sync trades opened AFTER the user started their bot (next-cycle-only)
+                    await syncEngineTrades(engineTrades, userBot.id, userBot.startedAt);
                 }
             } catch (err) {
                 console.error('[trades] Sync failed:', err);

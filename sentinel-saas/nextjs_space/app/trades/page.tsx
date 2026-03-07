@@ -83,10 +83,10 @@ export default async function TradesPage() {
       orderBy: { updatedAt: 'desc' },
     });
 
-    if (userBot && engineTrades.length > 0) {
+    if (userBot && userBot.startedAt && engineTrades.length > 0) {
       try {
-        // Pass null to sync ALL engine trades regardless of bot start time
-        await syncEngineTrades(engineTrades, userBot.id, null);
+        // Only sync trades opened AFTER the user started their bot (next-cycle-only)
+        await syncEngineTrades(engineTrades, userBot.id, userBot.startedAt);
       } catch (err) {
         console.error('[trades-page] Sync failed:', err);
       }

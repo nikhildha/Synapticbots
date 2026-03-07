@@ -55,11 +55,11 @@ export async function GET() {
                     orderBy: { updatedAt: 'desc' },
                 });
 
-                if (userBot && engineTradesRaw.length > 0) {
+                if (userBot && userBot.startedAt && engineTradesRaw.length > 0) {
                     try {
-                        // Pass null so ALL engine positions sync regardless of when the bot was started.
-                        // This ensures users see pre-existing engine positions immediately after deployment.
-                        await syncEngineTrades(engineTradesRaw, userBot.id, null);
+                        // Only sync trades that were opened AFTER the user started their bot.
+                        // This prevents late-entry scenarios where a user joins mid-trade.
+                        await syncEngineTrades(engineTradesRaw, userBot.id, userBot.startedAt);
                     } catch (err) {
                         console.error('[bot-state] Trade sync failed:', err);
                     }
