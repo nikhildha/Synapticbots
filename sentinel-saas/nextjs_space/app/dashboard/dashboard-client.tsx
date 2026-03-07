@@ -229,8 +229,24 @@ export function DashboardClient({ user, stats, bots, recentTrades }: DashboardCl
     return sum + maxT * capT;
   }, 0) || (bots.length > 0 ? 0 : 0);
 
-  const paperCapital = MAX_CAPITAL;
-  const liveCapital = MAX_CAPITAL;
+  // Split max capital by bot mode (paper vs live)
+  const paperMaxCapital: number = bots.reduce((sum: number, b: any) => {
+    const mode = (b?.config?.mode || 'paper').toLowerCase();
+    if (mode.includes('live')) return sum;
+    const maxT: number = b?.config?.maxTrades ?? 0;
+    const capT: number = b?.config?.capitalPerTrade ?? 0;
+    return sum + maxT * capT;
+  }, 0);
+  const liveMaxCapital: number = bots.reduce((sum: number, b: any) => {
+    const mode = (b?.config?.mode || 'paper').toLowerCase();
+    if (!mode.includes('live')) return sum;
+    const maxT: number = b?.config?.maxTrades ?? 0;
+    const capT: number = b?.config?.capitalPerTrade ?? 0;
+    return sum + maxT * capT;
+  }, 0);
+
+  const paperCapital = paperMaxCapital;
+  const liveCapital = liveMaxCapital;
   const paperPnlPct = paperCapital > 0 ? (paperTotalPnl / paperCapital * 100) : 0;
   const livePnlPct = liveCapital > 0 ? (liveTotalModePnl / liveCapital * 100) : 0;
 
@@ -258,6 +274,8 @@ export function DashboardClient({ user, stats, bots, recentTrades }: DashboardCl
     paperCapitalDeployed,
     liveCapitalDeployed,
     totalCapitalDeployed,
+    paperMaxCapital,
+    liveMaxCapital,
   };
 
   return (
@@ -485,13 +503,13 @@ export function DashboardClient({ user, stats, bots, recentTrades }: DashboardCl
                   <span style={{ fontSize: '12px', color: '#9CA3AF' }}>Paper</span>
                   <span style={{ fontSize: '16px', fontWeight: 700, color: '#22C55E', fontFamily: 'monospace' }}>
                     ${liveStats.paperCapitalDeployed}
-                    {MAX_CAPITAL > 0 && <span style={{ color: '#6B7280', fontWeight: 400, fontSize: '12px' }}>/${MAX_CAPITAL}</span>}
+                    {liveStats.paperMaxCapital > 0 && <span style={{ color: '#6B7280', fontWeight: 400, fontSize: '12px' }}>/{liveStats.paperMaxCapital}</span>}
                   </span>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                   <span style={{ fontSize: '16px', fontWeight: 700, color: '#EF4444', fontFamily: 'monospace' }}>
                     ${liveStats.liveCapitalDeployed}
-                    {MAX_CAPITAL > 0 && <span style={{ color: '#6B7280', fontWeight: 400, fontSize: '12px' }}>/${MAX_CAPITAL}</span>}
+                    {liveStats.liveMaxCapital > 0 && <span style={{ color: '#6B7280', fontWeight: 400, fontSize: '12px' }}>/{liveStats.liveMaxCapital}</span>}
                   </span>
                   <span style={{ fontSize: '12px', color: '#9CA3AF' }}>Live</span>
                   <span style={{ fontSize: '12px' }}>🔴</span>
