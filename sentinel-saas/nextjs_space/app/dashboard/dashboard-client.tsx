@@ -205,8 +205,8 @@ export function DashboardClient({ user, stats, bots, recentTrades }: DashboardCl
   // Paper vs Live split — BOTH active (unrealized) + closed (realized) trades
   const paperActiveTrades = liveActiveTrades.filter((t: any) => (t.mode || 'paper').toUpperCase() === 'PAPER');
   const paperClosedTrades = liveClosedTrades.filter((t: any) => (t.mode || 'paper').toUpperCase() === 'PAPER');
-  const liveModeTrades = liveActiveTrades.filter((t: any) => (t.mode || '').toUpperCase() === 'LIVE');
-  const liveClosedModeTrades = liveClosedTrades.filter((t: any) => (t.mode || '').toUpperCase() === 'LIVE');
+  const liveModeTrades = liveActiveTrades.filter((t: any) => (t.mode || '').toUpperCase().includes('LIVE'));
+  const liveClosedModeTrades = liveClosedTrades.filter((t: any) => (t.mode || '').toUpperCase().includes('LIVE'));
 
   // Unrealized PnL from active trades (via live prices)
   const paperUnrealizedPnl = paperActiveTrades.reduce((sum: number, t: any) => sum + computePnlFromPrices(t), 0);
