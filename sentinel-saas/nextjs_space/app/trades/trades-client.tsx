@@ -159,7 +159,7 @@ export function TradesClient({ trades: initialTrades }: TradesClientProps) {
     }
   }, []);
 
-  // Live price polling from Binance every 5s for active trade symbols
+  // Live price polling from Binance every 1.5s for active trade symbols
   useEffect(() => {
     async function fetchLivePrices() {
       const activeSymbols = [...new Set(
@@ -180,13 +180,13 @@ export function TradesClient({ trades: initialTrades }: TradesClientProps) {
       } catch { /* silent */ }
     }
     fetchLivePrices();
-    const timer = setInterval(fetchLivePrices, 5000);
+    const timer = setInterval(fetchLivePrices, 1500);
     return () => clearInterval(timer);
   }, [trades]);
 
   useEffect(() => {
     refreshTrades(); // initial fetch
-    const timer = setInterval(refreshTrades, 15000);
+    const timer = setInterval(refreshTrades, 5000);
     return () => clearInterval(timer);
   }, [refreshTrades]);
 
