@@ -49,9 +49,11 @@ export function Header() {
                 <Link href="/performance" className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)] transition-colors">
                   Performance
                 </Link>
+                {/* Intelligence page disabled for now
                 <Link href="/intelligence" className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)] transition-colors">
                   Intelligence
                 </Link>
+                */}
                 <Link href="/howto" className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)] transition-colors">
                   How To?
                 </Link>
@@ -111,9 +113,11 @@ export function Header() {
                 <Link href="/performance" className="block text-[var(--color-text-secondary)] hover:text-[var(--color-primary)] transition-colors">
                   Performance
                 </Link>
+                {/* Intelligence page disabled for now
                 <Link href="/intelligence" className="block text-[var(--color-text-secondary)] hover:text-[var(--color-primary)] transition-colors">
                   Intelligence
                 </Link>
+                */}
                 <Link href="/howto" className="block text-[var(--color-text-secondary)] hover:text-[var(--color-primary)] transition-colors">
                   How To?
                 </Link>

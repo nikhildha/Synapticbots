@@ -230,7 +230,7 @@ class RegimeMasterBot:
             if os.path.exists(config.MULTI_STATE_FILE):
                 with open(config.MULTI_STATE_FILE, "r") as f:
                     multi = json.load(f)
-            multi["last_analysis_time"] = datetime.now(IST).replace(tzinfo=None).isoformat() + "Z"
+            multi["last_analysis_time"] = datetime.utcnow().isoformat() + "Z"
             nxt = self._last_analysis_time + config.ANALYSIS_INTERVAL_SECONDS
             multi["next_analysis_time"] = datetime.fromtimestamp(nxt, tz=IST).strftime("%Y-%m-%dT%H:%M:%S")
             multi["analysis_interval_seconds"] = config.ANALYSIS_INTERVAL_SECONDS
