@@ -79,24 +79,22 @@ export function StatsCard({
       ref={cardRef}
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
-      className="card-gradient rounded-xl p-6 glow-hover hover-lift"
+      className="card-gradient rounded-xl p-5 glow-hover hover-lift"
     >
-      {(Icon || trendValue) && (
-        <div className="flex items-center justify-between mb-4">
-          {Icon && (
-            <div className="p-3 bg-[var(--color-primary)]/20 rounded-lg">
-              <Icon className="w-6 h-6 text-[var(--color-primary)]" />
-            </div>
-          )}
-          {trendValue && (
-            <span className={`text-sm font-medium ${getTrendColor()}`}>
-              {trendValue}
-            </span>
-          )}
+      {Icon && (
+        <div className="p-3 bg-[var(--color-primary)]/20 rounded-lg inline-block mb-3">
+          <Icon className="w-6 h-6 text-[var(--color-primary)]" />
         </div>
       )}
-      <h3 className="text-sm text-[var(--color-text-secondary)] mb-2">{title}</h3>
-      <p className={`text-3xl font-bold ${trend === 'up' ? 'text-[var(--color-success)]' : trend === 'down' ? 'text-[var(--color-danger)]' : ''}`}>{displayValue}</p>
+      <h3 className="text-sm text-[var(--color-text-secondary)] mb-1">{title}</h3>
+      <div className="flex items-baseline gap-2">
+        <p className={`text-2xl font-bold ${trend === 'up' ? 'text-[var(--color-success)]' : trend === 'down' ? 'text-[var(--color-danger)]' : ''}`}>{displayValue}</p>
+        {trendValue && (
+          <span className={`text-sm font-medium ${getTrendColor()}`}>
+            {trendValue}
+          </span>
+        )}
+      </div>
     </motion.div>
   );
 }

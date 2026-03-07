@@ -268,7 +268,33 @@ export function DashboardClient({ user, stats, bots, recentTrades }: DashboardCl
                   AI Trading Command Center — Monitor your bots and market signals
                 </p>
               </div>
-
+              {/* PnL Scope Toggle — top right */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <span style={{ fontSize: '11px', color: '#6B7280', fontWeight: 500 }}>PnL Scope:</span>
+                <div style={{
+                  display: 'inline-flex', borderRadius: '8px', overflow: 'hidden',
+                  border: '1px solid rgba(6,182,212,0.2)', background: 'rgba(17,24,39,0.6)',
+                }}>
+                  {(['session', 'all'] as const).map((scope) => (
+                    <button
+                      key={scope}
+                      onClick={() => setPnlScope(scope)}
+                      style={{
+                        padding: '4px 12px', fontSize: '11px', fontWeight: 600,
+                        border: 'none', cursor: 'pointer', transition: 'all 0.15s',
+                        background: pnlScope === scope ? 'rgba(6,182,212,0.2)' : 'transparent',
+                        color: pnlScope === scope ? '#06B6D4' : '#6B7280',
+                        borderRight: scope === 'session' ? '1px solid rgba(6,182,212,0.15)' : 'none',
+                      }}
+                    >
+                      {scope === 'session' ? 'This Session' : 'All Time'}
+                    </button>
+                  ))}
+                </div>
+                {pnlScope === 'session' && !currentSessionId && (
+                  <span style={{ fontSize: '10px', color: '#F59E0B' }}>No active session</span>
+                )}
+              </div>
             </div>
           </motion.div>
 
@@ -392,39 +418,7 @@ export function DashboardClient({ user, stats, bots, recentTrades }: DashboardCl
             </div>
           </motion.div>
 
-          {/* ═══ Session Scope Toggle ═══ */}
-          <motion.div
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.12 }}
-            className="mb-4"
-            style={{ display: 'flex', alignItems: 'center', gap: '12px' }}
-          >
-            <span style={{ fontSize: '12px', color: '#6B7280', fontWeight: 500 }}>PnL Scope:</span>
-            <div style={{
-              display: 'inline-flex', borderRadius: '8px', overflow: 'hidden',
-              border: '1px solid rgba(6,182,212,0.2)', background: 'rgba(17,24,39,0.6)',
-            }}>
-              {(['session', 'all'] as const).map((scope) => (
-                <button
-                  key={scope}
-                  onClick={() => setPnlScope(scope)}
-                  style={{
-                    padding: '5px 14px', fontSize: '12px', fontWeight: 600,
-                    border: 'none', cursor: 'pointer', transition: 'all 0.15s',
-                    background: pnlScope === scope ? 'rgba(6,182,212,0.2)' : 'transparent',
-                    color: pnlScope === scope ? '#06B6D4' : '#6B7280',
-                    borderRight: scope === 'session' ? '1px solid rgba(6,182,212,0.15)' : 'none',
-                  }}
-                >
-                  {scope === 'session' ? 'This Session' : 'All Time'}
-                </button>
-              ))}
-            </div>
-            {pnlScope === 'session' && !currentSessionId && (
-              <span style={{ fontSize: '11px', color: '#F59E0B' }}>No active session detected</span>
-            )}
-          </motion.div>
+
 
           {/* ═══ Row 2: Quick SaaS Stats ═══ */}
           <motion.div
@@ -465,7 +459,7 @@ export function DashboardClient({ user, stats, bots, recentTrades }: DashboardCl
             className="mb-12"
           >
             <div className="flex items-center justify-between mb-6">
-              <h2 className="text-xl font-bold text-cyan-400">Your Bots</h2>
+              <h2 className="text-xl font-bold text-cyan-400">Your AI Bots</h2>
               <Link
                 href="/bots"
                 className="px-4 py-2 bg-[var(--color-primary)] text-white rounded-lg hover:bg-[var(--color-primary-dark)] transition-colors"
@@ -475,9 +469,9 @@ export function DashboardClient({ user, stats, bots, recentTrades }: DashboardCl
             </div>
 
             {bots && bots.length > 0 ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              <div className="flex flex-col gap-3">
                 {bots.map((bot) => (
-                  <BotCard key={bot?.id} bot={bot} onToggle={handleBotToggle} liveTradeCount={liveActiveTrades.length} />
+                  <BotCard key={bot?.id} bot={bot} onToggle={handleBotToggle} liveTradeCount={liveActiveTrades.length} trades={trades} />
                 ))}
               </div>
             ) : (
