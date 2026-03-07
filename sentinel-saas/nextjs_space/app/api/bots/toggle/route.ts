@@ -8,6 +8,7 @@ import { createBotSession, closeBotSession } from '@/lib/bot-session';
 export const dynamic = 'force-dynamic';
 
 const ORCHESTRATOR_URL = process.env.ORCHESTRATOR_URL || 'http://localhost:5000';
+const ENGINE_API_URL = process.env.ENGINE_API_URL || process.env.PYTHON_ENGINE_URL;
 
 export async function POST(request: Request) {
   try {
@@ -90,6 +91,47 @@ export async function POST(request: Request) {
         }
       } catch (err) {
         console.error('[toggle] Exit trades on stop failed:', err);
+      }
+    }
+
+    // ─── Live mode: switch engine mode + validate exchange pre-flight ────────
+    const botMode = bot.config?.mode ?? 'paper';
+    if (ENGINE_API_URL) {
+      if (isActive && botMode === 'live') {
+        const exchange = bot.exchange || 'coindcx';
+        // Switch engine to live mode
+        await fetch(`${ENGINE_API_URL}/api/set-mode`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ mode: 'live', exchange }),
+          signal: AbortSignal.timeout(5000),
+        }).catch(e => console.warn('[toggle] set-mode failed:', e));
+
+        // Validate exchange connectivity — block start if keys are broken
+        try {
+          const vRes = await fetch(
+            `${ENGINE_API_URL}/api/validate-exchange?exchange=${encodeURIComponent(exchange)}`,
+            { signal: AbortSignal.timeout(10000) }
+          );
+          const vData = await vRes.json();
+          if (!vData.valid) {
+            return NextResponse.json(
+              { error: `${exchange} connection failed — check API keys in Railway env vars`, detail: vData.error },
+              { status: 400 }
+            );
+          }
+          console.log(`[toggle] ${exchange} validated — balance: ${vData.balance} ${vData.currency ?? ''}`);
+        } catch (err) {
+          console.warn('[toggle] validate-exchange failed (continuing):', err);
+        }
+      } else if (!isActive) {
+        // Revert engine to paper mode on stop (best-effort, don't block)
+        fetch(`${ENGINE_API_URL}/api/set-mode`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ mode: 'paper', exchange: '' }),
+          signal: AbortSignal.timeout(3000),
+        }).catch(() => {});
       }
     }
 

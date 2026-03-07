@@ -171,6 +171,11 @@ export function BotsClient({ bots: initialBots }: BotsClientProps) {
   const [deployMaxTrades, setDeployMaxTrades] = useState(25);
   const [deployCapitalPerTrade, setDeployCapitalPerTrade] = useState(100);
 
+  // Verify exchange connection (live mode pre-flight)
+  const [verifying, setVerifying] = useState(false);
+  const [verifyStatus, setVerifyStatus] = useState<'idle' | 'ok' | 'fail'>('idle');
+  const [verifyBalance, setVerifyBalance] = useState<number | null>(null);
+
   useEffect(() => { setMounted(true); }, []);
 
   // Live active trade count from bot-state
@@ -216,6 +221,26 @@ export function BotsClient({ bots: initialBots }: BotsClientProps) {
       });
       if (res.ok) window.location.reload();
     } catch (error) { console.error('Error toggling bot:', error); }
+  };
+
+  const handleVerifyConnection = async () => {
+    setVerifying(true);
+    setVerifyStatus('idle');
+    setVerifyBalance(null);
+    try {
+      const res = await fetch(`/api/engine/validate-exchange?exchange=${deployExchange}`);
+      const data = await res.json();
+      if (data.valid) {
+        setVerifyStatus('ok');
+        setVerifyBalance(data.balance ?? null);
+      } else {
+        setVerifyStatus('fail');
+      }
+    } catch {
+      setVerifyStatus('fail');
+    } finally {
+      setVerifying(false);
+    }
   };
 
   const handleDeployBot = async () => {
@@ -488,12 +513,32 @@ export function BotsClient({ bots: initialBots }: BotsClientProps) {
                   ))}
                 </div>
                 {deployMode === 'live' && (
-                  <div style={{
-                    marginTop: '8px', padding: '8px 12px', borderRadius: '8px',
-                    background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)',
-                    fontSize: '11px', color: '#F87171',
-                  }}>
-                    ⚠️ Live trading uses real capital. Ensure your risk settings are configured in Settings.
+                  <div style={{ marginTop: '8px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    <div style={{
+                      padding: '8px 12px', borderRadius: '8px',
+                      background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)',
+                      fontSize: '11px', color: '#F87171',
+                    }}>
+                      ⚠️ Live trading uses real capital. Ensure your risk settings are configured in Settings.
+                    </div>
+                    {/* Verify Exchange Connection */}
+                    <button
+                      onClick={handleVerifyConnection}
+                      disabled={verifying}
+                      style={{
+                        width: '100%', padding: '9px 0', borderRadius: '10px', cursor: verifying ? 'wait' : 'pointer',
+                        border: `1px solid ${verifyStatus === 'ok' ? '#22C55E' : verifyStatus === 'fail' ? '#EF4444' : 'rgba(255,255,255,0.12)'}`,
+                        background: verifyStatus === 'ok' ? 'rgba(34,197,94,0.1)' : verifyStatus === 'fail' ? 'rgba(239,68,68,0.08)' : 'rgba(255,255,255,0.04)',
+                        color: verifyStatus === 'ok' ? '#22C55E' : verifyStatus === 'fail' ? '#F87171' : '#9CA3AF',
+                        fontSize: '12px', fontWeight: 700, transition: 'all 0.2s',
+                        opacity: verifying ? 0.7 : 1,
+                      }}
+                    >
+                      {verifying ? 'Checking connection...' :
+                       verifyStatus === 'ok' ? `✓ ${deployExchange === 'coindcx' ? 'CoinDCX' : 'Binance'} Connected${verifyBalance != null ? ` · $${verifyBalance.toFixed(2)} USDT` : ''}` :
+                       verifyStatus === 'fail' ? '✗ Connection failed — check API keys in Railway env vars' :
+                       `Verify ${deployExchange === 'coindcx' ? 'CoinDCX' : 'Binance'} Connection`}
+                    </button>
                   </div>
                 )}
               </div>
