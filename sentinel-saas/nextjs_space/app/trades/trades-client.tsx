@@ -235,10 +235,15 @@ export function TradesClient({ trades: initialTrades }: TradesClientProps) {
     });
   }, [trades, statusFilter, modeFilter, posFilter, regimeFilter, coinSearch, pnlFilter, sessionFilter]);
 
-  /* ── Portfolio Stats ── */
+  /* ── Portfolio Stats (respects master mode filter) ── */
   const CAPITAL_PER_TRADE = 100;
+  const modeFiltered = useMemo(() => {
+    if (modeFilter === 'all') return trades ?? [];
+    return (trades ?? []).filter(t => (t.mode || '').toLowerCase() === modeFilter);
+  }, [trades, modeFilter]);
+
   const stats = useMemo(() => {
-    const all = trades ?? [];
+    const all = modeFiltered;
     const active = all.filter(t => (t.status || '').toLowerCase() === 'active');
     const closed = all.filter(t => (t.status || '').toLowerCase() !== 'active');
     const wins = closed.filter(t => t.totalPnl > 0);
@@ -308,12 +313,14 @@ export function TradesClient({ trades: initialTrades }: TradesClientProps) {
       bestTrade, worstTrade,
       maxDD, maxDDPct, profitFactor, riskReward,
     };
-  }, [trades, livePrices]);
+  }, [modeFiltered, livePrices]);
 
-  /* ── CSV Export ── */
+  /* ── CSV Export (all trades, respects mode filter only) ── */
   const exportCSV = () => {
+    // Export all trades for the selected mode (ignoring status/position/regime filters)
+    const exportTrades = modeFiltered;
     const headers = ['Bot', 'Type', 'Coin', 'Side', 'Leverage', 'Capital', 'Entry Price', 'Exit Price', 'SL', 'TP', 'SL Type', 'Target Type', 'P&L $', 'P&L %', 'Status', 'Entry Time', 'Exit Time'];
-    const rows = filtered.map(t => [
+    const rows = exportTrades.map(t => [
       t.botName || 'Unknown Bot', t.mode || 'paper', t.coin, t.position, t.leverage, t.capital,
       t.entryPrice, t.exitPrice || t.currentPrice || '', t.stopLoss, t.takeProfit,
       t.slType, t.targetType,
@@ -325,7 +332,7 @@ export function TradesClient({ trades: initialTrades }: TradesClientProps) {
     const blob = new Blob([csv], { type: 'text/csv' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
-    a.href = url; a.download = `tradebook_${new Date().toISOString().slice(0, 10)}.csv`;
+    a.href = url; a.download = `tradebook_${modeFilter}_${new Date().toISOString().slice(0, 10)}.csv`;
     a.click(); URL.revokeObjectURL(url);
   };
 
@@ -715,7 +722,7 @@ export function TradesClient({ trades: initialTrades }: TradesClientProps) {
 
           {/* ═══ P&L Timeline + BTC Price (Enhanced) ═══ */}
           {(() => {
-            const allTrades = trades ?? [];
+            const allTrades = modeFiltered;
             if (allTrades.length < 1) return null;
 
             // Use the same values as the stat cards above

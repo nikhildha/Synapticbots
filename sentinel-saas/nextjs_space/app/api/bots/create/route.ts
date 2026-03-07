@@ -22,7 +22,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const { name, exchange } = await request.json();
+    const { name, exchange, mode, maxTrades, capitalPerTrade } = await request.json();
 
     if (!name || !exchange) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
@@ -47,7 +47,12 @@ export async function POST(request: Request) {
     // Determine coin scan limit from subscription
     const coinScansLimit = user?.subscription?.coinScans || 5; // free trial = 5
 
-    // Create bot with default config
+    // Use deploy modal values or defaults
+    const botMode = mode || 'paper';
+    const botMaxTrades = maxTrades || 25;
+    const botCapitalPerTrade = capitalPerTrade || 100;
+
+    // Create bot with config from deploy modal
     const bot = await prisma.bot.create({
       data: {
         userId: session.user.id,
@@ -57,9 +62,9 @@ export async function POST(request: Request) {
         isActive: false,
         config: {
           create: {
-            mode: 'paper',
-            capitalPerTrade: 100,
-            maxOpenTrades: 5,
+            mode: botMode,
+            capitalPerTrade: botCapitalPerTrade,
+            maxOpenTrades: botMaxTrades,
             slMultiplier: 0.8,
             tpMultiplier: 1.0,
             maxLossPct: -15,
