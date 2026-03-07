@@ -31,8 +31,8 @@ export function Header() {
           <Link href={session ? '/dashboard' : '/'} className="flex items-center space-x-2 hover:opacity-80 transition-opacity">
             <Shield className="w-8 h-8 text-[var(--color-primary)]" />
             <div>
-              <span className="text-2xl font-bold text-gradient">Synaptic AI</span>
-              <div style={{ fontSize: '8px', fontWeight: 700, letterSpacing: '2.5px', textTransform: 'uppercase' as any, color: '#6B7280', marginTop: '-2px' }}>Crypto Bots</div>
+              <span className="text-2xl font-bold text-gradient">Synaptic</span>
+              <div style={{ fontSize: '8px', fontWeight: 700, letterSpacing: '2.5px', textTransform: 'uppercase' as any, color: '#F0B90B', marginTop: '-2px', animation: 'blink 2s ease-in-out infinite' }}>AI · Crypto · Bots</div>
             </div>
           </Link>
 

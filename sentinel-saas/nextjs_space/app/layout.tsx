@@ -10,7 +10,7 @@ const inter = Inter({ subsets: ['latin'] });
 export const dynamic = 'force-dynamic';
 
 export const metadata: Metadata = {
-  title: 'Synaptic AI - Premium Crypto Trading Bot',
+  title: 'Synaptic - Premium Crypto Trading Bot',
   description: 'Advanced automated cryptocurrency trading platform for CoinDCX and Binance exchanges',
   metadataBase: new URL(process.env.NEXTAUTH_URL || 'https://sentinel.app'),
   icons: {
@@ -18,7 +18,7 @@ export const metadata: Metadata = {
     shortcut: '/favicon.svg',
   },
   openGraph: {
-    title: 'Synaptic AI - Premium Crypto Trading Bot',
+    title: 'Synaptic - Premium Crypto Trading Bot',
     description: 'Advanced automated cryptocurrency trading platform',
     images: ['/og-image.png'],
   },

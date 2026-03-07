@@ -166,7 +166,7 @@ export function HowToClient() {
                                 <BookOpen className="w-4 h-4" /> GETTING STARTED GUIDE
                             </div>
                             <h1 style={{ fontSize: '36px', fontWeight: 700, color: '#0891B2', marginBottom: '8px' }}>
-                                How to Use Synaptic AI
+                                How to Use Synaptic
                             </h1>
                             <p style={{ fontSize: '16px', color: '#6B7280', maxWidth: '600px', margin: '0 auto' }}>
                                 Your step-by-step guide to deploying AI-powered crypto trading bots,
@@ -242,7 +242,7 @@ export function HowToClient() {
                                     ⚡ Pro Tips
                                 </h2>
                                 <p style={{ fontSize: '12px', color: '#6B7280', marginTop: '4px' }}>
-                                    Best practices from experienced Synaptic AI traders
+                                    Best practices from experienced Synaptic traders
                                 </p>
                             </div>
                             <div style={{ padding: '20px 24px', display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '14px' }}>
@@ -285,7 +285,7 @@ export function HowToClient() {
                                     Ready to Start Trading?
                                 </h3>
                                 <p style={{ fontSize: '14px', color: '#6B7280', marginBottom: '20px' }}>
-                                    Deploy your first bot and let Synaptic AI&apos;s HMM engine find opportunities for you.
+                                    Deploy your first bot and let Synaptic&apos;s HMM engine find opportunities for you.
                                 </p>
                                 <div style={{ display: 'flex', gap: '12px', justifyContent: 'center' }}>
                                     <Link href="/bots" style={{

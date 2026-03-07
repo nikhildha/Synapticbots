@@ -91,7 +91,7 @@ export default function SignupPage() {
         <div className="text-center mb-8">
           <Link href="/" className="inline-flex items-center space-x-2 mb-6">
             <Shield className="w-10 h-10 text-[var(--color-primary)]" />
-            <span className="text-3xl font-bold text-gradient">Synaptic AI</span>
+            <span className="text-3xl font-bold text-gradient">Synaptic</span>
           </Link>
           <h1 className="text-3xl font-bold mb-2">Create Your Account</h1>
           <p className="text-[var(--color-text-secondary)]">

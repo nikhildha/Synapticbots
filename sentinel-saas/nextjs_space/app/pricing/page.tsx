@@ -170,7 +170,7 @@ export default function PricingPage() {
 
       <footer className="border-t border-[var(--color-surface-light)] py-8 px-4">
         <div className="max-w-6xl mx-auto text-center text-[var(--color-text-secondary)]">
-          <p>&copy; 2026 Synaptic AI. All rights reserved.</p>
+          <p>&copy; 2026 Synaptic. All rights reserved.</p>
         </div>
       </footer>
     </div>

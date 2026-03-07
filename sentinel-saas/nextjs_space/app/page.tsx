@@ -69,7 +69,7 @@ export default function LandingPage() {
               On Autopilot
             </h1>
             <p className="text-xl text-[var(--color-text-secondary)] mb-8 max-w-3xl mx-auto">
-              Harness the power of automated trading with Synaptic AI. Execute strategies on trading platforms with precision, speed, and confidence.
+              Harness the power of automated trading with Synaptic. Execute strategies on trading platforms with precision, speed, and confidence.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
               <Link
@@ -98,7 +98,7 @@ export default function LandingPage() {
             viewport={{ once: true }}
             className="text-center mb-16"
           >
-            <h2 className="text-4xl font-bold mb-4">Why Choose Synaptic AI?</h2>
+            <h2 className="text-4xl font-bold mb-4">Why Choose Synaptic?</h2>
             <p className="text-xl text-[var(--color-text-secondary)]">
               Professional-grade trading automation built for traders of all levels
             </p>
@@ -151,7 +151,7 @@ export default function LandingPage() {
       {/* Footer */}
       <footer className="border-t border-[var(--color-surface-light)] py-8 px-4">
         <div className="max-w-6xl mx-auto text-center text-[var(--color-text-secondary)]">
-          <p>&copy; 2026 Synaptic AI. All rights reserved.</p>
+          <p>&copy; 2026 Synaptic. All rights reserved.</p>
         </div>
       </footer>
     </div>
