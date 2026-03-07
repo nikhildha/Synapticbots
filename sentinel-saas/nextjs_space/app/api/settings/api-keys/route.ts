@@ -50,6 +50,9 @@ export async function POST(request: Request) {
     return NextResponse.json({ success: true });
   } catch (error: any) {
     console.error('API key save error:', error);
-    return NextResponse.json({ error: 'Failed to save API keys' }, { status: 500 });
+    const msg = error?.message?.includes('ENCRYPTION_KEY')
+      ? 'ENCRYPTION_KEY env var is missing or invalid — set a 64-char hex string in Railway'
+      : 'Failed to save API keys';
+    return NextResponse.json({ error: msg }, { status: 500 });
   }
 }
