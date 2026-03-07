@@ -34,31 +34,51 @@ async function fetchBinanceBalance(apiKey: string, apiSecret: string): Promise<n
 async function fetchCoinDCXBalance(apiKey: string, apiSecret: string): Promise<number | null> {
     try {
         const crypto = await import('crypto');
-        // CoinDCX Futures wallet: GET with signed JSON body (same HMAC pattern as POST)
+        const https = await import('https');
+
+        // CoinDCX Futures wallet: GET with signed JSON body.
+        // Node.js native fetch rejects body on GET, so we use https.request directly
+        // (same as Python requests.get(url, data=body) which CoinDCX expects).
         const body = JSON.stringify({ timestamp: Date.now() });
         const signature = crypto.default
             .createHmac('sha256', apiSecret)
             .update(body)
             .digest('hex');
 
-        const res = await fetch('https://api.coindcx.com/exchange/v1/derivatives/futures/wallets', {
-            method: 'GET',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-AUTH-APIKEY': apiKey,
-                'X-AUTH-SIGNATURE': signature,
-            },
-            body,
-            signal: AbortSignal.timeout(8000),
+        const data = await new Promise<any>((resolve, reject) => {
+            const req = https.default.request({
+                hostname: 'api.coindcx.com',
+                path: '/exchange/v1/derivatives/futures/wallets',
+                method: 'GET',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Content-Length': Buffer.byteLength(body),
+                    'X-AUTH-APIKEY': apiKey,
+                    'X-AUTH-SIGNATURE': signature,
+                },
+                timeout: 8000,
+            }, (res) => {
+                let raw = '';
+                res.on('data', (chunk: Buffer) => { raw += chunk; });
+                res.on('end', () => {
+                    if (res.statusCode === 200) {
+                        try { resolve(JSON.parse(raw)); } catch { reject(new Error('Parse error')); }
+                    } else {
+                        reject(new Error(`HTTP ${res.statusCode}: ${raw}`));
+                    }
+                });
+            });
+            req.on('error', reject);
+            req.on('timeout', () => { req.destroy(new Error('Timeout')); });
+            req.write(body);
+            req.end();
         });
-        if (res.ok) {
-            const data = await res.json();
-            // Futures wallet uses currency_short_name (not currency)
-            const usdt = Array.isArray(data)
-                ? data.find((b: any) => b.currency_short_name === 'USDT')
-                : null;
-            return usdt ? parseFloat(usdt.balance || '0') : 0;
-        }
+
+        // Futures wallet uses currency_short_name (not currency)
+        const usdt = Array.isArray(data)
+            ? data.find((b: any) => b.currency_short_name === 'USDT')
+            : null;
+        return usdt ? parseFloat(usdt.balance || '0') : 0;
     } catch { /* silent */ }
     return null;
 }
