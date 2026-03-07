@@ -34,14 +34,15 @@ async function fetchBinanceBalance(apiKey: string, apiSecret: string): Promise<n
 async function fetchCoinDCXBalance(apiKey: string, apiSecret: string): Promise<number | null> {
     try {
         const crypto = await import('crypto');
+        // CoinDCX Futures wallet: GET with signed JSON body (same HMAC pattern as POST)
         const body = JSON.stringify({ timestamp: Date.now() });
         const signature = crypto.default
             .createHmac('sha256', apiSecret)
             .update(body)
             .digest('hex');
 
-        const res = await fetch('https://api.coindcx.com/exchange/v1/users/balances', {
-            method: 'POST',
+        const res = await fetch('https://api.coindcx.com/exchange/v1/derivatives/futures/wallets', {
+            method: 'GET',
             headers: {
                 'Content-Type': 'application/json',
                 'X-AUTH-APIKEY': apiKey,
@@ -52,9 +53,9 @@ async function fetchCoinDCXBalance(apiKey: string, apiSecret: string): Promise<n
         });
         if (res.ok) {
             const data = await res.json();
-            // Sum all INR/USDT balances — find USDT balance
+            // Futures wallet uses currency_short_name (not currency)
             const usdt = Array.isArray(data)
-                ? data.find((b: any) => b.currency === 'USDT' || b.currency === 'INR')
+                ? data.find((b: any) => b.currency_short_name === 'USDT')
                 : null;
             return usdt ? parseFloat(usdt.balance || '0') : 0;
         }

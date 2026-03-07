@@ -418,6 +418,31 @@ export function TradesClient({ trades: initialTrades }: TradesClientProps) {
             </div>
           </motion.div>
 
+          {/* ═══ Master Mode Filter ═══ */}
+          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.03 }} className="mb-4">
+            <div style={{
+              display: 'inline-flex', gap: '0', borderRadius: '10px', overflow: 'hidden',
+              border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(17,24,39,0.7)',
+            }}>
+              {(['all', 'paper', 'live'] as const).map(m => (
+                <button key={m} onClick={() => setModeFilter(m)} style={{
+                  padding: '8px 20px', border: 'none', cursor: 'pointer',
+                  fontSize: '13px', fontWeight: 600,
+                  background: modeFilter === m
+                    ? m === 'paper' ? 'rgba(34,197,94,0.2)' : m === 'live' ? 'rgba(239,68,68,0.2)' : 'rgba(6,182,212,0.15)'
+                    : 'transparent',
+                  color: modeFilter === m
+                    ? m === 'paper' ? '#22C55E' : m === 'live' ? '#EF4444' : '#06B6D4'
+                    : '#6B7280',
+                  borderRight: m !== 'live' ? '1px solid rgba(255,255,255,0.08)' : 'none',
+                  transition: 'all 0.2s',
+                }}>
+                  {m === 'all' ? 'All Modes' : m === 'paper' ? '🟢 Paper' : '🔴 Live'}
+                </button>
+              ))}
+            </div>
+          </motion.div>
+
           {/* ═══ Portfolio Summary Stats ═══ */}
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.05 }} className="mb-6">
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: '12px' }}>
@@ -443,24 +468,6 @@ export function TradesClient({ trades: initialTrades }: TradesClientProps) {
                     transition: 'all 0.2s',
                   }}>
                     {s === 'all' ? `All (${stats.total})` : s === 'active' ? `Active (${stats.active})` : `Closed (${stats.closed})`}
-                  </button>
-                ))}
-
-                <div style={{ width: '1px', height: '20px', background: 'rgba(255,255,255,0.1)' }} />
-
-                {(['all', 'paper', 'live'] as const).map(m => (
-                  <button key={m} onClick={() => setModeFilter(m)} style={{
-                    padding: '6px 14px', borderRadius: '8px', border: 'none', cursor: 'pointer',
-                    fontSize: '13px', fontWeight: 600,
-                    background: modeFilter === m
-                      ? m === 'paper' ? 'rgba(34,197,94,0.2)' : m === 'live' ? 'rgba(239,68,68,0.2)' : 'rgba(255,255,255,0.1)'
-                      : 'rgba(255,255,255,0.05)',
-                    color: modeFilter === m
-                      ? m === 'paper' ? '#22C55E' : m === 'live' ? '#EF4444' : '#D1D5DB'
-                      : '#6B7280',
-                    transition: 'all 0.2s',
-                  }}>
-                    {m === 'all' ? 'All Modes' : m === 'paper' ? '🟢 Paper' : '🔴 Live'}
                   </button>
                 ))}
 

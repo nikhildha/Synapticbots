@@ -236,6 +236,11 @@ export function DashboardClient({ user, stats, bots, recentTrades }: DashboardCl
   const MAX_SLOTS = 25;
   const usedCapital = liveActiveTrades.length * CAPITAL_PER_TRADE;
 
+  // Capital deployed: paper + live (active trades only)
+  const paperCapitalDeployed = paperActiveTrades.length * CAPITAL_PER_TRADE;
+  const liveCapitalDeployed = liveModeTrades.length * CAPITAL_PER_TRADE;
+  const totalCapitalDeployed = paperCapitalDeployed + liveCapitalDeployed;
+
   const liveStats = {
     activeBots: stats?.activeBots ?? (bots?.filter((b: any) => b?.isActive)?.length ?? 0),
     activeTrades: liveActiveTrades.length || stats?.activeTrades || 0,
@@ -245,6 +250,9 @@ export function DashboardClient({ user, stats, bots, recentTrades }: DashboardCl
     liveTotalPnl: liveTotalModePnl,
     livePnlPct,
     usedCapital,
+    paperCapitalDeployed,
+    liveCapitalDeployed,
+    totalCapitalDeployed,
   };
 
   return (
@@ -430,7 +438,7 @@ export function DashboardClient({ user, stats, bots, recentTrades }: DashboardCl
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.15 }}
-            className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8"
+            className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 mb-8"
           >
             <StatsCard
               title="Active Bots"
@@ -441,6 +449,11 @@ export function DashboardClient({ user, stats, bots, recentTrades }: DashboardCl
               title="Active Trades"
               value={`${liveStats.activeTrades} · $${liveStats.usedCapital} of $${MAX_CAPITAL}`}
               animated
+            />
+            <StatsCard
+              title="Capital Deployed"
+              value={`$${liveStats.totalCapitalDeployed}`}
+              trendValue={`Paper: $${liveStats.paperCapitalDeployed} · Live: $${liveStats.liveCapitalDeployed}`}
             />
             <StatsCard
               title="Total Paper PnL"
@@ -475,9 +488,30 @@ export function DashboardClient({ user, stats, bots, recentTrades }: DashboardCl
 
             {bots && bots.length > 0 ? (
               <div className="flex flex-col gap-3">
-                {bots.map((bot) => (
-                  <BotCard key={bot?.id} bot={bot} onToggle={handleBotToggle} liveTradeCount={liveActiveTrades.length} trades={trades} />
-                ))}
+                {bots.map((bot) => {
+                  // Filter trades for this specific bot
+                  const botNameLower = (bot?.name || '').toLowerCase();
+                  const botTrades = trades.filter((t: any) => {
+                    // Direct botId match
+                    if (t.bot_id && bot?.id && t.bot_id === bot.id) return true;
+                    if (t.botId && bot?.id && t.botId === bot.id) return true;
+                    // Bot name matching — handle engine format 'SM-Standard' vs DB 'Synaptic Marshal — Standard'
+                    const tradeBotName = (t.bot_name || t.botName || '').toLowerCase();
+                    if (!tradeBotName) return false;
+                    // Check if the model keyword (standard/conservative) appears in both
+                    const modelKeywords = ['standard', 'conservative', 'aggressive'];
+                    const tradeModel = modelKeywords.find(k => tradeBotName.includes(k));
+                    const botModel = modelKeywords.find(k => botNameLower.includes(k));
+                    if (tradeModel && botModel) return tradeModel === botModel;
+                    // Fallback: direct name inclusion
+                    return botNameLower.includes(tradeBotName) || tradeBotName.includes(botNameLower);
+                  });
+                  // If no trades matched, fall back to all trades only if there's exactly 1 bot
+                  const displayTrades = botTrades.length > 0 ? botTrades : (bots.length === 1 ? trades : []);
+                  return (
+                    <BotCard key={bot?.id} bot={bot} onToggle={handleBotToggle} liveTradeCount={liveActiveTrades.length} trades={displayTrades} />
+                  );
+                })}
               </div>
             ) : (
               <div className="card-gradient p-12 rounded-xl text-center">
