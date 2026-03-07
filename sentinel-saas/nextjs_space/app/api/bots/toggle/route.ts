@@ -125,13 +125,34 @@ export async function POST(request: Request) {
           console.warn('[toggle] validate-exchange failed (continuing):', err);
         }
       } else if (!isActive) {
+        // ── LIVE MODE STOP: close all CoinDCX positions FIRST ────────────
+        if (botMode === 'live') {
+          try {
+            const exitRes = await fetch(`${ENGINE_API_URL}/api/exit-all-live`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              signal: AbortSignal.timeout(15000), // 15s — closing positions can take time
+            });
+            const exitData = await exitRes.json();
+            console.log(
+              `[toggle] exit-all-live: ${exitData.closed_exchange?.length ?? 0} exchange positions closed, ` +
+              `${exitData.closed_tradebook?.length ?? 0} tradebook entries closed`
+            );
+            if (exitData.errors?.length > 0) {
+              console.warn('[toggle] exit-all-live errors:', exitData.errors);
+            }
+          } catch (err) {
+            console.error('[toggle] exit-all-live failed:', err);
+          }
+        }
+
         // Revert engine to paper mode on stop (best-effort, don't block)
         fetch(`${ENGINE_API_URL}/api/set-mode`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ mode: 'paper', exchange: '' }),
           signal: AbortSignal.timeout(3000),
-        }).catch(() => {});
+        }).catch(() => { });
       }
     }
 

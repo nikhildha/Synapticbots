@@ -189,6 +189,63 @@ def api_close_all():
         return jsonify({"error": str(e)}), 500
 
 
+@app.route("/api/exit-all-live", methods=["POST"])
+def api_exit_all_live():
+    """
+    Immediately close ALL active CoinDCX positions and tradebook entries.
+    Called when the bot is stopped from the dashboard.
+    """
+    import tradebook as tb
+
+    results = {"closed_exchange": [], "closed_tradebook": [], "errors": []}
+
+    # 1. Close all positions on CoinDCX
+    if not config.PAPER_TRADE:
+        try:
+            import coindcx_client as cdx
+            positions = cdx.list_positions()
+            for p in positions:
+                active_pos = float(p.get("active_pos", 0))
+                if active_pos == 0:
+                    continue
+                pair = p.get("pair", "")
+                pos_id = p.get("id")
+                try:
+                    cdx.exit_position(pos_id)
+                    symbol = cdx.from_coindcx_pair(pair)
+                    results["closed_exchange"].append(symbol)
+                    logger.info("📤 EXIT-ALL: Closed CoinDCX position %s (%s)", pos_id, pair)
+                except Exception as e:
+                    results["errors"].append(f"{pair}: {str(e)}")
+                    logger.error("EXIT-ALL: Failed to close %s: %s", pair, e)
+        except Exception as e:
+            results["errors"].append(f"CoinDCX error: {str(e)}")
+            logger.error("EXIT-ALL: CoinDCX list_positions failed: %s", e)
+
+    # 2. Close all active trades in tradebook
+    try:
+        active = tb.get_active_trades()
+        for trade in active:
+            tb.close_trade(trade_id=trade["trade_id"], reason="BOT_STOPPED")
+            results["closed_tradebook"].append(trade["symbol"])
+    except Exception as e:
+        results["errors"].append(f"Tradebook error: {str(e)}")
+
+    logger.info(
+        "🛑 EXIT-ALL complete: %d exchange positions closed, %d tradebook entries closed, %d errors",
+        len(results["closed_exchange"]),
+        len(results["closed_tradebook"]),
+        len(results["errors"]),
+    )
+
+    return jsonify({
+        "success": True,
+        "closed_exchange": results["closed_exchange"],
+        "closed_tradebook": results["closed_tradebook"],
+        "errors": results["errors"],
+    })
+
+
 @app.route("/api/reset-trades", methods=["POST"])
 def api_reset_trades():
     """Clear all trades from the tradebook."""
