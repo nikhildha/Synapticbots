@@ -1,6 +1,6 @@
 'use client';
 
-import { Bot, Play, Square, ChevronDown, ChevronUp } from 'lucide-react';
+import { Bot, Play, Square, ChevronDown, ChevronUp, Trash2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useState } from 'react';
 
@@ -17,11 +17,12 @@ interface BotCardProps {
     };
   };
   onToggle: (botId: string, currentStatus: boolean) => void;
+  onDelete?: (botId: string) => void;
   liveTradeCount?: number;
   trades?: any[];
 }
 
-export function BotCard({ bot, onToggle, liveTradeCount, trades = [] }: BotCardProps) {
+export function BotCard({ bot, onToggle, onDelete, liveTradeCount, trades = [] }: BotCardProps) {
   const [expanded, setExpanded] = useState(false);
   const isRunning = bot?.isActive ?? false;
 
@@ -30,11 +31,14 @@ export function BotCard({ bot, onToggle, liveTradeCount, trades = [] }: BotCardP
   const closedTrades = trades.filter((t: any) => (t.status || '').toLowerCase() !== 'active');
   const totalTrades = trades.length;
 
-  // PnL calculations
-  const activePnl = activeTrades.reduce((sum: number, t: any) => sum + (parseFloat(t.pnl) || 0), 0);
-  const totalPnl = trades.reduce((sum: number, t: any) => sum + (parseFloat(t.pnl) || parseFloat(t.realized_pnl) || parseFloat(t.total_pnl) || 0), 0);
-  const totalCapital = trades.reduce((sum: number, t: any) => sum + (parseFloat(t.capital) || parseFloat(t.entry_price) * parseFloat(t.quantity) || 100), 0);
-  const roiPct = totalCapital > 0 ? (totalPnl / totalCapital * 100) : 0;
+  // PnL calculations — use totalPnl/total_pnl/realized_pnl fields
+  const activePnl = activeTrades.reduce((sum: number, t: any) => sum + (parseFloat(t.pnl) || parseFloat(t.activePnl) || 0), 0);
+  const totalPnl = trades.reduce((sum: number, t: any) => sum + (parseFloat(t.pnl) || parseFloat(t.totalPnl) || parseFloat(t.realized_pnl) || parseFloat(t.total_pnl) || 0), 0);
+
+  // ROI: PnL / total capital deployed (trades × $100 each)
+  const CAPITAL_PER_TRADE = 100;
+  const totalCapitalDeployed = totalTrades * CAPITAL_PER_TRADE;
+  const roiPct = totalCapitalDeployed > 0 ? (totalPnl / totalCapitalDeployed * 100) : 0;
 
   const pnlColor = (v: number) => v >= 0 ? '#22C55E' : '#EF4444';
   const sign = (v: number) => v >= 0 ? '+' : '';
@@ -91,7 +95,7 @@ export function BotCard({ bot, onToggle, liveTradeCount, trades = [] }: BotCardP
           </div>
         </div>
 
-        {/* Right: ROI + Toggle + Expand */}
+        {/* Right: ROI + Toggle + Delete + Expand */}
         <div className="flex items-center gap-3">
           <div className="text-right">
             <span className="text-sm font-bold" style={{ color: pnlColor(roiPct) }}>
@@ -107,6 +111,16 @@ export function BotCard({ bot, onToggle, liveTradeCount, trades = [] }: BotCardP
           >
             {isRunning ? <Square className="w-4 h-4 text-white" /> : <Play className="w-4 h-4 text-white" />}
           </button>
+          {onDelete && (
+            <button
+              onClick={(e) => { e.stopPropagation(); onDelete(bot?.id ?? ''); }}
+              title="Delete bot"
+              className="p-2 rounded-lg transition-colors flex-shrink-0 hover:bg-red-500/20"
+              style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)' }}
+            >
+              <Trash2 className="w-4 h-4 text-red-400" />
+            </button>
+          )}
           <div className="text-[var(--color-text-secondary)]">
             {expanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
           </div>
@@ -140,7 +154,7 @@ export function BotCard({ bot, onToggle, liveTradeCount, trades = [] }: BotCardP
                 </thead>
                 <tbody>
                   {trades.slice(0, 20).map((t: any, idx: number) => {
-                    const pnl = parseFloat(t.pnl) || parseFloat(t.realized_pnl) || parseFloat(t.total_pnl) || 0;
+                    const pnl = parseFloat(t.pnl) || parseFloat(t.totalPnl) || parseFloat(t.realized_pnl) || parseFloat(t.total_pnl) || 0;
                     const isActive = (t.status || '').toLowerCase() === 'active';
                     return (
                       <tr key={idx} style={{ borderBottom: '1px solid rgba(255,255,255,0.03)' }}>

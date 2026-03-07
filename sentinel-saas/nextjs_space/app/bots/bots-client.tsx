@@ -28,7 +28,133 @@ const BOT_MODELS = [
   },
 ];
 
-interface BotsClientProps { bots: any[]; }
+interface BotsClientProps { bots: any[]; sessions?: any[]; perfSummary?: any; }
+
+/* ═══ Inline Performance Section ═══ */
+function PerformanceSection() {
+  const [sessions, setSessions] = useState<any[]>([]);
+  const [summary, setSummary] = useState<any>({ allTimePnl: 0, allTimeRoi: 0, totalSessions: 0, bestSessionPnl: 0 });
+  const [expanded, setExpanded] = useState<string | null>(null);
+  const [loaded, setLoaded] = useState(false);
+
+  useEffect(() => {
+    fetch('/api/performance', { cache: 'no-store' })
+      .then(r => r.ok ? r.json() : null)
+      .then(d => {
+        if (d) {
+          setSessions(d.sessions || []);
+          setSummary(d.summary || summary);
+        }
+        setLoaded(true);
+      })
+      .catch(() => setLoaded(true));
+  }, []);
+
+  const fmt = (n: number) => (n >= 0 ? '+' : '') + n.toFixed(2);
+  const fmtDate = (iso: string) => new Date(iso).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: '2-digit' });
+  const duration = (start: string, end: string | null) => {
+    const ms = (end ? new Date(end) : new Date()).getTime() - new Date(start).getTime();
+    const days = Math.floor(ms / 86400000);
+    const hours = Math.floor((ms % 86400000) / 3600000);
+    return days > 0 ? `${days}d ${hours}h` : `${hours}h`;
+  };
+
+  if (!loaded) return <div style={{ textAlign: 'center', padding: '24px', color: '#6B7280', fontSize: '13px' }}>Loading performance data...</div>;
+  if (sessions.length === 0) return (
+    <div style={{ textAlign: 'center', padding: '32px', color: '#6B7280', fontSize: '13px' }}>
+      No sessions yet. Start your bot to begin tracking performance.
+    </div>
+  );
+
+  return (
+    <div>
+      {/* Summary cards */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '12px', marginBottom: '16px' }}>
+        {[
+          { label: 'All-time PnL', value: `${fmt(summary.allTimePnl)} USDT`, color: summary.allTimePnl >= 0 ? '#22C55E' : '#EF4444' },
+          { label: 'All-time ROI', value: `${fmt(summary.allTimeRoi)}%`, color: summary.allTimeRoi >= 0 ? '#22C55E' : '#EF4444' },
+          { label: 'Total Sessions', value: String(summary.totalSessions), color: '#D1D5DB' },
+          { label: 'Best Session', value: `${fmt(summary.bestSessionPnl)} USDT`, color: summary.bestSessionPnl >= 0 ? '#22C55E' : '#EF4444' },
+        ].map(c => (
+          <div key={c.label} style={{
+            background: 'rgba(17,24,39,0.6)', border: '1px solid rgba(255,255,255,0.06)',
+            borderRadius: '12px', padding: '14px',
+          }}>
+            <div style={{ fontSize: '11px', color: '#6B7280', marginBottom: '4px' }}>{c.label}</div>
+            <div style={{ fontSize: '16px', fontWeight: 700, fontFamily: 'monospace', color: c.color }}>{c.value}</div>
+          </div>
+        ))}
+      </div>
+      {/* Session list */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+        {sessions.map((s: any) => (
+          <div key={s.id} style={{
+            background: 'rgba(17,24,39,0.6)', border: '1px solid rgba(255,255,255,0.06)',
+            borderRadius: '12px', overflow: 'hidden',
+          }}>
+            <div onClick={() => setExpanded(expanded === s.id ? null : s.id)}
+              style={{
+                display: 'grid', gridTemplateColumns: '100px 1fr 70px 70px 70px 80px 80px 28px',
+                gap: '8px', alignItems: 'center', padding: '10px 14px', cursor: 'pointer',
+                fontSize: '13px',
+              }}>
+              <span style={{
+                fontSize: '10px', fontWeight: 600,
+                padding: '2px 8px', borderRadius: '4px', width: 'fit-content',
+                ...(s.status === 'active'
+                  ? { background: 'rgba(34,197,94,0.15)', color: '#22C55E' }
+                  : { background: 'rgba(107,114,128,0.15)', color: '#9CA3AF' }),
+              }}>
+                {s.status === 'active' ? '● Live' : `Run #${s.sessionIndex}`}
+              </span>
+              <span>{fmtDate(s.startedAt)} <span style={{ fontSize: '11px', color: '#6B7280' }}>· {duration(s.startedAt, s.endedAt)}</span></span>
+              <span style={{ textAlign: 'right' }}>{s.totalTrades}</span>
+              <span style={{ textAlign: 'right', fontFamily: 'monospace', color: (s.winRate || 0) >= 50 ? '#22C55E' : '#9CA3AF' }}>
+                {s.closedTrades > 0 ? `${(s.winRate || 0).toFixed(0)}%` : '—'}
+              </span>
+              <span style={{ textAlign: 'right' }}>
+                <span style={{
+                  fontSize: '10px', padding: '2px 6px', borderRadius: '4px',
+                  background: s.mode === 'live' ? 'rgba(245,158,11,0.15)' : 'rgba(107,114,128,0.15)',
+                  color: s.mode === 'live' ? '#F59E0B' : '#9CA3AF',
+                }}>{s.mode}</span>
+              </span>
+              <span style={{ textAlign: 'right', fontFamily: 'monospace', fontWeight: 600, color: (s.livePnl || s.totalPnl || 0) >= 0 ? '#22C55E' : '#EF4444' }}>
+                {fmt(s.livePnl || s.totalPnl || 0)}
+              </span>
+              <span style={{ textAlign: 'right', fontFamily: 'monospace', fontSize: '11px', color: (s.liveRoi || s.roi || 0) >= 0 ? '#22C55E' : '#EF4444' }}>
+                {fmt(s.liveRoi || s.roi || 0)}%
+              </span>
+              <span style={{ color: '#6B7280', fontSize: '12px' }}>{expanded === s.id ? '▲' : '▼'}</span>
+            </div>
+            {expanded === s.id && (
+              <div style={{
+                borderTop: '1px solid rgba(255,255,255,0.06)', padding: '12px 14px',
+                display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '12px', fontSize: '12px',
+              }}>
+                {[
+                  { l: 'Closed Trades', v: s.closedTrades },
+                  { l: 'Open Trades', v: s.openTrades || 0 },
+                  { l: 'Best Trade', v: `${fmt(s.bestTrade || 0)} USDT` },
+                  { l: 'Worst Trade', v: `${fmt(s.worstTrade || 0)} USDT` },
+                  { l: 'Capital Deployed', v: `$${(s.totalCapital || 0).toFixed(0)}` },
+                  { l: 'Bot', v: s.bot?.name || s.name || '-' },
+                  { l: 'Exchange', v: s.bot?.exchange || s.exchange || '-' },
+                  ...(s.endedAt ? [{ l: 'Ended', v: fmtDate(s.endedAt) }] : []),
+                ].map((item, i) => (
+                  <div key={i}>
+                    <div style={{ fontSize: '10px', color: '#6B7280', marginBottom: '2px' }}>{item.l}</div>
+                    <div style={{ fontWeight: 600, color: '#D1D5DB' }}>{item.v}</div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
 
 export function BotsClient({ bots: initialBots }: BotsClientProps) {
   const { data: session } = useSession();
@@ -195,72 +321,37 @@ export function BotsClient({ bots: initialBots }: BotsClientProps) {
             </motion.div>
           )}
 
-          {/* ── Deployed Bots Grid ── */}
+          {/* ── Deployed Bots List ── */}
           {bots && bots.length > 0 && (
             <div className="flex flex-col gap-4 mb-12">
-              {bots.map((bot) => {
-                const model = getModel(bot?.name || '');
-                return (
-                  <div key={bot?.id}>
-                    {/* Model badge + delete row */}
-                    <div style={{
-                      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                      marginBottom: '6px', padding: '0 4px',
-                    }}>
-                      <span style={{
-                        padding: '3px 10px', borderRadius: '8px', fontSize: '10px', fontWeight: 700,
-                        color: model.color, background: model.color + '22', letterSpacing: '0.5px',
-                      }}>
-                        {model.badge} {model.name}
-                      </span>
-                      <button onClick={() => handleDeleteBot(bot?.id)}
-                        title="Delete bot"
-                        style={{
-                          padding: '4px 8px', borderRadius: '6px',
-                          background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)',
-                          color: '#EF4444', cursor: 'pointer', fontSize: '11px',
-                          display: 'flex', alignItems: 'center', gap: '4px',
-                          transition: 'all 0.2s',
-                        }}
-                        onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(239,68,68,0.25)'; }}
-                        onMouseLeave={(e) => { e.currentTarget.style.background = 'rgba(239,68,68,0.1)'; }}
-                      >
-                        <Trash2 className="w-3 h-3" /> Delete
-                      </button>
-                    </div>
-                    <BotCard bot={bot} onToggle={handleBotToggle} liveTradeCount={liveTradeCount} />
-                  </div>
-                );
-              })}
+              {bots.map((bot) => (
+                <BotCard
+                  key={bot?.id}
+                  bot={bot}
+                  onToggle={handleBotToggle}
+                  onDelete={handleDeleteBot}
+                  liveTradeCount={liveTradeCount}
+                />
+              ))}
             </div>
           )}
 
-          {/* ═══ SECTION 2: PERFORMANCE ═══ */}
+          {/* ═══ SECTION 2: PERFORMANCE ANALYTICS (Inline) ═══ */}
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }}>
-            <a href="/performance" style={{ textDecoration: 'none' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
               <div style={{
-                background: 'rgba(17, 24, 39, 0.7)', backdropFilter: 'blur(12px)',
-                border: '1px solid rgba(6, 182, 212, 0.15)', borderRadius: '16px',
-                padding: '20px 24px', cursor: 'pointer',
-                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                transition: 'all 0.2s',
+                width: '36px', height: '36px', borderRadius: '10px',
+                background: 'rgba(6, 182, 212, 0.15)', display: 'flex',
+                alignItems: 'center', justifyContent: 'center',
               }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                  <div style={{
-                    width: '36px', height: '36px', borderRadius: '10px',
-                    background: 'rgba(6, 182, 212, 0.15)', display: 'flex',
-                    alignItems: 'center', justifyContent: 'center',
-                  }}>
-                    <TrendingUp size={18} color="#06B6D4" />
-                  </div>
-                  <div>
-                    <div style={{ fontSize: '16px', fontWeight: 700, color: '#06B6D4' }}>Performance Analytics</div>
-                    <div style={{ fontSize: '12px', color: '#6B7280' }}>View detailed PnL, win rates, and bot performance metrics</div>
-                  </div>
-                </div>
-                <div style={{ fontSize: '20px', color: '#6B7280' }}>→</div>
+                <TrendingUp size={18} color="#06B6D4" />
               </div>
-            </a>
+              <div>
+                <div style={{ fontSize: '16px', fontWeight: 700, color: '#06B6D4' }}>Performance Analytics</div>
+                <div style={{ fontSize: '12px', color: '#6B7280' }}>All-time bot run records, session by session</div>
+              </div>
+            </div>
+            <PerformanceSection />
           </motion.div>
 
         </div>

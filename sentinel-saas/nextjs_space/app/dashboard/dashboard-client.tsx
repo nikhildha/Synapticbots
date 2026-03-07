@@ -439,7 +439,7 @@ export function DashboardClient({ user, stats, bots, recentTrades }: DashboardCl
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.15 }}
-            className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 mb-8"
+            className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-6 mb-8"
           >
             <StatsCard
               title="Active Bots"
@@ -451,22 +451,28 @@ export function DashboardClient({ user, stats, bots, recentTrades }: DashboardCl
               value={`${liveStats.activeTrades} · $${liveStats.usedCapital} of $${MAX_CAPITAL}`}
               animated
             />
-            {/* Capital Deployed — custom card with used/max bar */}
+            {/* Capital Deployed — wider card with paper/live emphasized */}
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              className="card-gradient rounded-xl p-5 glow-hover hover-lift"
+              className="card-gradient rounded-xl p-5 glow-hover hover-lift lg:col-span-2"
             >
               <h3 className="text-sm text-[var(--color-text-secondary)] mb-1">Capital Deployed</h3>
-              <p className="text-2xl font-bold">${liveStats.totalCapitalDeployed} <span className="text-sm font-normal text-[var(--color-text-secondary)]">/ ${MAX_CAPITAL}</span></p>
-              {/* Paper / Live split */}
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '8px', fontSize: '11px' }}>
-                <span style={{ color: '#22C55E' }}>🟢 Paper: ${liveStats.paperCapitalDeployed}</span>
-                <span style={{ color: '#EF4444' }}>🔴 Live: ${liveStats.liveCapitalDeployed}</span>
+              <p style={{ fontSize: '12px', color: '#9CA3AF', marginBottom: '8px' }}>${liveStats.totalCapitalDeployed} / ${MAX_CAPITAL}</p>
+              {/* Paper / Live split — big text */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div>
+                  <div style={{ fontSize: '16px', fontWeight: 700, color: '#22C55E' }}>${liveStats.paperCapitalDeployed}</div>
+                  <div style={{ fontSize: '10px', color: '#6B7280' }}>🟢 Paper</div>
+                </div>
+                <div style={{ textAlign: 'right' }}>
+                  <div style={{ fontSize: '16px', fontWeight: 700, color: '#EF4444' }}>${liveStats.liveCapitalDeployed}</div>
+                  <div style={{ fontSize: '10px', color: '#6B7280' }}>🔴 Live</div>
+                </div>
               </div>
               {/* Progress bar */}
               <div style={{
-                marginTop: '6px', height: '4px', borderRadius: '2px',
+                marginTop: '8px', height: '4px', borderRadius: '2px',
                 background: 'rgba(255,255,255,0.06)', overflow: 'hidden',
               }}>
                 <div style={{
@@ -499,7 +505,7 @@ export function DashboardClient({ user, stats, bots, recentTrades }: DashboardCl
             className="mb-12"
           >
             <div className="flex items-center justify-between mb-6">
-              <h2 className="text-xl font-bold text-cyan-400">Your Synaptic AI Bots</h2>
+              <h2 className="text-xl font-bold text-cyan-400">Synaptic AI Bots Deployment</h2>
               <Link
                 href="/bots"
                 className="px-4 py-2 bg-[var(--color-primary)] text-white rounded-lg hover:bg-[var(--color-primary-dark)] transition-colors"

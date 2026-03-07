@@ -52,11 +52,44 @@ export async function POST(request: Request) {
         console.error('[toggle] createBotSession failed:', err);
       }
     } else {
-      // Stopping: close active session + close paper trades + signal engine
+      // Stopping: close active session + exit ALL active trades + signal engine
       try {
         await closeBotSession(botId);
       } catch (err) {
         console.error('[toggle] closeBotSession failed:', err);
+      }
+
+      // Exit all active trades for this bot
+      try {
+        const activeTrades = await prisma.trade.findMany({
+          where: { botId, status: { in: ['active', 'ACTIVE', 'Active'] } },
+        });
+        for (const trade of activeTrades) {
+          const currentPrice = trade.currentPrice || trade.entryPrice;
+          const isLong = trade.position === 'long';
+          const priceDiff = isLong ? (currentPrice - trade.entryPrice) : (trade.entryPrice - currentPrice);
+          const rawPnl = priceDiff / trade.entryPrice * trade.leverage * trade.capital;
+          const leveragedPnl = Math.round(rawPnl * 10000) / 10000;
+          const pnlPct = trade.capital > 0 ? Math.round(leveragedPnl / trade.capital * 100 * 100) / 100 : 0;
+          await prisma.trade.update({
+            where: { id: trade.id },
+            data: {
+              status: 'closed',
+              exitPrice: currentPrice,
+              exitTime: new Date(),
+              exitReason: 'BOT_STOPPED',
+              totalPnl: leveragedPnl,
+              totalPnlPercent: pnlPct,
+              activePnl: 0,
+              activePnlPercent: 0,
+            },
+          });
+        }
+        if (activeTrades.length > 0) {
+          console.log(`[toggle] Exited ${activeTrades.length} active trades for bot ${botId}`);
+        }
+      } catch (err) {
+        console.error('[toggle] Exit trades on stop failed:', err);
       }
     }
 
