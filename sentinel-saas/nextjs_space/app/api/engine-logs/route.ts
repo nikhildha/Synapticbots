@@ -1,10 +1,9 @@
 import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth-options';
+import { getEngineUrl, type EngineMode } from '@/lib/engine-url';
 
 export const dynamic = 'force-dynamic';
-
-const ENGINE_URL = process.env.ENGINE_API_URL || process.env.PYTHON_ENGINE_URL || 'http://localhost:3001';
 
 /**
  * GET /api/engine-logs — Admin-only proxy to engine /api/logs.
@@ -19,9 +18,11 @@ export async function GET(req: Request) {
 
     const { searchParams } = new URL(req.url);
     const n = searchParams.get('n') || '200';
+    const mode = (searchParams.get('mode') || 'live') as EngineMode;
+    const engineUrl = getEngineUrl(mode);
 
     try {
-        const res = await fetch(`${ENGINE_URL}/api/logs?n=${n}`, {
+        const res = await fetch(`${engineUrl}/api/logs?n=${n}`, {
             cache: 'no-store',
             signal: AbortSignal.timeout(5000),
         });

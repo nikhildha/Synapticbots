@@ -3,16 +3,15 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth-options';
 import { prisma } from '@/lib/prisma';
 import { syncEngineTrades, getUserTrades } from '@/lib/sync-engine-trades';
+import { getEngineUrl, type EngineMode } from '@/lib/engine-url';
 
 export const dynamic = 'force-dynamic';
 
-// ─── Engine API URL (Railway internal) or local fallback ────────────────
-const ENGINE_API_URL = process.env.ENGINE_API_URL || process.env.PYTHON_ENGINE_URL;
-
-async function fetchEngineTrades(): Promise<any[]> {
-    if (!ENGINE_API_URL) return [];
+async function fetchEngineTrades(mode: EngineMode = 'live'): Promise<any[]> {
+    const url = getEngineUrl(mode);
+    if (!url) return [];
     try {
-        const res = await fetch(`${ENGINE_API_URL}/api/all`, {
+        const res = await fetch(`${url}/api/all`, {
             cache: 'no-store',
             signal: AbortSignal.timeout(8000),
         });
@@ -21,7 +20,7 @@ async function fetchEngineTrades(): Promise<any[]> {
             return data?.tradebook?.trades || [];
         }
     } catch (err) {
-        console.error('[trades] Engine API fetch failed:', err);
+        console.error(`[trades] Engine API (${mode}) fetch failed:`, err);
     }
     return [];
 }
@@ -51,9 +50,13 @@ export async function GET(request: NextRequest) {
             orderBy: { updatedAt: 'desc' },
         });
 
+        // Determine correct engine based on bot mode
+        const botMode = (userBot?.config as any)?.mode || 'paper';
+        const engineMode: EngineMode = botMode.toLowerCase().includes('live') ? 'live' : 'paper';
+
         if (userBot && userBot.startedAt) {
             try {
-                const engineTrades = await fetchEngineTrades();
+                const engineTrades = await fetchEngineTrades(engineMode);
                 if (engineTrades.length > 0) {
                     // Only sync trades opened AFTER the user started their bot (next-cycle-only)
                     await syncEngineTrades(engineTrades, userBot.id, userBot.startedAt);

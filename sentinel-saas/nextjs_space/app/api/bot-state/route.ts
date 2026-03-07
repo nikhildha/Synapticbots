@@ -3,22 +3,21 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth-options';
 import { prisma } from '@/lib/prisma';
 import { syncEngineTrades, getUserTrades } from '@/lib/sync-engine-trades';
+import { getEngineUrl, type EngineMode } from '@/lib/engine-url';
 
 export const dynamic = 'force-dynamic';
 
-// ─── Engine API URL (Railway) ────────────────────────────────────────────────
-const ENGINE_API_URL = process.env.ENGINE_API_URL || process.env.PYTHON_ENGINE_URL;
-
-async function fetchEngineData() {
-    if (!ENGINE_API_URL) return null;
+async function fetchEngineData(mode: EngineMode = 'live') {
+    const url = getEngineUrl(mode);
+    if (!url) return null;
     try {
-        const res = await fetch(`${ENGINE_API_URL}/api/all`, {
+        const res = await fetch(`${url}/api/all`, {
             cache: 'no-store',
             signal: AbortSignal.timeout(8000),
         });
         if (res.ok) return await res.json();
     } catch (err) {
-        console.error('[bot-state] Engine API fetch failed:', err);
+        console.error(`[bot-state] Engine API (${mode}) fetch failed:`, err);
     }
     return null;
 }
@@ -30,12 +29,23 @@ export async function GET() {
         const userId = (session?.user as any)?.id;
         const isAdmin = (session?.user as any)?.role === 'admin';
 
-        // Fetch from engine API (production)
-        const engineData = await fetchEngineData();
+        // Determine which engine to call based on user's active bot mode
+        let engineMode: EngineMode = 'live'; // default for admin
+        if (userId && !isAdmin) {
+            const userBot = await prisma.bot.findFirst({
+                where: { userId, isActive: true },
+                select: { config: true },
+            });
+            const botMode = (userBot?.config as any)?.mode || 'paper';
+            engineMode = botMode.toLowerCase().includes('live') ? 'live' : 'paper';
+        }
+
+        // Fetch from the correct engine
+        const engineData = await fetchEngineData(engineMode);
 
         const multi = engineData?.multi || { coin_states: {}, last_analysis_time: null, deployed_count: 0 };
         const engineTradebook = engineData?.tradebook || { trades: [], summary: {} };
-        const engineState = engineData?.engine || { status: ENGINE_API_URL ? 'unknown' : 'not_configured' };
+        const engineState = engineData?.engine || { status: getEngineUrl(engineMode) ? 'unknown' : 'not_configured' };
 
         // Build the engine state part of the response (shared — not per-user)
         const coinStates = multi.coin_states || {};
