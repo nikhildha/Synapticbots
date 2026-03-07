@@ -16,6 +16,7 @@ export default async function BotsPage() {
   const bots = await prisma.bot.findMany({
     where: { userId: session.user.id },
     include: {
+      config: { select: { mode: true } },
       _count: {
         select: { trades: true },
       },
@@ -32,6 +33,7 @@ export default async function BotsPage() {
         status: bot.status,
         isActive: bot?.isActive ?? false,
         startedAt: bot?.startedAt ?? null,
+        config: bot?.config ? { mode: bot.config.mode } : null,
         _count: {
           trades: bot?._count?.trades ?? 0,
         },

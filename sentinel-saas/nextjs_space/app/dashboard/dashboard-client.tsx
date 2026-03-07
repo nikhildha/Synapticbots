@@ -457,30 +457,20 @@ export function DashboardClient({ user, stats, bots, recentTrades }: DashboardCl
               animate={{ opacity: 1, y: 0 }}
               className="card-gradient rounded-xl p-5 glow-hover hover-lift lg:col-span-2"
             >
-              <h3 className="text-sm text-[var(--color-text-secondary)] mb-1">Capital Deployed</h3>
-              <p style={{ fontSize: '12px', color: '#9CA3AF', marginBottom: '8px' }}>${liveStats.totalCapitalDeployed} / ${MAX_CAPITAL}</p>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '12px' }}>
+                <h3 className="text-sm text-[var(--color-text-secondary)]">Capital Deployed</h3>
+                <span style={{ fontSize: '11px', color: '#6B7280', fontFamily: 'monospace' }}>${liveStats.totalCapitalDeployed} / ${MAX_CAPITAL}</span>
+              </div>
               {/* Paper / Live split — big text */}
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <div>
-                  <div style={{ fontSize: '16px', fontWeight: 700, color: '#22C55E' }}>${liveStats.paperCapitalDeployed}</div>
+                  <div style={{ fontSize: '18px', fontWeight: 700, color: '#22C55E' }}>${liveStats.paperCapitalDeployed}</div>
                   <div style={{ fontSize: '10px', color: '#6B7280' }}>🟢 Paper</div>
                 </div>
                 <div style={{ textAlign: 'right' }}>
-                  <div style={{ fontSize: '16px', fontWeight: 700, color: '#EF4444' }}>${liveStats.liveCapitalDeployed}</div>
+                  <div style={{ fontSize: '18px', fontWeight: 700, color: '#EF4444' }}>${liveStats.liveCapitalDeployed}</div>
                   <div style={{ fontSize: '10px', color: '#6B7280' }}>🔴 Live</div>
                 </div>
-              </div>
-              {/* Progress bar */}
-              <div style={{
-                marginTop: '8px', height: '4px', borderRadius: '2px',
-                background: 'rgba(255,255,255,0.06)', overflow: 'hidden',
-              }}>
-                <div style={{
-                  height: '100%', borderRadius: '2px',
-                  background: 'linear-gradient(90deg, #22C55E, #06B6D4)',
-                  width: `${Math.min(100, (liveStats.totalCapitalDeployed / MAX_CAPITAL) * 100)}%`,
-                  transition: 'width 0.5s ease',
-                }} />
               </div>
             </motion.div>
             <StatsCard
@@ -505,7 +495,7 @@ export function DashboardClient({ user, stats, bots, recentTrades }: DashboardCl
             className="mb-12"
           >
             <div className="flex items-center justify-between mb-6">
-              <h2 className="text-xl font-bold text-cyan-400">Synaptic AI Bots Deployment</h2>
+              <h2 className="text-xl font-bold text-cyan-400">Synaptic AI Bots Deployment · <span style={{ fontSize: '14px', color: '#9CA3AF' }}>${liveStats.totalCapitalDeployed} deployed</span></h2>
               <Link
                 href="/bots"
                 className="px-4 py-2 bg-[var(--color-primary)] text-white rounded-lg hover:bg-[var(--color-primary-dark)] transition-colors"

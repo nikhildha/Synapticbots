@@ -12,6 +12,7 @@ interface BotCardProps {
     status: string;
     isActive: boolean;
     startedAt?: Date | null;
+    config?: { mode?: string } | null;
     _count?: {
       trades: number;
     };
@@ -32,8 +33,14 @@ export function BotCard({ bot, onToggle, onDelete, liveTradeCount, trades = [] }
   const totalTrades = trades.length;
 
   // PnL calculations — use totalPnl/total_pnl/realized_pnl fields
-  const activePnl = activeTrades.reduce((sum: number, t: any) => sum + (parseFloat(t.pnl) || parseFloat(t.activePnl) || 0), 0);
+  // When bot is stopped, there are NO active trades — force activePnl to 0
+  const activePnl = isRunning
+    ? activeTrades.reduce((sum: number, t: any) => sum + (parseFloat(t.pnl) || parseFloat(t.activePnl) || 0), 0)
+    : 0;
   const totalPnl = trades.reduce((sum: number, t: any) => sum + (parseFloat(t.pnl) || parseFloat(t.totalPnl) || parseFloat(t.realized_pnl) || parseFloat(t.total_pnl) || 0), 0);
+
+  // Mode from bot config
+  const botMode = bot?.config?.mode || 'paper';
 
   // ROI: PnL / total capital deployed (trades × $100 each)
   const CAPITAL_PER_TRADE = 100;
@@ -76,6 +83,15 @@ export function BotCard({ bot, onToggle, onDelete, liveTradeCount, trades = [] }
               }`}
           >
             {isRunning ? 'Running' : 'Stopped'}
+          </span>
+          {/* Paper / Live mode tag */}
+          <span style={{
+            fontSize: '10px', fontWeight: 600,
+            padding: '2px 8px', borderRadius: '4px',
+            background: botMode === 'live' ? 'rgba(239,68,68,0.15)' : 'rgba(34,197,94,0.15)',
+            color: botMode === 'live' ? '#EF4444' : '#22C55E',
+          }}>
+            {botMode === 'live' ? '🔴 Live' : '🟢 Paper'}
           </span>
           <div className="text-center">
             <div className="text-sm font-semibold">{totalTrades}</div>

@@ -41,16 +41,13 @@ export function Header() {
             {session ? (
               <>
                 <Link href="/dashboard" className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)] transition-colors">
-                  Dashboard
+                  Command Center
                 </Link>
                 <Link href="/bots" className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)] transition-colors">
                   Bots
                 </Link>
                 <Link href="/trades" className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)] transition-colors">
                   Trade Book
-                </Link>
-                <Link href="/performance" className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)] transition-colors">
-                  Performance
                 </Link>
                 {/* Intelligence page disabled for now
                 <Link href="/intelligence" className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)] transition-colors">
@@ -105,16 +102,13 @@ export function Header() {
             {session ? (
               <>
                 <Link href="/dashboard" className="block text-[var(--color-text-secondary)] hover:text-[var(--color-primary)] transition-colors">
-                  Dashboard
+                  Command Center
                 </Link>
                 <Link href="/bots" className="block text-[var(--color-text-secondary)] hover:text-[var(--color-primary)] transition-colors">
                   Bots
                 </Link>
                 <Link href="/trades" className="block text-[var(--color-text-secondary)] hover:text-[var(--color-primary)] transition-colors">
                   Trade Book
-                </Link>
-                <Link href="/performance" className="block text-[var(--color-text-secondary)] hover:text-[var(--color-primary)] transition-colors">
-                  Performance
                 </Link>
                 {/* Intelligence page disabled for now
                 <Link href="/intelligence" className="block text-[var(--color-text-secondary)] hover:text-[var(--color-primary)] transition-colors">
