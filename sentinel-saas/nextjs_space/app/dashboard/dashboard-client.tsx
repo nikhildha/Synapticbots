@@ -286,123 +286,116 @@ export function DashboardClient({ user, stats, bots, recentTrades }: DashboardCl
             }}>
               <RegimeCard regime={regime} confidence={confidence} symbol={symbol} macroRegime={macroRegime} trend15m={trend15m} coinStates={multi?.coin_states} />
 
-              {/* ═══ Neural Core — Engine Status Card ═══ */}
+              {/* ═══ Neural Network Brain — Engine Status ═══ */}
               {(() => {
                 const engineTs = botState?.multi?.timestamp || botState?.state?.timestamp;
                 const cycle = botState?.multi?.cycle || 0;
                 const coinsScanned = botState?.multi?.coins_scanned || 0;
-                const deployed = botState?.multi?.deployed_count || 0;
-                const eligible = botState?.multi?.eligible_count || 0;
                 const isOn = engineTs && (Date.now() - new Date(engineTs).getTime()) < 600000;
-                const statusColor = isOn ? '#22C55E' : '#EF4444';
-                const glowColor = isOn ? 'rgba(34,197,94,0.3)' : 'rgba(239,68,68,0.3)';
+                const sc = isOn ? '#22C55E' : '#EF4444';
+                const gc = isOn ? 'rgba(34,197,94,' : 'rgba(239,68,68,';
+
+                // 10 satellite nodes arranged in a circle
+                const cx = 100, cy = 85, r = 55;
+                const nodes = Array.from({ length: 10 }, (_, i) => {
+                  const angle = (i / 10) * Math.PI * 2 - Math.PI / 2;
+                  return { x: cx + Math.cos(angle) * r, y: cy + Math.sin(angle) * r };
+                });
 
                 return (
                   <div style={{
-                    background: 'rgba(17,24,39,0.85)',
-                    backdropFilter: 'blur(16px)',
-                    border: `1px solid ${isOn ? 'rgba(34,197,94,0.15)' : 'rgba(239,68,68,0.15)'}`,
-                    borderRadius: '20px',
-                    padding: '20px',
-                    position: 'relative' as const,
-                    overflow: 'hidden',
-                    display: 'flex',
-                    flexDirection: 'column' as const,
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    minHeight: '180px',
+                    background: 'rgba(10,14,26,0.95)',
+                    border: `1px solid ${gc}0.15)`,
+                    borderRadius: '20px', padding: '16px 20px',
+                    position: 'relative' as const, overflow: 'hidden',
+                    display: 'flex', flexDirection: 'column' as const, alignItems: 'center',
+                    justifyContent: 'center', minHeight: '180px',
                   }}>
-                    {/* Background neural glow */}
-                    <div style={{
-                      position: 'absolute' as const,
-                      top: '50%', left: '50%',
-                      width: '120px', height: '120px',
-                      borderRadius: '50%',
-                      background: `radial-gradient(circle, ${glowColor} 0%, transparent 70%)`,
-                      transform: 'translate(-50%, -50%)',
-                      animation: isOn ? 'pulse 3s ease-in-out infinite' : 'none',
-                    }} />
 
-                    {/* Animated concentric rings */}
-                    {isOn && [60, 45, 30].map((size, i) => (
-                      <div key={i} style={{
-                        position: 'absolute' as const,
-                        top: '50%', left: '50%',
-                        width: `${size}px`, height: `${size}px`,
-                        borderRadius: '50%',
-                        border: `1px solid ${statusColor}`,
-                        opacity: 0.15 + i * 0.1,
-                        transform: 'translate(-50%, -50%)',
-                        animation: `pulse ${2 + i * 0.5}s ease-in-out infinite`,
-                      }} />
-                    ))}
+                    {/* SVG Neural Network */}
+                    <svg viewBox="0 0 200 170" style={{ width: '200px', height: '140px' }}>
+                      <defs>
+                        <radialGradient id="brainGlow">
+                          <stop offset="0%" stopColor={sc} stopOpacity="0.6" />
+                          <stop offset="100%" stopColor={sc} stopOpacity="0" />
+                        </radialGradient>
+                        <filter id="nGlow">
+                          <feGaussianBlur stdDeviation="2" result="blur" />
+                          <feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge>
+                        </filter>
+                      </defs>
 
-                    {/* Core brain dot */}
-                    <div style={{
-                      width: '14px', height: '14px', borderRadius: '50%',
-                      background: statusColor,
-                      boxShadow: `0 0 20px ${glowColor}, 0 0 40px ${glowColor}`,
-                      animation: isOn ? 'pulse 1.5s ease-in-out infinite' : 'none',
-                      position: 'relative' as const,
-                      zIndex: 2,
-                      marginBottom: '10px',
-                    }} />
+                      {/* Background glow behind brain */}
+                      <circle cx={cx} cy={cy} r="35" fill="url(#brainGlow)">
+                        {isOn && <animate attributeName="r" values="30;40;30" dur="3s" repeatCount="indefinite" />}
+                      </circle>
 
-                    {/* Title */}
-                    <div style={{
-                      fontSize: '10px', fontWeight: 800, letterSpacing: '3px',
-                      textTransform: 'uppercase' as const,
-                      color: statusColor,
-                      position: 'relative' as const, zIndex: 2,
-                      marginBottom: '4px',
-                    }}>
-                      🧠 Neural Core
+                      {/* Connection lines (synapses) */}
+                      {nodes.map((n, i) => (
+                        <g key={`line-${i}`}>
+                          <line x1={cx} y1={cy} x2={n.x} y2={n.y}
+                            stroke={sc} strokeWidth="0.8" opacity="0.2">
+                            {isOn && <animate attributeName="opacity" values="0.1;0.4;0.1" dur={`${1.5 + i * 0.2}s`} repeatCount="indefinite" />}
+                          </line>
+                          {/* Traveling signal dot on each connection */}
+                          {isOn && (
+                            <circle r="1.5" fill={sc} opacity="0.8">
+                              <animateMotion
+                                dur={`${1 + i * 0.15}s`}
+                                repeatCount="indefinite"
+                                path={`M${cx},${cy} L${n.x},${n.y}`}
+                              />
+                              <animate attributeName="opacity" values="0;1;0" dur={`${1 + i * 0.15}s`} repeatCount="indefinite" />
+                            </circle>
+                          )}
+                        </g>
+                      ))}
+
+                      {/* Satellite nodes */}
+                      {nodes.map((n, i) => (
+                        <g key={`node-${i}`}>
+                          <circle cx={n.x} cy={n.y} r="4" fill={sc} opacity="0.2">
+                            {isOn && <animate attributeName="opacity" values="0.15;0.6;0.15" dur={`${1.2 + i * 0.25}s`} repeatCount="indefinite" />}
+                          </circle>
+                          <circle cx={n.x} cy={n.y} r="2" fill={sc} opacity="0.6">
+                            {isOn && <animate attributeName="opacity" values="0.3;1;0.3" dur={`${1.2 + i * 0.25}s`} repeatCount="indefinite" />}
+                          </circle>
+                        </g>
+                      ))}
+
+                      {/* Central brain node */}
+                      <circle cx={cx} cy={cy} r="10" fill={sc} opacity="0.15" filter="url(#nGlow)">
+                        {isOn && <animate attributeName="r" values="8;12;8" dur="2s" repeatCount="indefinite" />}
+                      </circle>
+                      <circle cx={cx} cy={cy} r="6" fill={sc} opacity="0.6" filter="url(#nGlow)">
+                        {isOn && <animate attributeName="opacity" values="0.4;1;0.4" dur="1.5s" repeatCount="indefinite" />}
+                      </circle>
+                      {/* Brain emoji as text */}
+                      <text x={cx} y={cy + 4} textAnchor="middle" fontSize="10">🧠</text>
+                    </svg>
+
+                    {/* Status text */}
+                    <div style={{ fontSize: '10px', fontWeight: 800, letterSpacing: '3px', textTransform: 'uppercase' as const, color: '#F0B90B', marginTop: '4px' }}>
+                      Synaptic Core
                     </div>
-                    <div style={{
-                      fontSize: '18px', fontWeight: 800,
-                      color: statusColor,
-                      position: 'relative' as const, zIndex: 2,
-                      marginBottom: '8px',
-                    }}>
-                      {isOn ? 'ACTIVE' : 'OFFLINE'}
+                    <div style={{ fontSize: '18px', fontWeight: 800, color: sc }}>
+                      {isOn ? 'THINKING' : 'DORMANT'}
                     </div>
 
-                    {/* Stats row */}
+                    {/* Stats */}
                     {isOn && (
-                      <div style={{
-                        display: 'flex', gap: '12px', position: 'relative' as const, zIndex: 2,
-                      }}>
+                      <div style={{ display: 'flex', gap: '14px', marginTop: '8px' }}>
                         {[
                           { label: 'Cycle', value: `#${cycle}` },
                           { label: 'Scanned', value: coinsScanned },
-                          { label: 'Deployed', value: deployed },
                         ].map((s, i) => (
-                          <div key={i} style={{
-                            textAlign: 'center' as const,
-                            padding: '4px 10px',
-                            borderRadius: '8px',
-                            background: 'rgba(34,197,94,0.08)',
-                            border: '1px solid rgba(34,197,94,0.12)',
-                          }}>
+                          <div key={i} style={{ textAlign: 'center' as const, padding: '3px 10px', borderRadius: '8px', background: `${gc}0.08)`, border: `1px solid ${gc}0.12)` }}>
                             <div style={{ fontSize: '13px', fontWeight: 700, color: '#E5E7EB', fontFamily: 'monospace' }}>{s.value}</div>
                             <div style={{ fontSize: '8px', fontWeight: 600, color: '#6B7280', textTransform: 'uppercase' as const, letterSpacing: '0.5px' }}>{s.label}</div>
                           </div>
                         ))}
                       </div>
                     )}
-
-                    {/* Neural sparkle dots */}
-                    {isOn && [0, 1, 2, 3, 4, 5].map(i => (
-                      <div key={`dot-${i}`} style={{
-                        position: 'absolute' as const,
-                        width: '2px', height: '2px', borderRadius: '50%',
-                        background: statusColor,
-                        opacity: 0.4,
-                        top: `${20 + Math.sin(i * 1.1) * 35}%`,
-                        left: `${15 + i * 13}%`,
-                        animation: `pulse ${1.5 + i * 0.3}s ease-in-out infinite`,
-                      }} />
-                    ))}
                   </div>
                 );
               })()}
@@ -681,199 +674,6 @@ export function DashboardClient({ user, stats, bots, recentTrades }: DashboardCl
             className="mt-8"
           >
             <SignalSummaryTable coinStates={multi?.coin_states || {}} multi={multi} />
-          </motion.div>
-
-          {/* ═══ DESIGN PREVIEWS — Pick your Neural Core style ═══ */}
-          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.4 }} className="mt-12 mb-8">
-            <div style={{ fontSize: '14px', fontWeight: 700, color: '#F0B90B', marginBottom: '16px', textAlign: 'center' as const, letterSpacing: '2px', textTransform: 'uppercase' as const }}>
-              ⚡ Pick Your Engine Card Style ⚡
-            </div>
-            {(() => {
-              const engineTs = botState?.multi?.timestamp || botState?.state?.timestamp;
-              const cycle = botState?.multi?.cycle || 0;
-              const coinsScanned = botState?.multi?.coins_scanned || 0;
-              const isOn = engineTs && (Date.now() - new Date(engineTs).getTime()) < 600000;
-              const sc = isOn ? '#22C55E' : '#EF4444';
-              const gc = isOn ? 'rgba(34,197,94,' : 'rgba(239,68,68,';
-
-              return (
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '20px' }}>
-
-                  {/* ════ OPTION A: EKG Heartbeat ════ */}
-                  <div style={{
-                    background: 'rgba(17,24,39,0.9)',
-                    border: `1px solid ${gc}0.15)`,
-                    borderRadius: '20px', padding: '20px',
-                    position: 'relative' as const, overflow: 'hidden',
-                    display: 'flex', flexDirection: 'column' as const, alignItems: 'center', justifyContent: 'center',
-                    minHeight: '200px',
-                  }}>
-                    <div style={{ position: 'absolute' as const, top: '8px', left: '14px', fontSize: '9px', fontWeight: 700, color: '#6B7280', letterSpacing: '1px' }}>OPTION A</div>
-                    {/* Animated EKG line */}
-                    <svg viewBox="0 0 200 60" style={{ width: '100%', height: '60px', marginBottom: '12px' }}>
-                      <defs>
-                        <linearGradient id="ekgGrad" x1="0" y1="0" x2="1" y2="0">
-                          <stop offset="0%" stopColor={sc} stopOpacity="0" />
-                          <stop offset="40%" stopColor={sc} stopOpacity="0.8" />
-                          <stop offset="100%" stopColor={sc} stopOpacity="1" />
-                        </linearGradient>
-                      </defs>
-                      {/* Heartbeat line */}
-                      <polyline
-                        points="0,30 30,30 40,30 50,12 55,48 60,30 70,30 80,30 90,30 100,30 110,30 120,12 125,48 130,30 140,30 160,30 170,30 180,12 185,48 190,30 200,30"
-                        fill="none" stroke={sc} strokeWidth="1.5" strokeLinejoin="round"
-                        opacity="0.7"
-                      >
-                        {isOn && <animate attributeName="stroke-dashoffset" from="400" to="0" dur="2s" repeatCount="indefinite" />}
-                      </polyline>
-                      {isOn && <polyline
-                        points="0,30 30,30 40,30 50,12 55,48 60,30 70,30 80,30 90,30 100,30 110,30 120,12 125,48 130,30 140,30 160,30 170,30 180,12 185,48 190,30 200,30"
-                        fill="none" stroke={sc} strokeWidth="2.5" strokeLinejoin="round"
-                        opacity="0.15" filter="url(#pnlGlow)"
-                        strokeDasharray="400" strokeDashoffset="0"
-                      >
-                        <animate attributeName="stroke-dashoffset" from="400" to="0" dur="2s" repeatCount="indefinite" />
-                      </polyline>}
-                      {/* Scanning dot */}
-                      {isOn && <circle r="3" fill={sc} opacity="0.9">
-                        <animateMotion dur="2s" repeatCount="indefinite" path="M0,30 L30,30 L40,30 L50,12 L55,48 L60,30 L70,30 L80,30 L90,30 L100,30 L110,30 L120,12 L125,48 L130,30 L140,30 L160,30 L170,30 L180,12 L185,48 L190,30 L200,30" />
-                      </circle>}
-                    </svg>
-                    <div style={{ fontSize: '10px', fontWeight: 800, letterSpacing: '3px', textTransform: 'uppercase' as const, color: '#F0B90B', marginBottom: '2px' }}>
-                      ⚡ Synaptic Pulse
-                    </div>
-                    <div style={{ fontSize: '20px', fontWeight: 800, color: sc }}>{isOn ? 'ALIVE' : 'FLATLINE'}</div>
-                    <div style={{ display: 'flex', gap: '16px', marginTop: '10px' }}>
-                      <div style={{ textAlign: 'center' as const }}>
-                        <div style={{ fontSize: '14px', fontWeight: 700, color: '#E5E7EB', fontFamily: 'monospace' }}>#{cycle}</div>
-                        <div style={{ fontSize: '8px', color: '#6B7280', letterSpacing: '0.5px' }}>CYCLE</div>
-                      </div>
-                      <div style={{ textAlign: 'center' as const }}>
-                        <div style={{ fontSize: '14px', fontWeight: 700, color: '#E5E7EB', fontFamily: 'monospace' }}>{coinsScanned}</div>
-                        <div style={{ fontSize: '8px', color: '#6B7280', letterSpacing: '0.5px' }}>SCANNED</div>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* ════ OPTION B: Mission Control Radar ════ */}
-                  <div style={{
-                    background: 'rgba(10,14,26,0.95)',
-                    border: `1px solid ${gc}0.15)`,
-                    borderRadius: '20px', padding: '20px',
-                    position: 'relative' as const, overflow: 'hidden',
-                    display: 'flex', flexDirection: 'column' as const, alignItems: 'center', justifyContent: 'center',
-                    minHeight: '200px',
-                  }}>
-                    <div style={{ position: 'absolute' as const, top: '8px', left: '14px', fontSize: '9px', fontWeight: 700, color: '#6B7280', letterSpacing: '1px' }}>OPTION B</div>
-                    {/* Radar */}
-                    <div style={{ position: 'relative' as const, width: '100px', height: '100px', marginBottom: '12px' }}>
-                      {/* Radar rings */}
-                      {[90, 65, 40].map((s, i) => (
-                        <div key={i} style={{
-                          position: 'absolute' as const, top: '50%', left: '50%',
-                          width: `${s}px`, height: `${s}px`, borderRadius: '50%',
-                          border: `1px solid ${gc}${0.1 + i * 0.05})`,
-                          transform: 'translate(-50%, -50%)',
-                        }} />
-                      ))}
-                      {/* Crosshair */}
-                      <div style={{ position: 'absolute' as const, top: '50%', left: '5%', right: '5%', height: '1px', background: `${gc}0.1)` }} />
-                      <div style={{ position: 'absolute' as const, left: '50%', top: '5%', bottom: '5%', width: '1px', background: `${gc}0.1)` }} />
-                      {/* Sweep */}
-                      {isOn && <div style={{
-                        position: 'absolute' as const, top: '50%', left: '50%',
-                        width: '45px', height: '2px', transformOrigin: '0 0',
-                        background: `linear-gradient(90deg, ${sc}, transparent)`,
-                        animation: 'radarSweep 3s linear infinite',
-                      }} />}
-                      {/* Center dot */}
-                      <div style={{
-                        position: 'absolute' as const, top: '50%', left: '50%',
-                        width: '8px', height: '8px', borderRadius: '50%',
-                        background: sc, transform: 'translate(-50%, -50%)',
-                        boxShadow: `0 0 12px ${gc}0.5)`,
-                        animation: isOn ? 'pulse 2s infinite' : 'none',
-                      }} />
-                      {/* Blips */}
-                      {isOn && [
-                        { top: '25%', left: '65%' },
-                        { top: '60%', left: '30%' },
-                        { top: '40%', left: '75%' },
-                      ].map((pos, i) => (
-                        <div key={i} style={{
-                          position: 'absolute' as const, ...pos,
-                          width: '4px', height: '4px', borderRadius: '50%',
-                          background: sc, opacity: 0.6,
-                          animation: `pulse ${1.5 + i * 0.4}s infinite`,
-                        }} />
-                      ))}
-                    </div>
-                    <div style={{ fontSize: '10px', fontWeight: 800, letterSpacing: '3px', textTransform: 'uppercase' as const, color: '#F0B90B', marginBottom: '2px' }}>
-                      🛰️ Mission Control
-                    </div>
-                    <div style={{ fontSize: '20px', fontWeight: 800, color: sc }}>{isOn ? 'SCANNING' : 'OFFLINE'}</div>
-                    <div style={{ display: 'flex', gap: '16px', marginTop: '10px' }}>
-                      <div style={{ textAlign: 'center' as const }}>
-                        <div style={{ fontSize: '14px', fontWeight: 700, color: '#E5E7EB', fontFamily: 'monospace' }}>#{cycle}</div>
-                        <div style={{ fontSize: '8px', color: '#6B7280', letterSpacing: '0.5px' }}>CYCLE</div>
-                      </div>
-                      <div style={{ textAlign: 'center' as const }}>
-                        <div style={{ fontSize: '14px', fontWeight: 700, color: '#E5E7EB', fontFamily: 'monospace' }}>{coinsScanned}</div>
-                        <div style={{ fontSize: '8px', color: '#6B7280', letterSpacing: '0.5px' }}>TARGETS</div>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* ════ OPTION C: DNA Helix ════ */}
-                  <div style={{
-                    background: 'rgba(17,24,39,0.9)',
-                    border: `1px solid ${gc}0.15)`,
-                    borderRadius: '20px', padding: '20px',
-                    position: 'relative' as const, overflow: 'hidden',
-                    display: 'flex', flexDirection: 'column' as const, alignItems: 'center', justifyContent: 'center',
-                    minHeight: '200px',
-                  }}>
-                    <div style={{ position: 'absolute' as const, top: '8px', left: '14px', fontSize: '9px', fontWeight: 700, color: '#6B7280', letterSpacing: '1px' }}>OPTION C</div>
-                    {/* DNA Helix SVG */}
-                    <svg viewBox="0 0 80 120" style={{ width: '80px', height: '100px', marginBottom: '8px' }}>
-                      {/* Strand 1 */}
-                      {Array.from({ length: 12 }, (_, i) => {
-                        const y = i * 10 + 5;
-                        const x1 = 40 + Math.sin(i * 0.55) * 25;
-                        const x2 = 40 + Math.sin(i * 0.55 + Math.PI) * 25;
-                        return (
-                          <g key={i}>
-                            <circle cx={x1} cy={y} r="3" fill={sc} opacity={0.3 + Math.abs(Math.sin(i * 0.55)) * 0.5}>
-                              {isOn && <animate attributeName="opacity" values={`${0.2};${0.8};${0.2}`} dur={`${1.5 + i * 0.1}s`} repeatCount="indefinite" />}
-                            </circle>
-                            <circle cx={x2} cy={y} r="3" fill="#06B6D4" opacity={0.3 + Math.abs(Math.cos(i * 0.55)) * 0.5}>
-                              {isOn && <animate attributeName="opacity" values={`${0.2};${0.8};${0.2}`} dur={`${1.8 + i * 0.1}s`} repeatCount="indefinite" />}
-                            </circle>
-                            {/* Bridge connecting strands */}
-                            <line x1={x1} y1={y} x2={x2} y2={y} stroke={sc} strokeWidth="0.5" opacity="0.15" />
-                          </g>
-                        );
-                      })}
-                    </svg>
-                    <div style={{ fontSize: '10px', fontWeight: 800, letterSpacing: '3px', textTransform: 'uppercase' as const, color: '#F0B90B', marginBottom: '2px' }}>
-                      🧬 Genetic Core
-                    </div>
-                    <div style={{ fontSize: '20px', fontWeight: 800, color: sc }}>{isOn ? 'EVOLVING' : 'DORMANT'}</div>
-                    <div style={{ display: 'flex', gap: '16px', marginTop: '10px' }}>
-                      <div style={{ textAlign: 'center' as const }}>
-                        <div style={{ fontSize: '14px', fontWeight: 700, color: '#E5E7EB', fontFamily: 'monospace' }}>#{cycle}</div>
-                        <div style={{ fontSize: '8px', color: '#6B7280', letterSpacing: '0.5px' }}>CYCLE</div>
-                      </div>
-                      <div style={{ textAlign: 'center' as const }}>
-                        <div style={{ fontSize: '14px', fontWeight: 700, color: '#E5E7EB', fontFamily: 'monospace' }}>{coinsScanned}</div>
-                        <div style={{ fontSize: '8px', color: '#6B7280', letterSpacing: '0.5px' }}>SCANNED</div>
-                      </div>
-                    </div>
-                  </div>
-
-                </div>
-              );
-            })()}
           </motion.div>
         </div>
       </main>
