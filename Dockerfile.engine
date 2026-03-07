@@ -13,6 +13,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy all Python source code
 COPY *.py ./
+COPY tools/ ./tools/
 
 # Ensure data directory exists
 RUN mkdir -p /app/data
