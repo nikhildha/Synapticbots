@@ -30,7 +30,10 @@ export function Header() {
         <div className="flex items-center justify-between h-16">
           <Link href={session ? '/dashboard' : '/'} className="flex items-center space-x-2 hover:opacity-80 transition-opacity">
             <Shield className="w-8 h-8 text-[var(--color-primary)]" />
-            <span className="text-2xl font-bold text-gradient">Synaptic AI</span>
+            <div>
+              <span className="text-2xl font-bold text-gradient">Synaptic AI</span>
+              <div style={{ fontSize: '8px', fontWeight: 700, letterSpacing: '2.5px', textTransform: 'uppercase' as any, color: '#6B7280', marginTop: '-2px' }}>Crypto Bots</div>
+            </div>
           </Link>
 
           {/* Desktop Navigation */}
