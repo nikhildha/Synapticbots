@@ -85,7 +85,7 @@ export function DashboardClient({ user, stats, bots, recentTrades }: DashboardCl
       } catch { /* silent */ }
     };
     fetchWalletBalance();
-    const walletInterval = setInterval(fetchWalletBalance, 60000);
+    const walletInterval = setInterval(fetchWalletBalance, 15000);
 
     // Fetch feed health for admin
     if ((user as any)?.role === 'admin') {

@@ -6,6 +6,8 @@ import { decryptApiKeys } from '@/lib/encryption';
 
 export const dynamic = 'force-dynamic';
 
+const ENGINE_API_URL = process.env.ENGINE_API_URL || process.env.PYTHON_ENGINE_URL;
+
 async function fetchBinanceBalance(apiKey: string, apiSecret: string): Promise<number | null> {
     try {
         const crypto = await import('crypto');
@@ -83,6 +85,27 @@ async function fetchCoinDCXBalance(apiKey: string, apiSecret: string): Promise<n
     return null;
 }
 
+/**
+ * Fallback: fetch balance from engine API (uses Railway env var keys).
+ * Used when user hasn't saved API keys in SaaS settings.
+ */
+async function fetchEngineBalance(exchange: string): Promise<number | null> {
+    if (!ENGINE_API_URL) return null;
+    try {
+        const res = await fetch(
+            `${ENGINE_API_URL}/api/validate-exchange?exchange=${encodeURIComponent(exchange)}`,
+            { signal: AbortSignal.timeout(8000), cache: 'no-store' }
+        );
+        if (res.ok) {
+            const data = await res.json();
+            if (data.valid && data.balance != null) {
+                return parseFloat(data.balance);
+            }
+        }
+    } catch { /* silent */ }
+    return null;
+}
+
 export async function GET() {
     try {
         const session = await getServerSession(authOptions);
@@ -121,14 +144,24 @@ export async function GET() {
             } catch { /* decryption failed */ }
         }
 
+        // Fallback: if user keys returned null, try fetching from engine API
+        // (engine uses Railway env var keys directly)
+        if (binanceBalance === null) {
+            binanceBalance = await fetchEngineBalance('binance');
+        }
+        if (coindcxBalance === null) {
+            coindcxBalance = await fetchEngineBalance('coindcx');
+        }
+
         return NextResponse.json({
             binance: binanceBalance,      // null = not connected
             coindcx: coindcxBalance,      // null = not connected
-            binanceConnected: !!binanceKey,
-            coindcxConnected: !!coindcxKey,
+            binanceConnected: !!(binanceKey || binanceBalance !== null),
+            coindcxConnected: !!(coindcxKey || coindcxBalance !== null),
         });
     } catch (err) {
         console.error('[wallet-balance]', err);
         return NextResponse.json({ binance: null, coindcx: null, binanceConnected: false, coindcxConnected: false });
     }
 }
+
