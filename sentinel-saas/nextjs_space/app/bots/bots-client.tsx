@@ -232,9 +232,15 @@ export function BotsClient({ bots: initialBots }: BotsClientProps) {
       const res = await fetch('/api/wallet-balance');
       const data = await res.json();
       const balance = deployExchange === 'coindcx' ? data.coindcx : data.binance;
+      const isConnected = deployExchange === 'coindcx' ? data.coindcxConnected : data.binanceConnected;
+      // Connected = key saved + balance fetch succeeded (or key saved and balance=0 is still valid)
       if (balance !== null && balance !== undefined) {
         setVerifyStatus('ok');
         setVerifyBalance(balance);
+      } else if (isConnected) {
+        // Key is saved but live balance fetch failed — treat as connected with unknown balance
+        setVerifyStatus('ok');
+        setVerifyBalance(null);
       } else {
         setVerifyStatus('fail');
       }
