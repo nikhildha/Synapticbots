@@ -226,14 +226,15 @@ export function DashboardClient({ user, stats, bots, recentTrades }: DashboardCl
   const paperTotalPnl = paperRealizedPnl + paperUnrealizedPnl;
   const liveTotalModePnl = liveRealizedPnl + liveUnrealizedPnl;
 
-  const paperCapital = (paperActiveTrades.length + paperClosedTrades.length) * 100 || 1;
-  const liveCapital = (liveModeTrades.length + liveClosedModeTrades.length) * 100 || 1;
-  const paperPnlPct = paperCapital > 0 ? (paperTotalPnl / paperCapital * 100) : 0;
-  const livePnlPct = liveCapital > 0 ? (liveTotalModePnl / liveCapital * 100) : 0;
-
   const CAPITAL_PER_TRADE = 100;
   const MAX_CAPITAL = 2500;
   const MAX_SLOTS = 25;
+
+  const paperCapital = MAX_SLOTS * CAPITAL_PER_TRADE; // 25 × $100 = $2500 total paper capital
+  const liveCapital = MAX_SLOTS * CAPITAL_PER_TRADE;  // 25 × $100 = $2500 total live capital
+  const paperPnlPct = paperCapital > 0 ? (paperTotalPnl / paperCapital * 100) : 0;
+  const livePnlPct = liveCapital > 0 ? (liveTotalModePnl / liveCapital * 100) : 0;
+
   const usedCapital = liveActiveTrades.length * CAPITAL_PER_TRADE;
 
   // Capital deployed: paper + live (active trades only)
@@ -453,7 +454,7 @@ export function DashboardClient({ user, stats, bots, recentTrades }: DashboardCl
             <StatsCard
               title="Capital Deployed"
               value={`$${liveStats.totalCapitalDeployed}`}
-              trendValue={`Paper: $${liveStats.paperCapitalDeployed} · Live: $${liveStats.liveCapitalDeployed}`}
+              subtitle={`Paper: $${liveStats.paperCapitalDeployed} · Live: $${liveStats.liveCapitalDeployed}`}
             />
             <StatsCard
               title="Total Paper PnL"

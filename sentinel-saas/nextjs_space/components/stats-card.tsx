@@ -10,6 +10,7 @@ interface StatsCardProps {
   icon?: LucideIcon;
   trend?: 'up' | 'down' | 'neutral';
   trendValue?: string;
+  subtitle?: string;
   animated?: boolean;
 }
 
@@ -19,6 +20,7 @@ export function StatsCard({
   icon: Icon,
   trend,
   trendValue,
+  subtitle,
   animated = false,
 }: StatsCardProps) {
   const [displayValue, setDisplayValue] = useState(animated ? 0 : value);
@@ -95,6 +97,9 @@ export function StatsCard({
           </span>
         )}
       </div>
+      {subtitle && (
+        <p className="text-[10px] text-[var(--color-text-secondary)] mt-1">{subtitle}</p>
+      )}
     </motion.div>
   );
 }
