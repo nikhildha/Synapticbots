@@ -558,12 +558,11 @@ export function SignalSummaryTable({ coinStates, multi }: SignalSummaryProps) {
             {/* Stats Bar */}
             {(() => {
                 const engineTs = liveMulti?.last_analysis_time || liveMulti?.timestamp || null;
-                const isEngineOn = engineTs && (Date.now() - new Date(String(engineTs).replace(/Z$/, '')).getTime()) < 600000;
+                const isEngineOn = engineTs && (Date.now() - new Date(String(engineTs)).getTime()) < 600000;
                 const nextCycleLabel = (() => {
                     if (!engineTs || !intervalSec) return '—';
                     try {
-                        const clean = String(engineTs).replace(/Z$/, '');
-                        const lastMs = new Date(clean).getTime();
+                        const lastMs = new Date(String(engineTs)).getTime();
                         const nextMs = lastMs + (intervalSec * 1000);
                         const now = Date.now();
                         if (nextMs <= now) return 'Running…';
