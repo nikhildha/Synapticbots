@@ -307,7 +307,7 @@ export function DashboardClient({ user, stats, bots, recentTrades }: DashboardCl
           >
             <div style={{
               display: 'grid',
-              gridTemplateColumns: '1fr 1fr 1fr',
+              gridTemplateColumns: '1.3fr 0.7fr 1.3fr',
               gap: '20px',
             }}>
               <RegimeCard regime={regime} confidence={confidence} symbol={symbol} macroRegime={macroRegime} trend15m={trend15m} coinStates={multi?.coin_states} />
@@ -329,7 +329,7 @@ export function DashboardClient({ user, stats, bots, recentTrades }: DashboardCl
                     position: 'relative' as const,
                   }}>
                     {/* SVG Wireframe Brain */}
-                    <svg viewBox="0 0 200 180" style={{ width: '220px', height: '160px' }}>
+                    <svg viewBox="0 0 200 180" style={{ width: '280px', height: '200px' }}>
                       <defs>
                         <filter id="brainGlow2">
                           <feGaussianBlur stdDeviation="3" result="blur" />
@@ -357,7 +357,7 @@ export function DashboardClient({ user, stats, bots, recentTrades }: DashboardCl
 
                       {/* Brain outline — side profile */}
                       <g filter="url(#outerGlow)" opacity={isOn ? 1 : 0.3}>
-                        {isOn && <animate attributeName="opacity" values="0.7;1;0.7" dur="2s" repeatCount="indefinite" />}
+                        {isOn && <animate attributeName="opacity" values="0.5;1;0.5" dur="1.5s" repeatCount="indefinite" />}
                         {/* Left hemisphere outline */}
                         <path d="M100,30 C65,30 40,50 38,75 C36,95 45,110 55,120 C60,125 62,132 65,140 L75,140 C72,130 68,120 60,115 C50,108 44,95 45,80 C46,60 65,42 95,40"
                           fill="none" stroke={bc} strokeWidth="1.5" strokeLinecap="round" />
