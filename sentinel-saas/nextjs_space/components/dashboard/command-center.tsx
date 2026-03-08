@@ -541,12 +541,14 @@ export function SignalSummaryTable({ coinStates, multi }: SignalSummaryProps) {
                 const engineTs = liveMulti?.last_analysis_time || liveMulti?.timestamp || null;
                 const isEngineOn = engineTs && (Date.now() - new Date(String(engineTs)).getTime()) < 600000;
                 const nextCycleLabel = (() => {
-                    // Prefer engine's pre-computed next_analysis_time (already in IST, no suffix)
                     const nextRaw = liveMulti?.next_analysis_time;
                     try {
                         if (nextRaw) {
-                            // Engine stores IST without timezone marker — append +05:30 to parse correctly
-                            const nextMs = new Date(String(nextRaw) + '+05:30').getTime();
+                            // Normalize: if already has Z or ±HH:MM, don't append; else assume UTC
+                            const raw = String(nextRaw);
+                            const normalized = /Z$|[+-]\d{2}:\d{2}$/.test(raw) ? raw : raw + 'Z';
+                            const nextMs = new Date(normalized).getTime();
+                            if (isNaN(nextMs)) return '—';
                             if (nextMs <= Date.now()) return 'Running…';
                             const secsLeft = Math.floor((nextMs - Date.now()) / 1000);
                             const m = Math.floor(secsLeft / 60);
@@ -556,12 +558,12 @@ export function SignalSummaryTable({ coinStates, multi }: SignalSummaryProps) {
                             });
                             return m > 0 ? `${m}m ${s}s · ${timeStr} IST` : `${s}s · ${timeStr} IST`;
                         }
-                        // Fallback: compute from last_analysis_time + interval (last_analysis_time is UTC+Z)
+                        // Fallback: compute from last_analysis_time + interval
                         if (!engineTs || !intervalSec) return '—';
                         const ts = String(engineTs);
                         const normalized = /Z$|[+-]\d{2}:\d{2}$/.test(ts) ? ts : ts + 'Z';
                         const nextMs = new Date(normalized).getTime() + (intervalSec * 1000);
-                        if (nextMs <= Date.now()) return 'Running…';
+                        if (isNaN(nextMs) || nextMs <= Date.now()) return 'Running…';
                         return new Date(nextMs).toLocaleTimeString('en-IN', {
                             hour: '2-digit', minute: '2-digit', hour12: true, timeZone: 'Asia/Kolkata',
                         }) + ' IST';
@@ -624,8 +626,12 @@ export function SignalSummaryTable({ coinStates, multi }: SignalSummaryProps) {
                                 const as = actStyle(action);
                                 const isE = action.includes('ELIGIBLE');
                                 const regBg = regime.includes('BULL') ? 'rgba(34,197,94,0.12)' : regime.includes('BEAR') ? 'rgba(239,68,68,0.12)' : regime.includes('CHOP') || regime.includes('SIDE') ? 'rgba(245,158,11,0.12)' : 'rgba(107,114,128,0.10)';
+                                // Check if this coin has an active trade (deployed)
+                                const activePositions = liveMulti?.active_positions || liveMulti?.positions || {};
+                                const isDeployed = Object.keys(activePositions).some(k => k === c.symbol || k.endsWith(':' + c.symbol));
                                 let dLabel = '⏳ PENDING', dColor = '#6B7280', dBg = 'rgba(107,114,128,0.08)';
-                                if (isE) { dLabel = '🟢 READY'; dColor = '#22C55E'; dBg = 'rgba(34,197,94,0.12)'; }
+                                if (isDeployed) { dLabel = '🚀 DEPLOYED'; dColor = '#06B6D4'; dBg = 'rgba(6,182,212,0.12)'; }
+                                else if (isE) { dLabel = '🟢 READY'; dColor = '#22C55E'; dBg = 'rgba(34,197,94,0.12)'; }
                                 else if (action.includes('SKIP') || action.includes('VETO') || action.includes('CONFLICT') || action.includes('CRASH')) { dLabel = '🔴 FILTERED'; dColor = '#EF4444'; dBg = 'rgba(239,68,68,0.08)'; }
 
                                 return (
