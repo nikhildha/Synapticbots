@@ -69,7 +69,7 @@ export async function GET() {
 
     return NextResponse.json({
         engine: {
-            url: ENGINE_API_URL || null,
+            url: ENGINE_API_URL ? '(configured)' : null,  // L2 FIX: don't leak internal URL
             totalTradeCount: engineTradeCount,
             error: engineError,
         },

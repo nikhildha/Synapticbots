@@ -68,7 +68,6 @@ export default async function TradesPage() {
   if (!session?.user) redirect('/login');
 
   const userId = (session.user as any)?.id;
-  const isAdmin = (session.user as any)?.role === 'admin';
 
   // Determine correct engine based on user's active bot mode
   const userBot = await prisma.bot.findFirst({
@@ -79,27 +78,20 @@ export default async function TradesPage() {
   const botMode = (userBot?.config as any)?.mode || 'paper';
   const engineMode: EngineMode = botMode.toLowerCase().includes('live') ? 'live' : 'paper';
 
+  // G1 FIX: All users (including admins) see their own bot's trades via Prisma isolation.
+  // Admin raw engine view belongs in the admin panel, not the regular trades page.
   const engineTrades = await fetchEngineTradesAll(engineMode);
 
-  let trades: ReturnType<typeof mapTrade>[];
-
-  if (isAdmin) {
-    // Admin sees all engine trades directly (from live engine)
-    trades = engineTrades.map(mapTrade);
-  } else {
-    // Regular user: sync engine trades into their Prisma bot, then read back
-    if (userBot && userBot.startedAt && engineTrades.length > 0) {
-      try {
-        // Only sync trades opened AFTER the user started their bot (next-cycle-only)
-        await syncEngineTrades(engineTrades, userBot.id, userBot.startedAt);
-      } catch (err) {
-        console.error('[trades-page] Sync failed:', err);
-      }
+  if (userBot && userBot.startedAt && engineTrades.length > 0) {
+    try {
+      await syncEngineTrades(engineTrades, userBot.id, userBot.startedAt);
+    } catch (err) {
+      console.error('[trades-page] Sync failed:', err);
     }
-
-    const prismaTrades = await getUserTrades(userId);
-    trades = prismaTrades.map(mapTrade);
   }
+
+  const prismaTrades = await getUserTrades(userId);
+  const trades = prismaTrades.map(mapTrade);
 
   return <TradesClient trades={trades} />;
 }

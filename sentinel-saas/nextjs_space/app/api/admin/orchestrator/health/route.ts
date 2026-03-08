@@ -7,8 +7,9 @@ export const dynamic = 'force-dynamic';
 export async function GET() {
     try {
         const session = await getServerSession(authOptions);
-        if (!session?.user) {
-            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+        // H1 FIX: Require admin role (was only checking for any session)
+        if (!session?.user || (session.user as any)?.role !== 'admin') {
+            return NextResponse.json({ error: 'Admin only' }, { status: 403 });
         }
 
         const orchestratorUrl = process.env.ORCHESTRATOR_URL || 'http://localhost:5000';

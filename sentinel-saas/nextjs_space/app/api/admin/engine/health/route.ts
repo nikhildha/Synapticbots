@@ -1,4 +1,6 @@
 import { NextResponse } from 'next/server';
+import { getServerSession } from 'next-auth';
+import { authOptions } from '@/lib/auth-options';
 import { getEngineUrl } from '@/lib/engine-url';
 
 export const dynamic = 'force-dynamic';
@@ -8,9 +10,14 @@ const ENGINE_API_URL = getEngineUrl('live');
 /**
  * Proxy to the remote engine's /api/health endpoint.
  * Returns engine status, uptime, cycle count, config info.
- * Falls back to local engine status if ENGINE_API_URL is not set.
+ * Admin-only.
  */
 export async function GET() {
+    // S10 FIX: Admin-only — was missing auth check entirely
+    const session = await getServerSession(authOptions);
+    if (!session?.user || (session.user as any)?.role !== 'admin') {
+        return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
     // Production: proxy to remote engine API
     if (ENGINE_API_URL) {
         try {

@@ -47,7 +47,14 @@ export async function PUT(req: NextRequest) {
         // Update user fields
         const updateData: any = {};
         if (name !== undefined) updateData.name = name;
-        if (role !== undefined) updateData.role = role;
+        // M3 FIX: validate role against allowlist
+        if (role !== undefined) {
+            const VALID_ROLES = ['user', 'admin'];
+            if (!VALID_ROLES.includes(role)) {
+                return NextResponse.json({ error: `Invalid role: ${role}. Must be one of: ${VALID_ROLES.join(', ')}` }, { status: 400 });
+            }
+            updateData.role = role;
+        }
 
         await prisma.user.update({ where: { id: userId }, data: updateData });
 

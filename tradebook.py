@@ -6,6 +6,7 @@ Persists to JSON for the dashboard. Supports live unrealized P&L updates.
 import json
 import os
 import logging
+import threading
 from datetime import datetime
 from data_pipeline import get_current_price
 import config
@@ -15,25 +16,30 @@ logger = logging.getLogger("Tradebook")
 
 TRADEBOOK_FILE = os.path.join(config.DATA_DIR, "tradebook.json")
 
+# H2 FIX: Thread lock for concurrent file access safety
+_book_lock = threading.Lock()
+
 
 def _load_book():
-    """Load tradebook from disk."""
-    if not os.path.exists(TRADEBOOK_FILE):
-        return {"trades": [], "summary": {}}
-    try:
-        with open(TRADEBOOK_FILE, "r") as f:
-            return json.load(f)
-    except Exception:
-        return {"trades": [], "summary": {}}
+    """Load tradebook from disk (thread-safe)."""
+    with _book_lock:
+        if not os.path.exists(TRADEBOOK_FILE):
+            return {"trades": [], "summary": {}}
+        try:
+            with open(TRADEBOOK_FILE, "r") as f:
+                return json.load(f)
+        except Exception:
+            return {"trades": [], "summary": {}}
 
 
 def _save_book(book):
-    """Save tradebook to disk."""
-    try:
-        with open(TRADEBOOK_FILE, "w") as f:
-            json.dump(book, f, indent=2)
-    except Exception as e:
-        logger.error("Failed to save tradebook: %s", e)
+    """Save tradebook to disk (thread-safe)."""
+    with _book_lock:
+        try:
+            with open(TRADEBOOK_FILE, "w") as f:
+                json.dump(book, f, indent=2)
+        except Exception as e:
+            logger.error("Failed to save tradebook: %s", e)
 
 
 def _next_id(book):
@@ -265,7 +271,7 @@ def close_trade(trade_id=None, symbol=None, exit_price=None, reason="MANUAL"):
         # A3 FIX: For LIVE trades, use CoinDCX price (not Binance)
         px = exit_price
         if px is None:
-            if target.get("mode") == "LIVE":
+            if target.get("mode", "").upper() == "LIVE":
                 try:
                     import coindcx_client as cdx
                     cdx_pair = target.get("pair") or cdx.to_coindcx_pair(target["symbol"])
@@ -504,7 +510,7 @@ def update_unrealized(prices=None, funding_rates=None):
             current = prices[symbol]
         else:
             # A4 FIX: For LIVE trades, try CoinDCX price first (not Binance)
-            if trade.get("mode") == "LIVE":
+            if trade.get("mode", "").upper() == "LIVE":
                 try:
                     import coindcx_client as cdx
                     cdx_pair = trade.get("pair") or cdx.to_coindcx_pair(symbol)

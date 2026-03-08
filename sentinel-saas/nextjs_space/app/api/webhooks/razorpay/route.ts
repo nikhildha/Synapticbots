@@ -29,18 +29,24 @@ export async function POST(request: Request) {
         const rawBody = await request.text();
         const signature = request.headers.get('x-razorpay-signature');
 
-        // ─── Signature Verification ───────────────────────────────
+        // ─── C2 FIX: Signature Verification (MANDATORY) ──────────
         const webhookSecret = process.env.RAZORPAY_WEBHOOK_SECRET;
-        if (webhookSecret && signature) {
-            const expectedSig = crypto
-                .createHmac('sha256', webhookSecret)
-                .update(rawBody)
-                .digest('hex');
+        if (!webhookSecret) {
+            console.error('RAZORPAY_WEBHOOK_SECRET not configured — rejecting webhook');
+            return NextResponse.json({ error: 'Webhook secret not configured' }, { status: 500 });
+        }
+        if (!signature) {
+            return NextResponse.json({ error: 'Missing x-razorpay-signature header' }, { status: 401 });
+        }
 
-            if (signature !== expectedSig) {
-                console.error('Razorpay webhook signature mismatch');
-                return NextResponse.json({ error: 'Invalid signature' }, { status: 401 });
-            }
+        const expectedSig = crypto
+            .createHmac('sha256', webhookSecret)
+            .update(rawBody)
+            .digest('hex');
+
+        if (signature !== expectedSig) {
+            console.error('Razorpay webhook signature mismatch');
+            return NextResponse.json({ error: 'Invalid signature' }, { status: 401 });
         }
 
         const payload = JSON.parse(rawBody);

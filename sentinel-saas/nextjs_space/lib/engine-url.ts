@@ -9,7 +9,8 @@
  */
 
 const LIVE_URL = process.env.ENGINE_API_URL || process.env.PYTHON_ENGINE_URL || '';
-const PAPER_URL = process.env.ENGINE_API_URL_PAPER || LIVE_URL; // fallback to live if paper not set
+// M1 FIX: Paper URL must NOT fall back to live — prevents accidental live trading
+const PAPER_URL = process.env.ENGINE_API_URL_PAPER || '';
 
 export type EngineMode = 'live' | 'paper';
 

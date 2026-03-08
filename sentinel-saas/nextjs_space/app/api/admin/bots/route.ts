@@ -18,7 +18,8 @@ export async function GET() {
                 name: true,
                 isActive: true,
                 createdAt: true,
-                userId: true,
+                // H4 FIX: removed userId to prevent admin from mapping users to bots
+                exchange: true,
             },
             orderBy: { createdAt: 'desc' },
         });

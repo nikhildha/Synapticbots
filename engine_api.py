@@ -101,6 +101,28 @@ def _read_json(filename, default=None):
     return default if default is not None else {}
 
 
+# ─── C1 FIX: API Auth Middleware ─────────────────────────────────────
+# All routes require Bearer token if ENGINE_API_SECRET is set.
+# Health endpoint is exempt for monitoring.
+ENGINE_API_SECRET = os.getenv("ENGINE_API_SECRET", "")
+
+def _check_auth():
+    """Validate Bearer token. Returns error response or None if OK."""
+    if not ENGINE_API_SECRET:
+        return None  # No secret configured — open access (dev mode)
+    auth = request.headers.get("Authorization", "")
+    if auth == f"Bearer {ENGINE_API_SECRET}":
+        return None
+    return jsonify({"error": "Unauthorized — missing or invalid Bearer token"}), 401
+
+@app.before_request
+def _auth_middleware():
+    """C1 FIX: Require auth on all routes except /api/health."""
+    if request.path == "/api/health":
+        return None  # Health check exempt for monitoring
+    return _check_auth()
+
+
 # ─── API Routes ───────────────────────────────────────────────────────
 
 @app.route("/api/all", methods=["GET"])

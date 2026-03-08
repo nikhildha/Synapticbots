@@ -51,5 +51,5 @@ export function getTierLimits(tier?: string | null): TierLimits {
     return TIER_LIMITS[(tier || 'free') as TierName] || TIER_LIMITS.free;
 }
 
-// God account referral code — grants Ultra forever
-export const GOD_REFERRAL_CODE = 'godaccount';
+// M7 FIX: God account referral code from env var (not hardcoded)
+export const GOD_REFERRAL_CODE = process.env.GOD_REFERRAL_CODE || '';

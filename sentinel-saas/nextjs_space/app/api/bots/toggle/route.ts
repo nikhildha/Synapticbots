@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth-options';
 import prisma from '@/lib/prisma';
-import { checkSubscription } from '@/lib/subscription';
+import { checkSubscription, hasFeature } from '@/lib/subscription';
 import { createBotSession, closeBotSession } from '@/lib/bot-session';
 import { getEngineUrl } from '@/lib/engine-url';
 
@@ -34,6 +34,24 @@ export async function POST(request: Request) {
       }
     }
 
+    // C5 FIX: Block free-tier users from starting LIVE bots
+    if (isActive) {
+      const bot = await prisma.bot.findFirst({
+        where: { id: botId, userId: session.user.id },
+        include: { config: true },
+      });
+      const requestedMode = (bot?.config?.mode ?? 'paper').toLowerCase();
+      if (requestedMode === 'live') {
+        const canTradeLive = await hasFeature(session.user.id, 'liveTrading');
+        if (!canTradeLive) {
+          return NextResponse.json(
+            { error: 'Live trading requires a Pro or Ultra subscription. Upgrade to continue.' },
+            { status: 403 }
+          );
+        }
+      }
+    }
+
     // Verify ownership (include config for mode)
     const bot = await prisma.bot.findFirst({
       where: { id: botId, userId: session.user.id },
@@ -61,7 +79,8 @@ export async function POST(request: Request) {
       }
 
       // ─── LIVE MODE STOP: close CoinDCX positions FIRST ────────────
-      const botMode = bot.config?.mode ?? 'paper';
+      // C4 FIX: case-insensitive mode check for live exit
+      const botMode = (bot.config?.mode ?? 'paper').toLowerCase();
       const engineUrl = getEngineUrl(botMode === 'live' ? 'live' : 'paper');
 
       if (botMode === 'live' && engineUrl) {
@@ -129,7 +148,8 @@ export async function POST(request: Request) {
     }
 
     // ─── Live mode: switch engine mode + validate exchange pre-flight ────────
-    const botMode = bot.config?.mode ?? 'paper';
+    // C4 FIX: case-insensitive mode check for engine routing
+    const botMode = (bot.config?.mode ?? 'paper').toLowerCase();
     const engineUrl = getEngineUrl(botMode === 'live' ? 'live' : 'paper');
     if (engineUrl && isActive) {
       // ──── CRITICAL: Push bot_id to engine for data isolation ────────────
