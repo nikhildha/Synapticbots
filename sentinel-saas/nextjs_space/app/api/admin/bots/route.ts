@@ -18,9 +18,7 @@ export async function GET() {
                 name: true,
                 isActive: true,
                 createdAt: true,
-                user: {
-                    select: { name: true, email: true },
-                },
+                userId: true,
             },
             orderBy: { createdAt: 'desc' },
         });

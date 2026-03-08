@@ -71,8 +71,17 @@ export async function syncEngineTrades(
                 } else {
                     continue;  // bot_id belongs to a different user — skip
                 }
+            } else {
+                // STRICT ISOLATION: If bot_id is NOT stamped on the trade,
+                // skip it entirely. This prevents ALL trades from being
+                // attributed to whichever user's sync runs first.
+                // The ENGINE_BOT_ID env var MUST be set in Railway.
+                console.warn(
+                    `[sync] Trade ${engineTradeId} has no bot_id — skipping. ` +
+                    `Set ENGINE_BOT_ID env var in Railway engine service.`
+                );
+                continue;
             }
-            // If t.bot_id is null/empty → fall through with default botId (single-user mode)
 
             // Upsert: create if not exists, update PNL/status if exists
             await prisma.trade.upsert({

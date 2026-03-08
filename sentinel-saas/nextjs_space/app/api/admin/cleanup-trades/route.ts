@@ -7,8 +7,8 @@ export const dynamic = 'force-dynamic';
 
 /**
  * POST /api/admin/cleanup-trades
- * Admin-only: delete all stale trades from Prisma DB.
- * After engine tradebook reset, this ensures the Prisma DB is also clean.
+ * Admin-only: delete only the ADMIN's own closed trades.
+ * Does NOT touch other users' data.
  */
 export async function POST() {
     try {
@@ -18,30 +18,32 @@ export async function POST() {
             return NextResponse.json({ error: 'Admin only' }, { status: 403 });
         }
 
-        // Count before
-        const before = await prisma.trade.count();
+        const userId = (session.user as any)?.id;
 
-        // Get all bots and their trade counts
-        const bots = await prisma.bot.findMany({
-            select: { id: true, name: true, userId: true },
+        // Only delete admin's own closed trades — NEVER touch other users
+        const adminBots = await prisma.bot.findMany({
+            where: { userId },
+            select: { id: true, name: true },
         });
-        const breakdown: Record<string, number> = {};
-        for (const bot of bots) {
-            const count = await prisma.trade.count({ where: { botId: bot.id } });
-            if (count > 0) {
-                breakdown[`${bot.name} (${bot.userId.substring(0, 8)})`] = count;
-            }
+        const botIds = adminBots.map(b => b.id);
+
+        if (botIds.length === 0) {
+            return NextResponse.json({ success: true, deletedCount: 0, message: 'No bots found' });
         }
 
-        // Delete ALL trades
-        const result = await prisma.trade.deleteMany({});
+        const before = await prisma.trade.count({
+            where: { botId: { in: botIds } },
+        });
+
+        const result = await prisma.trade.deleteMany({
+            where: { botId: { in: botIds }, status: 'closed' },
+        });
 
         return NextResponse.json({
             success: true,
             deletedCount: result.count,
             beforeCount: before,
-            breakdown,
-            message: `Deleted ${result.count} trades. Fresh sync will import current engine trades on next page load.`,
+            message: `Deleted ${result.count} of your closed trades. Active trades preserved.`,
         });
     } catch (err) {
         console.error('[cleanup-trades]', err);

@@ -6,29 +6,24 @@ import { getEngineUrl } from '@/lib/engine-url';
 
 export const dynamic = 'force-dynamic';
 
-const ENGINE_API_URL = getEngineUrl('live');
-
 /**
  * GET /api/debug
- * Admin-only: returns full sync diagnostics for a given user email.
- * Usage: /api/debug?email=nikhildha@gmail.com
+ * Returns sync diagnostics for the CURRENT user only.
+ * Admin no longer has access to other users' data.
  */
-export async function GET(request: Request) {
+export async function GET() {
     const session = await getServerSession(authOptions);
     if (!session?.user) {
         return NextResponse.json({ error: 'Not logged in' }, { status: 401 });
     }
-    const isAdmin = (session?.user as any)?.role === 'admin';
 
-    const { searchParams } = new URL(request.url);
-    // Admin can look up any email; regular user always sees their own data
-    const email = isAdmin
-        ? (searchParams.get('email') || session.user.email)
-        : session.user.email;
+    const userId = (session.user as any)?.id;
+    const email = session.user.email;
 
-    // ─── 1. Engine data ───────────────────────────────────────────────────────
-    let engineTrades: any[] = [];
+    // ─── 1. Engine data (shared telemetry, no user-specific trades) ──────────
+    let engineTradeCount = 0;
     let engineError: string | null = null;
+    const ENGINE_API_URL = getEngineUrl('live');
     try {
         if (ENGINE_API_URL) {
             const res = await fetch(`${ENGINE_API_URL}/api/all`, {
@@ -37,7 +32,7 @@ export async function GET(request: Request) {
             });
             if (res.ok) {
                 const data = await res.json();
-                engineTrades = data?.tradebook?.trades || [];
+                engineTradeCount = (data?.tradebook?.trades || []).length;
             } else {
                 engineError = `Engine returned ${res.status}`;
             }
@@ -48,68 +43,41 @@ export async function GET(request: Request) {
         engineError = String(err);
     }
 
-    // ─── 2. Target user ───────────────────────────────────────────────────────
-    let targetUser: any = null;
-    let userBots: any[] = [];
-    let dbTradeCount = 0;
-    let dbTrades: any[] = [];
+    // ─── 2. Current user's own data only ────────────────────────────────────
+    const userBots = await prisma.bot.findMany({
+        where: { userId },
+        select: {
+            id: true, name: true, exchange: true, status: true,
+            isActive: true, startedAt: true, stoppedAt: true,
+            updatedAt: true,
+        },
+    });
 
-    if (email) {
-        targetUser = await prisma.user.findUnique({
-            where: { email },
-            select: { id: true, email: true, name: true, role: true },
-        });
+    const dbTradeCount = await prisma.trade.count({
+        where: { bot: { userId } },
+    });
 
-        if (targetUser) {
-            userBots = await prisma.bot.findMany({
-                where: { userId: targetUser.id },
-                select: {
-                    id: true, name: true, exchange: true, status: true,
-                    isActive: true, startedAt: true, stoppedAt: true,
-                    updatedAt: true,
-                },
-            });
-
-            dbTradeCount = await prisma.trade.count({
-                where: { bot: { userId: targetUser.id } },
-            });
-
-            dbTrades = await prisma.trade.findMany({
-                where: { bot: { userId: targetUser.id } },
-                select: {
-                    id: true, coin: true, status: true, entryTime: true,
-                    botId: true, exchangeOrderId: true,
-                },
-                orderBy: { entryTime: 'desc' },
-                take: 10,
-            });
-        }
-    }
-
-    // ─── 3. Engine trade sample ───────────────────────────────────────────────
-    const engineSample = engineTrades.slice(0, 3).map((t: any) => ({
-        trade_id: t.trade_id || t.id,
-        symbol: t.symbol || t.coin,
-        status: t.status,
-        entry_time: t.entry_time || t.entryTime,
-        regime: t.regime,
-    }));
+    const dbTrades = await prisma.trade.findMany({
+        where: { bot: { userId } },
+        select: {
+            id: true, coin: true, status: true, entryTime: true,
+            botId: true, exchangeOrderId: true,
+        },
+        orderBy: { entryTime: 'desc' },
+        take: 10,
+    });
 
     return NextResponse.json({
         engine: {
             url: ENGINE_API_URL || null,
-            tradeCount: engineTrades.length,
+            totalTradeCount: engineTradeCount,
             error: engineError,
-            sample: engineSample,
         },
-        user: targetUser
-            ? {
-                  ...targetUser,
-                  bots: userBots,
-                  dbTradeCount,
-                  dbTrades,
-              }
-            : { error: email ? `User not found: ${email}` : 'No email param provided' },
-        instructions: 'Add ?email=user@example.com to check a specific user',
+        user: {
+            email,
+            bots: userBots,
+            dbTradeCount,
+            dbTrades,
+        },
     });
 }

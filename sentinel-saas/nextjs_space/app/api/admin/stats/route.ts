@@ -19,7 +19,6 @@ export async function GET() {
             totalTrades,
             activeTrades,
             activeSubscriptions,
-            trades,
         ] = await Promise.all([
             prisma.user.count(),
             prisma.bot.count(),
@@ -27,13 +26,7 @@ export async function GET() {
             prisma.trade.count(),
             prisma.trade.count({ where: { status: 'active' } }),
             prisma.subscription.count({ where: { status: 'active' } }),
-            prisma.trade.findMany({
-                where: { status: 'closed' },
-                select: { totalPnl: true },
-            }),
         ]);
-
-        const totalPnl = trades.reduce((sum: number, t: any) => sum + (t.totalPnl || 0), 0);
 
         // Revenue estimate: count pro ($999) and ultra ($2499) subscriptions
         const proCount = await prisma.subscription.count({ where: { tier: 'pro', status: 'active' } });
@@ -47,7 +40,6 @@ export async function GET() {
             totalTrades,
             activeTrades,
             activeSubscriptions,
-            totalPnl: Math.round(totalPnl * 100) / 100,
             revenueEstimate,
         });
     } catch (error: any) {
