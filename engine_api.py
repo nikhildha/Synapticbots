@@ -359,8 +359,10 @@ def api_exit_all_live():
 
 @app.route("/api/reset-trades", methods=["POST"])
 def api_reset_trades():
-    """Clear all trades from the tradebook."""
+    """Clear all trades from the tradebook. PAPER MODE ONLY for safety."""
     try:
+        if not config.PAPER_TRADE:
+            return jsonify({"error": "Cannot reset trades in LIVE mode. Use /api/sync-exchange instead."}), 400
         book = tb._load_book()
         count = len(book.get("trades", []))
         book["trades"] = []
@@ -370,6 +372,156 @@ def api_reset_trades():
         return jsonify({"success": True, "deletedCount": count})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/sync-exchange", methods=["POST"])
+def api_sync_exchange():
+    """
+    Reconcile tradebook with CoinDCX exchange positions.
+
+    1. For each ACTIVE tradebook entry: if exchange has NO position → close as EXCHANGE_CLOSED
+    2. For each exchange position NOT in tradebook → import as new trade
+    3. For matching positions: update current_price, SL, TP from exchange data
+    """
+    results = {
+        "closed_orphans": [],    # tradebook entries closed (no exchange position)
+        "imported": [],          # exchange positions imported to tradebook
+        "updated": [],           # existing trades with updated prices
+        "errors": [],
+    }
+
+    if config.PAPER_TRADE:
+        return jsonify({
+            "success": True,
+            "message": "Paper mode — nothing to sync with exchange",
+            **results,
+        })
+
+    try:
+        import coindcx_client as cdx
+        from data_pipeline import get_current_price
+
+        # Step 1: Get all CoinDCX positions
+        try:
+            exchange_positions = cdx.list_positions()
+        except Exception as e:
+            return jsonify({"error": f"Failed to fetch CoinDCX positions: {str(e)}"}), 500
+
+        # Build lookup: symbol → position
+        exchange_map = {}
+        for p in exchange_positions:
+            active_pos = float(p.get("active_pos", 0))
+            if active_pos == 0:
+                continue
+            pair = p.get("pair", "")
+            symbol = cdx.from_coindcx_pair(pair)
+            exchange_map[symbol] = {
+                "pair": pair,
+                "position_id": p.get("id"),
+                "side": "LONG" if active_pos > 0 else "SHORT",
+                "quantity": abs(active_pos),
+                "entry_price": float(p.get("avg_price", 0)),
+                "leverage": int(p.get("leverage", 1)),
+                "sl": float(p.get("stop_loss", 0) or 0),
+                "tp": float(p.get("take_profit", 0) or 0),
+                "pnl": float(p.get("pnl", 0) or 0),
+            }
+
+        logger.info("🔄 SYNC: Exchange has %d active positions: %s",
+                     len(exchange_map), list(exchange_map.keys()))
+
+        # Step 2: Get all ACTIVE trades in tradebook
+        active_trades = tb.get_active_trades()
+        tradebook_symbols = set()
+
+        # Step 3: Reconcile tradebook → exchange
+        for trade in active_trades:
+            symbol = trade["symbol"]
+            tradebook_symbols.add(symbol)
+            mode = (trade.get("mode") or "").upper()
+            if not mode.startswith("LIVE"):
+                continue  # Skip paper trades
+
+            if symbol in exchange_map:
+                # Position exists — update current data
+                ex = exchange_map[symbol]
+                current = get_current_price(symbol) or ex["entry_price"]
+                trade["current_price"] = round(current, 6)
+                if ex["sl"] > 0:
+                    trade["trailing_sl"] = round(ex["sl"], 6)
+                if ex["tp"] > 0:
+                    trade["trailing_tp"] = round(ex["tp"], 6)
+                results["updated"].append(symbol)
+            else:
+                # Position NOT on exchange → close as EXCHANGE_CLOSED
+                try:
+                    tb.close_trade(trade_id=trade["trade_id"], reason="EXCHANGE_CLOSED")
+                    results["closed_orphans"].append({
+                        "trade_id": trade["trade_id"],
+                        "symbol": symbol,
+                    })
+                    logger.info("🔄 SYNC: Closed orphan tradebook entry %s (%s) — no exchange position",
+                                trade["trade_id"], symbol)
+                except Exception as e:
+                    results["errors"].append(f"Close {trade['trade_id']}: {str(e)}")
+
+        # Step 4: Import exchange positions NOT in tradebook
+        for symbol, ex in exchange_map.items():
+            if symbol in tradebook_symbols:
+                continue  # Already tracked
+
+            try:
+                current = get_current_price(symbol) or ex["entry_price"]
+                side = "BUY" if ex["side"] == "LONG" else "SELL"
+                capital = round(ex["quantity"] * ex["entry_price"] / ex["leverage"], 2)
+                trade_id = tb.open_trade(
+                    symbol=symbol,
+                    side=side,
+                    leverage=ex["leverage"],
+                    quantity=ex["quantity"],
+                    entry_price=ex["entry_price"],
+                    atr=0,
+                    regime=0,
+                    confidence=0,
+                    reason="IMPORTED_FROM_EXCHANGE",
+                    capital=capital,
+                    mode="LIVE",
+                    exchange="coindcx",
+                    pair=ex["pair"],
+                    position_id=ex["position_id"],
+                )
+                results["imported"].append({
+                    "trade_id": trade_id,
+                    "symbol": symbol,
+                    "side": ex["side"],
+                    "entry_price": ex["entry_price"],
+                })
+                logger.info("🔄 SYNC: Imported exchange position %s %s @ %.4f",
+                            symbol, ex["side"], ex["entry_price"])
+            except Exception as e:
+                results["errors"].append(f"Import {symbol}: {str(e)}")
+
+        # Save updates
+        book = tb._load_book()
+        tb._compute_summary(book)
+        tb._save_book(book)
+
+    except Exception as e:
+        logger.error("SYNC: Fatal error: %s", e, exc_info=True)
+        results["errors"].append(str(e))
+
+    logger.info(
+        "🔄 SYNC complete: %d updated, %d orphans closed, %d imported, %d errors",
+        len(results["updated"]),
+        len(results["closed_orphans"]),
+        len(results["imported"]),
+        len(results["errors"]),
+    )
+
+    return jsonify({
+        "success": len(results["errors"]) == 0,
+        **results,
+    })
 
 
 @app.route("/api/set-mode", methods=["POST"])

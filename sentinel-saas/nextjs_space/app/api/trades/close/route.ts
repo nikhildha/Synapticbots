@@ -174,9 +174,11 @@ export async function POST(request: Request) {
         const isLong = trade.position === 'long';
 
         const priceDiff = isLong ? (currentPrice - entry) : (entry - currentPrice);
-        const rawPnl = priceDiff / entry * lev * capital;
-        const leveragedPnl = Math.round(rawPnl * 10000) / 10000;
-        const pnlPct = capital > 0 ? Math.round(leveragedPnl / capital * 100 * 100) / 100 : 0;
+        // PnL FIX: use quantity (already leveraged) — don't multiply by lev again
+        const quantity = (trade as any).quantity || (capital * lev / entry);
+        const rawPnl = priceDiff * quantity;
+        const netPnl = Math.round(rawPnl * 10000) / 10000;
+        const pnlPct = capital > 0 ? Math.round(netPnl / capital * 100 * 100) / 100 : 0;
 
         // ─── Update trade in Prisma ──────────────────────────────────────
         await prisma.trade.update({
@@ -186,7 +188,7 @@ export async function POST(request: Request) {
                 exitPrice: currentPrice,
                 exitTime: new Date(),
                 exitReason: 'MANUAL_CLOSE',
-                totalPnl: leveragedPnl,
+                totalPnl: netPnl,
                 totalPnlPercent: pnlPct,
                 activePnl: 0,
                 activePnlPercent: 0,
@@ -216,7 +218,7 @@ export async function POST(request: Request) {
             closed: [{
                 trade_id: trade.exchangeOrderId || trade.id,
                 symbol: trade.coin,
-                pnl: leveragedPnl,
+                pnl: netPnl,
                 pnl_pct: pnlPct,
             }],
         });

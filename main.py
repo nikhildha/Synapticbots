@@ -1014,7 +1014,7 @@ class RegimeMasterBot:
         # If tradebook has an ACTIVE LIVE trade but CoinDCX doesn't → closed on exchange
         for trade in tb_active:
             sym = trade["symbol"]
-            if trade.get("mode") != "LIVE":
+            if not (trade.get("mode") or "").upper().startswith("LIVE"):
                 continue
             if sym not in cdx_active:
                 logger.info(

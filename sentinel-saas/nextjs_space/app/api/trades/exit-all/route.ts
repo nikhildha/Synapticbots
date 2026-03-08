@@ -9,8 +9,8 @@ export const dynamic = 'force-dynamic';
 /**
  * POST /api/trades/exit-all
  * Exits ALL active trades for the current user.
- * Optionally filter by mode: { mode: 'live' | 'paper' | 'all' }
- * Closes in Prisma DB + best-effort on Engine.
+ * For LIVE trades: calls engine /api/exit-all-live FIRST to close CoinDCX positions.
+ * For PAPER trades: closes in Prisma DB + best-effort engine close.
  */
 export async function POST(request: Request) {
     try {
@@ -20,7 +20,6 @@ export async function POST(request: Request) {
         }
 
         const userId = (session.user as any)?.id;
-        const isAdmin = (session.user as any)?.role === 'admin';
         const body = await request.json().catch(() => ({}));
         const modeFilter = body.mode || 'all'; // 'live', 'paper', or 'all'
 
@@ -44,7 +43,35 @@ export async function POST(request: Request) {
         const results: any[] = [];
         const errors: any[] = [];
 
-        // ─── Close each trade ────────────────────────────────────────────
+        // ─── LIVE TRADES: Close CoinDCX positions FIRST via engine ────────
+        const hasLiveTrades = activeTrades.some(t =>
+            (t.mode || '').toLowerCase().startsWith('live')
+        );
+
+        if (hasLiveTrades) {
+            const liveEngineUrl = getEngineUrl('live');
+            if (liveEngineUrl) {
+                try {
+                    // Call engine exit-all-live — closes ALL CoinDCX positions + tradebook
+                    const exitRes = await fetch(`${liveEngineUrl}/api/exit-all-live`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        signal: AbortSignal.timeout(15000),
+                    });
+                    const exitData = await exitRes.json();
+                    console.log('[exit-all] Engine exit-all-live result:', JSON.stringify(exitData));
+
+                    if (exitData.errors?.length > 0) {
+                        errors.push(...exitData.errors.map((e: string) => ({ source: 'engine', error: e })));
+                    }
+                } catch (err) {
+                    console.error('[exit-all] Engine exit-all-live failed:', err);
+                    errors.push({ source: 'engine', error: 'Failed to close CoinDCX positions' });
+                }
+            }
+        }
+
+        // ─── Close each trade in Prisma DB ────────────────────────────────
         for (const trade of activeTrades) {
             try {
                 const currentPrice = trade.currentPrice || trade.entryPrice;
@@ -54,9 +81,11 @@ export async function POST(request: Request) {
                 const isLong = trade.position === 'long';
 
                 const priceDiff = isLong ? (currentPrice - entry) : (entry - currentPrice);
-                const rawPnl = priceDiff / entry * lev * capital;
-                const leveragedPnl = Math.round(rawPnl * 10000) / 10000;
-                const pnlPct = capital > 0 ? Math.round(leveragedPnl / capital * 100 * 100) / 100 : 0;
+                // PnL FIX: use quantity (already leveraged) — don't multiply by lev again
+                const quantity = (trade as any).quantity || (capital * lev / entry);
+                const rawPnl = priceDiff * quantity;
+                const netPnl = Math.round(rawPnl * 10000) / 10000;
+                const pnlPct = capital > 0 ? Math.round(netPnl / capital * 100 * 100) / 100 : 0;
 
                 // Update in Prisma
                 await prisma.trade.update({
@@ -66,7 +95,7 @@ export async function POST(request: Request) {
                         exitPrice: currentPrice,
                         exitTime: new Date(),
                         exitReason: 'EXIT_ALL',
-                        totalPnl: leveragedPnl,
+                        totalPnl: netPnl,
                         totalPnlPercent: pnlPct,
                         activePnl: 0,
                         activePnlPercent: 0,
@@ -77,27 +106,29 @@ export async function POST(request: Request) {
                     trade_id: trade.exchangeOrderId || trade.id,
                     symbol: trade.coin,
                     mode: trade.mode,
-                    pnl: leveragedPnl,
+                    pnl: netPnl,
                     pnl_pct: pnlPct,
                 });
 
-                // B2 FIX: case-insensitive mode check — DB may have 'LIVE' (uppercase from engine)
-                const engineUrl = getEngineUrl((trade.mode || '').toLowerCase() === 'live' ? 'live' : 'paper');
-                if (engineUrl) {
-                    try {
-                        const engineTradeId = trade.exchangeOrderId || trade.id;
-                        await fetch(`${engineUrl}/api/close-trade`, {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({
-                                trade_id: engineTradeId,
-                                symbol: trade.coin,
-                                reason: 'EXIT_ALL',
-                            }),
-                            signal: AbortSignal.timeout(5000),
-                        });
-                    } catch {
-                        // Engine close is best-effort
+                // For paper trades: best-effort engine close
+                const isLive = (trade.mode || '').toLowerCase().startsWith('live');
+                if (!isLive) {
+                    const engineUrl = getEngineUrl('paper');
+                    if (engineUrl) {
+                        try {
+                            await fetch(`${engineUrl}/api/close-trade`, {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({
+                                    trade_id: trade.exchangeOrderId || trade.id,
+                                    symbol: trade.coin,
+                                    reason: 'EXIT_ALL',
+                                }),
+                                signal: AbortSignal.timeout(5000),
+                            });
+                        } catch {
+                            // Engine close is best-effort for paper
+                        }
                     }
                 }
             } catch (err: any) {

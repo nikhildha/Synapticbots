@@ -27,7 +27,6 @@ export async function GET() {
         // Get session to filter trades by user
         const session = await getServerSession(authOptions);
         const userId = (session?.user as any)?.id;
-        const isAdmin = (session?.user as any)?.role === 'admin';
 
         // Determine which engine to call based on user's active bot mode
         // C1 FIX: default to 'paper' for safety (not 'live')
