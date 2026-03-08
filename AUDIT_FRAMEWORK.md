@@ -505,17 +505,56 @@ HMMBOT/
 
 ### S13 · Subscription & Tier Enforcement
 
-**File**: `lib/subscription.ts`, `lib/subscription-limits.ts`, `app/api/bots/toggle/route.ts`
+**Files**: `app/api/bots/create/route.ts`, `app/api/subscription/`, `lib/subscription.ts`
 **What it checks**:
-- Free tier users: `liveTrading=false` enforced — `/api/bots/toggle` rejects live mode start
-- `maxBots=1` enforced on bot creation for free tier
-- Trial expired users: `isActive=false` → all protected endpoints return 403
-- Expired paid plan: same behavior as expired trial
-- Ultra tier: `maxBots=999`, `liveTrading=true`, `apiAccess=true` all verified
-- Tier limits from `TIER_LIMITS` match enforcement logic (no drift)
+- Users on free tier cannot create > 1 bot
+- Users on free tier cannot select live mode
+- Subscription status is verified before bot creation
+- Expired subscriptions are blocked from premium features
+- Rate limiting on bot creation endpoints
 
-**Pass criteria**: Tier limits enforced at all entry points
-**Severity if failed**: HIGH — free users access paid features
+**Pass criteria**: All tier restrictions enforced
+**Severity if failed**: HIGH — free users could access paid features
+
+---
+
+### S14 · Timestamp Timezone Normalization
+
+**Files**: `components/dashboard/command-center.tsx`, `main.py` (`_save_timing`)
+**What it checks**:
+- Engine `next_analysis_time` is stored as UTC with `Z` suffix (via `datetime.utcfromtimestamp().isoformat() + "Z"`)
+- Frontend does NOT blindly append `+05:30` to strings that already have `Z` or `±HH:MM`
+- `new Date(normalized).getTime()` never returns `NaN` — add `isNaN()` guard
+- All timestamp fields across `multi_bot_state.json` use consistent format (UTC+Z or no-suffix IST)
+- Dashboard displays valid countdown or `—` fallback, never `NaN · Invalid Date`
+
+**Pass criteria**: Next Cycle field always shows valid countdown or `Running…`, never NaN
+**Severity if failed**: HIGH — broken display undermines user trust, hides engine timing
+
+> **History**: Found 2026-03-08 — engine stored `2026-03-08T12:21:35Z`, frontend appended `+05:30`
+> creating `2026-03-08T12:21:35Z+05:30` → NaN. Fixed in commit `551b638`.
+
+---
+
+### S15 · Deploy Status Accuracy
+
+**Files**: `components/dashboard/command-center.tsx` (Deploy column), `main.py` (`_save_multi_state`)
+**What it checks**:
+- Dashboard Deploy column correctly reflects trade execution state:
+  - 🚀 DEPLOYED: coin has active trade in `active_positions` from engine state
+  - 🟢 READY: eligible but not yet deployed
+  - 🔴 FILTERED: rejected by a filter
+  - ⏳ PENDING: still being analyzed
+- `active_positions` keys match format: `profile_id:SYMBOL` or plain `SYMBOL`
+- Deploy status updates on each auto-refresh cycle (tracks `liveMulti.active_positions`)
+- No coins simultaneously show READY and DEPLOYED
+
+**Pass criteria**: Deploy column accurately reflects engine tradebook state
+**Severity if failed**: HIGH — users can't tell if bot is actually trading
+
+> **History**: Found 2026-03-08 — dashboard only had 3 states (READY/FILTERED/PENDING).
+> No DEPLOYED state existed. Users couldn't distinguish between "eligible" and "actively trading".
+> Fixed in commit `551b638`.
 
 ---
 
@@ -673,6 +712,25 @@ HMMBOT/
 
 ---
 
+### P14 · Deployment Pipeline Verification
+
+**Files**: `main.py` (`_tick`, `_evaluate_for_profile`), `execution_engine.py` (`execute_trade`)
+**What it checks**:
+- After `_analyze_coin` marks coins as ELIGIBLE, verify `_evaluate_for_profile` does NOT silently return `None`
+- Check `current_price` in `_coin_states[symbol]["price"]` is > 0 (line 889-891 guard causes silent drops)
+- Verify `balance` from `get_futures_balance()` is > 0 (paper=1000, live=CoinDCX balance)
+- Confirm `risk.get_conviction_leverage_for_profile()` returns non-zero leverage for high-confidence coins
+- Log comparison: count of ELIGIBLE coins in `_coin_states` vs `deployed` count in cycle summary
+- If eligible_count > 0 but deployed_count == 0 for 3+ consecutive cycles → ALERT
+
+**Pass criteria**: Deployed count > 0 when eligible count > 0 (unless max positions reached)
+**Severity if failed**: HIGH — bot scans correctly but never deploys = silent failure
+
+> **History**: Found 2026-03-08 — new user had 8 eligible coins showing READY but 0 deployed.
+> Root cause suspected: `current_price == 0` in `_evaluate_for_profile` causing silent `None` return.
+
+---
+
 ## Priority Matrix
 
 ```
@@ -685,9 +743,10 @@ HMMBOT/
 │                      │ S2, S8, S9        │                    │
 ├──────────────────────┼───────────────────┼────────────────────┤
 │  HIGH                │ P3, P5, P7, P10,  │ Telegram alert     │
-│  (fix within 24h)    │ P12, S1, S3, S6,  │                    │
-│                      │ S7, S10, S12,     │                    │
-│                      │ S13, I2, I4, I7   │                    │
+│  (fix within 24h)    │ P12, P14, S1, S3, │                    │
+│                      │ S6, S7, S10, S12, │                    │
+│                      │ S13, S14, S15,    │                    │
+│                      │ I2, I4, I7        │                    │
 ├──────────────────────┼───────────────────┼────────────────────┤
 │  MEDIUM              │ P9, S4, S11, I5,  │ Log only           │
 │  (fix within week)   │ I6, I8, I10       │                    │
@@ -872,7 +931,10 @@ model AuditReport {
 | 34 | I8 | Coin Tier Compliance | Integration | MEDIUM |
 | 35 | I9 | SL/TP Validity | Integration | CRITICAL |
 | 36 | I10 | HMM Signal Quality | Integration | MEDIUM |
+| 37 | P14 | **Deployment Pipeline Verification** | Engine | **HIGH** |
+| 38 | S14 | **Timestamp Timezone Normalization** | SaaS | **HIGH** |
+| 39 | S15 | **Deploy Status Accuracy** | SaaS | **HIGH** |
 
 ---
 
-*Last updated: 2026-03-08 · 36 checks · 3 sections · 04:00 UTC daily run*
+*Last updated: 2026-03-08 · 39 checks · 3 sections · 04:00 UTC daily run*

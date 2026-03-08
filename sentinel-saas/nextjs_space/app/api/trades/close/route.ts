@@ -56,16 +56,7 @@ export async function POST(request: Request) {
                 });
             }
 
-            if (!trade) {
-                trade = await prisma.trade.findFirst({
-                    where: {
-                        id: { contains: tradeId },
-                        status: { in: activeStatuses },
-                        bot: { userId },
-                    },
-                    include: { bot: true },
-                });
-            }
+            // Note: no partial-match (contains) fallback — ambiguous matches can close the wrong trade
         }
 
         if (!trade && symbol) {
@@ -134,35 +125,10 @@ export async function POST(request: Request) {
             }
         }
 
-        // ─── Fallback: close via engine API if no local trade found ──────────────
+        // F2 FIX: Removed unsafe engine fallback — forwarding an unverified trade_id/symbol
+        // to the engine with no ownership proof allows closing another user's engine trade
+        // in a shared-engine setup. If the trade isn't in Prisma, it doesn't belong to this user.
         if (!trade) {
-            const userBot = await prisma.bot.findFirst({ where: { userId }, select: { config: true } });
-            const fallbackMode = (userBot?.config as any)?.mode?.includes('live') ? 'live' : 'paper';
-            const fallbackUrl = getEngineUrl(fallbackMode);
-            if (fallbackUrl) {
-                try {
-                    const engineRes = await fetch(`${fallbackUrl}/api/close-trade`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ trade_id: tradeId, symbol, reason: 'MANUAL_CLOSE' }),
-                        signal: AbortSignal.timeout(10000),
-                    });
-                    const engineData = await engineRes.json();
-                    if (engineRes.ok && engineData.success) {
-                        return NextResponse.json({
-                            success: true, source: 'engine',
-                            closed: engineData.closed || [{ trade_id: tradeId, symbol }],
-                        });
-                    }
-                    return NextResponse.json(
-                        { error: engineData.error || 'Engine failed to close trade' },
-                        { status: engineRes.status || 404 }
-                    );
-                } catch (err) {
-                    console.error('[trades/close] Engine close failed:', err);
-                }
-            }
-
             return NextResponse.json({ error: 'No matching active trade found' }, { status: 404 });
         }
 

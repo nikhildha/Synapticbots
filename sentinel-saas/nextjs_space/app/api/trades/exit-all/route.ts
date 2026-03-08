@@ -66,8 +66,24 @@ export async function POST(request: Request) {
                     }
                 } catch (err) {
                     console.error('[exit-all] Engine exit-all-live failed:', err);
-                    errors.push({ source: 'engine', error: 'Failed to close CoinDCX positions' });
+                    // F1 FIX: Abort — do NOT close Prisma trades if CoinDCX positions could not be closed.
+                    // Silently marking DB as closed while exchange still holds the position is
+                    // operationally dangerous (hidden live risk with no UI visibility).
+                    return NextResponse.json({
+                        success: false,
+                        error: 'Could not reach engine to close CoinDCX live positions. ' +
+                               'No trades were closed. Please retry or close positions manually on CoinDCX.',
+                        liveTradesAffected: activeTrades
+                            .filter(t => (t.mode || '').toLowerCase().startsWith('live'))
+                            .map(t => ({ id: t.id, coin: t.coin })),
+                    }, { status: 502 });
                 }
+            } else {
+                // F1 FIX: Engine URL not configured — cannot safely close live positions
+                return NextResponse.json({
+                    success: false,
+                    error: 'Live engine URL not configured. Cannot close CoinDCX positions safely.',
+                }, { status: 503 });
             }
         }
 

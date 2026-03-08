@@ -27,10 +27,12 @@ export async function POST(request: Request) {
         const userId = (session.user as any)?.id;
 
         // Determine engine mode from user's bot config
+        // F3 FIX: include config relation — without this, userBot.config is undefined (always paper)
         let engineMode: EngineMode = 'paper';
         const userBot = await prisma.bot.findFirst({
             where: { userId },
             orderBy: [{ isActive: 'desc' }, { updatedAt: 'desc' }],
+            include: { config: true },
         });
         if (userBot) {
             const botMode = (userBot.config as any)?.mode || 'paper';
@@ -71,8 +73,8 @@ export async function POST(request: Request) {
                 const engineTrades = engineData?.tradebook?.trades || [];
 
                 if (userBot && userBot.startedAt && engineTrades.length > 0) {
-                    await syncEngineTrades(engineTrades, userBot.id, userBot.startedAt);
-                    tradesSynced = engineTrades.length;
+                    // F4 FIX: capture actual synced count (throttled/skipped trades return 0)
+                    tradesSynced = await syncEngineTrades(engineTrades, userBot.id, userBot.startedAt);
                 }
             }
         } catch (err) {

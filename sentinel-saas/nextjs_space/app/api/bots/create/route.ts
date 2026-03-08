@@ -74,9 +74,7 @@ export async function POST(request: Request) {
             t3Multiplier: 1.5,
             t1BookPct: 0.25,
             t2BookPct: 0.50,
-            coinList: JSON.stringify([
-              'BTCUSDT', 'ETHUSDT', 'BNBUSDT', 'SOLUSDT', 'DOGEUSDT',
-            ].slice(0, coinScansLimit)),
+            coinList: ['BTCUSDT', 'ETHUSDT', 'BNBUSDT', 'SOLUSDT', 'DOGEUSDT'].slice(0, coinScansLimit),
           },
         },
         state: {
