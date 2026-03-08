@@ -32,6 +32,8 @@ IST = timezone(timedelta(hours=5, minutes=30))
 _engine_thread = None
 _engine_start_time = None
 _engine_bot = None
+_engine_crash_count = 0
+_engine_last_crash = None
 
 logger = logging.getLogger("EngineAPI")
 
@@ -158,6 +160,9 @@ def api_health():
         "paper_trade": config.PAPER_TRADE,
         "exchange_live": config.EXCHANGE_LIVE or "",
         "mode": "paper" if config.PAPER_TRADE else f"live:{config.EXCHANGE_LIVE}",
+        # Crash tracking
+        "crash_count": _engine_crash_count,
+        "last_crash": _engine_last_crash,
     })
 
 
@@ -355,26 +360,80 @@ def _fmt_uptime(seconds):
 # ─── Engine Thread ────────────────────────────────────────────────────
 
 def _run_engine():
-    """Run the bot's main loop in a background thread."""
-    global _engine_bot
-    try:
-        from main import RegimeMasterBot
-        _engine_bot = RegimeMasterBot()
-        _engine_bot.run()
-    except Exception as e:
-        logger.critical("Engine thread crashed: %s", e, exc_info=True)
+    """Run the bot's main loop in a background thread with auto-restart."""
+    global _engine_bot, _engine_crash_count, _engine_last_crash
+    MAX_RETRIES = 5
+    BASE_BACKOFF = 10  # seconds
+
+    retry = 0
+    while retry < MAX_RETRIES:
+        loop_start = time.time()
+        try:
+            from main import RegimeMasterBot
+            _engine_bot = RegimeMasterBot()
+            logger.info("🚀 Engine loop starting (attempt %d/%d)", retry + 1, MAX_RETRIES)
+            _engine_bot.run()
+            # If run() returns cleanly, break out
+            logger.info("Engine run() returned cleanly")
+            break
+        except Exception as e:
+            _engine_crash_count += 1
+            _engine_last_crash = datetime.now(timezone.utc).isoformat()
+            logger.critical("💥 Engine thread crashed (attempt %d/%d): %s", retry + 1, MAX_RETRIES, e, exc_info=True)
+
+            # If engine ran for > 5 minutes, reset retry counter (it was healthy)
+            run_duration = time.time() - loop_start
+            if run_duration > 300:
+                logger.info("Engine ran for %.0fs before crash — resetting retry counter", run_duration)
+                retry = 0
+            else:
+                retry += 1
+
+            if retry < MAX_RETRIES:
+                backoff = min(BASE_BACKOFF * (2 ** (retry - 1)), 160)
+                logger.info("⏳ Restarting engine in %ds...", backoff)
+                time.sleep(backoff)
+
+    if retry >= MAX_RETRIES:
+        logger.critical("❌ Engine exhausted all %d restart attempts — giving up", MAX_RETRIES)
 
 
 def start_engine():
     """Start the engine in a background thread."""
-    global _engine_thread, _engine_start_time
+    global _engine_thread, _engine_start_time, _engine_crash_count
     if _engine_thread and _engine_thread.is_alive():
         logger.info("Engine already running")
         return
+    _engine_crash_count = 0
     logger.info("🚀 Starting engine thread...")
     _engine_thread = threading.Thread(target=_run_engine, daemon=True, name="EngineThread")
     _engine_thread.start()
     _engine_start_time = time.time()
+
+
+@app.route("/api/restart", methods=["POST"])
+def api_restart():
+    """Force-restart the engine thread."""
+    global _engine_thread, _engine_start_time, _engine_crash_count, _engine_bot
+    logger.info("🔄 Manual engine restart requested")
+
+    # Try to stop the current engine gracefully
+    if _engine_bot:
+        try:
+            _engine_bot._running = False
+        except Exception:
+            pass
+
+    # Wait briefly for thread to die
+    if _engine_thread and _engine_thread.is_alive():
+        _engine_thread.join(timeout=5)
+
+    _engine_thread = None
+    _engine_bot = None
+    _engine_crash_count = 0
+    start_engine()
+
+    return jsonify({"status": "restarting", "message": "Engine restart initiated"})
 
 
 # ─── Log viewer ───────────────────────────────────────────────────────
