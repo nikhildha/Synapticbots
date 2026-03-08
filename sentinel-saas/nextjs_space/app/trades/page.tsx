@@ -60,6 +60,7 @@ function mapTrade(t: any) {
     botId: t.bot_id || t.botId || null,
     targetType: t.target_type || t.targetType || null,
     sessionId: t.sessionId ?? null,
+    fee: t.exchange_fee || t.commission || t.fee || 0,
   };
 }
 
@@ -82,7 +83,10 @@ export default async function TradesPage() {
   // Admin raw engine view belongs in the admin panel, not the regular trades page.
   const engineTrades = await fetchEngineTradesAll(engineMode);
 
-  if (userBot && userBot.startedAt && engineTrades.length > 0) {
+  // Sync whenever a bot exists and engine has trades — don't require startedAt.
+  // syncEngineTrades handles null startedAt correctly (no time filter applied).
+  // startedAt guard was blocking sync when bot had never been formally started via toggle.
+  if (userBot && engineTrades.length > 0) {
     try {
       await syncEngineTrades(engineTrades, userBot.id, userBot.startedAt);
     } catch (err) {

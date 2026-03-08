@@ -22,6 +22,14 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Bot not found' }, { status: 404 });
     }
 
+    // D1 FIX: Block deletion of active bots — could orphan live CoinDCX positions
+    if (bot.isActive) {
+      return NextResponse.json(
+        { error: 'Stop the bot before deleting it.' },
+        { status: 409 }
+      );
+    }
+
     await prisma.bot.delete({
       where: { id: botId },
     });

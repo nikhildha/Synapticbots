@@ -5,10 +5,13 @@
  * Checks performed:
  *   S1  — DB Integrity (Prisma connect, row counts, orphaned records)
  *   S2  — User isolation (trades with null botId)
+ *   S14 — Stopped-bot orphan active trades (T2/K1 bug detector)
+ *   S15 — Stale active trade prices (sync health — updatedAt > 30 min)
  *   I2  — ENGINE_BOT_ID in env vars matches a real DB bot
  *   I3  — Engine mode vs DB active bot mode consistency
  *   I5  — Balance accuracy (engine balance vs CoinDCX API)
  *   I6  — DB timestamp validity (no null or future entryTime)
+ *   I11 — SaaS DB vs engine tradebook count divergence (C1/K1 detector)
  *
  * Returns: { run_ts, section, results[], summary }
  * Called by: tools/audit_runner.sh (daily cron) or admin dashboard
@@ -212,8 +215,6 @@ async function checkI5BalanceAccuracy(): Promise<CheckResult> {
     // Full exchange↔engine balance comparison would need live API keys on both sides.
     // We verify the SaaS can still fetch a balance (keys working, endpoint healthy).
     try {
-        const baseUrl = process.env.NEXTAUTH_URL || process.env.APP_URL || 'http://localhost:3000';
-        // Build internal request (reuse wallet-balance logic without full HTTP round-trip)
         const [coinDCXKey, coinDCXSecret] = [
             process.env.COINDCX_API_KEY || '',
             process.env.COINDCX_API_SECRET || '',
@@ -258,6 +259,153 @@ async function checkI5BalanceAccuracy(): Promise<CheckResult> {
 
     } catch (err: any) {
         return result('I5', 'WARN', `Balance check failed: ${err.message}`);
+    }
+}
+
+// ─── S14: Stopped-bot orphan active trades ────────────────────────────
+// Catches T2 bug (bot stopped but live close failed → DB trades left ACTIVE)
+// and K1 bug (kill switch ran without closing CoinDCX positions first).
+async function checkS14OrphanActiveTrades(): Promise<CheckResult> {
+    try {
+        const activeStatuses = ['active', 'ACTIVE', 'Active'];
+
+        // Active Prisma trades whose parent bot is NOT running
+        const orphanActive = await prisma.trade.count({
+            where: { status: { in: activeStatuses }, bot: { isActive: false } },
+        });
+
+        // Subset: live-mode orphans are more critical (real exchange exposure)
+        const orphanActiveLive = await prisma.trade.count({
+            where: {
+                status: { in: activeStatuses },
+                mode: { contains: 'live', mode: 'insensitive' },
+                bot: { isActive: false },
+            },
+        });
+
+        if (orphanActiveLive > 0) {
+            return result('S14', 'FAIL',
+                `${orphanActiveLive} LIVE active trade(s) on stopped bot(s) — possible hidden exchange exposure`,
+                { orphanActiveLive, orphanActiveTotal: orphanActive,
+                  action: 'Run /api/admin/force-sync-user or close positions manually on CoinDCX' });
+        }
+        if (orphanActive > 0) {
+            return result('S14', 'WARN',
+                `${orphanActive} PAPER active trade(s) on stopped bot(s) — stale DB records`,
+                { orphanActiveLive: 0, orphanActiveTotal: orphanActive });
+        }
+        return result('S14', 'PASS', 'No active trades on stopped bots');
+    } catch (err: any) {
+        return result('S14', 'FAIL', `S14 check failed: ${err.message}`);
+    }
+}
+
+// ─── S15: Stale active trade prices ──────────────────────────────────
+// Active trades where updatedAt > 30 min old indicate syncEngineTrades
+// has stopped running — prices in UI are frozen and PnL is unreliable.
+async function checkS15StalePrices(): Promise<CheckResult> {
+    try {
+        const STALE_MS = 30 * 60 * 1000; // 30 minutes
+        const staleThreshold = new Date(Date.now() - STALE_MS);
+
+        const totalActive = await prisma.trade.count({
+            where: { status: { in: ['active', 'ACTIVE', 'Active'] } },
+        });
+
+        if (totalActive === 0) {
+            return result('S15', 'PASS', 'No active trades — stale price check skipped');
+        }
+
+        const staleCount = await prisma.trade.count({
+            where: {
+                status: { in: ['active', 'ACTIVE', 'Active'] },
+                updatedAt: { lt: staleThreshold },
+            },
+        });
+
+        const staleLiveCount = await prisma.trade.count({
+            where: {
+                status: { in: ['active', 'ACTIVE', 'Active'] },
+                mode: { contains: 'live', mode: 'insensitive' },
+                updatedAt: { lt: staleThreshold },
+            },
+        });
+
+        if (staleLiveCount > 0) {
+            return result('S15', 'FAIL',
+                `${staleLiveCount} LIVE active trade(s) with price not updated in >30 min — sync broken`,
+                { staleCount, staleLiveCount, totalActive, staleThresholdMins: 30 });
+        }
+        if (staleCount > 0) {
+            return result('S15', 'WARN',
+                `${staleCount}/${totalActive} active trade(s) with price not updated in >30 min`,
+                { staleCount, staleLiveCount: 0, totalActive, staleThresholdMins: 30 });
+        }
+        return result('S15', 'PASS',
+            `All ${totalActive} active trade(s) have recent price updates`,
+            { totalActive, staleThresholdMins: 30 });
+    } catch (err: any) {
+        return result('S15', 'FAIL', `S15 check failed: ${err.message}`);
+    }
+}
+
+// ─── I11: SaaS DB vs engine tradebook count divergence ───────────────
+// Catches C1 (close route fallthrough) and K1 (kill without engine close):
+// if SaaS marked trades closed in DB but engine tradebook still shows them
+// active (or vice versa), the counts diverge.
+async function checkI11DbEngineDivergence(): Promise<CheckResult> {
+    try {
+        const activeStatuses = ['active', 'ACTIVE', 'Active'];
+
+        const dbActiveLive = await prisma.trade.count({
+            where: {
+                status: { in: activeStatuses },
+                mode: { contains: 'live', mode: 'insensitive' },
+            },
+        });
+
+        const engineUrl = getEngineUrl('live');
+        if (!engineUrl) {
+            return result('I11', 'SKIP',
+                'Live engine URL not configured — DB vs engine divergence check skipped',
+                { dbActiveLive });
+        }
+
+        let engineActiveLive = 0;
+        try {
+            const res = await fetch(`${engineUrl}/api/all`, {
+                cache: 'no-store',
+                signal: AbortSignal.timeout(6000),
+            });
+            if (res.ok) {
+                const data = await res.json();
+                const trades: any[] = data?.tradebook?.trades || [];
+                engineActiveLive = trades.filter((t: any) =>
+                    (t.status || '').toLowerCase() === 'active' &&
+                    (t.mode || '').toLowerCase().includes('live')
+                ).length;
+            }
+        } catch {
+            return result('I11', 'SKIP',
+                'Engine unreachable — DB vs engine divergence check skipped',
+                { dbActiveLive });
+        }
+
+        const delta = Math.abs(dbActiveLive - engineActiveLive);
+        if (delta > 2) {
+            const severity = delta > 5 ? 'FAIL' : 'WARN';
+            return result('I11', severity,
+                `Trade count divergence: DB has ${dbActiveLive} active live trades, engine has ${engineActiveLive} (delta=${delta})`,
+                { dbActiveLive, engineActiveLive, delta,
+                  action: 'Run /api/admin/force-sync-user to reconcile' });
+        }
+
+        return result('I11', 'PASS',
+            `DB (${dbActiveLive}) ≈ engine (${engineActiveLive}) active live trades (delta=${delta})`,
+            { dbActiveLive, engineActiveLive, delta });
+
+    } catch (err: any) {
+        return result('I11', 'FAIL', `I11 check failed: ${err.message}`);
     }
 }
 
@@ -316,21 +464,24 @@ export async function GET() {
 
     const runTs = new Date().toISOString();
 
-    // Run all checks in parallel where safe, sequential for DB to avoid pool exhaustion
-    const [s1, s2, i2] = await Promise.all([
+    // Run DB-only checks in parallel
+    const [s1, s2, s14, s15, i2, i6] = await Promise.all([
         checkS1DbIntegrity(),
         checkS2UserIsolation(),
+        checkS14OrphanActiveTrades(),
+        checkS15StalePrices(),
         checkI2BotIdCrossSystem(),
-    ]);
-
-    // I3 reads DB then engine — run after DB checks complete
-    const [i3, i5, i6] = await Promise.all([
-        checkI3ModeCrossSystem(),
-        checkI5BalanceAccuracy(),
         checkI6TimestampValidity(),
     ]);
 
-    const results: CheckResult[] = [s1, s2, i2, i3, i5, i6];
+    // Engine-dependent checks after DB checks complete
+    const [i3, i5, i11] = await Promise.all([
+        checkI3ModeCrossSystem(),
+        checkI5BalanceAccuracy(),
+        checkI11DbEngineDivergence(),
+    ]);
+
+    const results: CheckResult[] = [s1, s2, s14, s15, i2, i3, i5, i6, i11];
 
     const summary = {
         pass:  results.filter(r => r.status === 'PASS').length,

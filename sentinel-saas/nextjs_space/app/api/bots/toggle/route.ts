@@ -83,6 +83,11 @@ export async function POST(request: Request) {
       const botMode = (bot.config?.mode ?? 'paper').toLowerCase();
       const engineUrl = getEngineUrl(botMode.startsWith('live') ? 'live' : 'paper');
 
+      // T2 FIX: Track whether live exchange close succeeded before closing Prisma trades.
+      // If CoinDCX positions couldn't be closed, leave Prisma trades ACTIVE so they remain
+      // visible in UI. User must close manually on CoinDCX, then run /api/trades/sync.
+      let liveExitOk = !botMode.startsWith('live'); // true for paper (no exchange close needed)
+
       if (botMode.startsWith('live') && engineUrl) {
         try {
           const exitRes = await fetch(`${engineUrl}/api/exit-all-live`, {
@@ -96,41 +101,52 @@ export async function POST(request: Request) {
             `${exitData.closed_tradebook?.length ?? 0} tradebook entries closed`
           );
           if (exitData.errors?.length > 0) {
-            console.warn('[toggle] exit-all-live errors:', exitData.errors);
+            console.warn('[toggle] exit-all-live partial errors — Prisma trades will NOT be auto-closed:', exitData.errors);
+          } else {
+            liveExitOk = true;
           }
         } catch (err) {
-          console.error('[toggle] exit-all-live failed:', err);
+          console.error('[toggle] exit-all-live failed — Prisma trades will NOT be auto-closed:', err);
         }
       }
 
-      // THEN close Prisma trades (after CoinDCX is already closed)
+      // THEN close Prisma trades — only if exchange close succeeded (or paper mode)
       try {
         const activeTrades = await prisma.trade.findMany({
           where: { botId, status: { in: ['active', 'ACTIVE', 'Active'] } },
         });
-        for (const trade of activeTrades) {
-          const currentPrice = trade.currentPrice || trade.entryPrice;
-          const isLong = trade.position === 'long';
-          const priceDiff = isLong ? (currentPrice - trade.entryPrice) : (trade.entryPrice - currentPrice);
-          const rawPnl = priceDiff / trade.entryPrice * trade.leverage * trade.capital;
-          const leveragedPnl = Math.round(rawPnl * 10000) / 10000;
-          const pnlPct = trade.capital > 0 ? Math.round(leveragedPnl / trade.capital * 100 * 100) / 100 : 0;
-          await prisma.trade.update({
-            where: { id: trade.id },
-            data: {
-              status: 'closed',
-              exitPrice: currentPrice,
-              exitTime: new Date(),
-              exitReason: 'BOT_STOPPED',
-              totalPnl: leveragedPnl,
-              totalPnlPercent: pnlPct,
-              activePnl: 0,
-              activePnlPercent: 0,
-            },
-          });
-        }
-        if (activeTrades.length > 0) {
-          console.log(`[toggle] Exited ${activeTrades.length} active trades for bot ${botId}`);
+        if (!liveExitOk && activeTrades.length > 0) {
+          // T2 FIX: Leave DB trades active — user must close CoinDCX positions manually
+          // then use /api/trades/sync to reconcile.
+          console.warn(
+            `[toggle] T2 WARN: ${activeTrades.length} Prisma trade(s) left ACTIVE — ` +
+            `CoinDCX close failed. Close manually on exchange, then sync.`
+          );
+        } else {
+          for (const trade of activeTrades) {
+            const currentPrice = trade.currentPrice || trade.entryPrice;
+            const isLong = trade.position === 'long';
+            const priceDiff = isLong ? (currentPrice - trade.entryPrice) : (trade.entryPrice - currentPrice);
+            const rawPnl = priceDiff / trade.entryPrice * trade.leverage * trade.capital;
+            const leveragedPnl = Math.round(rawPnl * 10000) / 10000;
+            const pnlPct = trade.capital > 0 ? Math.round(leveragedPnl / trade.capital * 100 * 100) / 100 : 0;
+            await prisma.trade.update({
+              where: { id: trade.id },
+              data: {
+                status: 'closed',
+                exitPrice: currentPrice,
+                exitTime: new Date(),
+                exitReason: 'BOT_STOPPED',
+                totalPnl: leveragedPnl,
+                totalPnlPercent: pnlPct,
+                activePnl: 0,
+                activePnlPercent: 0,
+              },
+            });
+          }
+          if (activeTrades.length > 0) {
+            console.log(`[toggle] Exited ${activeTrades.length} active trades for bot ${botId}`);
+          }
         }
       } catch (err) {
         console.error('[toggle] Exit trades on stop failed:', err);
@@ -150,7 +166,8 @@ export async function POST(request: Request) {
     // ─── Live mode: switch engine mode + validate exchange pre-flight ────────
     // C4 FIX: case-insensitive mode check for engine routing
     const botMode = (bot.config?.mode ?? 'paper').toLowerCase();
-    const engineUrl = getEngineUrl(botMode === 'live' ? 'live' : 'paper');
+    // T4 FIX: startsWith('live') handles 'live-coindcx' and other live variants
+    const engineUrl = getEngineUrl(botMode.startsWith('live') ? 'live' : 'paper');
     if (engineUrl && isActive) {
       // ──── CRITICAL: Push bot_id to engine for data isolation ────────────
       // This ensures ALL trades opened by the engine are stamped with
@@ -170,7 +187,7 @@ export async function POST(request: Request) {
         console.warn('[toggle] set-bot-id failed (continuing):', e);
       }
 
-      if (botMode === 'live') {
+      if (botMode.startsWith('live')) {
         const exchange = bot.exchange || 'coindcx';
         // Switch engine to live mode
         await fetch(`${engineUrl}/api/set-mode`, {

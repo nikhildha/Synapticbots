@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth-options';
 import prisma from '@/lib/prisma';
 import { closeBotSession } from '@/lib/bot-session';
+import { getEngineUrl } from '@/lib/engine-url';
 
 export const dynamic = 'force-dynamic';
 
@@ -43,6 +44,30 @@ export async function POST(request: Request) {
             });
         } catch {
             // Orchestrator might be offline — continue with DB cleanup
+        }
+
+        // K1 FIX: For live bots, close CoinDCX positions via engine BEFORE closing Prisma trades.
+        // Without this, kill switch would mark trades closed in DB while exchange positions remain open.
+        const botConfig = await prisma.botConfig.findUnique({ where: { botId }, select: { mode: true } });
+        const botMode = (botConfig?.mode ?? 'paper').toLowerCase();
+        if (botMode.startsWith('live')) {
+            const liveEngineUrl = getEngineUrl('live');
+            if (liveEngineUrl) {
+                try {
+                    const exitRes = await fetch(`${liveEngineUrl}/api/exit-all-live`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        signal: AbortSignal.timeout(15000),
+                    });
+                    const exitData = await exitRes.json();
+                    console.log(`[kill] exit-all-live: ${exitData.closed_exchange?.length ?? 0} exchange positions closed`);
+                    if (exitData.errors?.length > 0) {
+                        console.warn('[kill] exit-all-live errors:', exitData.errors);
+                    }
+                } catch (err) {
+                    console.error('[kill] exit-all-live failed (continuing with DB close):', err);
+                }
+            }
         }
 
         // 2. Close all active trades for this bot

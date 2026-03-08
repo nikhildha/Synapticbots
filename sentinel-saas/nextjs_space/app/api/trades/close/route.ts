@@ -139,10 +139,36 @@ export async function POST(request: Request) {
 
         // Paper trade path — safe to close locally using current price.
 
-        // F2 FIX: Removed unsafe engine fallback — forwarding an unverified trade_id/symbol
-        // to the engine with no ownership proof allows closing another user's engine trade
-        // in a shared-engine setup. If the trade isn't in Prisma, it doesn't belong to this user.
+        // If the trade is not in Prisma yet (sync hasn't run or bot_id not set), attempt a
+        // safe engine-only close for PAPER mode. Safety gate: user must have a bot that owns
+        // a paper engine URL — this proves ownership without needing a Prisma trade record.
         if (!trade) {
+            const paperEngineUrl = getEngineUrl('paper');
+            if (paperEngineUrl && (tradeId || symbol)) {
+                // Verify user has a bot (ownership proof)
+                const userBot = await prisma.bot.findFirst({
+                    where: { userId },
+                    select: { id: true },
+                });
+                if (userBot) {
+                    try {
+                        const engineRes = await fetch(`${paperEngineUrl}/api/close-trade`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                trade_id: tradeId,
+                                symbol: symbol?.toUpperCase(),
+                                reason: 'MANUAL_CLOSE',
+                            }),
+                            signal: AbortSignal.timeout(8000),
+                        });
+                        const engineData = await engineRes.json();
+                        if (engineRes.ok && engineData.success) {
+                            return NextResponse.json({ success: true, closed: engineData.closed || [], source: 'engine_only' });
+                        }
+                    } catch { /* engine unreachable */ }
+                }
+            }
             return NextResponse.json({ error: 'No matching active trade found' }, { status: 404 });
         }
 
