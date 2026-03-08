@@ -159,7 +159,7 @@ export function TradesClient({ trades: initialTrades }: TradesClientProps) {
     }
   }, []);
 
-  // Live price polling from Binance every 1.5s for active trade symbols
+  // Live price polling from CoinDCX every 1.5s for active trade symbols (BUG-11: unified with dashboard)
   useEffect(() => {
     async function fetchLivePrices() {
       const activeSymbols = [...new Set(
@@ -169,13 +169,17 @@ export function TradesClient({ trades: initialTrades }: TradesClientProps) {
       )];
       if (activeSymbols.length === 0) return;
       try {
-        const symbols = JSON.stringify(activeSymbols);
-        const res = await fetch(`https://api.binance.com/api/v3/ticker/price?symbols=${encodeURIComponent(symbols)}`);
+        // Use CoinDCX public prices (same source as dashboard)
+        const res = await fetch('/api/coindcx/prices', { cache: 'no-store' });
         if (res.ok) {
-          const data: { symbol: string; price: string }[] = await res.json();
+          const prices = await res.json();
           const map: Record<string, number> = {};
-          data.forEach(d => { map[d.symbol] = parseFloat(d.price); });
-          setLivePrices(map);
+          Object.entries(prices).forEach(([pair, info]: [string, any]) => {
+            const sym = pair.replace(/^B-/, '').replace('_', '');
+            if (info?.ls) map[sym] = parseFloat(info.ls);
+          });
+          // Only update if we got some prices
+          if (Object.keys(map).length > 0) setLivePrices(map);
         }
       } catch { /* silent */ }
     }

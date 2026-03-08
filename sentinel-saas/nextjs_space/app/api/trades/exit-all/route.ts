@@ -24,11 +24,11 @@ export async function POST(request: Request) {
         const body = await request.json().catch(() => ({}));
         const modeFilter = body.mode || 'all'; // 'live', 'paper', or 'all'
 
-        // ─── Find all active trades ──────────────────────────────────────
+        // ─── Find all active trades (always scoped to current user) ────
         const activeStatuses = ['active', 'ACTIVE', 'Active'];
         const whereClause: any = {
             status: { in: activeStatuses },
-            ...(isAdmin ? {} : { bot: { userId } }),
+            bot: { userId },
             ...(modeFilter !== 'all' ? { mode: modeFilter } : {}),
         };
 

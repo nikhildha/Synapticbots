@@ -24,6 +24,7 @@ from flask import Flask, jsonify, request
 sys.path.insert(0, os.path.dirname(__file__))
 
 import config
+import tradebook as tb
 
 app = Flask(__name__)
 IST = timezone(timedelta(hours=5, minutes=30))
@@ -116,7 +117,6 @@ def api_all():
     if len(tb_trades) == 0 and tb_summary.get("active_trades", 0) > 0:
         logger.warning("Stale summary detected: trades=[] but active_trades=%d. Auto-fixing.",
                        tb_summary.get("active_trades", 0))
-        import tradebook as tb
         book = tb._load_book()
         book["trades"] = []
         tb._compute_summary(book)
@@ -169,8 +169,6 @@ def api_health():
 @app.route("/api/close-trade", methods=["POST"])
 def api_close_trade():
     """Directly close a trade in the tradebook."""
-    import tradebook as tb
-
     data = request.get_json() or {}
     trade_id = data.get("trade_id")
     symbol = data.get("symbol")
@@ -204,8 +202,6 @@ def api_close_trade():
 @app.route("/api/close-all", methods=["POST"])
 def api_close_all():
     """Write a CLOSE_ALL command so main.py closes all open positions on next cycle."""
-    import json
-    from datetime import datetime
     try:
         cmd = {"command": "CLOSE_ALL", "timestamp": datetime.utcnow().isoformat()}
         with open(config.COMMANDS_FILE, "w") as f:
@@ -221,8 +217,6 @@ def api_exit_all_live():
     Immediately close ALL active CoinDCX positions and tradebook entries.
     Called when the bot is stopped from the dashboard.
     """
-    import tradebook as tb
-
     results = {"closed_exchange": [], "closed_tradebook": [], "errors": []}
 
     # 1. Close all positions on CoinDCX
@@ -275,7 +269,6 @@ def api_exit_all_live():
 @app.route("/api/reset-trades", methods=["POST"])
 def api_reset_trades():
     """Clear all trades from the tradebook."""
-    import tradebook as tb
     try:
         book = tb._load_book()
         count = len(book.get("trades", []))

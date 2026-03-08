@@ -3,11 +3,9 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth-options';
 import { clearUserTrades } from '@/lib/sync-engine-trades';
 import { getAllEngineUrls } from '@/lib/engine-url';
-import { PrismaClient } from '@prisma/client';
+import prisma from '@/lib/prisma';
 
 export const dynamic = 'force-dynamic';
-
-const prisma = new PrismaClient();
 
 export async function POST() {
     try {
@@ -29,17 +27,9 @@ export async function POST() {
             });
         }
 
-        // Admin: clear ALL trades from database + reset engine in-memory state
-        let deletedCount = 0;
-
-        // 1. Delete all trades from Prisma/Postgres
-        try {
-            const result = await prisma.trade.deleteMany({});
-            deletedCount = result.count;
-            console.log(`[reset-trades] Deleted ${deletedCount} trades from database`);
-        } catch (err) {
-            console.error('[reset-trades] Error deleting trades from database:', err);
-        }
+        // Admin: clear only their own closed trades (same as regular users) + reset engine
+        const deletedCount = await clearUserTrades(userId);
+        console.log(`[reset-trades] Admin cleared ${deletedCount} of their own closed trades`);
 
         // 2. Reset BOTH engine in-memory trades (paper + live, best-effort)
         const { live: liveUrl, paper: paperUrl } = getAllEngineUrls();

@@ -19,7 +19,6 @@ export async function POST(request: Request) {
         }
 
         const userId = (session.user as any)?.id;
-        const isAdmin = (session.user as any)?.role === 'admin';
 
         // ─── Parse composite IDs (e.g. "T-0030-BTCUSDT" → tradeId="T-0030", symbol="BTCUSDT") ──
         let tradeId = rawTradeId;
@@ -32,40 +31,37 @@ export async function POST(request: Request) {
             }
         }
 
-        // ─── Find the trade in Prisma ────────────────────────────────────
+        // ─── Find the trade in Prisma (ALWAYS filter by userId — no admin bypass) ────
         let trade = null;
         const activeStatuses = ['active', 'ACTIVE', 'Active'];
 
         if (tradeId) {
-            // Try direct ID match first
             trade = await prisma.trade.findFirst({
                 where: {
                     id: tradeId,
                     status: { in: activeStatuses },
-                    bot: isAdmin ? {} : { userId },
+                    bot: { userId },
                 },
                 include: { bot: true },
             });
 
-            // Fallback: match by exchangeOrderId (engine trade_id)
             if (!trade) {
                 trade = await prisma.trade.findFirst({
                     where: {
                         exchangeOrderId: tradeId,
                         status: { in: activeStatuses },
-                        bot: isAdmin ? {} : { userId },
+                        bot: { userId },
                     },
                     include: { bot: true },
                 });
             }
 
-            // Fallback: partial match (trade IDs from frontend may be engine_XXX_botId)
             if (!trade) {
                 trade = await prisma.trade.findFirst({
                     where: {
                         id: { contains: tradeId },
                         status: { in: activeStatuses },
-                        bot: isAdmin ? {} : { userId },
+                        bot: { userId },
                     },
                     include: { bot: true },
                 });
@@ -77,16 +73,68 @@ export async function POST(request: Request) {
                 where: {
                     coin: symbol.toUpperCase(),
                     status: { in: activeStatuses },
-                    bot: isAdmin ? {} : { userId },
+                    bot: { userId },
                 },
                 include: { bot: true },
                 orderBy: { entryTime: 'desc' },
             });
         }
 
-        // ─── Fallback: close via engine API ──────────────────────────────
+        // ─── For LIVE trades: close on CoinDCX FIRST, then update Prisma ─────────
+        const isLiveTrade = trade && (trade.mode || '').toLowerCase().includes('live');
+        const engineUrl = trade ? getEngineUrl(isLiveTrade ? 'live' : 'paper') : null;
+
+        if (isLiveTrade && engineUrl) {
+            // Close on engine/CoinDCX FIRST to get actual fill price
+            try {
+                const engineTradeId = trade!.exchangeOrderId || trade!.id;
+                const engineRes = await fetch(`${engineUrl}/api/close-trade`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        trade_id: engineTradeId,
+                        symbol: trade!.coin,
+                        reason: 'MANUAL_CLOSE',
+                    }),
+                    signal: AbortSignal.timeout(10000),
+                });
+                const engineData = await engineRes.json();
+                if (engineRes.ok && engineData.success && engineData.closed?.length > 0) {
+                    // Use the actual fill price and PnL from the engine
+                    const closed = engineData.closed[0];
+                    await prisma.trade.update({
+                        where: { id: trade!.id },
+                        data: {
+                            status: 'closed',
+                            exitPrice: closed.exit_price || closed.realized_pnl != null ? trade!.currentPrice || trade!.entryPrice : trade!.entryPrice,
+                            exitTime: new Date(),
+                            exitReason: 'MANUAL_CLOSE',
+                            totalPnl: closed.realized_pnl || 0,
+                            totalPnlPercent: closed.realized_pnl_pct || 0,
+                            activePnl: 0,
+                            activePnlPercent: 0,
+                        },
+                    });
+
+                    return NextResponse.json({
+                        success: true,
+                        closed: [{
+                            trade_id: trade!.exchangeOrderId || trade!.id,
+                            symbol: trade!.coin,
+                            pnl: closed.realized_pnl || 0,
+                            pnl_pct: closed.realized_pnl_pct || 0,
+                        }],
+                    });
+                }
+                // Engine returned error — fall through to local close
+            } catch (err) {
+                console.error('[trades/close] Engine close failed:', err);
+                // Fall through to local close
+            }
+        }
+
+        // ─── Fallback: close via engine API if no local trade found ──────────────
         if (!trade) {
-            // No trade in DB — try the user's bot-mode engine
             const userBot = await prisma.bot.findFirst({ where: { userId }, select: { config: true } });
             const fallbackMode = (userBot?.config as any)?.mode?.includes('live') ? 'live' : 'paper';
             const fallbackUrl = getEngineUrl(fallbackMode);
@@ -105,7 +153,6 @@ export async function POST(request: Request) {
                             closed: engineData.closed || [{ trade_id: tradeId, symbol }],
                         });
                     }
-                    // Engine returned an error — pass it through
                     return NextResponse.json(
                         { error: engineData.error || 'Engine failed to close trade' },
                         { status: engineRes.status || 404 }
@@ -118,7 +165,7 @@ export async function POST(request: Request) {
             return NextResponse.json({ error: 'No matching active trade found' }, { status: 404 });
         }
 
-        // ─── Calculate PNL at current price ──────────────────────────────
+        // ─── Calculate PNL at current price (paper trades / fallback) ────────────
         const currentPrice = trade.currentPrice || trade.entryPrice;
         const entry = trade.entryPrice;
         const capital = trade.capital;
@@ -145,9 +192,8 @@ export async function POST(request: Request) {
             },
         });
 
-        // ─── Also try to close on engine (best-effort) ───────────────────
-        const engineUrl = getEngineUrl(trade.mode === 'live' ? 'live' : 'paper');
-        if (engineUrl) {
+        // ─── Also try to close on engine (best-effort for paper trades) ──────────
+        if (engineUrl && !isLiveTrade) {
             try {
                 const engineTradeId = trade.exchangeOrderId || trade.id;
                 await fetch(`${engineUrl}/api/close-trade`, {
@@ -160,7 +206,7 @@ export async function POST(request: Request) {
                     signal: AbortSignal.timeout(5000),
                 });
             } catch {
-                // Engine close is best-effort — Prisma is source of truth
+                // Engine close is best-effort for paper
             }
         }
 

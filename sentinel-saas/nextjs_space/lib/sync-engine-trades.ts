@@ -17,13 +17,9 @@ export async function syncEngineTrades(
 ): Promise<number> {
     if (!engineTrades || engineTrades.length === 0) return 0;
 
-    // Purge stale trades: delete any DB records for this bot that predate the bot's start time.
-    // This cleans up trades that were synced before the next-cycle-only filter was enforced.
-    if (botStartedAt) {
-        await prisma.trade.deleteMany({
-            where: { botId, entryTime: { lt: botStartedAt } },
-        });
-    }
+    // Note: We no longer purge pre-start trades on every sync (BUG-16).
+    // Historical trades are preserved. Only the entryTime filter below
+    // prevents new pre-start trades from being synced.
 
     // Look up the userId for this bot once — used to verify engine-supplied bot_id ownership
     const botRecord = await prisma.bot.findUnique({ where: { id: botId }, select: { userId: true } });
@@ -105,7 +101,7 @@ export async function syncEngineTrades(
                     activePnlPercent: t.unrealized_pnl_pct || t.activePnlPercent || 0,
                     totalPnl: status === 'closed'
                         ? (t.pnl || t.realized_pnl || t.total_pnl || 0)
-                        : (t.unrealized_pnl || t.active_pnl || 0),
+                        : 0,  // BUG-13: active trades have no realized PnL yet
                     totalPnlPercent: t.pnl_pct || t.totalPnlPercent || 0,
                     exitReason: t.exit_reason || t.exitReason || null,
                     exitPercent: t.exit_percent || null,
@@ -132,7 +128,7 @@ export async function syncEngineTrades(
                     activePnlPercent: t.unrealized_pnl_pct || t.activePnlPercent || 0,
                     totalPnl: status === 'closed'
                         ? (t.pnl || t.realized_pnl || t.total_pnl || 0)
-                        : (t.unrealized_pnl || t.active_pnl || 0),
+                        : 0,  // BUG-13: active trades have no realized PnL yet
                     totalPnlPercent: t.pnl_pct || t.totalPnlPercent || 0,
                     exitReason: t.exit_reason || t.exitReason || null,
                     exitTime,

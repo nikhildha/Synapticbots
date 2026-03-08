@@ -51,7 +51,7 @@ export async function GET(request: NextRequest) {
         });
 
         // Determine correct engine based on bot mode
-        const botMode = (userBot?.config as any)?.mode || 'paper';
+        const botMode = ((userBot as any)?.config as any)?.mode || 'paper';
         const engineMode: EngineMode = botMode.toLowerCase().includes('live') ? 'live' : 'paper';
 
         if (userBot && userBot.startedAt) {

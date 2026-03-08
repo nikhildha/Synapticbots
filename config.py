@@ -5,21 +5,13 @@ All settings, thresholds, and constants live here.
 import os
 from dotenv import load_dotenv
 
-# ── DIAGNOSTIC: raw env before dotenv ──
-_raw_paper = os.getenv("PAPER_TRADE", "<NOT SET>")
-print(f"🔧 CONFIG DIAGNOSTIC [pre-dotenv]: PAPER_TRADE={_raw_paper}", flush=True)
-
 load_dotenv()
-
-_post_paper = os.getenv("PAPER_TRADE", "<NOT SET>")
-print(f"🔧 CONFIG DIAGNOSTIC [post-dotenv]: PAPER_TRADE={_post_paper}", flush=True)
 
 # ─── Binance API (used for PAPER trading) ────────────────────────────────────────
 BINANCE_API_KEY = os.getenv("BINANCE_API_KEY", "")
 BINANCE_API_SECRET = os.getenv("BINANCE_API_SECRET", "")
 TESTNET = os.getenv("TESTNET", "true").lower() == "true"
 PAPER_TRADE = os.getenv("PAPER_TRADE", "true").lower() == "true"
-print(f"🔧 CONFIG DIAGNOSTIC [resolved]: PAPER_TRADE={PAPER_TRADE} TESTNET={TESTNET}", flush=True)
 ENGINE_USER_ID = "cmmbvbo2l0000j1xo3rqvkfhz"  # Default user for engine trades (admin)
 ENGINE_BOT_ID  = os.getenv("ENGINE_BOT_ID", "")    # DB Bot.id — set in Railway per deployment
 ENGINE_BOT_NAME = os.getenv("ENGINE_BOT_NAME", "") # Human-readable bot name shown in trades UI

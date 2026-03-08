@@ -2,10 +2,11 @@ import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth-options';
 import { prisma } from '@/lib/prisma';
+import { getEngineUrl } from '@/lib/engine-url';
 
 export const dynamic = 'force-dynamic';
 
-const ENGINE_API_URL = process.env.ENGINE_API_URL || process.env.PYTHON_ENGINE_URL;
+const ENGINE_API_URL = getEngineUrl('live');
 
 /**
  * GET /api/debug

@@ -53,14 +53,38 @@ export async function POST(request: Request) {
         console.error('[toggle] createBotSession failed:', err);
       }
     } else {
-      // Stopping: close active session + exit ALL active trades + signal engine
+      // Stopping: close active session
       try {
         await closeBotSession(botId);
       } catch (err) {
         console.error('[toggle] closeBotSession failed:', err);
       }
 
-      // Exit all active trades for this bot
+      // ─── LIVE MODE STOP: close CoinDCX positions FIRST ────────────
+      const botMode = bot.config?.mode ?? 'paper';
+      const engineUrl = getEngineUrl(botMode === 'live' ? 'live' : 'paper');
+
+      if (botMode === 'live' && engineUrl) {
+        try {
+          const exitRes = await fetch(`${engineUrl}/api/exit-all-live`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            signal: AbortSignal.timeout(15000),
+          });
+          const exitData = await exitRes.json();
+          console.log(
+            `[toggle] exit-all-live: ${exitData.closed_exchange?.length ?? 0} exchange positions closed, ` +
+            `${exitData.closed_tradebook?.length ?? 0} tradebook entries closed`
+          );
+          if (exitData.errors?.length > 0) {
+            console.warn('[toggle] exit-all-live errors:', exitData.errors);
+          }
+        } catch (err) {
+          console.error('[toggle] exit-all-live failed:', err);
+        }
+      }
+
+      // THEN close Prisma trades (after CoinDCX is already closed)
       try {
         const activeTrades = await prisma.trade.findMany({
           where: { botId, status: { in: ['active', 'ACTIVE', 'Active'] } },
@@ -92,14 +116,23 @@ export async function POST(request: Request) {
       } catch (err) {
         console.error('[toggle] Exit trades on stop failed:', err);
       }
+
+      // Revert engine to paper mode (best-effort, don't block)
+      if (engineUrl) {
+        fetch(`${engineUrl}/api/set-mode`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ mode: 'paper', exchange: '' }),
+          signal: AbortSignal.timeout(3000),
+        }).catch(() => { });
+      }
     }
 
     // ─── Live mode: switch engine mode + validate exchange pre-flight ────────
     const botMode = bot.config?.mode ?? 'paper';
-    // Route all engine signals to the correct engine (paper or live)
     const engineUrl = getEngineUrl(botMode === 'live' ? 'live' : 'paper');
-    if (engineUrl) {
-      if (isActive && botMode === 'live') {
+    if (engineUrl && isActive) {
+      if (botMode === 'live') {
         const exchange = bot.exchange || 'coindcx';
         // Switch engine to live mode
         await fetch(`${engineUrl}/api/set-mode`, {
@@ -126,35 +159,6 @@ export async function POST(request: Request) {
         } catch (err) {
           console.warn('[toggle] validate-exchange failed (continuing):', err);
         }
-      } else if (!isActive) {
-        // ── LIVE MODE STOP: close all CoinDCX positions FIRST ────────────
-        if (botMode === 'live') {
-          try {
-            const exitRes = await fetch(`${engineUrl}/api/exit-all-live`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              signal: AbortSignal.timeout(15000), // 15s — closing positions can take time
-            });
-            const exitData = await exitRes.json();
-            console.log(
-              `[toggle] exit-all-live: ${exitData.closed_exchange?.length ?? 0} exchange positions closed, ` +
-              `${exitData.closed_tradebook?.length ?? 0} tradebook entries closed`
-            );
-            if (exitData.errors?.length > 0) {
-              console.warn('[toggle] exit-all-live errors:', exitData.errors);
-            }
-          } catch (err) {
-            console.error('[toggle] exit-all-live failed:', err);
-          }
-        }
-
-        // Revert engine to paper mode on stop (best-effort, don't block)
-        fetch(`${engineUrl}/api/set-mode`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ mode: 'paper', exchange: '' }),
-          signal: AbortSignal.timeout(3000),
-        }).catch(() => { });
       }
     }
 
@@ -176,12 +180,14 @@ export async function POST(request: Request) {
     }
 
     // Update bot status in database
+    // BUG-18: Don't reset startedAt on restart — only set on first start
     await prisma.bot.update({
       where: { id: botId },
       data: {
         isActive,
         status: isActive ? 'running' : 'stopped',
-        ...(isActive ? { startedAt: new Date() } : { stoppedAt: new Date() }),
+        ...(isActive && !bot.startedAt ? { startedAt: new Date() } : {}),
+        ...(!isActive ? { stoppedAt: new Date() } : {}),
       },
     });
 

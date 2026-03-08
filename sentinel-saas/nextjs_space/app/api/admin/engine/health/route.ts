@@ -1,8 +1,9 @@
 import { NextResponse } from 'next/server';
+import { getEngineUrl } from '@/lib/engine-url';
 
 export const dynamic = 'force-dynamic';
 
-const ENGINE_API_URL = process.env.ENGINE_API_URL;
+const ENGINE_API_URL = getEngineUrl('live');
 
 /**
  * Proxy to the remote engine's /api/health endpoint.

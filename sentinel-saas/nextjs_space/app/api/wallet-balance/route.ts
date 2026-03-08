@@ -3,10 +3,11 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth-options';
 import { prisma } from '@/lib/prisma';
 import { decryptApiKeys } from '@/lib/encryption';
+import { getEngineUrl } from '@/lib/engine-url';
 
 export const dynamic = 'force-dynamic';
 
-const ENGINE_API_URL = process.env.ENGINE_API_URL || process.env.PYTHON_ENGINE_URL;
+const ENGINE_API_URL = getEngineUrl('live');
 
 async function fetchBinanceBalance(apiKey: string, apiSecret: string): Promise<number | null> {
     try {
@@ -145,12 +146,15 @@ export async function GET() {
         }
 
         // Fallback: if user keys returned null, try fetching from engine API
-        // (engine uses Railway env var keys directly)
-        if (binanceBalance === null) {
-            binanceBalance = await fetchEngineBalance('binance');
-        }
-        if (coindcxBalance === null) {
-            coindcxBalance = await fetchEngineBalance('coindcx');
+        // ONLY for admin — regular users should see "not connected" (BUG-21)
+        const isAdmin = (session.user as any)?.role === 'admin';
+        if (isAdmin) {
+            if (binanceBalance === null) {
+                binanceBalance = await fetchEngineBalance('binance');
+            }
+            if (coindcxBalance === null) {
+                coindcxBalance = await fetchEngineBalance('coindcx');
+            }
         }
 
         return NextResponse.json({

@@ -47,7 +47,7 @@ export async function POST(request: Request) {
 
         // 2. Close all active trades for this bot
         const activeTrades = await prisma.trade.findMany({
-            where: { botId, status: 'active' },
+            where: { botId, status: { in: ['active', 'ACTIVE', 'Active'] } },
         });
 
         const closeTime = new Date();
