@@ -75,8 +75,15 @@ export async function POST(request: Request) {
         const isLiveTrade = trade && (trade.mode || '').toLowerCase().includes('live');
         const engineUrl = trade ? getEngineUrl(isLiveTrade ? 'live' : 'paper') : null;
 
-        if (isLiveTrade && engineUrl) {
-            // Close on engine/CoinDCX FIRST to get actual fill price
+        if (isLiveTrade) {
+            // C1 FIX: For live trades, MUST close on CoinDCX via engine FIRST.
+            // Abort on any failure — do NOT silently close in DB while exchange position remains open.
+            if (!engineUrl) {
+                return NextResponse.json({
+                    success: false,
+                    error: 'Live engine not configured. Cannot close CoinDCX position safely.',
+                }, { status: 503 });
+            }
             try {
                 const engineTradeId = trade!.exchangeOrderId || trade!.id;
                 const engineRes = await fetch(`${engineUrl}/api/close-trade`, {
@@ -97,7 +104,6 @@ export async function POST(request: Request) {
                         where: { id: trade!.id },
                         data: {
                             status: 'closed',
-                            // E1 FIX: Use engine exit_price FIRST, then fallback chain
                             exitPrice: closed.exit_price ?? trade!.currentPrice ?? trade!.entryPrice,
                             exitTime: new Date(),
                             exitReason: 'MANUAL_CLOSE',
@@ -107,7 +113,6 @@ export async function POST(request: Request) {
                             activePnlPercent: 0,
                         },
                     });
-
                     return NextResponse.json({
                         success: true,
                         closed: [{
@@ -118,12 +123,21 @@ export async function POST(request: Request) {
                         }],
                     });
                 }
-                // Engine returned error — fall through to local close
+                // Engine reached but returned non-success — abort; CoinDCX position may still be open.
+                return NextResponse.json({
+                    success: false,
+                    error: engineData.error || 'Engine could not close the CoinDCX position. Retry or close manually on CoinDCX.',
+                }, { status: 502 });
             } catch (err) {
                 console.error('[trades/close] Engine close failed:', err);
-                // Fall through to local close
+                return NextResponse.json({
+                    success: false,
+                    error: 'Could not reach engine to close CoinDCX position. Retry or close manually on CoinDCX.',
+                }, { status: 502 });
             }
         }
+
+        // Paper trade path — safe to close locally using current price.
 
         // F2 FIX: Removed unsafe engine fallback — forwarding an unverified trade_id/symbol
         // to the engine with no ownership proof allows closing another user's engine trade

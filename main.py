@@ -387,6 +387,8 @@ class RegimeMasterBot:
         # ── 5. Deploy across all active profiles ─────────────────
         # Sort raw results by conviction (highest first)
         raw_results.sort(key=lambda x: x.get("conviction", 0), reverse=True)
+        logger.info("📋 Deployment pipeline: %d eligible coins after analysis: %s",
+                    len(raw_results), [r['symbol'] for r in raw_results])
 
         # ── Loss streak cooldown: pause 30 min after 5 consecutive losses ──
         LOSS_STREAK_LIMIT = 5
@@ -413,6 +415,11 @@ class RegimeMasterBot:
         deployed_trades = []  # Collect for batch Telegram alert
         eligible_trades = []  # For backward compat with _save_multi_state
 
+        logger.info("🔄 Deploying across %d profiles: %s | tradebook_active_keys: %s",
+                    len(self._active_profiles),
+                    list(self._active_profiles.keys()),
+                    tradebook_active_keys)
+
         for profile_id, profile in self._active_profiles.items():
             profile_deployed = 0
             for raw in raw_results:
@@ -426,9 +433,11 @@ class RegimeMasterBot:
                 # Evaluate raw analysis through this profile's lens
                 trade = self._evaluate_for_profile(raw, profile_id, profile, balance)
                 if not trade:
+                    logger.info("   ⛔ [%s] %s: FILTERED by profile evaluation", profile_id, sym)
                     continue
 
                 eligible_trades.append(trade)
+                logger.info("   ✅ [%s] %s: PASSED evaluation — preparing to deploy", profile_id, sym)
 
                 # Re-check hard limit from tradebook
                 current_total = len(tradebook.get_active_trades())
@@ -912,8 +921,8 @@ class RegimeMasterBot:
         # Profile-specific leverage mapping
         leverage = self.risk.get_conviction_leverage_for_profile(conviction, profile)
         if leverage == 0:
-            logger.debug("⛔ [%s] %s: leverage=0 (conviction=%.1f too low for profile)",
-                         profile_id, symbol, conviction)
+            logger.info("⛔ [%s] %s: leverage=0 (conviction=%.1f below profile min)",
+                        profile_id, symbol, conviction)
             return None
 
         # Check profile's max position limit
@@ -921,8 +930,8 @@ class RegimeMasterBot:
         profile_active = sum(1 for k in self._active_positions if k.startswith(profile_prefix))
         max_pos = profile.get("max_positions", config.MAX_CONCURRENT_POSITIONS)
         if profile_active >= max_pos:
-            logger.debug("⛔ [%s] %s: max positions reached (%d/%d)",
-                         profile_id, symbol, profile_active, max_pos)
+            logger.info("⛔ [%s] %s: max positions reached (%d/%d)",
+                        profile_id, symbol, profile_active, max_pos)
             return None
 
         # Position sizing — always requires valid balance for correct user experience
@@ -940,7 +949,7 @@ class RegimeMasterBot:
 
         current_price = self._coin_states.get(symbol, {}).get("price", 0)
         if current_price <= 0:
-            logger.debug("⛔ [%s] %s: current_price=0, cannot size position", profile_id, symbol)
+            logger.info("⛔ [%s] %s: current_price=0, cannot size position", profile_id, symbol)
             return None
         quantity = self.risk.calculate_position_size(
             coin_budget, current_price, raw["atr"], leverage
