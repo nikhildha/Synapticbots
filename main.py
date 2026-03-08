@@ -132,8 +132,8 @@ class RegimeMasterBot:
     def _heartbeat(self):
         """1-minute heartbeat: lightweight checks + trigger full analysis on schedule."""
         # ── Check engine pause state ──────────────────────────────────
+        # H3 FIX: json imported at module level (line 6), no inline import needed
         try:
-            import json
             state_path = os.path.join(os.path.dirname(__file__), "data", "engine_state.json")
             if os.path.exists(state_path):
                 with open(state_path) as f:
@@ -271,7 +271,8 @@ class RegimeMasterBot:
                     multi = json.load(f)
             multi["last_analysis_time"] = datetime.utcnow().isoformat() + "Z"
             nxt = self._last_analysis_time + config.ANALYSIS_INTERVAL_SECONDS
-            multi["next_analysis_time"] = datetime.fromtimestamp(nxt, tz=IST).strftime("%Y-%m-%dT%H:%M:%S")
+            # F5 FIX: Use UTC+Z for next_analysis_time (matching last_analysis_time format)
+            multi["next_analysis_time"] = datetime.utcfromtimestamp(nxt).isoformat() + "Z"
             multi["analysis_interval_seconds"] = config.ANALYSIS_INTERVAL_SECONDS
             with open(config.MULTI_STATE_FILE, "w") as f:
                 json.dump(multi, f, indent=2)
@@ -1053,9 +1054,10 @@ class RegimeMasterBot:
                 quantity=abs(pos["active_pos"]),
                 entry_price=pos["avg_price"],
                 atr=atr,
-                regime="BEARISH" if pos["side"] == "SELL" else "BULLISH",
-                confidence=0.99,
-                reason="Auto-synced from CoinDCX",
+                # H4 FIX: Use honest labels for auto-synced positions (not fake regime)
+                regime="AUTO_SYNCED" if pos["side"] == "SELL" else "AUTO_SYNCED",
+                confidence=0.0,
+                reason="Auto-synced from CoinDCX (not engine-originated)",
                 capital=capital,
                 mode="LIVE",
                 user_id=getattr(config, 'ENGINE_USER_ID', None),

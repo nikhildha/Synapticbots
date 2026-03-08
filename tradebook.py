@@ -262,10 +262,19 @@ def close_trade(trade_id=None, symbol=None, exit_price=None, reason="MANUAL"):
 
     closed = []
     for target in targets:
-        # Get exit price
+        # A3 FIX: For LIVE trades, use CoinDCX price (not Binance)
         px = exit_price
         if px is None:
-            px = get_current_price(target["symbol"]) or target["entry_price"]
+            if target.get("mode") == "LIVE":
+                try:
+                    import coindcx_client as cdx
+                    cdx_pair = target.get("pair") or cdx.to_coindcx_pair(target["symbol"])
+                    if cdx_pair:
+                        px = cdx.get_current_price(cdx_pair)
+                except Exception:
+                    pass
+            if px is None:
+                px = get_current_price(target["symbol"]) or target["entry_price"]
         px = round(px, 6)
 
         # Calculate P&L
@@ -494,9 +503,22 @@ def update_unrealized(prices=None, funding_rates=None):
         if prices and symbol in prices:
             current = prices[symbol]
         else:
-            current = get_current_price(symbol)
+            # A4 FIX: For LIVE trades, try CoinDCX price first (not Binance)
+            if trade.get("mode") == "LIVE":
+                try:
+                    import coindcx_client as cdx
+                    cdx_pair = trade.get("pair") or cdx.to_coindcx_pair(symbol)
+                    if cdx_pair:
+                        current = cdx.get_current_price(cdx_pair)
+                except Exception:
+                    current = None
+            else:
+                current = None
+
             if not current:
-                continue
+                current = get_current_price(symbol)
+                if not current:
+                    continue
 
         current = round(current, 6)
         entry = trade["entry_price"]

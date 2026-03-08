@@ -233,40 +233,21 @@ class ExecutionEngine:
 
     @staticmethod
     def _cdx_qty_step(price):
-        """
-        Infer CoinDCX quantity step from unit price.
-
-        Conservative heuristic (smaller steps to avoid rejection):
-          BTC          (price >= $10,000) → step 0.001
-          ETH/mid-caps ($10 – $10,000)   → step 0.01
-          Low-caps     ($0.10 – $10)     → step 0.1
-          Micro-caps   (< $0.10)         → step 1.0
-
-        If CoinDCX rejects, the retry handler parses the real step from the error.
-        """
-        if price >= 10_000:
-            return 0.001
-        elif price >= 10:
-            return 0.01
-        elif price >= 0.10:
-            return 0.1
-        else:
-            return 1.0
+        """A5 FIX: Delegate to CoinDCXExchangeClient (single source of truth)."""
+        from coindcx_exchange_client import CoinDCXExchangeClient
+        return CoinDCXExchangeClient._qty_step(price)
 
     @staticmethod
     def _round_to_step(qty, step):
-        """Round quantity UP to the nearest step size."""
-        import math
-        return math.ceil(qty / step) * step
+        """A5 FIX: Delegate to CoinDCXExchangeClient (single source of truth)."""
+        from coindcx_exchange_client import CoinDCXExchangeClient
+        return CoinDCXExchangeClient._round_to_step(qty, step)
 
     @staticmethod
     def _cdx_price_round(p: float) -> float:
-        """Round price to CoinDCX tick size (fewer decimals for higher prices)."""
-        if p >= 1000:   return round(p, 1)
-        elif p >= 10:   return round(p, 2)
-        elif p >= 1:    return round(p, 3)
-        elif p >= 0.01: return round(p, 4)
-        else:           return round(p, 5)
+        """A5 FIX: Delegate to CoinDCXExchangeClient (single source of truth)."""
+        from coindcx_exchange_client import CoinDCXExchangeClient
+        return CoinDCXExchangeClient._price_round(p)
 
     def _validate_and_size_cdx_order(self, symbol, pair, quantity, leverage, cdx):
         """Fetch price, enforce min notional, check wallet margin, set leverage.

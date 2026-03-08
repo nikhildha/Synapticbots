@@ -1,10 +1,15 @@
 import { prisma } from '@/lib/prisma';
 import { getActiveBotSession } from '@/lib/bot-session';
 
+// D1 FIX: Throttle sync to prevent DB hammering (max once per 30s per bot)
+const _lastSyncTime: Record<string, number> = {};
+const SYNC_THROTTLE_MS = 30_000;
+
 /**
  * Sync engine trades into Prisma, scoped to a specific bot.
  * Only syncs trades whose entry_time >= bot.startedAt.
  * Uses engine trade_id as unique key to upsert (avoid duplicates).
+ * D1 FIX: Throttled to max once per 30 seconds per bot.
  *
  * @param engineTrades - Raw trades array from engine (tradebook.json or /api/all)
  * @param botId - Prisma Bot ID to associate trades with
@@ -16,6 +21,13 @@ export async function syncEngineTrades(
     botStartedAt: Date | null
 ): Promise<number> {
     if (!engineTrades || engineTrades.length === 0) return 0;
+
+    // D1 FIX: Throttle — skip if synced within last 30s for this bot
+    const now = Date.now();
+    if (_lastSyncTime[botId] && (now - _lastSyncTime[botId]) < SYNC_THROTTLE_MS) {
+        return 0; // skip, too soon
+    }
+    _lastSyncTime[botId] = now;
 
     // Note: We no longer purge pre-start trades on every sync (BUG-16).
     // Historical trades are preserved. Only the entryTime filter below
