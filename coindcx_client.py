@@ -545,6 +545,124 @@ def modify_take_profit(position_id, new_tp_price):
     return _private_post(f"{FUTURES_PREFIX}/positions/create_tpsl", body)
 
 
+# ─── Trade & Order History (for accurate exit price detection) ───────────────────
+
+def get_trade_history(pair, from_date=None, to_date=None, limit=10):
+    """
+    Fetch executed trade (fill) history for a pair.
+
+    Parameters
+    ----------
+    pair : str — CoinDCX pair (B-BTC_USDT)
+    from_date : str — YYYY-MM-DD (defaults to 7 days ago)
+    to_date : str — YYYY-MM-DD (defaults to today)
+    limit : int — max trades to return (1-100, default 10)
+
+    Returns
+    -------
+    list[dict] — trade fills with price, quantity, timestamp, side, etc.
+    """
+    from datetime import datetime, timedelta
+
+    if from_date is None:
+        from_date = (datetime.utcnow() - timedelta(days=7)).strftime("%Y-%m-%d")
+    if to_date is None:
+        to_date = (datetime.utcnow() + timedelta(days=1)).strftime("%Y-%m-%d")
+
+    body = {
+        "pair": pair,
+        "from_date": from_date,
+        "to_date": to_date,
+        "limit": min(limit, 100),
+    }
+    try:
+        result = _private_post(f"{FUTURES_PREFIX}/trades", body)
+        trades = result if isinstance(result, list) else result.get("trades", result.get("data", []))
+        logger.debug("CoinDCX trade history for %s: %d fills", pair, len(trades) if isinstance(trades, list) else 0)
+        return trades if isinstance(trades, list) else []
+    except Exception as e:
+        logger.warning("Failed to fetch trade history for %s: %s", pair, e)
+        return []
+
+
+def get_order_history(status="filled", side=None, page=1, size=20):
+    """
+    Fetch futures order history filtered by status.
+
+    Parameters
+    ----------
+    status : str — comma-separated statuses (e.g., 'filled', 'cancelled')
+    side : str — 'buy' or 'sell' (optional, fetches both if None)
+    page : int — page number
+    size : int — page size
+
+    Returns
+    -------
+    list[dict] — order objects with status, price, quantity, pair, etc.
+    """
+    body = {
+        "status": status,
+        "page": str(page),
+        "size": str(size),
+    }
+    if side:
+        body["side"] = side.lower()
+
+    try:
+        result = _private_post(f"{FUTURES_PREFIX}/orders", body)
+        orders = result if isinstance(result, list) else result.get("orders", result.get("data", []))
+        return orders if isinstance(orders, list) else []
+    except Exception as e:
+        logger.warning("Failed to fetch order history: %s", e)
+        return []
+
+
+def get_last_exit_price(pair, from_date=None):
+    """
+    Get the most recent fill price for a pair — used to determine
+    the actual exit price when an exchange-side close is detected.
+
+    Tries trade history first (most accurate), falls back to
+    current market price.
+
+    Parameters
+    ----------
+    pair : str — CoinDCX pair (B-BTC_USDT)
+    from_date : str — YYYY-MM-DD (defaults to 2 days ago)
+
+    Returns
+    -------
+    float or None — the actual exit price, or None if unavailable
+    """
+    from datetime import datetime, timedelta
+
+    if from_date is None:
+        from_date = (datetime.utcnow() - timedelta(days=2)).strftime("%Y-%m-%d")
+
+    trades = get_trade_history(pair, from_date=from_date, limit=5)
+    if trades:
+        # Most recent trade first — get its price
+        # CoinDCX returns trades with 'price' and 'timestamp' fields
+        latest = trades[0] if isinstance(trades, list) else None
+        if latest:
+            price = latest.get("price") or latest.get("fill_price") or latest.get("avg_price")
+            if price:
+                exit_px = float(price)
+                logger.info("📊 CoinDCX exit price for %s from trade history: %.6f", pair, exit_px)
+                return exit_px
+
+    # Fallback: current market price
+    try:
+        px = get_current_price(pair)
+        if px:
+            logger.info("📊 CoinDCX exit price for %s from market (fallback): %.6f", pair, px)
+            return px
+    except Exception:
+        pass
+
+    return None
+
+
 # ─── CLI Test ────────────────────────────────────────────────────────────────────
 
 if __name__ == "__main__":
