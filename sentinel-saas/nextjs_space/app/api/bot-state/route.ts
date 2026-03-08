@@ -30,13 +30,13 @@ export async function GET() {
         const isAdmin = (session?.user as any)?.role === 'admin';
 
         // Determine which engine to call based on user's active bot mode
-        let engineMode: EngineMode = 'live'; // default for admin
-        if (userId && !isAdmin) {
+        let engineMode: EngineMode = 'live'; // default
+        if (userId) {
             const userBot = await prisma.bot.findFirst({
                 where: { userId, isActive: true },
                 select: { config: true },
             });
-            const botMode = (userBot?.config as any)?.mode || 'paper';
+            const botMode = (userBot?.config as any)?.mode || 'live';
             engineMode = botMode.toLowerCase().includes('live') ? 'live' : 'paper';
         }
 
@@ -55,32 +55,29 @@ export async function GET() {
         let trades: any[] = [];
 
         if (session && userId) {
-            if (isAdmin) {
-                // Admin: see all engine trades directly (same as tradebook page)
-                trades = engineTradesRaw;
-            } else {
-                // Regular user: sync engine trades into their bot, then read from DB
-                const userBot = await prisma.bot.findFirst({
-                    where: { userId },
-                    orderBy: { updatedAt: 'desc' },
-                });
+            // All users (including admin) go through per-user sync flow
+            const userBot = await prisma.bot.findFirst({
+                where: { userId },
+                orderBy: { updatedAt: 'desc' },
+            });
 
-                if (userBot && userBot.startedAt && engineTradesRaw.length > 0) {
-                    try {
-                        // Only sync trades that were opened AFTER the user started their bot.
-                        // This prevents late-entry scenarios where a user joins mid-trade.
-                        await syncEngineTrades(engineTradesRaw, userBot.id, userBot.startedAt);
-                    } catch (err) {
-                        console.error('[bot-state] Trade sync failed:', err);
-                    }
-                }
-
+            if (userBot && userBot.startedAt && engineTradesRaw.length > 0) {
                 try {
-                    trades = await getUserTrades(userId);
+                    await syncEngineTrades(engineTradesRaw, userBot.id, userBot.startedAt);
                 } catch (err) {
-                    console.error('[bot-state] getUserTrades failed:', err);
-                    trades = [];
+                    console.error('[bot-state] Trade sync failed:', err);
                 }
+            }
+
+            try {
+                trades = await getUserTrades(userId);
+            } catch (err) {
+                console.error('[bot-state] getUserTrades failed:', err);
+                // Fallback: use engine trades filtered by user_id
+                const engineUserId = userBot?.id;
+                trades = engineUserId
+                    ? engineTradesRaw.filter((t: any) => t.bot_id === engineUserId || t.user_id === userId)
+                    : [];
             }
         }
 
