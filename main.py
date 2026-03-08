@@ -307,6 +307,8 @@ class RegimeMasterBot:
 
         # ── 2. Global equity + kill switch check ─────────────────
         balance = self.executor.get_futures_balance()
+        logger.info("💰 Cycle #%d balance: $%.2f (%s mode)",
+                    self._cycle_count, balance, "PAPER" if config.PAPER_TRADE else "LIVE")
         self.risk.record_equity(balance)
         if self.risk.check_kill_switch():
             logger.warning("🚨 Kill switch triggered! Closing all positions.")
@@ -875,6 +877,8 @@ class RegimeMasterBot:
         # Profile-specific leverage mapping
         leverage = self.risk.get_conviction_leverage_for_profile(conviction, profile)
         if leverage == 0:
+            logger.debug("⛔ [%s] %s: leverage=0 (conviction=%.1f too low for profile)",
+                         profile_id, symbol, conviction)
             return None
 
         # Check profile's max position limit
@@ -882,17 +886,33 @@ class RegimeMasterBot:
         profile_active = sum(1 for k in self._active_positions if k.startswith(profile_prefix))
         max_pos = profile.get("max_positions", config.MAX_CONCURRENT_POSITIONS)
         if profile_active >= max_pos:
+            logger.debug("⛔ [%s] %s: max positions reached (%d/%d)",
+                         profile_id, symbol, profile_active, max_pos)
             return None
 
-        # Position sizing
-        coin_budget = balance * config.CAPITAL_PER_COIN_PCT
+        # Position sizing — use profile's fixed capital_per_trade (not balance-dependent)
+        # This ensures trades deploy even if CoinDCX balance API fails.
+        # For LIVE mode, the execution engine validates actual margin availability.
+        coin_budget = profile.get("capital_per_trade", 100.0)
+        # If overall balance is available and large enough, cap at percentage
+        if balance > 0:
+            balance_budget = balance * config.CAPITAL_PER_COIN_PCT
+            if balance_budget > 0:
+                coin_budget = min(coin_budget, balance_budget)
+
         current_price = self._coin_states.get(symbol, {}).get("price", 0)
         if current_price <= 0:
+            logger.debug("⛔ [%s] %s: current_price=0, cannot size position", profile_id, symbol)
             return None
         quantity = self.risk.calculate_position_size(
             coin_budget, current_price, raw["atr"], leverage
         )
         quantity = round(quantity, 6)
+
+        logger.debug(
+            "✅ [%s] %s PASS: conviction=%.1f lev=%dx budget=$%.0f qty=%.6f price=%.2f",
+            profile_id, symbol, conviction, leverage, coin_budget, quantity, current_price,
+        )
 
         return {
             "symbol": symbol,
