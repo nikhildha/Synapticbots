@@ -731,6 +731,38 @@ HMMBOT/
 
 ---
 
+### P15 · LIVE Balance API Health
+
+**Files**: `main.py` (`_tick`), `execution_engine.py` (`get_futures_balance`), `coindcx_client.py` (`get_usdt_balance`)
+**What it checks**:
+- For LIVE mode users: verify `get_futures_balance()` returns > 0 every cycle
+- Retry mechanism active: 3 retries with exponential backoff (2s, 4s, 6s) before halting
+- When all retries fail: deployments HALTED + Telegram alert sent to user
+- Position sizing uses `profile['capital_per_trade']` (user-set) capped at `balance × CAPITAL_PER_COIN_PCT`
+- **Never** deploy with wrong capital if balance is unknown — silent wrong-amount trades = worst UX
+- Verify that existing positions (exits, trailing SL) continue to be managed during balance outage
+
+**Check frequency**: 
+| Mode | Frequency | Rationale |
+|------|-----------|-----------|
+| **LIVE users** | Every cycle (5 min) | Balance is fetched at top of `_tick`, critical for position sizing |
+| **PAPER users** | N/A | Returns hardcoded `$1000`, no API call |
+| **Audit runner** | Daily (04:00 UTC) | Verify retry + halt logic exists in code, review logs for `BALANCE ALERT` |
+
+**Automated monitoring**:
+- Engine log check: count occurrences of `⚠️  Balance=$0 in LIVE mode` in last 24h
+- If > 10 occurrences → API key may be invalid or CoinDCX has recurring outages
+- Telegram alert log: verify `🚨 BALANCE ALERT` messages match log occurrences
+
+**Pass criteria**: Balance > 0 for all LIVE cycles in last 24h; 0 instances of deployment with unconfirmed balance
+**Severity if failed**: CRITICAL — deploying with wrong capital or silently skipping deploys destroys user trust
+
+> **History**: Found 2026-03-09 — LIVE user had 6 eligible coins across 100+ cycles but 0 deployed.
+> Root cause: `get_futures_balance()` returned $0 → `coin_budget = $0 × 0.05 = $0` → silent failure.
+> Fixed in commits `bf6c571` (initial) and `05f3b96` (retry + halt + Telegram alert).
+
+---
+
 ## Priority Matrix
 
 ```
@@ -739,7 +771,7 @@ HMMBOT/
 ├──────────────────────┼───────────────────┼────────────────────┤
 │  CRITICAL            │ P1, P2, P4, P6,   │ Telegram + stop    │
 │  (fix immediately)   │ P8, P11, P13,     │ bot if live        │
-│                      │ I1, I3, I9,       │                    │
+│                      │ P15, I1, I3, I9,  │                    │
 │                      │ S2, S8, S9        │                    │
 ├──────────────────────┼───────────────────┼────────────────────┤
 │  HIGH                │ P3, P5, P7, P10,  │ Telegram alert     │
@@ -932,9 +964,10 @@ model AuditReport {
 | 35 | I9 | SL/TP Validity | Integration | CRITICAL |
 | 36 | I10 | HMM Signal Quality | Integration | MEDIUM |
 | 37 | P14 | **Deployment Pipeline Verification** | Engine | **HIGH** |
-| 38 | S14 | **Timestamp Timezone Normalization** | SaaS | **HIGH** |
-| 39 | S15 | **Deploy Status Accuracy** | SaaS | **HIGH** |
+| 38 | P15 | **LIVE Balance API Health** | Engine (live) | **CRITICAL** |
+| 39 | S14 | **Timestamp Timezone Normalization** | SaaS | **HIGH** |
+| 40 | S15 | **Deploy Status Accuracy** | SaaS | **HIGH** |
 
 ---
 
-*Last updated: 2026-03-08 · 39 checks · 3 sections · 04:00 UTC daily run*
+*Last updated: 2026-03-09 · 40 checks · 3 sections · 04:00 UTC daily run*
