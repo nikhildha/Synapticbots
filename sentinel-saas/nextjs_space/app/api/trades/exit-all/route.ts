@@ -81,8 +81,8 @@ export async function POST(request: Request) {
                     pnl_pct: pnlPct,
                 });
 
-                // Best-effort close on correct engine (paper or live) based on trade mode
-                const engineUrl = getEngineUrl(trade.mode === 'live' ? 'live' : 'paper');
+                // B2 FIX: case-insensitive mode check — DB may have 'LIVE' (uppercase from engine)
+                const engineUrl = getEngineUrl((trade.mode || '').toLowerCase() === 'live' ? 'live' : 'paper');
                 if (engineUrl) {
                     try {
                         const engineTradeId = trade.exchangeOrderId || trade.id;

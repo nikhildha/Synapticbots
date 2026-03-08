@@ -168,7 +168,7 @@ def api_health():
 
 @app.route("/api/close-trade", methods=["POST"])
 def api_close_trade():
-    """Directly close a trade in the tradebook."""
+    """Close a single trade — for LIVE trades, closes CoinDCX position FIRST."""
     data = request.get_json() or {}
     trade_id = data.get("trade_id")
     symbol = data.get("symbol")
@@ -178,14 +178,83 @@ def api_close_trade():
         return jsonify({"error": "trade_id or symbol required"}), 400
 
     try:
-        result = tb.close_trade(trade_id=trade_id, symbol=symbol, reason=reason)
-        if result is None:
+        # Find the trade first to check if it's live
+        book = tb._load_book()
+        target = None
+        for t in book["trades"]:
+            if t["status"] != "ACTIVE":
+                continue
+            if trade_id and t["trade_id"] == trade_id:
+                target = t
+                break
+            if symbol and t["symbol"] == symbol:
+                target = t
+                break
+
+        if not target:
             return jsonify({"error": "No matching active trade found"}), 404
 
-        # Normalize to list
+        exchange_close_result = None
+        actual_exit_price = None
+
+        # ─── LIVE: Close CoinDCX position FIRST ─────────────────────
+        if not config.PAPER_TRADE and target.get("mode") == "LIVE":
+            try:
+                import coindcx_client as cdx
+                pos_id = target.get("position_id")
+                pair = target.get("pair")
+
+                if pos_id:
+                    cdx.exit_position(pos_id)
+                    exchange_close_result = f"closed position {pos_id}"
+                    logger.info("📤 CLOSE-TRADE: Closed CoinDCX position %s", pos_id)
+                elif pair:
+                    # Find position by pair
+                    positions = cdx.list_positions()
+                    for p in positions:
+                        if p.get("pair") == pair and float(p.get("active_pos", 0)) != 0:
+                            cdx.exit_position(p["id"])
+                            exchange_close_result = f"closed position {p['id']}"
+                            logger.info("📤 CLOSE-TRADE: Closed CoinDCX position %s (by pair %s)", p["id"], pair)
+                            break
+                elif symbol:
+                    # Find position by symbol
+                    cdx_pair = cdx.to_coindcx_pair(symbol)
+                    if cdx_pair:
+                        positions = cdx.list_positions()
+                        for p in positions:
+                            if p.get("pair") == cdx_pair and float(p.get("active_pos", 0)) != 0:
+                                cdx.exit_position(p["id"])
+                                exchange_close_result = f"closed position {p['id']}"
+                                logger.info("📤 CLOSE-TRADE: Closed CoinDCX position by symbol %s", symbol)
+                                break
+
+                # Get actual CoinDCX exit price
+                try:
+                    cdx_pair = target.get("pair") or cdx.to_coindcx_pair(symbol)
+                    if cdx_pair:
+                        ticker = cdx.get_ticker(cdx_pair)
+                        if ticker:
+                            actual_exit_price = float(ticker.get("last_price", 0))
+                except Exception:
+                    pass
+
+            except Exception as e:
+                logger.error("CLOSE-TRADE: CoinDCX close failed: %s", e)
+                exchange_close_result = f"exchange close failed: {str(e)}"
+
+        # ─── THEN close in tradebook ─────────────────────────────────
+        result = tb.close_trade(
+            trade_id=trade_id, symbol=symbol, reason=reason,
+            exit_price=actual_exit_price,  # Use CoinDCX fill price if available
+        )
+        if result is None:
+            return jsonify({"error": "Trade not found in tradebook (may already be closed)"}), 404
+
         closed = result if isinstance(result, list) else [result]
         return jsonify({
             "success": True,
+            "exchange_close": exchange_close_result,
             "closed": [{
                 "trade_id": t.get("trade_id"),
                 "symbol": t.get("symbol"),

@@ -106,7 +106,8 @@ export async function POST(request: Request) {
                         where: { id: trade!.id },
                         data: {
                             status: 'closed',
-                            exitPrice: closed.exit_price || closed.realized_pnl != null ? trade!.currentPrice || trade!.entryPrice : trade!.entryPrice,
+                            // E1 FIX: Use engine exit_price FIRST, then fallback chain
+                            exitPrice: closed.exit_price ?? trade!.currentPrice ?? trade!.entryPrice,
                             exitTime: new Date(),
                             exitReason: 'MANUAL_CLOSE',
                             totalPnl: closed.realized_pnl || 0,

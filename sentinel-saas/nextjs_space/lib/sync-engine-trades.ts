@@ -95,7 +95,8 @@ export async function syncEngineTrades(
                     position: side === 'buy' || side === 'long' ? 'long' : 'short',
                     regime: t.regime || '',
                     confidence: t.confidence || 0,
-                    mode: t.mode || 'paper',
+                    // B3 FIX: normalize mode to lowercase to prevent case mismatches
+                    mode: (t.mode || 'paper').toLowerCase(),
                     leverage: t.leverage || 1,
                     capital: t.capital || t.position_size || 100,
                     quantity: t.quantity || 0,

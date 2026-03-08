@@ -198,7 +198,10 @@ export function DashboardClient({ user, stats, bots, recentTrades }: DashboardCl
     const pos = (t.side || t.position || '').toUpperCase();
     const isLong = pos === 'BUY' || pos === 'LONG';
     if (entry <= 0) return 0;
-    return Math.round((isLong ? current - entry : entry - current) / entry * lev * cap * 10000) / 10000;
+    // E2 FIX: For LIVE CoinDCX trades, qty is already leveraged — don't multiply by leverage again
+    const isLive = (t.mode || '').toUpperCase().includes('LIVE');
+    const effectiveLev = isLive ? 1 : lev;
+    return Math.round((isLong ? current - entry : entry - current) / entry * effectiveLev * cap * 10000) / 10000;
   };
 
   const liveActivePnl = liveActiveTrades.reduce((sum: number, t: any) => sum + computePnlFromPrices(t), 0);

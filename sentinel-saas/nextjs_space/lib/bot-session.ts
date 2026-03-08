@@ -5,7 +5,7 @@
  */
 import { prisma } from '@/lib/prisma';
 
-const ENGINE_API_URL = process.env.ENGINE_API_URL;
+import { getEngineUrl } from '@/lib/engine-url';
 
 // ─── Create ───────────────────────────────────────────────────────────────────
 
@@ -52,9 +52,9 @@ export async function closeBotSession(botId: string): Promise<void> {
 
     const now = new Date();
 
-    // 1. Close active paper trades in Prisma
+    // B1 FIX: Use case-insensitive mode matching (engine writes PAPER/LIVE uppercase)
     const activePaperTrades = await prisma.trade.findMany({
-        where: { botId, status: 'active', mode: 'paper' },
+        where: { botId, status: { in: ['active', 'ACTIVE', 'Active'] }, mode: { in: ['paper', 'PAPER', 'Paper'] } },
     });
     if (activePaperTrades.length > 0) {
         await Promise.all(activePaperTrades.map(t =>
@@ -74,16 +74,17 @@ export async function closeBotSession(botId: string): Promise<void> {
 
     // 2. Signal engine to close live positions (best effort — don't block on this)
     const activeLiveTrades = await prisma.trade.findMany({
-        where: { botId, status: 'active', mode: 'live' },
+        where: { botId, status: { in: ['active', 'ACTIVE', 'Active'] }, mode: { in: ['live', 'LIVE', 'Live'] } },
     });
-    if (activeLiveTrades.length > 0 && ENGINE_API_URL) {
+    // C3 FIX: Use getEngineUrl() instead of hardcoded env var
+    const liveEngineUrl = getEngineUrl('live');
+    if (activeLiveTrades.length > 0 && liveEngineUrl) {
         try {
-            await fetch(`${ENGINE_API_URL}/api/close-all`, {
+            await fetch(`${liveEngineUrl}/api/close-all`, {
                 method: 'POST',
                 signal: AbortSignal.timeout(5000),
             });
         } catch {
-            // Non-blocking — engine may not be reachable; positions will close via SL/TP
             console.warn('[bot-session] Engine CLOSE_ALL unreachable; live positions will close via exchange SL/TP');
         }
     }

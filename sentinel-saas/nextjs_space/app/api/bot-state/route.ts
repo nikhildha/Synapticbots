@@ -30,14 +30,19 @@ export async function GET() {
         const isAdmin = (session?.user as any)?.role === 'admin';
 
         // Determine which engine to call based on user's active bot mode
-        let engineMode: EngineMode = 'live'; // default
+        // C1 FIX: default to 'paper' for safety (not 'live')
+        let engineMode: EngineMode = 'paper';
+        let userBot: any = null;
         if (userId) {
-            const userBot = await prisma.bot.findFirst({
-                where: { userId, isActive: true },
-                select: { config: true },
+            // C2 FIX: single bot query used for BOTH engine routing AND trade sync
+            userBot = await prisma.bot.findFirst({
+                where: { userId },
+                orderBy: [{ isActive: 'desc' }, { updatedAt: 'desc' }],
             });
-            const botMode = (userBot?.config as any)?.mode || 'live';
-            engineMode = botMode.toLowerCase().includes('live') ? 'live' : 'paper';
+            if (userBot) {
+                const botMode = (userBot.config as any)?.mode || 'paper';
+                engineMode = botMode.toLowerCase().includes('live') ? 'live' : 'paper';
+            }
         }
 
         // Fetch from the correct engine
@@ -55,12 +60,7 @@ export async function GET() {
         let trades: any[] = [];
 
         if (session && userId) {
-            // All users (including admin) go through per-user sync flow
-            const userBot = await prisma.bot.findFirst({
-                where: { userId },
-                orderBy: { updatedAt: 'desc' },
-            });
-
+            // C2 FIX: reuse the same userBot from above
             if (userBot && userBot.startedAt && engineTradesRaw.length > 0) {
                 try {
                     await syncEngineTrades(engineTradesRaw, userBot.id, userBot.startedAt);
@@ -73,11 +73,7 @@ export async function GET() {
                 trades = await getUserTrades(userId);
             } catch (err) {
                 console.error('[bot-state] getUserTrades failed:', err);
-                // Fallback: use engine trades filtered by user_id
-                const engineUserId = userBot?.id;
-                trades = engineUserId
-                    ? engineTradesRaw.filter((t: any) => t.bot_id === engineUserId || t.user_id === userId)
-                    : [];
+                trades = [];
             }
         }
 
@@ -107,7 +103,15 @@ export async function GET() {
             scanner: { coins: Object.keys(coinStates) },
             tradebook: {
                 trades,
-                summary: engineTradebook.stats || engineTradebook.summary || {},
+                // F2 FIX: compute per-user summary from user's trades, not engine-wide
+                summary: {
+                    total_trades: trades.length,
+                    active_trades: activeTrades.length,
+                    closed_trades: trades.filter((t: any) => (t.status || '').toLowerCase() === 'closed').length,
+                    total_pnl: trades
+                        .filter((t: any) => (t.status || '').toLowerCase() === 'closed')
+                        .reduce((sum: number, t: any) => sum + (t.totalPnl || t.realized_pnl || 0), 0),
+                },
             },
             engine: engineState,
         });
