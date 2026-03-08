@@ -307,8 +307,43 @@ class RegimeMasterBot:
 
         # ── 2. Global equity + kill switch check ─────────────────
         balance = self.executor.get_futures_balance()
+
+        # Retry balance fetch if it returns 0 in LIVE mode (API may have failed)
+        if not config.PAPER_TRADE and balance <= 0:
+            for attempt in range(1, 4):
+                logger.warning("⚠️  Balance=$0 in LIVE mode — retry %d/3...", attempt)
+                time.sleep(2 * attempt)  # 2s, 4s, 6s backoff
+                balance = self.executor.get_futures_balance()
+                if balance > 0:
+                    logger.info("✅ Balance recovered on retry %d: $%.2f", attempt, balance)
+                    break
+
         logger.info("💰 Cycle #%d balance: $%.2f (%s mode)",
                     self._cycle_count, balance, "PAPER" if config.PAPER_TRADE else "LIVE")
+
+        # HALT deployments if LIVE balance is still 0 after retries
+        if not config.PAPER_TRADE and balance <= 0:
+            logger.error(
+                "🚨 LIVE balance is $0 after 3 retries — HALTING deployments this cycle. "
+                "Check CoinDCX API keys and wallet."
+            )
+            try:
+                tg.send_message(
+                    "🚨 *BALANCE ALERT*\n\n"
+                    "CoinDCX balance returned $0 after 3 retries.\n"
+                    "Deployments are PAUSED until balance is available.\n\n"
+                    "Possible causes:\n"
+                    "• Empty futures wallet\n"
+                    "• Invalid API keys\n"
+                    "• CoinDCX API downtime"
+                )
+            except Exception:
+                pass
+            # Still run exits and state save, but skip new deployments
+            self._check_exits(symbols)
+            self._save_multi_state(symbols, [], 0)
+            return
+
         self.risk.record_equity(balance)
         if self.risk.check_kill_switch():
             logger.warning("🚨 Kill switch triggered! Closing all positions.")
@@ -890,15 +925,18 @@ class RegimeMasterBot:
                          profile_id, symbol, profile_active, max_pos)
             return None
 
-        # Position sizing — use profile's fixed capital_per_trade (not balance-dependent)
-        # This ensures trades deploy even if CoinDCX balance API fails.
-        # For LIVE mode, the execution engine validates actual margin availability.
-        coin_budget = profile.get("capital_per_trade", 100.0)
-        # If overall balance is available and large enough, cap at percentage
-        if balance > 0:
-            balance_budget = balance * config.CAPITAL_PER_COIN_PCT
-            if balance_budget > 0:
-                coin_budget = min(coin_budget, balance_budget)
+        # Position sizing — always requires valid balance for correct user experience
+        # User sets capital_per_trade in their profile; balance validates funds exist
+        user_budget = profile.get("capital_per_trade", 100.0)
+
+        if not config.PAPER_TRADE and balance <= 0:
+            # LIVE mode: never deploy without confirmed balance
+            logger.warning("⛔ [%s] %s: LIVE balance=$0 — cannot deploy", profile_id, symbol)
+            return None
+
+        # Use user's capital_per_trade, capped at balance percentage
+        balance_budget = balance * config.CAPITAL_PER_COIN_PCT
+        coin_budget = min(user_budget, balance_budget) if balance_budget > 0 else user_budget
 
         current_price = self._coin_states.get(symbol, {}).get("price", 0)
         if current_price <= 0:
