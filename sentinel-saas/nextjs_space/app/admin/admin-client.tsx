@@ -159,11 +159,11 @@ export default function AdminDashboard() {
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div className="bg-white/5 border border-white/10 rounded-xl p-6">
                             <h3 className="text-gray-400 text-sm font-medium mb-2">Platform-Wide PNL</h3>
-                            <p className={`text-3xl font-bold ${stats.totalPnl >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                                {stats.totalPnl >= 0 ? '+' : ''}${stats.totalPnl.toFixed(2)}
+                            <p className={`text-3xl font-bold ${(stats.totalPnl ?? 0) >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                                {(stats.totalPnl ?? 0) >= 0 ? '+' : ''}${(stats.totalPnl ?? 0).toFixed(2)}
                             </p>
                             <div className="flex items-center gap-1 mt-1">
-                                {stats.totalPnl >= 0
+                                {(stats.totalPnl ?? 0) >= 0
                                     ? <TrendingUp className="w-4 h-4 text-green-400" />
                                     : <TrendingDown className="w-4 h-4 text-red-400" />}
                                 <span className="text-xs text-gray-500">Across all users</span>
@@ -172,7 +172,7 @@ export default function AdminDashboard() {
                         <div className="bg-white/5 border border-white/10 rounded-xl p-6">
                             <h3 className="text-gray-400 text-sm font-medium mb-2">Estimated Monthly Revenue</h3>
                             <p className="text-3xl font-bold text-emerald-400">
-                                ₹{stats.revenueEstimate.toLocaleString('en-IN')}
+                                ₹{(stats.revenueEstimate ?? 0).toLocaleString('en-IN')}
                             </p>
                             <span className="text-xs text-gray-500">Based on active subscriptions</span>
                         </div>

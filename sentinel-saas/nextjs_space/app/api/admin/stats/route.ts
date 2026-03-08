@@ -33,6 +33,13 @@ export async function GET() {
         const ultraCount = await prisma.subscription.count({ where: { tier: 'ultra', status: 'active' } });
         const revenueEstimate = proCount * 999 + ultraCount * 2499;
 
+        // Total PnL across all closed trades
+        const pnlAgg = await prisma.trade.aggregate({
+            _sum: { totalPnl: true },
+            where: { status: 'closed' },
+        });
+        const totalPnl = pnlAgg._sum.totalPnl ?? 0;
+
         return NextResponse.json({
             totalUsers,
             totalBots,
@@ -41,6 +48,7 @@ export async function GET() {
             activeTrades,
             activeSubscriptions,
             revenueEstimate,
+            totalPnl,
         });
     } catch (error: any) {
         console.error('Admin stats error:', error);
