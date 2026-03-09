@@ -100,8 +100,12 @@ export function BotCard({ bot, onToggle, onDelete, liveTradeCount, trades = [], 
             {botMode === 'live' ? '🔴 Live' : '🟢 Paper'}
           </span>
           <div className="text-center">
+            <div className="text-sm font-semibold">{activeTrades.length}</div>
+            <div className="text-[10px] text-[var(--color-text-secondary)]">Active</div>
+          </div>
+          <div className="text-center">
             <div className="text-sm font-semibold">{totalTrades}</div>
-            <div className="text-[10px] text-[var(--color-text-secondary)]">Trades</div>
+            <div className="text-[10px] text-[var(--color-text-secondary)]">Total</div>
           </div>
           <div className="text-center">
             <div className="text-sm font-bold" style={{ color: pnlColor(activePnl) }}>
