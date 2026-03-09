@@ -187,6 +187,22 @@ export async function POST(request: Request) {
         console.warn('[toggle] set-bot-id failed (continuing):', e);
       }
 
+      // ──── Push per-bot risk config (maxLossPct, capitalPerTrade) to engine ──
+      try {
+        await fetch(`${engineUrl}/api/set-config`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            max_loss_pct: bot.config?.maxLossPct ?? -15,
+            capital_per_trade: bot.config?.capitalPerTrade ?? 100,
+          }),
+          signal: AbortSignal.timeout(5000),
+        });
+        console.log(`[toggle] set-config: maxLossPct=${bot.config?.maxLossPct ?? -15}, capitalPerTrade=${bot.config?.capitalPerTrade ?? 100}`);
+      } catch (e) {
+        console.warn('[toggle] set-config failed (continuing):', e);
+      }
+
       if (botMode.startsWith('live')) {
         const exchange = bot.exchange || 'coindcx';
         // Switch engine to live mode

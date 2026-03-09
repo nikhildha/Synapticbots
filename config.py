@@ -286,6 +286,10 @@ OI_CHANGE_MED      =  0.01   # > 1%: moderate positioning
 OI_CHANGE_NEG_HIGH = -0.03   # < -3%: OI falling (short-covering risk for BUY)
 OI_CHANGE_NEG_MED  = -0.01   # < -1%: mild OI contraction
 
+# ─── Funding Rate (used by tradebook.update_unrealized) ──────────────────────
+FUNDING_INTERVAL_HOURS = 8          # Perpetual funding paid every 8 hours
+DEFAULT_FUNDING_RATE   = 0.0001     # 0.01% per 8h — typical Binance/CoinDCX rate
+
 # ─── CoinDCX Execution ───────────────────────────────────────────────────────
 COINDCX_MIN_NOTIONAL      = 120.0   # Minimum order size in USD
 COINDCX_ORDER_SETTLE_SLEEP = 0.5    # Seconds to wait after placing order

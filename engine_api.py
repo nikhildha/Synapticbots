@@ -577,6 +577,55 @@ def api_validate_exchange():
         return jsonify({"valid": False, "exchange": exchange, "error": str(e)}), 200
 
 
+@app.route("/api/set-config", methods=["POST"])
+def api_set_config():
+    """
+    Apply per-bot risk settings from the SaaS DB at bot-start time.
+    Called by toggle/route.ts alongside /api/set-bot-id.
+    Accepted fields (all optional):
+      max_loss_pct      — overrides config.MAX_LOSS_PER_TRADE_PCT (e.g. -15)
+      capital_per_trade — overrides profile capital_per_trade (e.g. 100)
+      paper_balance     — overrides simulated paper balance (default 1000)
+    """
+    data = request.get_json() or {}
+    applied = {}
+
+    max_loss = data.get("max_loss_pct")
+    if max_loss is not None:
+        try:
+            config.MAX_LOSS_PER_TRADE_PCT = float(max_loss)
+            # Ensure it's stored as a negative value (guard against user sending 15 instead of -15)
+            if config.MAX_LOSS_PER_TRADE_PCT > 0:
+                config.MAX_LOSS_PER_TRADE_PCT = -config.MAX_LOSS_PER_TRADE_PCT
+            applied["max_loss_pct"] = config.MAX_LOSS_PER_TRADE_PCT
+        except (TypeError, ValueError):
+            pass
+
+    capital = data.get("capital_per_trade")
+    if capital is not None:
+        try:
+            cap = float(capital)
+            if cap > 0:
+                for profile in config.STRATEGY_PROFILES.values():
+                    profile["capital_per_trade"] = cap
+                applied["capital_per_trade"] = cap
+        except (TypeError, ValueError):
+            pass
+
+    paper_balance = data.get("paper_balance")
+    if paper_balance is not None:
+        try:
+            bal = float(paper_balance)
+            if bal > 0:
+                config.PAPER_BALANCE_OVERRIDE = bal
+                applied["paper_balance"] = bal
+        except (TypeError, ValueError):
+            pass
+
+    logger.info("⚙️  set-config applied: %s", applied)
+    return jsonify({"success": True, "applied": applied})
+
+
 @app.route("/api/set-bot-id", methods=["POST"])
 def api_set_bot_id():
     """Set the ENGINE_BOT_ID at runtime — called by dashboard when user starts a bot.

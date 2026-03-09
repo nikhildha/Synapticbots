@@ -981,21 +981,23 @@ class RegimeMasterBot:
     def _check_exits(self, current_symbols):
         """
         DISABLED — Regime changes no longer trigger exits.
-        
+
         Backtest confirmed: regime-change exits HURT returns because
         the HMM anticipates moves, and exit fees eat into profits.
-        
+
         Trades now exit ONLY via:
           • ATR-based Stop Loss
           • ATR-based Take Profit
           • Trailing SL / Trailing TP
-          • Max-loss guard (server.js)
+          • Max-loss guard (tradebook.update_unrealized)
         """
-        # Sync _active_positions dict (remove entries closed by SL engine)
+        # Sync _active_positions dict (remove entries closed by SL engine).
+        # Keys may be "profile_id:symbol" or plain "symbol" — extract symbol portion.
         active_syms = {t["symbol"] for t in tradebook.get_active_trades()}
-        for sym in list(self._active_positions.keys()):
+        for key in list(self._active_positions.keys()):
+            sym = key.split(":")[-1] if ":" in key else key
             if sym not in active_syms:
-                del self._active_positions[sym]
+                del self._active_positions[key]
 
     def _load_positions_from_tradebook(self):
         """Load active tradebook entries into _active_positions on startup."""
@@ -1024,12 +1026,15 @@ class RegimeMasterBot:
         """
         Remove entries from _active_positions that were auto-closed
         by the tradebook (e.g., SL/TP hit during paper-mode simulation).
+        Keys may be "profile_id:symbol" or plain "symbol" — extract symbol portion.
         """
         active_symbols = {t["symbol"] for t in tradebook.get_active_trades()}
-        closed_out = [sym for sym in self._active_positions if sym not in active_symbols]
-        for sym in closed_out:
+        closed_out = [key for key in self._active_positions
+                      if (key.split(":")[-1] if ":" in key else key) not in active_symbols]
+        for key in closed_out:
+            sym = key.split(":")[-1] if ":" in key else key
             logger.info("📗 Position %s auto-closed by tradebook (SL/TP hit). Removing.", sym)
-            del self._active_positions[sym]
+            del self._active_positions[key]
 
     def _sync_coindcx_positions(self):
         """

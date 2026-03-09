@@ -485,7 +485,9 @@ class ExecutionEngine:
     def get_futures_balance(self):
         """Get USDT futures wallet balance."""
         if config.PAPER_TRADE:
-            return 1000.0  # Simulated starting balance
+            # Use override if set via /api/set-config (from SaaS BotConfig.capitalPerTrade)
+            override = getattr(config, 'PAPER_BALANCE_OVERRIDE', 0)
+            return float(override) if override > 0 else 1000.0
 
         # ── CoinDCX Live ──
         import coindcx_client as cdx
