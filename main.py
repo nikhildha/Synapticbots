@@ -740,17 +740,21 @@ class RegimeMasterBot:
             signal = evaluate_mean_reversion(df_1h_feat, symbol)
             if signal:
                 current_atr = df_1h_feat["atr"].iloc[-1] if "atr" in df_1h_feat.columns else 0
-                coin_budget = balance * config.CAPITAL_PER_COIN_PCT
-                quantity = self.risk.calculate_position_size(
-                    coin_budget, current_price, current_atr, signal["leverage"],
+                # Margin-first: use default capital_per_trade (profile not in scope here)
+                margin = config.RISK_PROFILES.get("standard", {}).get("capital_per_trade", 100.0)
+                quantity, final_lev = self.risk.calculate_margin_first_position(
+                    margin, current_price, current_atr, signal["leverage"]
                 )
+                if quantity <= 0:
+                    self._coin_states[symbol]["action"] = "SKIP_RISK"
+                    return None
                 quantity *= (1 - config.SIDEWAYS_POSITION_REDUCTION)
                 quantity = round(quantity, 6)
                 self._coin_states[symbol]["action"] = f"MEAN_REV_{signal['side']}"
                 return {
                     "symbol": symbol,
                     "side": signal["side"],
-                    "leverage": signal["leverage"],
+                    "leverage": final_lev,
                     "quantity": quantity,
                     "atr": current_atr,
                     "regime": regime,
@@ -947,22 +951,34 @@ class RegimeMasterBot:
             logger.warning("⛔ [%s] %s: LIVE balance=$0 — cannot deploy", profile_id, symbol)
             return None
 
-        # Use user's capital_per_trade, capped at balance percentage
-        balance_budget = balance * config.CAPITAL_PER_COIN_PCT
-        coin_budget = min(user_budget, balance_budget) if balance_budget > 0 else user_budget
+        # ── Margin-First Position Sizing ──
+        # User's capital_per_trade is the EXACT margin deployed.
+        # Leverage is reduced (not increased) to keep SL loss ≤ MAX_LOSS_PER_TRADE_PCT.
+        margin = user_budget  # capital_per_trade
+
+        # Live mode: ensure margin doesn't exceed wallet balance
+        if not config.PAPER_TRADE and balance > 0:
+            margin = min(margin, balance * config.CAPITAL_PER_COIN_PCT)
 
         current_price = self._coin_states.get(symbol, {}).get("price", 0)
         if current_price <= 0:
             logger.info("⛔ [%s] %s: current_price=0, cannot size position", profile_id, symbol)
             return None
-        quantity = self.risk.calculate_position_size(
-            coin_budget, current_price, raw["atr"], leverage
+
+        quantity, final_leverage = self.risk.calculate_margin_first_position(
+            margin, current_price, raw["atr"], leverage
         )
-        quantity = round(quantity, 6)
+        if quantity <= 0:
+            logger.info("⛔ [%s] %s: trade skipped — risk too high at min leverage",
+                        profile_id, symbol)
+            return None
+
+        # Use the risk-capped leverage (may be lower than conviction leverage)
+        leverage = final_leverage
 
         logger.debug(
-            "✅ [%s] %s PASS: conviction=%.1f lev=%dx budget=$%.0f qty=%.6f price=%.2f",
-            profile_id, symbol, conviction, leverage, coin_budget, quantity, current_price,
+            "✅ [%s] %s PASS: conviction=%.1f lev=%dx margin=$%.0f qty=%.6f price=%.2f",
+            profile_id, symbol, conviction, leverage, margin, quantity, current_price,
         )
 
         return {

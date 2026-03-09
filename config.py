@@ -105,6 +105,7 @@ ACTIVE_PROFILES = ["standard"]  # Only run the profile the user deployed
 RISK_PER_TRADE = 0.04
 KILL_SWITCH_DRAWDOWN = 0.10   # Pause bot if 10% drawdown in 24h
 MAX_LOSS_PER_TRADE_PCT = -15     # Hard max-loss per trade – flat for all leverage
+MIN_LEVERAGE_FLOOR = 5           # Skip trade if leverage must drop below this
 MIN_HOLD_MINUTES = 30         # Minimum hold time before regime-change exits
 DEFAULT_QUANTITY = 0.002      # BTC quantity (overridden by position sizer)
 MARGIN_TYPE = "ISOLATED"      # Never use CROSS for high leverage
@@ -120,9 +121,7 @@ def get_atr_multipliers(leverage=1):
     Always maintains 1:2 risk-reward ratio."""
     if leverage >= 50:
         return (0.5, 1.0)
-    elif leverage >= 25:
-        return (0.7, 1.4)
-    elif leverage >= 10:
+    elif leverage >= 10:    # 10x–35x: uniform 1:2 R:R at 1×ATR (backtest-proven)
         return (1.0, 2.0)
     elif leverage >= 5:
         return (1.2, 2.4)

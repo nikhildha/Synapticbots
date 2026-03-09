@@ -102,6 +102,60 @@ class RiskManager:
         quantity = round(quantity, 6)
         return max(quantity, 0.0001)  # Binance minimum
 
+    # ─── Margin-First Position Sizing ────────────────────────────────────────
+
+    @staticmethod
+    def calculate_margin_first_position(margin, price, atr, conviction_leverage,
+                                         max_risk_pct=None):
+        """
+        Margin-first position sizing: margin is fixed, leverage is reduced to
+        keep SL loss ≤ max_risk_pct.
+
+        Parameters
+        ----------
+        margin : float            User's capital_per_trade (e.g. $100)
+        price : float             Current entry price
+        atr : float               Current ATR value
+        conviction_leverage : int  Desired leverage from conviction score
+        max_risk_pct : float       Max loss % at SL (e.g. 15.0 = 15%)
+
+        Returns
+        -------
+        (quantity: float, final_leverage: int)
+            quantity=0 means trade should be skipped (risk too high even at floor)
+        """
+        max_risk = max_risk_pct or abs(config.MAX_LOSS_PER_TRADE_PCT)
+        leverage_tiers = [35, 25, 15, 10, 5]
+
+        final_leverage = 0
+        for lev in leverage_tiers:
+            if lev > conviction_leverage:
+                continue
+            sl_mult, _ = config.get_atr_multipliers(lev)
+            loss_at_sl = (atr * sl_mult / price) * lev * 100  # % of margin
+            if loss_at_sl <= max_risk:
+                final_leverage = lev
+                break
+
+        if final_leverage < config.MIN_LEVERAGE_FLOOR:
+            logger.info("⚠️ Leverage would be %dx (below floor %dx) — skipping trade "
+                        "(ATR=%.6f, price=%.2f, conviction_lev=%dx)",
+                        final_leverage, config.MIN_LEVERAGE_FLOOR, atr, price,
+                        conviction_leverage)
+            return 0.0, 0
+
+        notional = margin * final_leverage
+        quantity = notional / price
+        quantity = round(quantity, 6)
+        quantity = max(quantity, 0.0001)
+
+        if final_leverage < conviction_leverage:
+            logger.info("📉 Leverage reduced: %dx → %dx (ATR risk cap, "
+                        "ATR=%.6f, price=%.2f)", conviction_leverage,
+                        final_leverage, atr, price)
+
+        return quantity, final_leverage
+
     # ─── ATR Stop Loss / Take Profit ─────────────────────────────────────────
 
     @staticmethod
