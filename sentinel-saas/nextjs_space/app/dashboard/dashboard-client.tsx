@@ -158,7 +158,24 @@ export function DashboardClient({ user, stats, bots, recentTrades }: DashboardCl
   const formatCurrency = (value: number) => `$${value.toFixed(2)}`;
 
   const multi = botState?.multi;
-  const trades = botState?.tradebook?.trades || [];
+  // Prefer live trades from bot-state API; fall back to SSR Prisma trades
+  const apiTrades = botState?.tradebook?.trades || [];
+  const ssrTradesNormalized = (recentTrades || []).map((t: any) => ({
+    ...t,
+    symbol: t.coin || t.symbol || '',
+    side: t.position === 'long' ? 'BUY' : 'SELL',
+    status: (t.status || '').toUpperCase(),
+    entry_price: t.entryPrice || t.entry_price || 0,
+    current_price: t.currentPrice || t.current_price || null,
+    exit_price: t.exitPrice || t.exit_price || null,
+    stop_loss: t.stopLoss || t.stop_loss || 0,
+    take_profit: t.takeProfit || t.take_profit || 0,
+    entry_time: t.entryTime || t.entry_time || '',
+    exit_time: t.exitTime || t.exit_time || null,
+    bot_name: 'Synaptic Marshal',
+    mode: t.mode || 'paper',
+  }));
+  const trades = apiTrades.length > 0 ? apiTrades : ssrTradesNormalized;
 
   // Extract BTC multi-timeframe data for regime card — prefer coin_states over stale state
   const btcState = multi?.coin_states?.['BTCUSDT'] || {};

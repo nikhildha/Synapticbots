@@ -12,6 +12,10 @@
  *   I5  — Balance accuracy (engine balance vs CoinDCX API)
  *   I6  — DB timestamp validity (no null or future entryTime)
  *   I11 — SaaS DB vs engine tradebook count divergence (C1/K1 detector)
+ *   S16 — Duplicate active trades (same coin + user, multiple active records)
+ *   S17 — Engine slot usage (active trades vs MAX_CONCURRENT_POSITIONS)
+ *   S18 — Multi-user conflict (multiple bots active simultaneously on same engine)
+ *   S19 — Paper engine orphan trades (active DB trades not found in engine tradebook)
  *
  * Returns: { run_ts, section, results[], summary }
  * Called by: tools/audit_runner.sh (daily cron) or admin dashboard
