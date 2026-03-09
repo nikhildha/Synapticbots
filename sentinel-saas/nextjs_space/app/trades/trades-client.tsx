@@ -591,7 +591,7 @@ export function TradesClient({ trades: initialTrades }: TradesClientProps) {
             {filtered.length > 0 ? (
               <Card>
                 <div style={{ overflowX: 'auto', maxHeight: '600px', overflowY: 'auto' }}>
-                  <table style={{ width: '100%', minWidth: '1300px', borderCollapse: 'collapse', fontSize: '13px' }}>
+                  <table style={{ width: '100%', minWidth: '1300px', borderCollapse: 'collapse', fontSize: '17px' }}>
                     <thead>
                       <tr style={{ borderBottom: '2px solid rgba(255,255,255,0.08)' }}>
                         {['Bot', 'Coin', 'Position', 'Leverage', 'Capital', 'Entry', 'LTP', 'Stop Loss', 'Target Price', 'SL Type', 'PnL', 'Fee', 'Net PnL', 'Exit', 'Action'].map(h => (

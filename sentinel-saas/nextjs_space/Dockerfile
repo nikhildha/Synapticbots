@@ -41,4 +41,4 @@ COPY --from=builder /app/next.config.js ./next.config.js
 
 EXPOSE 8080
 
-CMD ["npx", "next", "start", "-p", "8080"]
+CMD ["sh", "-c", "npx prisma db push --accept-data-loss && npx next start -p 8080"]
