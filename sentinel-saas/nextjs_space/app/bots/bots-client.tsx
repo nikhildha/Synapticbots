@@ -180,6 +180,7 @@ export function BotsClient({ bots: initialBots }: BotsClientProps) {
 
   // Live active trade count from bot-state
   const [liveTradeCount, setLiveTradeCount] = useState(0);
+  const [liveTrades, setLiveTrades] = useState<any[]>([]);
   const [allSessions, setAllSessions] = useState<any[]>([]);
   const [perfSummary, setPerfSummary] = useState<any>({ allTimePnl: 0, allTimeRoi: 0, totalSessions: 0, bestSessionPnl: 0 });
 
@@ -189,6 +190,7 @@ export function BotsClient({ bots: initialBots }: BotsClientProps) {
       if (res.ok) {
         const d = await res.json();
         const trades = d?.tradebook?.trades || [];
+        setLiveTrades(trades);
         setLiveTradeCount(trades.filter((t: any) => (t.status || '').toUpperCase() === 'ACTIVE').length);
       }
     } catch { /* silent */ }
@@ -383,6 +385,7 @@ export function BotsClient({ bots: initialBots }: BotsClientProps) {
                     onToggle={handleBotToggle}
                     onDelete={handleDeleteBot}
                     liveTradeCount={liveTradeCount}
+                    trades={liveTrades}
                     sessions={botSessions}
                   />
                 );
