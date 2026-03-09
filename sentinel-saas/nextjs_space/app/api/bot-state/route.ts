@@ -79,6 +79,27 @@ export async function GET() {
                 console.error('[bot-state] getUserTrades failed:', err);
                 trades = [];
             }
+
+            // Enrich Prisma trades with stepped_lock_level from raw engine data
+            // (not stored in Prisma — passed through from engine each request)
+            if (engineTradesRaw.length > 0 && trades.length > 0) {
+                const engineMap = new Map<string, any>();
+                for (const et of engineTradesRaw) {
+                    const eid = et.trade_id || et.id;
+                    if (eid) engineMap.set(eid, et);
+                }
+                trades = trades.map((t: any) => {
+                    const engineTrade = engineMap.get(t.trade_id);
+                    if (engineTrade) {
+                        return {
+                            ...t,
+                            stepped_lock_level: engineTrade.stepped_lock_level ?? -1,
+                            trailing_active: engineTrade.trailing_active || t.trailing_active || false,
+                        };
+                    }
+                    return t;
+                });
+            }
         }
 
         const activeTrades = trades.filter((t: any) => (t.status || '').toUpperCase() === 'ACTIVE');
