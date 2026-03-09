@@ -194,7 +194,6 @@ model Trade {
   trailingTp        Float?
   trailingActive    Boolean   @default(false)
   trailSlCount      Int       @default(0)
-  steppedLockLevel  Int       @default(-1)
   
   // ─── Capital Protection ────────────────────────
   capitalProtectionActive Boolean @default(false)

@@ -116,7 +116,6 @@ export async function syncEngineTrades(
                     t2Hit: t.t2_hit || false,
                     trailingSl: t.trailing_sl || null,
                     trailingActive: t.trailing_active || false,
-                    steppedLockLevel: t.stepped_lock_level ?? -1,
                     sessionId: activeSession?.id ?? null,
                 },
                 update: {
@@ -140,7 +139,6 @@ export async function syncEngineTrades(
                     t2Hit: t.t2_hit || false,
                     trailingSl: t.trailing_sl || null,
                     trailingActive: t.trailing_active || false,
-                    steppedLockLevel: t.stepped_lock_level ?? -1,
                 },
             });
 
@@ -192,7 +190,6 @@ export async function getUserTrades(userId: string, statusFilter?: string, botId
         t2Hit: t.t2Hit,
         trailing_sl: t.trailingSl,
         trailing_active: t.trailingActive,
-        stepped_lock_level: t.steppedLockLevel,
         status: t.status.toUpperCase(),
         unrealized_pnl: t.activePnl,
         unrealized_pnl_pct: t.activePnlPercent,
