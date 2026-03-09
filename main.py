@@ -1276,14 +1276,10 @@ class RegimeMasterBot:
             pass
 
         # Multi-coin state
-        # Preserve timing fields written by _save_timing() earlier in the cycle
-        existing_multi = {}
-        try:
-            if os.path.exists(config.MULTI_STATE_FILE):
-                with open(config.MULTI_STATE_FILE, "r") as f:
-                    existing_multi = json.load(f)
-        except Exception:
-            pass
+        now_utc = datetime.utcnow()
+        next_analysis = datetime.utcfromtimestamp(
+            self._last_analysis_time + config.ANALYSIS_INTERVAL_SECONDS
+        ) if self._last_analysis_time else None
 
         multi_state = {
             "timestamp":        datetime.now(IST).replace(tzinfo=None).isoformat(),
@@ -1300,9 +1296,9 @@ class RegimeMasterBot:
             "paper_mode":       config.PAPER_TRADE,
             "cycle_execution_time_seconds": getattr(self, '_last_cycle_duration', 0),
             "analysis_interval_seconds": config.ANALYSIS_INTERVAL_SECONDS,
-            # Carry forward timing fields from _save_timing()
-            "last_analysis_time": existing_multi.get("last_analysis_time"),
-            "next_analysis_time": existing_multi.get("next_analysis_time"),
+            # Timing fields — written directly so dashboard always has them
+            "last_analysis_time": now_utc.isoformat() + "Z",
+            "next_analysis_time": (next_analysis.isoformat() + "Z") if next_analysis else None,
             "active_profiles":  {pid: {"label": p["label"], "confidence_min": p["confidence_min"],
                                        "max_positions": p["max_positions"]}
                                  for pid, p in self._active_profiles.items()},

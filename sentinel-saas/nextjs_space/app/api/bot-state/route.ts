@@ -96,13 +96,26 @@ export async function GET() {
 
         const activeTrades = trades.filter((t: any) => (t.status || '').toUpperCase() === 'ACTIVE');
 
+        // ─── Timing fields: fallback computation when engine doesn't provide them ──
+        const lastAnalysis = multi.last_analysis_time || multi.timestamp || null;
+        const intervalSec = multi.analysis_interval_seconds || 300; // default 5min
+        let nextAnalysis = multi.next_analysis_time || null;
+        if (!nextAnalysis && lastAnalysis && intervalSec) {
+            try {
+                const lastMs = new Date(String(lastAnalysis)).getTime();
+                if (!isNaN(lastMs)) {
+                    nextAnalysis = new Date(lastMs + intervalSec * 1000).toISOString();
+                }
+            } catch { /* silent */ }
+        }
+
         return NextResponse.json({
             state: {
                 regime: multi.macro_regime || coinStates?.BTCUSDT?.regime || 'WAITING',
                 confidence: coinStates?.BTCUSDT?.confidence || 0,
                 symbol: 'BTCUSDT',
                 btc_price: coinStates?.BTCUSDT?.price || null,
-                timestamp: multi.last_analysis_time || multi.timestamp || null,
+                timestamp: lastAnalysis,
             },
             multi: {
                 ...multi,
@@ -115,7 +128,11 @@ export async function GET() {
                 ),
                 coin_states: coinStates,
                 cycle: multi.cycle || 0,
-                timestamp: multi.last_analysis_time || multi.timestamp || null,
+                // Timing fields — always populated
+                last_analysis_time: lastAnalysis,
+                next_analysis_time: nextAnalysis,
+                analysis_interval_seconds: intervalSec,
+                timestamp: lastAnalysis,
             },
             scanner: { coins: Object.keys(coinStates) },
             tradebook: {
