@@ -283,6 +283,9 @@ class RegimeMasterBot:
         """Full analysis cycle — runs every ANALYSIS_INTERVAL_SECONDS."""
         cycle_start = time.time()
         self._cycle_count += 1
+        # Snapshot bot_id once per tick — prevents race condition if set-bot-id
+        # is called mid-cycle while another user starts their bot.
+        _tick_bot_id = config.ENGINE_BOT_ID
 
         # ── 0. Weekly coin tier re-classification (background) ───
         self._maybe_reclassify_tiers()
@@ -490,6 +493,7 @@ class RegimeMasterBot:
                     exchange=result.get("exchange") if result else None,
                     pair=result.get("pair") if result else None,
                     position_id=result.get("position_id") if result else None,
+                    bot_id=_tick_bot_id,
                 )
 
                 self._active_positions[pos_key] = {

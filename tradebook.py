@@ -102,7 +102,7 @@ def _compute_summary(book):
 def open_trade(symbol, side, leverage, quantity, entry_price, atr,
                regime, confidence, reason="", capital=100.0, mode=None, user_id=None,
                profile_id="standard", bot_name="SM-Standard",
-               exchange=None, pair=None, position_id=None):
+               exchange=None, pair=None, position_id=None, bot_id=None):
     """
     Record a new trade entry in the tradebook.
 
@@ -217,7 +217,7 @@ def open_trade(symbol, side, leverage, quantity, entry_price, atr,
         "last_funding_check": now_iso,
         "profile_id":       profile_id,
         "bot_name":         bot_name,
-        "bot_id":           config.ENGINE_BOT_ID,   # DB Bot.id — stamped for sync layer
+        "bot_id":           bot_id if bot_id is not None else config.ENGINE_BOT_ID,  # DB Bot.id — stamped for sync layer
         # CoinDCX exchange tracking
         "exchange":         exchange,
         "pair":             pair,
