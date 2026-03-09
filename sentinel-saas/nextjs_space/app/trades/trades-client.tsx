@@ -25,8 +25,8 @@ interface Trade {
 
 /* ═══ Utilities ═══ */
 const fmt$ = (v: number) => (v >= 0 ? '+' : '') + v.toFixed(2);
-const fmtPct = (v: number) => (v >= 0 ? '+' : '') + v.toFixed(2) + '%';
-const fmtPrice = (v: number) => v >= 100 ? v.toFixed(2) : v >= 1 ? v.toFixed(4) : v.toFixed(6);
+const fmtPct = (v: number) => (v >= 0 ? '+' : '') + v.toFixed(1) + '%';
+const fmtPrice = (v: number) => v.toFixed(4);
 const pnlColor = (v: number) => v > 0 ? '#22C55E' : v < 0 ? '#EF4444' : '#6B7280';
 
 /* ═══ Determine if a trade is truly active ═══ */
@@ -575,18 +575,36 @@ export function TradesClient({ trades: initialTrades }: TradesClientProps) {
                   <option value="loss">Loss Only</option>
                 </select>
 
-                <div style={{ position: 'relative', marginLeft: 'auto' }}>
-                  <Search size={14} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: '#6B7280' }} />
-                  <input value={coinSearch} onChange={e => setCoinSearch(e.target.value)}
-                    placeholder="Search coin..."
-                    style={{
-                      padding: '6px 10px 6px 30px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.1)',
-                      background: 'rgba(255,255,255,0.04)', color: '#D1D5DB', fontSize: '13px', width: '150px',
-                    }} />
-                  {coinSearch && (
-                    <X size={12} onClick={() => setCoinSearch('')}
-                      style={{ position: 'absolute', right: '8px', top: '50%', transform: 'translateY(-50%)', cursor: 'pointer', color: '#6B7280' }} />
-                  )}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginLeft: 'auto' }}>
+                  {/* Paper/Live mode indicator */}
+                  <span style={{
+                    padding: '4px 12px', borderRadius: '8px', fontSize: '11px', fontWeight: 800,
+                    letterSpacing: '0.5px',
+                    background: modeFilter === 'live'
+                      ? 'rgba(239,68,68,0.2)' : modeFilter === 'paper'
+                        ? 'rgba(34,197,94,0.2)' : 'rgba(6,182,212,0.15)',
+                    color: modeFilter === 'live'
+                      ? '#F87171' : modeFilter === 'paper'
+                        ? '#4ADE80' : '#06B6D4',
+                    border: `1px solid ${modeFilter === 'live'
+                      ? 'rgba(239,68,68,0.4)' : modeFilter === 'paper'
+                        ? 'rgba(34,197,94,0.4)' : 'rgba(6,182,212,0.3)'}`,
+                  }}>
+                    {modeFilter === 'live' ? '🔴 LIVE' : modeFilter === 'paper' ? '🟢 PAPER' : '📊 ALL MODES'}
+                  </span>
+                  <div style={{ position: 'relative' }}>
+                    <Search size={14} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: '#6B7280' }} />
+                    <input value={coinSearch} onChange={e => setCoinSearch(e.target.value)}
+                      placeholder="Search coin..."
+                      style={{
+                        padding: '6px 10px 6px 30px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.1)',
+                        background: 'rgba(255,255,255,0.04)', color: '#D1D5DB', fontSize: '13px', width: '150px',
+                      }} />
+                    {coinSearch && (
+                      <X size={12} onClick={() => setCoinSearch('')}
+                        style={{ position: 'absolute', right: '8px', top: '50%', transform: 'translateY(-50%)', cursor: 'pointer', color: '#6B7280' }} />
+                    )}
+                  </div>
                 </div>
               </div>
             </Card>
@@ -600,7 +618,7 @@ export function TradesClient({ trades: initialTrades }: TradesClientProps) {
                   <table style={{ width: '100%', minWidth: '1300px', borderCollapse: 'collapse', fontSize: '13px' }}>
                     <thead>
                       <tr style={{ borderBottom: '2px solid rgba(255,255,255,0.08)' }}>
-                        {['Bot', 'Type', 'Coin', 'Side', 'Lev', 'Capital', 'Entry', 'LTP', 'Exit', 'SL', 'TP', 'SL Type', 'P&L $', 'P&L %', 'Fee', 'Status', 'Action'].map(h => (
+                        {['Bot', 'Coin', 'Position', 'Leverage', 'Capital', 'Entry', 'LTP', 'Stop Loss', 'Target Price', 'SL Type', 'PnL', 'PnL %', 'Fee', 'Status', 'Exit', 'Action'].map(h => (
                           <th key={h} style={{
                             padding: '10px 10px', textAlign: h === 'Bot' || h === 'Coin' ? 'left' : 'center',
                             fontSize: '11px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.8px',
@@ -642,31 +660,8 @@ export function TradesClient({ trades: initialTrades }: TradesClientProps) {
                                 </div>
                               )}
                             </td>
-                            <td style={{ padding: '10px', textAlign: 'center' }}>
-                              <span style={{
-                                padding: '2px 8px', borderRadius: '6px', fontSize: '10px', fontWeight: 700,
-                                background: (t.mode || '').toLowerCase() === 'live' ? 'rgba(239,68,68,0.15)' : 'rgba(34,197,94,0.15)',
-                                color: (t.mode || '').toLowerCase() === 'live' ? '#EF4444' : '#22C55E',
-                              }}>
-                                {(t.mode || 'paper').toUpperCase()}
-                              </span>
-                            </td>
                             <td style={{ padding: '10px', fontWeight: 700, color: '#F0F4F8' }}>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                {t.coin.replace('USDT', '')}
-                                <span style={{
-                                  padding: '1px 6px', borderRadius: '4px', fontSize: '9px', fontWeight: 800,
-                                  letterSpacing: '0.5px', lineHeight: '16px',
-                                  background: (t.mode || '').toLowerCase() === 'live'
-                                    ? 'rgba(239,68,68,0.25)' : 'rgba(34,197,94,0.25)',
-                                  color: (t.mode || '').toLowerCase() === 'live'
-                                    ? '#F87171' : '#4ADE80',
-                                  border: `1px solid ${(t.mode || '').toLowerCase() === 'live'
-                                    ? 'rgba(239,68,68,0.4)' : 'rgba(34,197,94,0.4)'}`,
-                                }}>
-                                  {(t.mode || '').toLowerCase() === 'live' ? 'LIVE' : 'PAPER'}
-                                </span>
-                              </div>
+                              {t.coin.replace('USDT', '')}
                             </td>
                             <td style={{ padding: '10px', textAlign: 'center' }}>
                               <span style={{
@@ -687,9 +682,6 @@ export function TradesClient({ trades: initialTrades }: TradesClientProps) {
                                   {fmtPrice(currentPrice)}
                                 </span>
                               ) : <span style={{ color: '#6B7280' }}>—</span>}
-                            </td>
-                            <td style={{ padding: '10px', textAlign: 'center', fontFamily: 'monospace', fontSize: '12px', color: '#D1D5DB' }}>
-                              {!isActive && t.exitPrice ? fmtPrice(t.exitPrice) : '—'}
                             </td>
                             <td style={{ padding: '10px', textAlign: 'center', color: '#EF4444', fontFamily: 'monospace', fontSize: '12px' }}>{fmtPrice(t.stopLoss)}</td>
                             <td style={{ padding: '10px', textAlign: 'center', color: '#22C55E', fontFamily: 'monospace', fontSize: '12px' }}>{fmtPrice(t.takeProfit)}</td>
@@ -720,6 +712,9 @@ export function TradesClient({ trades: initialTrades }: TradesClientProps) {
                               }}>
                                 {isActive ? '● ACTIVE' : t.exitReason || 'CLOSED'}
                               </span>
+                            </td>
+                            <td style={{ padding: '10px', textAlign: 'center', fontFamily: 'monospace', fontSize: '12px', color: '#D1D5DB' }}>
+                              {!isActive && t.exitPrice ? fmtPrice(t.exitPrice) : '—'}
                             </td>
 
                             <td style={{ padding: '10px', textAlign: 'center' }}>
