@@ -33,9 +33,8 @@ export async function syncEngineTrades(
     // Historical trades are preserved. Only the entryTime filter below
     // prevents new pre-start trades from being synced.
 
-    // Look up the userId for this bot once — used to verify engine-supplied bot_id ownership
-    const botRecord = await prisma.bot.findUnique({ where: { id: botId }, select: { userId: true } });
-    const userId = botRecord?.userId;
+    // BROADCAST FIX: No longer need to look up userId for bot_id ownership check.
+    // User isolation is handled by getUserTrades(userId) at query time.
 
     // Look up active session once per sync call (not per trade)
     const activeSession = await getActiveBotSession(botId);
@@ -68,32 +67,11 @@ export async function syncEngineTrades(
                 if (!isNaN(d.getTime())) exitTime = d;
             }
 
-            // Resolve botId: prefer engine-stamped bot_id (set via ENGINE_BOT_ID env var).
-            // If bot_id is set, it MUST belong to this user — otherwise skip the trade entirely.
-            // This prevents cross-user trade leakage when multiple users share one engine.
-            let resolvedBotId = botId;
-            if (t.bot_id) {
-                if (!userId) continue;  // cannot verify ownership — skip
-                const engineBot = await prisma.bot.findFirst({
-                    where: { id: String(t.bot_id), userId },
-                    select: { id: true },
-                });
-                if (engineBot) {
-                    resolvedBotId = engineBot.id;
-                } else {
-                    continue;  // bot_id belongs to a different user — skip
-                }
-            } else {
-                // STRICT ISOLATION: If bot_id is NOT stamped on the trade,
-                // skip it entirely. This prevents ALL trades from being
-                // attributed to whichever user's sync runs first.
-                // The ENGINE_BOT_ID env var MUST be set in Railway.
-                console.warn(
-                    `[sync] Trade ${engineTradeId} has no bot_id — skipping. ` +
-                    `Set ENGINE_BOT_ID env var in Railway engine service.`
-                );
-                continue;
-            }
+            // BROADCAST FIX: Always attribute engine trades to the calling user's bot.
+            // User-level isolation is maintained by getUserTrades(userId) — each user
+            // only sees trades linked to their own bots. The engine's bot_id stamp
+            // is ignored; every active bot gets a copy of every engine trade.
+            const resolvedBotId = botId;
 
             // Upsert: create if not exists, update PNL/status if exists
             await prisma.trade.upsert({
