@@ -237,15 +237,15 @@ ORDERFLOW_LARGE_ORDER_USD  = 50_000    # USD threshold to flag a single order as
 
 # ─── Conviction Score Weights (must sum to 100) ───────────────────────────────
 # EXP 4 IC-guided weight optimization (300 trials) — Sharpe +0.2442 improvement
-CONVICTION_WEIGHT_HMM       = 44   # HMM regime confidence       (was 22 → IC strongest +0.135)
-CONVICTION_WEIGHT_BTC_MACRO = 7    # BTC macro regime alignment  (was 18 → IC weak +0.018)
-CONVICTION_WEIGHT_FUNDING   = 11   # Funding rate                (was 12 → IC -0.019, contrarian)
-CONVICTION_WEIGHT_SR_VWAP   = 2    # Support/Resistance + VWAP   (was 10 → IC -0.033, weak)
-CONVICTION_WEIGHT_OI        = 11   # Open Interest change        (was  8 → IC +0.016, modest)
-CONVICTION_WEIGHT_VOL       = 0    # Volatility quality          (was  5 → IC -0.047, noise)
-CONVICTION_WEIGHT_SENTIMENT = 15   # Social/news sentiment       (unchanged)
-CONVICTION_WEIGHT_ORDERFLOW = 10   # Order book flow             (unchanged)
-# Total: 44+7+11+2+11+0+15+10 = 100
+CONVICTION_WEIGHT_HMM       = 61   # HMM regime confidence       (44 + 15 from sentiment + 2 from S/R)
+CONVICTION_WEIGHT_BTC_MACRO = 7    # BTC macro regime alignment
+CONVICTION_WEIGHT_FUNDING   = 11   # Funding rate (contrarian signal)
+CONVICTION_WEIGHT_SR_VWAP   = 0    # REMOVED — S/R + VWAP (was weak, noise)
+CONVICTION_WEIGHT_OI        = 11   # Open Interest change
+CONVICTION_WEIGHT_VOL       = 0    # REMOVED — Volatility quality (noise)
+CONVICTION_WEIGHT_SENTIMENT = 0    # REMOVED — Sentiment (unreliable)
+CONVICTION_WEIGHT_ORDERFLOW = 10   # Order book flow
+# Total: 61+7+11+0+11+0+0+10 = 100
 
 # ─── Conviction Score: Leverage Bands ────────────────────────────────────────
 CONVICTION_MIN_TRADE   = 40   # Below this → no trade (leverage = 0)

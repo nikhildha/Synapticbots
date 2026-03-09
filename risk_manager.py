@@ -414,35 +414,26 @@ class RiskManager:
         orderflow_score=None,
     ) -> float:
         """
-        Compute a 0–100 conviction score from 8 independent factors.
+        Compute a 0–100 conviction score from 5 active factors.
 
-        Factors and max weights
-        ───────────────────────
-        1. HMM Confidence       (22 pts) — core signal quality
-        2. BTC Macro Regime     (18 pts) — macro alignment
-        3. Funding Rate         (12 pts) — perpetual swap carry signal
-        4. S/R + VWAP Position  (10 pts) — price vs key structural levels
-        5. Open Interest Change  (8 pts) — smart-money positioning
-        6. Volatility Quality    (5 pts) — regime quality filter
-        7. Sentiment Score      (15 pts) — social/news signal (alert = hard veto)
-        8. Order Flow           (10 pts) — L2 depth + taker flow + cumDelta
+        Active Factors
+        ──────────────
+        1. HMM Confidence       (61 pts) — core signal quality
+        2. BTC Macro Regime      (7 pts) — macro alignment
+        3. Funding Rate         (11 pts) — perpetual swap carry signal
+        4. Open Interest Change (11 pts) — smart-money positioning
+        5. Order Flow           (10 pts) — L2 depth + taker flow + cumDelta
+
+        REMOVED: Sentiment (0 pts), S/R + VWAP (0 pts), Volatility (0 pts)
 
         Total max = 100 pts.
         Conviction → leverage via get_conviction_leverage().
         """
-        # Hard veto: sentiment ALERT (hack, exploit, rug-pull, etc.)
-        if sentiment_score is not None and sentiment_score <= -1.0:
-            logger.warning("Sentiment ALERT veto — conviction forced to 0")
-            return 0.0
-
         score = (
             RiskManager._score_hmm(confidence)
             + RiskManager._score_btc_macro(btc_regime, regime, side)
             + RiskManager._score_funding(funding_rate, side)
-            + RiskManager._score_sr_vwap(sr_position, vwap_position, side)
             + RiskManager._score_oi(oi_change, side)
-            + RiskManager._score_volatility(volatility)
-            + RiskManager._score_sentiment(sentiment_score)
             + RiskManager._score_orderflow(orderflow_score, side)
         )
         return float(max(0.0, min(100.0, score)))
