@@ -47,8 +47,22 @@ function mapTrade(t: any): Trade {
   const sym = t.symbol || t.coin || '';
   const uniqueId = `${baseId}-${sym}`;
 
-  // Determine SL type from engine data
-  const slType = t.sl_type || t.slType || 'Default';
+  // Determine SL type from engine stepped_lock_level
+  const trailingActive = t.trailing_active || t.trailingActive || false;
+  const stepLevel = t.stepped_lock_level ?? t.steppedLockLevel ?? -1;
+  // Descriptive SL type names based on actual trailing state
+  const SL_TYPE_NAMES: Record<number, string> = {
+    0: 'Breakeven',     // +5% trigger → SL at entry
+    1: 'Lock +5%',      // +10% trigger → locks 5% profit
+    2: 'Lock +10%',     // +15% trigger → locks 10% profit
+    3: 'Lock +15%',     // +20% trigger → locks 15% profit (max)
+  };
+  let slType: string;
+  if (trailingActive && stepLevel >= 0) {
+    slType = SL_TYPE_NAMES[stepLevel] || `Lock L${stepLevel}`;
+  } else {
+    slType = 'Fixed SL';
+  }
 
   // Determine current target level from engine data
   const t1Hit = t.t1_hit || t.t1Hit || false;
@@ -71,7 +85,7 @@ function mapTrade(t: any): Trade {
     exitPrice: t.exit_price || t.exitPrice || null,
     stopLoss: t.trailing_sl || t.trailingSl || t.stop_loss || t.stopLoss || 0,
     takeProfit: t.trailing_tp || t.trailingTp || t.take_profit || t.takeProfit || 0,
-    slType: (t.trailing_active || t.trailingActive) ? `Trail (${slType})` : slType,
+    slType,
     targetType,
     status,
     mode: t.mode || 'paper',
@@ -650,10 +664,18 @@ export function TradesClient({ trades: initialTrades }: TradesClientProps) {
                             <td style={{ padding: '10px', textAlign: 'center' }}>
                               <span style={{
                                 padding: '2px 8px', borderRadius: '4px', fontSize: '10px', fontWeight: 600,
-                                background: (t.slType || '').includes('Trail') ? 'rgba(34,197,94,0.15)' : 'rgba(107,114,128,0.15)',
-                                color: (t.slType || '').includes('Trail') ? '#22C55E' : '#9CA3AF',
+                                background: t.slType === 'Fixed SL'
+                                  ? 'rgba(107,114,128,0.15)'
+                                  : t.slType === 'Breakeven'
+                                    ? 'rgba(245,158,11,0.15)'
+                                    : 'rgba(34,197,94,0.15)',
+                                color: t.slType === 'Fixed SL'
+                                  ? '#9CA3AF'
+                                  : t.slType === 'Breakeven'
+                                    ? '#F59E0B'
+                                    : '#22C55E',
                               }}>
-                                {t.slType || 'Default'}
+                                {t.slType}
                               </span>
                             </td>
 
