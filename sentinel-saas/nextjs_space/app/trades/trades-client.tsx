@@ -642,7 +642,21 @@ export function TradesClient({ trades: initialTrades }: TradesClientProps) {
                               </span>
                             </td>
                             <td style={{ padding: '10px', fontWeight: 700, color: '#F0F4F8' }}>
-                              {t.coin.replace('USDT', '')}
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                {t.coin.replace('USDT', '')}
+                                <span style={{
+                                  padding: '1px 6px', borderRadius: '4px', fontSize: '9px', fontWeight: 800,
+                                  letterSpacing: '0.5px', lineHeight: '16px',
+                                  background: (t.mode || '').toLowerCase() === 'live'
+                                    ? 'rgba(239,68,68,0.25)' : 'rgba(34,197,94,0.25)',
+                                  color: (t.mode || '').toLowerCase() === 'live'
+                                    ? '#F87171' : '#4ADE80',
+                                  border: `1px solid ${(t.mode || '').toLowerCase() === 'live'
+                                    ? 'rgba(239,68,68,0.4)' : 'rgba(34,197,94,0.4)'}`,
+                                }}>
+                                  {(t.mode || '').toLowerCase() === 'live' ? 'LIVE' : 'PAPER'}
+                                </span>
+                              </div>
                             </td>
                             <td style={{ padding: '10px', textAlign: 'center' }}>
                               <span style={{
