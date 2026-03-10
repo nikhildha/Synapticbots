@@ -112,7 +112,7 @@ export default async function DashboardPage() {
           exitPrice: trade?.exitPrice ?? null,
           stopLoss: trade.stopLoss,
           takeProfit: trade.takeProfit,
-          slType: trade.slType,
+          // slType removed — no longer used in engine or UI
           status: trade.status,
           activePnl: trade.activePnl,
           activePnlPercent: trade.activePnlPercent,

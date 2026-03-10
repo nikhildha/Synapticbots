@@ -577,7 +577,7 @@ export function DashboardClient({ user, stats, bots, recentTrades }: DashboardCl
                     // Direct botId match
                     if (t.bot_id && bot?.id && t.bot_id === bot.id) return true;
                     if (t.botId && bot?.id && t.botId === bot.id) return true;
-                    // Bot name matching — handle engine format 'SM-Standard' vs DB 'Synaptic Marshal — Standard'
+                    // Bot name matching — extract model keyword for matching
                     const tradeBotName = (t.bot_name || t.botName || '').toLowerCase();
                     if (!tradeBotName) return false;
                     // Check if the model keyword (adaptive/standard/conservative) appears in both

@@ -1322,7 +1322,7 @@ class RegimeMasterBot:
                 capital=capital,
                 mode="LIVE",
                 user_id=getattr(config, 'ENGINE_USER_ID', None),
-                bot_name=config.ENGINE_BOT_NAME or "SM-Standard",
+                bot_name=config.ENGINE_BOT_NAME or "Synaptic Adaptive",
             )
 
             self._active_positions[sym] = {

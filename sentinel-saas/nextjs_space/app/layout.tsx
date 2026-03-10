@@ -12,7 +12,7 @@ export const dynamic = 'force-dynamic';
 export const metadata: Metadata = {
   title: 'Synaptic - Premium Crypto Trading Bot',
   description: 'Advanced automated cryptocurrency trading platform for CoinDCX and Binance exchanges',
-  metadataBase: new URL(process.env.NEXTAUTH_URL || 'https://sentinel.app'),
+  metadataBase: new URL(process.env.NEXTAUTH_URL || 'https://synaptic.ai'),
   icons: {
     icon: '/favicon.svg',
     shortcut: '/favicon.svg',
