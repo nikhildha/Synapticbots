@@ -255,7 +255,7 @@ export function BotsClient({ bots: initialBots }: BotsClientProps) {
     setLoading(true);
     try {
       const selectedModel = BOT_MODELS.find(m => m.id === deployModel);
-      const botName = `Synaptic Marshal — ${selectedModel?.name || 'Synaptic Adaptive'}`;
+      const botName = selectedModel?.name || 'Synaptic Adaptive';
       const res = await fetch('/api/bots/create', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -324,7 +324,7 @@ export function BotsClient({ bots: initialBots }: BotsClientProps) {
             </button>
           </div>
 
-          {/* ── Synaptic Marshal Card (shows when no bots yet) ── */}
+          {/* ── Synaptic Bot Card (shows when no bots yet) ── */}
           {bots.length === 0 && (
             <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
               style={{
@@ -342,7 +342,7 @@ export function BotsClient({ bots: initialBots }: BotsClientProps) {
                 <Shield size={28} color="#22C55E" />
               </div>
               <h3 style={{ fontSize: '20px', fontWeight: 700, marginBottom: '6px', color: '#E5E7EB' }}>
-                Synaptic Marshal
+                Synaptic Adaptive
               </h3>
               <p style={{ fontSize: '12px', color: '#6B7280', marginBottom: '6px' }}>
                 HMM-Powered Crypto Trading Engine
@@ -365,7 +365,7 @@ export function BotsClient({ bots: initialBots }: BotsClientProps) {
                     color: '#fff', fontSize: '14px', fontWeight: 700, cursor: 'pointer',
                     transition: 'all 0.2s',
                   }}>
-                  <Rocket size={16} /> Deploy Synaptic Marshal
+                  <Rocket size={16} /> Deploy Bot
                 </button>
               </div>
             </motion.div>
@@ -454,7 +454,7 @@ export function BotsClient({ bots: initialBots }: BotsClientProps) {
                   <Rocket size={20} color="#22C55E" />
                 </div>
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <h2 style={{ fontSize: '18px', fontWeight: 700, color: '#E5E7EB', margin: 0 }}>Deploy Synaptic Marshal</h2>
+                  <h2 style={{ fontSize: '18px', fontWeight: 700, color: '#E5E7EB', margin: 0 }}>Deploy Synaptic Bot</h2>
                   <p style={{ fontSize: '11px', color: '#6B7280', margin: '2px 0 0' }}>Configure and launch your trading bot</p>
                 </div>
                 <button

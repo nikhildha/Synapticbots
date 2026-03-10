@@ -85,7 +85,7 @@ CONFIDENCE_LOW = 0.92    # 92–96% → 15x  (optimized from 0.85, below 92% = n
 # ─── Strategy Profiles (legacy — kept for backward compatibility) ───────────────
 STRATEGY_PROFILES = {
     "standard": {
-        "label": "SM-Adaptive",
+        "label": "Synaptic Adaptive",
         "confidence_min": 0.10,         # Multi-TF conviction replaces this
         "confidence_tiers": {0.10: 10}, # Brain switcher sets leverage
         "max_positions": 10,

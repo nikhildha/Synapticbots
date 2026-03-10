@@ -172,7 +172,7 @@ export function DashboardClient({ user, stats, bots, recentTrades }: DashboardCl
     take_profit: t.takeProfit || t.take_profit || 0,
     entry_time: t.entryTime || t.entry_time || '',
     exit_time: t.exitTime || t.exit_time || null,
-    bot_name: 'Synaptic Marshal',
+    bot_name: 'Synaptic Adaptive',
     mode: t.mode || 'paper',
   }));
   const trades = apiTrades.length > 0 ? apiTrades : ssrTradesNormalized;
