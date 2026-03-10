@@ -374,7 +374,7 @@ export function PnlCard({ trades, coinDcxBalance, binanceBalance }: PnlCardProps
             </div>
 
             {/* Exchange balances */}
-            <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '8px', marginBottom: hasAnyBalance ? '10px' : '0' }}>
+            <div style={{ display: 'flex', flexDirection: 'row' as const, gap: '8px', marginBottom: hasAnyBalance ? '10px' : '0' }}>
                 {/* Binance */}
                 <div style={{
                     flex: 1, padding: '10px 12px', borderRadius: '10px',
