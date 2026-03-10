@@ -15,6 +15,7 @@ PAPER_TRADE = os.getenv("PAPER_TRADE", "true").lower() == "true"
 ENGINE_USER_ID = "cmmbvbo2l0000j1xo3rqvkfhz"  # Default user for engine trades (admin)
 ENGINE_BOT_ID  = os.getenv("ENGINE_BOT_ID", "")    # DB Bot.id — set in Railway per deployment
 ENGINE_BOT_NAME = os.getenv("ENGINE_BOT_NAME", "") # Human-readable bot name shown in trades UI
+ENGINE_BRAIN_TYPE = "adaptive"                        # "adaptive" or "athena" — set at runtime via /api/set-bot-id
 PAPER_MAX_CAPITAL = 2500       # Total portfolio: 25 slots × $100/trade
 
 # ─── CoinDCX API (used for LIVE trading) ────────────────────────────────────────

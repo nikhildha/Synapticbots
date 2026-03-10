@@ -776,9 +776,9 @@ class RegimeMasterBot:
                 }
                 return None
 
-            # ── Athena LLM Reasoning Gate (contextual validation) ──
+            # ── Athena LLM Reasoning Gate (only when brain_type = "athena") ──
             athena_action = None
-            if self._athena and config.LLM_REASONING_ENABLED:
+            if self._athena and config.LLM_REASONING_ENABLED and config.ENGINE_BRAIN_TYPE == "athena":
                 try:
                     llm_ctx = {
                         "ticker": symbol,

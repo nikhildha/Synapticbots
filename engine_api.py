@@ -759,6 +759,7 @@ def api_set_bot_id():
     data = request.get_json() or {}
     bot_id = data.get("bot_id", "")
     user_id = data.get("user_id", "")
+    brain_type = data.get("brain_type", "adaptive")
 
     if not bot_id:
         return jsonify({"error": "bot_id is required"}), 400
@@ -766,13 +767,18 @@ def api_set_bot_id():
     old_id = config.ENGINE_BOT_ID
     config.ENGINE_BOT_ID = bot_id
 
+    # Set brain type (adaptive = HMM-only, athena = HMM + Gemini AI)
+    old_brain = config.ENGINE_BRAIN_TYPE
+    config.ENGINE_BRAIN_TYPE = brain_type if brain_type in ("adaptive", "athena") else "adaptive"
+
     # Also update user_id if provided
     if user_id:
         config.ENGINE_USER_ID = user_id
 
     logger.info(
-        "🔑 ENGINE_BOT_ID updated: %s → %s (user: %s)",
-        old_id or "<empty>", bot_id, user_id or "<unchanged>"
+        "🔑 ENGINE_BOT_ID updated: %s → %s (user: %s, brain: %s → %s)",
+        old_id or "<empty>", bot_id, user_id or "<unchanged>",
+        old_brain, config.ENGINE_BRAIN_TYPE,
     )
 
     return jsonify({
@@ -780,6 +786,7 @@ def api_set_bot_id():
         "bot_id": bot_id,
         "previous_bot_id": old_id,
         "user_id": user_id or config.ENGINE_USER_ID,
+        "brain_type": config.ENGINE_BRAIN_TYPE,
     })
 
 

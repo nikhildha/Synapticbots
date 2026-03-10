@@ -22,7 +22,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const { name, exchange, mode, maxTrades, capitalPerTrade } = await request.json();
+    const { name, exchange, mode, maxTrades, capitalPerTrade, brainType } = await request.json();
 
     if (!name || !exchange) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
@@ -51,6 +51,7 @@ export async function POST(request: Request) {
     const botMode = mode || 'paper';
     const botMaxTrades = maxTrades || 25;
     const botCapitalPerTrade = capitalPerTrade || 100;
+    const botBrainType = brainType || 'adaptive';
 
     // Create bot with config from deploy modal
     const bot = await prisma.bot.create({
@@ -74,6 +75,7 @@ export async function POST(request: Request) {
             t3Multiplier: 1.5,
             t1BookPct: 0.25,
             t2BookPct: 0.50,
+            brainType: botBrainType,
             coinList: ['BTCUSDT', 'ETHUSDT', 'BNBUSDT', 'SOLUSDT', 'DOGEUSDT'].slice(0, coinScansLimit),
           },
         },

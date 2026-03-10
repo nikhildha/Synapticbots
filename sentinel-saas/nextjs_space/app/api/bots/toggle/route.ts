@@ -180,10 +180,11 @@ export async function POST(request: Request) {
           body: JSON.stringify({
             bot_id: botId,
             user_id: session.user.id,
+            brain_type: (bot.config as any)?.brainType || 'adaptive',
           }),
           signal: AbortSignal.timeout(5000),
         });
-        console.log(`[toggle] set-bot-id: pushed botId=${botId} to engine`);
+        console.log(`[toggle] set-bot-id: pushed botId=${botId} brain=${(bot.config as any)?.brainType || 'adaptive'} to engine`);
       } catch (e) {
         console.warn('[toggle] set-bot-id failed (continuing):', e);
       }

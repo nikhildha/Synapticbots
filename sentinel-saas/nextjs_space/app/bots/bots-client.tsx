@@ -16,8 +16,15 @@ const BOT_MODELS = [
     id: 'adaptive',
     name: 'Synaptic Adaptive',
     color: '#22C55E',
-    description: 'Auto-adjusts between Conservative, Balanced & Aggressive based on market conditions',
+    description: 'HMM regime detection — auto-switches between Conservative, Balanced & Aggressive',
     badge: '🧠',
+  },
+  {
+    id: 'athena',
+    name: 'Athena AI',
+    color: '#A78BFA',
+    description: 'HMM + Gemini AI reasoning — validates every signal with real-time contextual analysis',
+    badge: '🏛️',
   },
 ];
 
@@ -264,6 +271,7 @@ export function BotsClient({ bots: initialBots }: BotsClientProps) {
           mode: deployMode,
           maxTrades: deployMaxTrades,
           capitalPerTrade: deployCapitalPerTrade,
+          brainType: deployModel,
         }),
       });
       if (res.ok) {

@@ -130,6 +130,9 @@ model BotConfig {
   // Conviction / leverage tiers (JSON)
   leverageTiers     Json?     // [{min:40,max:55,lev:5},{min:55,max:70,lev:10}...]
   
+  // Brain selection (adaptive = HMM-only, athena = HMM + Gemini AI)
+  brainType         String    @default("adaptive") // adaptive, athena
+
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @updatedAt
 }

@@ -84,7 +84,7 @@ export async function PUT(request: Request) {
             'mode', 'capitalPerTrade', 'maxOpenTrades',
             'slMultiplier', 'tpMultiplier', 'maxLossPct',
             'multiTargetEnabled', 't1Multiplier', 't2Multiplier', 't3Multiplier',
-            't1BookPct', 't2BookPct', 'coinList', 'leverageTiers',
+            't1BookPct', 't2BookPct', 'coinList', 'leverageTiers', 'brainType',
         ];
         for (const f of fields) {
             if (configData[f] !== undefined) allowed[f] = configData[f];
