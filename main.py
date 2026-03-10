@@ -442,14 +442,16 @@ class RegimeMasterBot:
 
                 # Skip if already have active trade for this profile:symbol
                 if pos_key in tradebook_active_keys:
+                    self._coin_states.setdefault(sym, {})["deploy_status"] = "ACTIVE"
                     continue
 
                 # Evaluate raw analysis through this profile's lens
                 trade = self._evaluate_for_profile(raw, profile_id, profile, balance)
                 if not trade:
-                    logger.info("   ⛔ [%s] %s: FILTERED by profile evaluation", profile_id, sym)
+                    logger.warning("   ⛔ [%s] %s: FILTERED by profile evaluation", profile_id, sym)
                     continue
 
+                self._coin_states.setdefault(sym, {})["deploy_status"] = "DEPLOYING"
                 eligible_trades.append(trade)
                 logger.info("   ✅ [%s] %s: PASSED evaluation — preparing to deploy", profile_id, sym)
 
@@ -1082,8 +1084,9 @@ class RegimeMasterBot:
             max_loss_pct = abs(config.MAX_LOSS_PER_TRADE_PCT)
 
         if leverage == 0:
-            logger.info("⛔ [%s] %s: leverage=0 (conviction=%.1f below profile min)",
+            logger.warning("⛔ [%s] %s: leverage=0 (conviction=%.1f below profile min)",
                         profile_id, symbol, conviction)
+            self._coin_states.setdefault(symbol, {})["deploy_status"] = "FILTERED: low conviction"
             return None
 
         # Check profile's max position limit
@@ -1091,8 +1094,9 @@ class RegimeMasterBot:
         profile_active = sum(1 for k in self._active_positions if k.startswith(profile_prefix))
         max_pos = brain_cfg.get("max_positions", profile.get("max_positions", config.MAX_CONCURRENT_POSITIONS)) if brain_cfg else profile.get("max_positions", config.MAX_CONCURRENT_POSITIONS)
         if profile_active >= max_pos:
-            logger.info("⛔ [%s] %s: max positions reached (%d/%d)",
+            logger.warning("⛔ [%s] %s: max positions reached (%d/%d)",
                         profile_id, symbol, profile_active, max_pos)
+            self._coin_states.setdefault(symbol, {})["deploy_status"] = f"FILTERED: max positions ({profile_active}/{max_pos})"
             return None
 
         # Position sizing — always requires valid balance for correct user experience
@@ -1100,6 +1104,7 @@ class RegimeMasterBot:
 
         if not config.PAPER_TRADE and balance <= 0:
             logger.warning("⛔ [%s] %s: LIVE balance=$0 — cannot deploy", profile_id, symbol)
+            self._coin_states.setdefault(symbol, {})["deploy_status"] = "FILTERED: zero balance"
             return None
 
         # ── Margin-First Position Sizing ──
@@ -1111,15 +1116,17 @@ class RegimeMasterBot:
 
         current_price = self._coin_states.get(symbol, {}).get("price", 0)
         if current_price <= 0:
-            logger.info("⛔ [%s] %s: current_price=0, cannot size position", profile_id, symbol)
+            logger.warning("⛔ [%s] %s: current_price=0, cannot size position", profile_id, symbol)
+            self._coin_states.setdefault(symbol, {})["deploy_status"] = "FILTERED: no price data"
             return None
 
         quantity, final_leverage = self.risk.calculate_margin_first_position(
             margin, current_price, raw["atr"], leverage
         )
         if quantity <= 0:
-            logger.info("⛔ [%s] %s: trade skipped — risk too high at min leverage",
-                        profile_id, symbol)
+            logger.warning("⛔ [%s] %s: trade skipped — risk too high at min leverage (margin=$%.0f price=%.4f atr=%.4f)",
+                        profile_id, symbol, margin, current_price, raw["atr"])
+            self._coin_states.setdefault(symbol, {})["deploy_status"] = "FILTERED: risk too high"
             return None
 
         # Use the risk-capped leverage (may be lower than conviction leverage)
