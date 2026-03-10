@@ -28,7 +28,7 @@ export async function GET() {
                 trades: {
                     select: {
                         id: true,
-                        symbol: true,
+                        coin: true,
                         position: true,
                         status: true,
                         entryPrice: true,
@@ -88,7 +88,7 @@ export async function GET() {
                 // Last 10 trades for expandable view
                 recentTrades: trades.slice(0, 10).map((t: any) => ({
                     id: t.id,
-                    symbol: t.symbol,
+                    symbol: t.coin,
                     position: t.position,
                     status: t.status,
                     entryPrice: t.entryPrice,
