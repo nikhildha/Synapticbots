@@ -37,7 +37,8 @@ class AthenaDecision:
     adjusted_confidence: float  # 0.0–1.0 (multiplied against conviction)
     reasoning: str          # Human-readable explanation
     risk_flags: list        # List of identified risk factors
-    model: str = ""         # Model used (e.g. "gemini-2.0-flash")
+    athena_direction: str = ""  # LONG, SHORT, or SKIP — Athena's own directional view
+    model: str = ""         # Model used (e.g. "gemini-2.5-flash")
     latency_ms: int = 0     # API call duration
     cached: bool = False    # Whether this was a cache hit
     timestamp: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
@@ -276,6 +277,7 @@ class AthenaEngine:
             adjusted_confidence=adj_conf,
             reasoning=reasoning,
             risk_flags=risk_flags,
+            athena_direction=raw_action,  # Preserve LONG/SHORT/SKIP
             model=config.LLM_MODEL,
             latency_ms=latency_ms,
         )

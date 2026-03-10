@@ -834,6 +834,41 @@ class RegimeMasterBot:
                         }
                         return None
 
+                    # ── Direction Conflict Detection ──
+                    # Compare HMM side (BUY/SELL) with Athena's direction (LONG/SHORT)
+                    athena_dir = getattr(athena_decision, "athena_direction", "").upper()
+                    hmm_side_map = {"BUY": "LONG", "SELL": "SHORT"}
+                    hmm_as_dir = hmm_side_map.get(side, "")
+
+                    if athena_dir in ("LONG", "SHORT") and athena_dir != hmm_as_dir:
+                        # Athena disagrees with HMM on direction
+                        if athena_decision.adjusted_confidence >= 0.8:
+                            # Strong Athena conviction (≥8/10) → OVERRIDE HMM direction
+                            old_side = side
+                            side = "BUY" if athena_dir == "LONG" else "SELL"
+                            logger.warning(
+                                "🏛️ Athena [%s] DIRECTION OVERRIDE: HMM=%s → Athena=%s "
+                                "(conf=%.0f%%) — %s",
+                                symbol, old_side, side,
+                                athena_decision.adjusted_confidence * 100,
+                                athena_decision.reasoning[:80],
+                            )
+                        else:
+                            # Weak disagreement → VETO (stay out when conflicting signals)
+                            logger.warning(
+                                "🏛️ Athena [%s] DIRECTION CONFLICT VETO: HMM=%s vs Athena=%s "
+                                "(conf=%.0f%% < 80%%) — staying out",
+                                symbol, side, athena_dir,
+                                athena_decision.adjusted_confidence * 100,
+                            )
+                            self._coin_states[symbol] = {
+                                "symbol": symbol, "regime": regime_summary,
+                                "confidence": round(conf, 4), "price": current_price,
+                                "action": f"ATHENA_CONFLICT:{side}vs{athena_dir}",
+                                "brain": brain_id,
+                            }
+                            return None
+
                     if athena_decision.action == "REDUCE_SIZE":
                         old_conv = conviction
                         conviction *= athena_decision.adjusted_confidence
