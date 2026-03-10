@@ -120,11 +120,8 @@ export function AthenaPanel({ athena, coinStates }: Props) {
                     <span style={{ fontSize: '24px' }}>🏛️</span>
                     <div>
                         <h2 style={{ fontSize: '17px', fontWeight: 800, color: '#A78BFA', margin: 0, letterSpacing: '0.5px' }}>
-                            Athena Intelligence
+                            Athena.AI
                         </h2>
-                        <span style={{ fontSize: '11px', color: '#6B7280' }}>
-                            Lead Investment Officer · Google Search Grounded
-                        </span>
                     </div>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
