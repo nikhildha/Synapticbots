@@ -101,7 +101,7 @@ def _compute_summary(book):
 
 def open_trade(symbol, side, leverage, quantity, entry_price, atr,
                regime, confidence, reason="", capital=100.0, mode=None, user_id=None,
-               profile_id="standard", bot_name="SM-Standard",
+               profile_id="standard", bot_name="Synaptic Adaptive",
                exchange=None, pair=None, position_id=None, bot_id=None):
     """
     Record a new trade entry in the tradebook.

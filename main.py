@@ -480,12 +480,28 @@ class RegimeMasterBot:
                 )
 
                 # Record in tradebook — use CoinDCX-confirmed values for live mode
+                # LIVE CONFIRMED: Do NOT record if execution failed (prevents phantom trades)
+                if result is None and not config.PAPER_TRADE:
+                    logger.warning(
+                        "⚠️ DEPLOYMENT_FAILED [%s]: %s %s — order rejected/failed, NOT recording",
+                        profile["label"], trade["side"], sym,
+                    )
+                    continue
+
                 entry_price = result.get("entry_price", 0) if result else 0
                 fill_qty    = result.get("quantity", trade["quantity"]) if result else trade["quantity"]
                 fill_lev    = result.get("leverage", trade["leverage"]) if result else trade["leverage"]
                 fill_capital = result.get("capital", 100.0) if result else 100.0
                 fill_sl     = result.get("stop_loss", 0) if result else 0
                 fill_tp     = result.get("take_profit", 0) if result else 0
+
+                # LIVE CONFIRMED: Skip if zero entry price (exchange didn't confirm fill)
+                if entry_price <= 0 and not config.PAPER_TRADE:
+                    logger.warning(
+                        "⚠️ DEPLOYMENT_FAILED [%s]: %s %s — zero entry price, NOT recording",
+                        profile["label"], trade["side"], sym,
+                    )
+                    continue
 
                 tradebook.open_trade(
                     symbol=sym,
