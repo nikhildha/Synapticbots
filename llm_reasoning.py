@@ -80,7 +80,7 @@ Given the HMM signal context, reason about:
 - You are a RISK FILTER, not a signal generator. Only validate or reject signals.
 - Be decisive. If you're uncertain, use REDUCE_SIZE, not VETO.
 - Never VETO based solely on "I'm not sure." Only VETO when you have specific contrary evidence.
-- Keep reasoning concise (1-3 sentences max).
+- Keep reasoning to 1-2 SHORT sentences. Do NOT write paragraphs.
 - Your adjusted_confidence should reflect how much you trust the HMM signal:
   - 1.0 = full trust, proceed at full conviction
   - 0.5 = half trust, reduce position size
@@ -193,7 +193,8 @@ class AthenaEngine:
             config=types.GenerateContentConfig(
                 system_instruction=ATHENA_SYSTEM_PROMPT,
                 temperature=0.3,
-                max_output_tokens=1024,
+                max_output_tokens=2048,
+                response_mime_type="application/json",
             ),
         )
         latency_ms = int((time.time() - start) * 1000)
