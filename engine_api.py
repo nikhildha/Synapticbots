@@ -890,9 +890,11 @@ def _run_engine():
         while retry < MAX_RETRIES:
             loop_start = time.time()
             try:
+                logger.info("🔧 Creating RegimeMasterBot (attempt %d/%d, mem: %sMB)...",
+                           retry + 1, MAX_RETRIES, _get_memory_mb())
                 from main import RegimeMasterBot
                 _engine_bot = RegimeMasterBot()
-                logger.info("🚀 Engine loop starting (attempt %d/%d)", retry + 1, MAX_RETRIES)
+                logger.info("✅ RegimeMasterBot created (mem: %sMB) — starting run loop", _get_memory_mb())
                 _engine_bot.run()
                 # If run() returns cleanly (self._running set to False), break out
                 logger.info("Engine run() returned (self._running = False)")
@@ -900,8 +902,6 @@ def _run_engine():
             except KeyboardInterrupt:
                 # SIGTERM from Railway during redeploy — NOT a crash
                 logger.warning("⚡ Engine received SIGTERM/KeyboardInterrupt — will restart")
-                _engine_crash_count += 1
-                _engine_last_crash = datetime.now(timezone.utc).isoformat()
                 _save_crash("SIGTERM/KeyboardInterrupt", crash_type="signal")
                 # Reset retry counter — signals are not bugs
                 retry = 0
@@ -910,7 +910,8 @@ def _run_engine():
             except Exception as e:
                 _engine_crash_count += 1
                 _engine_last_crash = datetime.now(timezone.utc).isoformat()
-                logger.critical("💥 Engine thread crashed (attempt %d/%d): %s", retry + 1, MAX_RETRIES, e, exc_info=True)
+                logger.critical("💥 Engine thread crashed (attempt %d/%d, mem: %sMB): %s",
+                               retry + 1, MAX_RETRIES, _get_memory_mb(), e, exc_info=True)
                 _save_crash(str(e), crash_type="thread_crash")
 
                 # If engine ran for > 5 minutes, reset retry counter (it was healthy)
