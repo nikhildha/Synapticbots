@@ -804,14 +804,14 @@ export function DashboardClient({ user, stats, bots, recentTrades }: DashboardCl
           </motion.div>
 
           {/* ═══ Row 6: Athena Intelligence Panel ═══ */}
-          {botState?.athena?.enabled && (
+          {(botState?.athena?.enabled || bots?.some((b: any) => (b.config?.brainType || b.brainType || '').toLowerCase() === 'athena')) && (
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.4 }}
               className="mt-6"
             >
-              <AthenaPanel athena={botState.athena} coinStates={multi?.coin_states} />
+              <AthenaPanel athena={botState?.athena || { enabled: true, recent_decisions: [], model: 'gemini-2.0-flash' }} coinStates={multi?.coin_states} />
             </motion.div>
           )}
         </div>
