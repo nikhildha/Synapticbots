@@ -19,17 +19,6 @@ interface AuditEntry {
     severity: 'info' | 'warning' | 'critical';
 }
 
-const MOCK_LOGS: AuditEntry[] = [
-    { id: '1', timestamp: new Date().toISOString(), actor: 'admin@sentinel.app', actorRole: 'admin', action: 'Admin Login', category: 'auth', details: 'Admin logged in via credentials', severity: 'info' },
-    { id: '2', timestamp: new Date(Date.now() - 300000).toISOString(), actor: 'testuser@sentinel.app', actorRole: 'user', action: 'Bot Created', category: 'bot', details: 'Created bot "HMM Alpha" in paper mode', severity: 'info' },
-    { id: '3', timestamp: new Date(Date.now() - 600000).toISOString(), actor: 'system', actorRole: 'system', action: 'Database Seeded', category: 'system', details: 'Initial seed script executed — 2 users, 1 bot, 3 trades', severity: 'info' },
-    { id: '4', timestamp: new Date(Date.now() - 900000).toISOString(), actor: 'admin@sentinel.app', actorRole: 'admin', action: 'Schema Migration', category: 'system', details: 'prisma db push executed — SQLite dev.db created', severity: 'warning' },
-    { id: '5', timestamp: new Date(Date.now() - 1200000).toISOString(), actor: 'testuser@sentinel.app', actorRole: 'user', action: 'Trade Opened', category: 'trade', details: 'LONG on ETHUSDT @ 3245.50 — 2x leverage, conviction 0.78', severity: 'info' },
-    { id: '6', timestamp: new Date(Date.now() - 1500000).toISOString(), actor: 'system', actorRole: 'system', action: 'Failed Login Attempt', category: 'auth', details: 'Invalid credentials for unknown@test.com from 192.168.1.1', severity: 'critical' },
-    { id: '7', timestamp: new Date(Date.now() - 1800000).toISOString(), actor: 'testuser@sentinel.app', actorRole: 'user', action: 'Subscription Upgraded', category: 'subscription', details: 'Upgraded from Free → Pro plan', severity: 'info' },
-    { id: '8', timestamp: new Date(Date.now() - 2400000).toISOString(), actor: 'admin@sentinel.app', actorRole: 'admin', action: 'User Role Changed', category: 'admin', details: 'Changed testuser@sentinel.app role from user to moderator', severity: 'warning' },
-];
-
 const CATEGORY_ICONS: Record<string, React.ReactNode> = {
     auth: <LogIn className="w-4 h-4" />,
     bot: <Bot className="w-4 h-4" />,
@@ -55,9 +44,20 @@ const SEVERITY_COLORS: Record<string, string> = {
 };
 
 export default function AuditLog() {
-    const [logs, setLogs] = useState<AuditEntry[]>(MOCK_LOGS);
+    const [logs, setLogs] = useState<AuditEntry[]>([]);
     const [filter, setFilter] = useState<string>('all');
     const [searchQuery, setSearchQuery] = useState('');
+    const [loading, setLoading] = useState(false);
+
+    // Future: fetch from /api/admin/audit-log
+    useEffect(() => {
+        // Placeholder for real audit log API
+        // setLoading(true);
+        // fetch('/api/admin/audit-log')
+        //   .then(r => r.json())
+        //   .then(data => setLogs(data.logs || []))
+        //   .finally(() => setLoading(false));
+    }, []);
 
     const filteredLogs = logs.filter(log => {
         const matchesCategory = filter === 'all' || log.category === filter;
@@ -76,8 +76,8 @@ export default function AuditLog() {
             <div className="flex items-center gap-3 p-4 rounded-xl bg-blue-500/5 border border-blue-500/10">
                 <Info className="w-5 h-5 text-blue-400 shrink-0" />
                 <p className="text-gray-400 text-sm">
-                    Audit log tracks all administrative actions, login events, and system changes.
-                    Logs will be persisted to the database once the audit model is added.
+                    Audit log will track all administrative actions, login events, and system changes.
+                    Connect to the <code className="text-blue-300">/api/admin/audit-log</code> endpoint once the notification framework is implemented.
                 </p>
             </div>
 
@@ -99,8 +99,8 @@ export default function AuditLog() {
                             key={cat}
                             onClick={() => setFilter(cat)}
                             className={`px-3 py-2 rounded-lg text-xs font-medium capitalize transition ${filter === cat
-                                    ? 'bg-blue-600 text-white'
-                                    : 'bg-white/5 text-gray-400 hover:bg-white/10'
+                                ? 'bg-blue-600 text-white'
+                                : 'bg-white/5 text-gray-400 hover:bg-white/10'
                                 }`}
                         >
                             {cat}
@@ -119,6 +119,13 @@ export default function AuditLog() {
                         Export CSV
                     </button>
                 </div>
+
+                {loading && (
+                    <div className="text-center py-12 text-gray-500">
+                        <RefreshCw className="w-8 h-8 mx-auto mb-3 animate-spin opacity-30" />
+                        <p>Loading audit logs...</p>
+                    </div>
+                )}
 
                 <div className="divide-y divide-white/5">
                     {filteredLogs.map((log) => (
@@ -155,10 +162,13 @@ export default function AuditLog() {
                     ))}
                 </div>
 
-                {filteredLogs.length === 0 && (
+                {!loading && filteredLogs.length === 0 && (
                     <div className="text-center py-12 text-gray-500">
                         <FileText className="w-10 h-10 mx-auto mb-3 opacity-30" />
-                        <p>No log entries match your filter</p>
+                        <p>No audit log entries yet</p>
+                        <p className="text-xs mt-1 text-gray-600">
+                            Logs will appear here once the notification framework is connected
+                        </p>
                     </div>
                 )}
             </div>

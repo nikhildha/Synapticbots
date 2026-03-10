@@ -14,10 +14,10 @@ async function main() {
   // ─── Admin Account ──────────────────────────────────────────────
   const adminPassword = await bcrypt.hash('Admin@2026', 12);
   const admin = await prisma.user.upsert({
-    where: { email: 'admin@sentinel.app' },
+    where: { email: 'admin@synaptic.ai' },
     update: {},
     create: {
-      email: 'admin@sentinel.app',
+      email: 'admin@synaptic.ai',
       name: 'Nikhil (Admin)',
       password: adminPassword,
       role: 'admin',
@@ -32,7 +32,7 @@ async function main() {
     },
   });
   console.log('✅ Admin account created:');
-  console.log('   Email:    admin@sentinel.app');
+  console.log('   Email:    admin@synaptic.ai');
   console.log('   Password: Admin@2026');
   console.log('   Role:     admin');
   console.log('   Plan:     Ultra (50 coin scans)\n');
@@ -40,10 +40,10 @@ async function main() {
   // ─── Test User Account ──────────────────────────────────────────
   const testPassword = await bcrypt.hash('Test@1234', 12);
   const testUser = await prisma.user.upsert({
-    where: { email: 'testuser@sentinel.app' },
+    where: { email: 'testuser@synaptic.ai' },
     update: {},
     create: {
-      email: 'testuser@sentinel.app',
+      email: 'testuser@synaptic.ai',
       name: 'Test Trader',
       password: testPassword,
       role: 'user',
@@ -58,7 +58,7 @@ async function main() {
     },
   });
   console.log('✅ Test user account created:');
-  console.log('   Email:    testuser@sentinel.app');
+  console.log('   Email:    testuser@synaptic.ai');
   console.log('   Password: Test@1234');
   console.log('   Role:     user');
   console.log('   Plan:     Pro (15 coin scans)\n');
@@ -181,8 +181,8 @@ async function main() {
   console.log('┌──────────────┬──────────────────────────┬──────────────┐');
   console.log('│ Role         │ Email                    │ Password     │');
   console.log('├──────────────┼──────────────────────────┼──────────────┤');
-  console.log('│ 🔑 Admin     │ admin@sentinel.app       │ Admin@2026   │');
-  console.log('│ 👤 Test User │ testuser@sentinel.app    │ Test@1234    │');
+  console.log('│ 🔑 Admin     │ admin@synaptic.ai       │ Admin@2026   │');
+  console.log('│ 👤 Test User │ testuser@synaptic.ai    │ Test@1234    │');
   console.log('└──────────────┴──────────────────────────┴──────────────┘');
 }
 
