@@ -60,15 +60,25 @@ _buf_handler.setLevel(logging.INFO)
 logging.getLogger().addHandler(_buf_handler)
 
 
+# ─── SAFETY GUARD: Require explicit env var to allow live trading ─────
+ALLOW_LIVE_TRADING = os.getenv("ALLOW_LIVE_TRADING", "false").lower() == "true"
+
 def _restore_mode_on_startup():
     """On startup: restore live mode from engine_mode.json if Railway PAPER_TRADE is still true.
-    This persists the runtime mode switch across engine restarts when env var isn't updated."""
+    This persists the runtime mode switch across engine restarts when env var isn't updated.
+    SAFETY: Requires ALLOW_LIVE_TRADING=true env var to actually switch to live."""
     try:
         mode_file = os.path.join(config.DATA_DIR, "engine_mode.json")
         if os.path.exists(mode_file):
             with open(mode_file, "r") as f:
                 saved = json.load(f)
             if saved.get("mode") == "live":
+                if not ALLOW_LIVE_TRADING:
+                    logger.warning(
+                        "🛑 SAFETY: engine_mode.json says live but ALLOW_LIVE_TRADING is not set. "
+                        "Staying in PAPER mode. Set ALLOW_LIVE_TRADING=true in Railway env vars to enable live trading."
+                    )
+                    return
                 config.PAPER_TRADE = False
                 config.EXCHANGE_LIVE = saved.get("exchange", "coindcx")
                 logger.info(
@@ -526,10 +536,22 @@ def api_sync_exchange():
 
 @app.route("/api/set-mode", methods=["POST"])
 def api_set_mode():
-    """Switch engine between paper and live trading mode at runtime."""
+    """Switch engine between paper and live trading mode at runtime.
+    SAFETY: Requires ALLOW_LIVE_TRADING=true env var to switch to live."""
     data = request.get_json() or {}
     mode = data.get("mode", "paper")          # "paper" | "live"
     exchange = data.get("exchange", "coindcx")
+
+    # ─── SAFETY GUARD ─────────────────────────────────────────────
+    if mode == "live" and not ALLOW_LIVE_TRADING:
+        logger.warning(
+            "🛑 SAFETY: Attempted to switch to LIVE mode but ALLOW_LIVE_TRADING is not set. "
+            "Set ALLOW_LIVE_TRADING=true in Railway env vars to enable live trading."
+        )
+        return jsonify({
+            "error": "Live trading is disabled. Set ALLOW_LIVE_TRADING=true in Railway environment variables to enable.",
+            "safety_blocked": True,
+        }), 403
 
     mode_config = {
         "mode": mode,
