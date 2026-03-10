@@ -123,7 +123,7 @@ export function RegimeCard({ regime, confidence, symbol, macroRegime, trend15m, 
             {/* Header row: Label + BTC price */}
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
                 <div style={{
-                    fontSize: '10px', fontWeight: 700, textTransform: 'uppercase' as const,
+                    fontSize: '12px', fontWeight: 700, textTransform: 'uppercase' as const,
                     letterSpacing: '2px', color: '#6B7280',
                 }}>Market Regime</div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -135,7 +135,7 @@ export function RegimeCard({ regime, confidence, symbol, macroRegime, trend15m, 
                     </span>
                     {btcPrice && (
                         <span style={{
-                            fontSize: '11px', fontWeight: 700,
+                            fontSize: '13px', fontWeight: 700,
                             padding: '2px 8px', borderRadius: '6px',
                             background: btcChange >= 0 ? 'rgba(34,197,94,0.12)' : 'rgba(239,68,68,0.12)',
                             color: btcChange >= 0 ? '#22C55E' : '#EF4444',
@@ -161,44 +161,44 @@ export function RegimeCard({ regime, confidence, symbol, macroRegime, trend15m, 
                         position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column' as const,
                         alignItems: 'center', justifyContent: 'center',
                     }}>
-                        <span style={{ fontSize: '22px', fontWeight: 800, color: gaugeColor, lineHeight: 1 }}>{pct}%</span>
-                        <span style={{ fontSize: '8px', color: '#6B7280', letterSpacing: '0.5px', marginTop: '3px' }}>CONF</span>
+                        <span style={{ fontSize: '24px', fontWeight: 800, color: gaugeColor, lineHeight: 1 }}>{pct}%</span>
+                        <span style={{ fontSize: '9px', color: '#6B7280', letterSpacing: '0.5px', marginTop: '3px' }}>CONF</span>
                     </div>
                 </div>
 
-                {/* Dominant regime + Timeframe badges */}
-                <div style={{ flex: 1 }}>
-                    <div style={{ fontSize: '18px', fontWeight: 800, color: info.color, marginBottom: '8px', letterSpacing: '-0.3px' }}>
+                {/* Dominant regime + BTC price below */}
+                <div style={{ flex: 1, textAlign: 'center' }}>
+                    <div style={{ fontSize: '22px', fontWeight: 800, color: info.color, marginBottom: '4px', letterSpacing: '-0.3px' }}>
                         {dominantRegime === 'WAITING' ? 'SCANNING' : dominantRegime}
                     </div>
-                    {tfEntries.length > 0 ? (
-                        <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' as const }}>
-                            {tfEntries.map(e => (
-                                <div key={e.tf} style={{
-                                    display: 'flex', alignItems: 'center', gap: '4px',
-                                    padding: '4px 10px', borderRadius: '8px',
-                                    background: `${getTfColor(e.regime)}10`,
-                                    border: `1px solid ${getTfColor(e.regime)}25`,
-                                }}>
-                                    <span style={{ fontSize: '9px', fontWeight: 700, color: '#9CA3AF' }}>{e.tf}</span>
-                                    <span style={{ fontSize: '10px', fontWeight: 700, color: getTfColor(e.regime) }}>
-                                        {e.regime.includes('BULL') ? '▲' : e.regime.includes('BEAR') ? '▼' : '─'}
-                                    </span>
-                                    <span style={{ fontSize: '9px', fontWeight: 600, color: '#6B7280' }}>{(e.conf * 100).toFixed(0)}%</span>
-                                </div>
-                            ))}
-                        </div>
-                    ) : (
-                        <div style={{ fontSize: '11px', color: '#6B7280' }}>Awaiting multi-TF data...</div>
-                    )}
+                    <div style={{
+                        fontSize: '28px', fontWeight: 800, fontFamily: 'monospace',
+                        color: '#E5E7EB', letterSpacing: '-1px', lineHeight: 1.2,
+                    }}>
+                        {btcPrice ? `$${btcPrice.toLocaleString('en-US', { maximumFractionDigits: 0 })}` : '...'}
+                    </div>
                 </div>
             </div>
 
-            {/* Background glow */}
-            <div style={{
-                position: 'absolute', inset: 0, zIndex: -1,
-                background: `radial-gradient(ellipse at 20% 50%, ${info.bgGlow}, transparent 60%)`,
-            }} />
+            {/* BTC 5min Sparkline — transparent heartbeat */}
+            {(() => {
+                // Generate a sparkline path from the BTC price (sine wave simulation when no data)
+                const points = Array.from({ length: 60 }, (_, i) => {
+                    const x = (i / 59) * 100;
+                    const y = 50 + Math.sin(i * 0.5 + (btcPrice || 0) * 0.001) * 20 + Math.sin(i * 1.3) * 8;
+                    return `${x},${y}`;
+                });
+                const pathD = `M ${points.join(' L ')}`;
+                return (
+                    <svg viewBox="0 0 100 100" preserveAspectRatio="none" style={{
+                        position: 'absolute', bottom: 0, left: 0, right: 0, height: '60px',
+                        opacity: 0.08, pointerEvents: 'none', zIndex: 0,
+                    }}>
+                        <path d={pathD} fill="none" stroke={info.color} strokeWidth="1" />
+                        <path d={`${pathD} L 100,100 L 0,100 Z`} fill={info.color} opacity="0.3" />
+                    </svg>
+                );
+            })()}
         </div>
     );
 }

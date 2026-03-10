@@ -344,7 +344,7 @@ export function DashboardClient({ user, stats, bots, recentTrades }: DashboardCl
                   Welcome, <span className="text-gradient">{user?.name ?? 'Trader'}</span>
                 </h1>
                 <p className="text-[var(--color-text-secondary)] text-sm">
-                  AI Trading Cockpit — Monitor your bots and market signals
+                  AI Crypto Trading Cockpit — Monitor your bots and market signals
                 </p>
               </div>
               {/* PnL Scope Toggle + Mode Badge — top right */}

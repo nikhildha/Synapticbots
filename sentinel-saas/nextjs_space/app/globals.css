@@ -24,6 +24,7 @@
 
   body {
     @apply bg-[var(--color-background)] text-[var(--color-text)] antialiased;
+    font-size: 15px;
     overflow-x: hidden;
     position: relative;
   }
