@@ -54,8 +54,17 @@ export default function LandingPage() {
     <div className="min-h-screen">
       <Header />
 
+      {/* Full-screen background image */}
+      <div style={{
+        position: 'fixed', inset: 0, zIndex: 0, pointerEvents: 'none',
+        backgroundImage: 'url(/bg-deep-space.png)',
+        backgroundSize: 'cover', backgroundPosition: 'center center',
+        backgroundRepeat: 'no-repeat',
+        opacity: 0.65,
+      }} />
+
       {/* Hero Section */}
-      <section className="relative pt-32 pb-20 px-4 overflow-hidden">
+      <section className="relative pt-32 pb-20 px-4 overflow-hidden" style={{ zIndex: 1 }}>
         <div className="absolute inset-0 bg-gradient-to-br from-[var(--color-primary)]/10 via-transparent to-[var(--color-accent)]/10"></div>
         <div className="max-w-6xl mx-auto text-center relative z-10">
           <motion.div
@@ -90,7 +99,7 @@ export default function LandingPage() {
       </section>
 
       {/* Features Section */}
-      <section className="py-20 px-4">
+      <section className="py-20 px-4" style={{ position: 'relative', zIndex: 1 }}>
         <div className="max-w-6xl mx-auto">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
@@ -126,7 +135,7 @@ export default function LandingPage() {
       </section>
 
       {/* CTA Section */}
-      <section className="py-20 px-4">
+      <section className="py-20 px-4" style={{ position: 'relative', zIndex: 1 }}>
         <div className="max-w-4xl mx-auto">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
@@ -149,7 +158,7 @@ export default function LandingPage() {
       </section>
 
       {/* Footer */}
-      <footer className="border-t border-[var(--color-surface-light)] py-8 px-4">
+      <footer className="border-t border-[var(--color-surface-light)] py-8 px-4" style={{ position: 'relative', zIndex: 1 }}>
         <div className="max-w-6xl mx-auto text-center text-[var(--color-text-secondary)]">
           <p>&copy; 2026 Synaptic. All rights reserved.</p>
         </div>
