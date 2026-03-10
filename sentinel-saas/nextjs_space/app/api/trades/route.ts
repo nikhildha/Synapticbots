@@ -44,26 +44,32 @@ export async function GET(request: NextRequest) {
         const page = parseInt(searchParams.get('page') || '1');
         const limit = Math.min(parseInt(searchParams.get('limit') || '50'), 100);
 
-        // Sync engine trades into Prisma for this user's bot before reading
-        const userBot = await prisma.bot.findFirst({
+        // Sync engine trades into Prisma for this user's bots before reading
+        // MULTI-BOT FIX: fetch ALL bots and sync each one
+        const userBots = await prisma.bot.findMany({
             where: { userId },
+            include: { config: true },  // F5 FIX: include config so mode is available
             orderBy: { updatedAt: 'desc' },
         });
 
         // Determine correct engine based on bot mode
-        const botMode = ((userBot as any)?.config as any)?.mode || 'paper';
-        const engineMode: EngineMode = botMode.toLowerCase().includes('live') ? 'live' : 'paper';
+        // Use live engine if ANY bot is in live mode
+        const hasLiveBot = userBots.some((b: any) =>
+            b.isActive && (b.config?.mode || '').toLowerCase().includes('live')
+        );
+        const engineMode: EngineMode = hasLiveBot ? 'live' : 'paper';
 
-        if (userBot && userBot.startedAt) {
-            try {
-                const engineTrades = await fetchEngineTrades(engineMode);
-                if (engineTrades.length > 0) {
-                    // Only sync trades opened AFTER the user started their bot (next-cycle-only)
-                    await syncEngineTrades(engineTrades, userBot.id, userBot.startedAt);
+        try {
+            const engineTrades = await fetchEngineTrades(engineMode);
+            if (engineTrades.length > 0) {
+                // Sync to ALL bots that have been started
+                for (const ub of userBots) {
+                    if (!ub.startedAt) continue;
+                    await syncEngineTrades(engineTrades, ub.id, ub.startedAt);
                 }
-            } catch (err) {
-                console.error('[trades] Sync failed:', err);
             }
+        } catch (err) {
+            console.error('[trades] Sync failed:', err);
         }
 
         // Read from Prisma — already user-isolated, optionally filtered by botId
@@ -102,7 +108,6 @@ export async function GET(request: NextRequest) {
                 exitPrice: t.exit_price || t.exitPrice || null,
                 stopLoss: t.stop_loss || t.stopLoss || 0,
                 takeProfit: t.take_profit || t.takeProfit || 0,
-                slType: t.sl_type || t.slType || 'ATR',
                 status: (t.status || '').toLowerCase(),
                 activePnl: t.unrealized_pnl || t.active_pnl || t.activePnl || 0,
                 activePnlPercent: t.unrealized_pnl_pct || t.activePnlPercent || 0,

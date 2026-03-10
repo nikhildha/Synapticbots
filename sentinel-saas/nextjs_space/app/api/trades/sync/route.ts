@@ -27,17 +27,18 @@ export async function POST(request: Request) {
         const userId = (session.user as any)?.id;
 
         // Determine engine mode from user's bot config
-        // F3 FIX: include config relation — without this, userBot.config is undefined (always paper)
+        // MULTI-BOT FIX: fetch all bots
         let engineMode: EngineMode = 'paper';
-        const userBot = await prisma.bot.findFirst({
+        const userBots = await prisma.bot.findMany({
             where: { userId },
             orderBy: [{ isActive: 'desc' }, { updatedAt: 'desc' }],
             include: { config: true },
         });
-        if (userBot) {
-            const botMode = (userBot.config as any)?.mode || 'paper';
-            engineMode = botMode.toLowerCase().includes('live') ? 'live' : 'paper';
-        }
+        // Use live engine if ANY active bot is live
+        const hasLiveBot = userBots.some((b: any) =>
+            b.isActive && ((b.config as any)?.mode || '').toLowerCase().includes('live')
+        );
+        if (hasLiveBot) engineMode = 'live';
 
         const engineUrl = getEngineUrl(engineMode);
         if (!engineUrl) {
@@ -61,7 +62,7 @@ export async function POST(request: Request) {
             }
         }
 
-        // Step 2: Fetch updated tradebook from engine and sync to DB
+        // Step 2: Fetch updated tradebook from engine and sync to ALL user bots
         let tradesSynced = 0;
         try {
             const allRes = await fetch(`${engineUrl}/api/all`, {
@@ -72,9 +73,12 @@ export async function POST(request: Request) {
                 const engineData = await allRes.json();
                 const engineTrades = engineData?.tradebook?.trades || [];
 
-                if (userBot && userBot.startedAt && engineTrades.length > 0) {
-                    // F4 FIX: capture actual synced count (throttled/skipped trades return 0)
-                    tradesSynced = await syncEngineTrades(engineTrades, userBot.id, userBot.startedAt);
+                if (engineTrades.length > 0) {
+                    for (const ub of userBots) {
+                        if (!ub.startedAt) continue;
+                        const count = await syncEngineTrades(engineTrades, ub.id, ub.startedAt);
+                        tradesSynced += count;
+                    }
                 }
             }
         } catch (err) {

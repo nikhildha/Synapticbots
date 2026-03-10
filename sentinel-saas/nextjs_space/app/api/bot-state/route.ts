@@ -34,19 +34,19 @@ export async function GET() {
         // Determine which engine to call based on user's active bot mode
         // C1 FIX: default to 'paper' for safety (not 'live')
         let engineMode: EngineMode = 'paper';
-        let userBot: any = null;
+        let userBots: any[] = [];
         if (userId) {
-            // C2 FIX: single bot query used for BOTH engine routing AND trade sync
-            userBot = await prisma.bot.findFirst({
+            // MULTI-BOT FIX: fetch ALL user bots for broadcast sync
+            userBots = await prisma.bot.findMany({
                 where: { userId },
                 include: { config: true },
                 orderBy: [{ isActive: 'desc' }, { updatedAt: 'desc' }],
             });
-            if (userBot) {
-                const botMode = userBot.config?.mode || '';
-                // Mode always takes priority — paper mode = paper engine regardless of exchange
-                engineMode = botMode.toLowerCase().includes('live') ? 'live' : 'paper';
-            }
+            // Use live engine if ANY active bot is in live mode
+            const hasLiveBot = userBots.some((b: any) =>
+                b.isActive && (b.config?.mode || '').toLowerCase().includes('live')
+            );
+            if (hasLiveBot) engineMode = 'live';
         }
 
         // Fetch only from the engine that matches the bot's mode — no cross-engine calls
@@ -64,12 +64,15 @@ export async function GET() {
         let trades: any[] = [];
 
         if (session && userId) {
-            // C2 FIX: reuse the same userBot from above
-            if (userBot && userBot.startedAt && engineTradesRaw.length > 0) {
-                try {
-                    await syncEngineTrades(engineTradesRaw, userBot.id, userBot.startedAt);
-                } catch (err) {
-                    console.error('[bot-state] Trade sync failed:', err);
+            // MULTI-BOT FIX: sync engine trades to ALL active bots (each gets its own copy)
+            if (engineTradesRaw.length > 0) {
+                for (const ub of userBots) {
+                    if (!ub.startedAt) continue; // skip bots never started
+                    try {
+                        await syncEngineTrades(engineTradesRaw, ub.id, ub.startedAt);
+                    } catch (err) {
+                        console.error(`[bot-state] Trade sync failed for bot ${ub.id}:`, err);
+                    }
                 }
             }
 
@@ -80,8 +83,7 @@ export async function GET() {
                 trades = [];
             }
 
-            // Enrich Prisma trades with stepped_lock_level from raw engine data
-            // (not stored in Prisma — passed through from engine each request)
+            // Enrich Prisma trades with live engine data (not stored in Prisma)
             if (engineTradesRaw.length > 0 && trades.length > 0) {
                 const engineMap = new Map<string, any>();
                 for (const et of engineTradesRaw) {
@@ -91,11 +93,7 @@ export async function GET() {
                 trades = trades.map((t: any) => {
                     const engineTrade = engineMap.get(t.trade_id);
                     if (engineTrade) {
-                        return {
-                            ...t,
-                            stepped_lock_level: engineTrade.stepped_lock_level ?? -1,
-                            trailing_active: engineTrade.trailing_active || t.trailing_active || false,
-                        };
+                        return { ...t };
                     }
                     return t;
                 });
@@ -174,8 +172,8 @@ export async function GET() {
                 paperUrl: getEngineUrl('paper') ? '✓ set' : '✗ empty',
                 engineDataOk: !!engineData,
                 altEngineDataOk: false,
-                botMode: userBot?.config?.mode || 'no-bot',
-                botExchange: userBot?.exchange || 'none',
+                totalBots: userBots.length,
+                activeBots: userBots.filter((b: any) => b.isActive).length,
             },
         });
     } catch (err) {

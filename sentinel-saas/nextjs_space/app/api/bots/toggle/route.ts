@@ -127,8 +127,9 @@ export async function POST(request: Request) {
             const currentPrice = trade.currentPrice || trade.entryPrice;
             const isLong = trade.position === 'long';
             const priceDiff = isLong ? (currentPrice - trade.entryPrice) : (trade.entryPrice - currentPrice);
-            const rawPnl = priceDiff / trade.entryPrice * trade.leverage * trade.capital;
-            const leveragedPnl = Math.round(rawPnl * 10000) / 10000;
+            // UNIFIED PnL FIX: use quantity path (same as trades/close) — handles E2 CoinDCX correctly
+            const quantity = trade.quantity || (trade.capital * trade.leverage / trade.entryPrice);
+            const leveragedPnl = Math.round(priceDiff * quantity * 10000) / 10000;
             const pnlPct = trade.capital > 0 ? Math.round(leveragedPnl / trade.capital * 100 * 100) / 100 : 0;
             await prisma.trade.update({
               where: { id: trade.id },

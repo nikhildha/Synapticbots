@@ -68,27 +68,28 @@ export default async function TradesPage() {
 
   const userId = (session.user as any)?.id;
 
-  // Determine correct engine based on user's active bot mode
-  const userBot = await prisma.bot.findFirst({
+  // MULTI-BOT FIX: fetch ALL user bots for broadcast sync
+  const userBots = await prisma.bot.findMany({
     where: { userId },
-    orderBy: { updatedAt: 'desc' },
     include: { config: true },
+    orderBy: { updatedAt: 'desc' },
   });
-  const botMode = (userBot?.config as any)?.mode || 'paper';
-  const engineMode: EngineMode = botMode.toLowerCase().includes('live') ? 'live' : 'paper';
+  const hasLiveBot = userBots.some((b: any) =>
+    b.isActive && ((b.config as any)?.mode || '').toLowerCase().includes('live')
+  );
+  const engineMode: EngineMode = hasLiveBot ? 'live' : 'paper';
 
-  // G1 FIX: All users (including admins) see their own bot's trades via Prisma isolation.
-  // Admin raw engine view belongs in the admin panel, not the regular trades page.
   const engineTrades = await fetchEngineTradesAll(engineMode);
 
-  // Sync whenever a bot exists and engine has trades — don't require startedAt.
-  // syncEngineTrades handles null startedAt correctly (no time filter applied).
-  // startedAt guard was blocking sync when bot had never been formally started via toggle.
-  if (userBot && engineTrades.length > 0) {
-    try {
-      await syncEngineTrades(engineTrades, userBot.id, userBot.startedAt);
-    } catch (err) {
-      console.error('[trades-page] Sync failed:', err);
+  // Sync to ALL user bots (each gets its own copy via broadcast model)
+  if (engineTrades.length > 0) {
+    for (const ub of userBots) {
+      if (!ub.startedAt) continue;
+      try {
+        await syncEngineTrades(engineTrades, ub.id, ub.startedAt);
+      } catch (err) {
+        console.error(`[trades-page] Sync failed for bot ${ub.id}:`, err);
+      }
     }
   }
 
