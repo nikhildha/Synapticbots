@@ -26,17 +26,43 @@ interface RegimeCardProps {
 }
 
 export function RegimeCard({ regime, confidence, symbol, macroRegime, trend15m, coinStates }: RegimeCardProps) {
-    const info = getRegimeInfo(regime);
     let conf = confidence;
     if (conf <= 1) conf *= 100;
     const pct = Math.round(conf);
+
+    // Parse multi-TF regime string like "1d=BEARISH(0.92) | 1h=BULLISH(1.00) | 15m=BEARISH(0.84)"
+    const tfEntries: { tf: string; regime: string; conf: number }[] = [];
+    const rawRegime = regime || '';
+    const tfPattern = /(\d+[mhd])=(\w[\w/]*)\(([\d.]+)\)/gi;
+    let match;
+    while ((match = tfPattern.exec(rawRegime)) !== null) {
+        tfEntries.push({ tf: match[1].toUpperCase(), regime: match[2].toUpperCase(), conf: parseFloat(match[3]) });
+    }
+
+    // Determine dominant regime (from 1h or first entry, or fall back to raw string)
+    const dominant = tfEntries.find(e => e.tf === '1H') || tfEntries[0];
+    const dominantRegime = dominant ? dominant.regime : rawRegime.split('=')[0]?.includes('BULL') ? 'BULLISH' : rawRegime.includes('BEAR') ? 'BEARISH' : rawRegime.includes('CHOP') || rawRegime.includes('SIDE') ? 'SIDEWAYS/CHOP' : rawRegime.includes('CRASH') ? 'CRASH/PANIC' : rawRegime;
+    const info = getRegimeInfo(dominantRegime);
+
+    const getTfColor = (r: string) => {
+        if (r.includes('BULL')) return '#22C55E';
+        if (r.includes('BEAR')) return '#EF4444';
+        if (r.includes('CHOP') || r.includes('SIDE')) return '#F59E0B';
+        if (r.includes('CRASH')) return '#DC2626';
+        return '#6B7280';
+    };
 
     let gaugeColor = '#EF4444';
     if (pct >= 85) gaugeColor = '#22C55E';
     else if (pct >= 65) gaugeColor = '#0EA5E9';
     else if (pct >= 50) gaugeColor = '#F59E0B';
 
-    // Live BTC price with fast refresh
+    // SVG ring constants
+    const ringRadius = 28;
+    const ringCircumference = 2 * Math.PI * ringRadius;
+    const ringOffset = ringCircumference - (pct / 100) * ringCircumference;
+
+    // Live BTC price
     const [btcPrice, setBtcPrice] = useState<number | null>(null);
     const [btcChange, setBtcChange] = useState<number>(0);
 
@@ -79,72 +105,98 @@ export function RegimeCard({ regime, confidence, symbol, macroRegime, trend15m, 
 
     return (
         <div style={{
-            background: 'rgba(17, 24, 39, 0.8)',
-            backdropFilter: 'blur(12px)',
-            border: `1px solid ${info.color}33`,
-            borderRadius: '16px',
-            padding: '14px 20px',
+            background: 'linear-gradient(135deg, rgba(17,24,39,0.95), rgba(10,15,28,0.98))',
+            backdropFilter: 'blur(16px)',
+            border: `1px solid ${info.color}22`,
+            borderRadius: '20px',
+            padding: '20px 24px',
             position: 'relative',
             overflow: 'hidden',
         }}>
             {/* Top accent line */}
             <div style={{
-                position: 'absolute', top: 0, left: 0, right: 0, height: '3px',
-                background: `linear-gradient(90deg, ${info.color}, transparent)`,
+                position: 'absolute', top: 0, left: 0, right: 0, height: '2px',
+                background: `linear-gradient(90deg, ${info.color}, ${info.color}44, transparent)`,
             }} />
 
-            <div style={{
-                fontSize: '10px', fontWeight: 600, textTransform: 'uppercase' as const,
-                letterSpacing: '1.5px', color: '#9CA3AF', marginBottom: '10px',
-            }}>BTC Regime</div>
-
-            {/* Row 1: Regime + Confidence */}
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px' }}>
+            {/* Header row: Label + BTC price */}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
+                <div style={{
+                    fontSize: '10px', fontWeight: 700, textTransform: 'uppercase' as const,
+                    letterSpacing: '2px', color: '#6B7280',
+                }}>Market Regime</div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <span style={{ fontSize: '28px' }}>{info.emoji}</span>
-                    <div style={{
-                        fontSize: '18px', fontWeight: 700, color: info.color,
-                        letterSpacing: '0.5px',
-                    }}>{regime}</div>
-                </div>
-                <div style={{ textAlign: 'right' }}>
-                    <div style={{
-                        fontSize: '24px', fontWeight: 700, color: gaugeColor,
-                    }}>{pct}%</div>
-                    <div style={{
-                        fontSize: '8px', textTransform: 'uppercase' as const,
-                        letterSpacing: '1px', color: '#6B7280',
-                    }}>Confidence</div>
+                    <span style={{
+                        fontSize: '13px', fontWeight: 700, fontFamily: 'monospace',
+                        color: '#E5E7EB', letterSpacing: '-0.5px',
+                    }}>
+                        {btcPrice ? `$${btcPrice.toLocaleString('en-US', { maximumFractionDigits: 0 })}` : '...'}
+                    </span>
+                    {btcPrice && (
+                        <span style={{
+                            fontSize: '11px', fontWeight: 700,
+                            padding: '2px 8px', borderRadius: '6px',
+                            background: btcChange >= 0 ? 'rgba(34,197,94,0.12)' : 'rgba(239,68,68,0.12)',
+                            color: btcChange >= 0 ? '#22C55E' : '#EF4444',
+                        }}>
+                            {btcChange >= 0 ? '▲' : '▼'} {Math.abs(btcChange).toFixed(2)}%
+                        </span>
+                    )}
                 </div>
             </div>
 
-            {/* Row 2: BTC Price + 24h Change — clean, centered */}
-            <div style={{
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                gap: '10px', marginTop: '2px',
-            }}>
-                <span style={{
-                    fontSize: '32px', fontWeight: 800, fontFamily: 'monospace',
-                    color: '#F0F4F8', letterSpacing: '-1px',
-                }}>
-                    {btcPrice ? `$${btcPrice.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}` : '...'}
-                </span>
-                {btcPrice && (
-                    <span style={{
-                        fontSize: '14px', fontWeight: 700,
-                        padding: '4px 10px', borderRadius: '8px',
-                        background: btcChange >= 0 ? 'rgba(34,197,94,0.15)' : 'rgba(239,68,68,0.15)',
-                        color: btcChange >= 0 ? '#22C55E' : '#EF4444',
+            {/* Main content: Confidence ring + Regime info */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '20px', marginBottom: '16px' }}>
+                {/* SVG Confidence Ring */}
+                <div style={{ position: 'relative', width: '72px', height: '72px', flexShrink: 0 }}>
+                    <svg width="72" height="72" viewBox="0 0 72 72" style={{ transform: 'rotate(-90deg)' }}>
+                        <circle cx="36" cy="36" r={ringRadius} fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth="5" />
+                        <circle cx="36" cy="36" r={ringRadius} fill="none" stroke={gaugeColor}
+                            strokeWidth="5" strokeLinecap="round"
+                            strokeDasharray={ringCircumference} strokeDashoffset={ringOffset}
+                            style={{ transition: 'stroke-dashoffset 1s ease, stroke 0.5s ease' }} />
+                    </svg>
+                    <div style={{
+                        position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column' as const,
+                        alignItems: 'center', justifyContent: 'center',
                     }}>
-                        {btcChange >= 0 ? '▲' : '▼'} {Math.abs(btcChange).toFixed(2)}%
-                    </span>
-                )}
+                        <span style={{ fontSize: '18px', fontWeight: 800, color: gaugeColor, lineHeight: 1 }}>{pct}%</span>
+                        <span style={{ fontSize: '7px', color: '#6B7280', letterSpacing: '0.5px', marginTop: '2px' }}>CONF</span>
+                    </div>
+                </div>
+
+                {/* Dominant regime + Timeframe badges */}
+                <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: '20px', fontWeight: 800, color: info.color, marginBottom: '10px', letterSpacing: '-0.3px' }}>
+                        {dominantRegime}
+                    </div>
+                    {tfEntries.length > 0 ? (
+                        <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' as const }}>
+                            {tfEntries.map(e => (
+                                <div key={e.tf} style={{
+                                    display: 'flex', alignItems: 'center', gap: '4px',
+                                    padding: '4px 10px', borderRadius: '8px',
+                                    background: `${getTfColor(e.regime)}10`,
+                                    border: `1px solid ${getTfColor(e.regime)}25`,
+                                }}>
+                                    <span style={{ fontSize: '9px', fontWeight: 700, color: '#9CA3AF' }}>{e.tf}</span>
+                                    <span style={{ fontSize: '10px', fontWeight: 700, color: getTfColor(e.regime) }}>
+                                        {e.regime.includes('BULL') ? '▲' : e.regime.includes('BEAR') ? '▼' : '─'}
+                                    </span>
+                                    <span style={{ fontSize: '9px', fontWeight: 600, color: '#6B7280' }}>{(e.conf * 100).toFixed(0)}%</span>
+                                </div>
+                            ))}
+                        </div>
+                    ) : (
+                        <div style={{ fontSize: '11px', color: '#6B7280' }}>Awaiting multi-TF data...</div>
+                    )}
+                </div>
             </div>
 
             {/* Background glow */}
             <div style={{
                 position: 'absolute', inset: 0, zIndex: -1,
-                background: `radial-gradient(circle at center, ${info.bgGlow}, transparent 70%)`,
+                background: `radial-gradient(ellipse at 20% 50%, ${info.bgGlow}, transparent 60%)`,
             }} />
         </div>
     );
