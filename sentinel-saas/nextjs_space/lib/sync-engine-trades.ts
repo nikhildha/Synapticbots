@@ -72,6 +72,33 @@ export async function syncEngineTrades(
             // getUserTrades(userId) at query time. Bot_id is NOT used for scoping.
             const resolvedBotId = botId;
 
+            // ── SL/TP Recalculation (fixes engine-side cross-contamination bug) ──
+            // The engine's tradebook.json sometimes stores SL/TP from the WRONG trade.
+            // We recalculate from each trade's own entry_price, atr_at_entry, leverage, position.
+            const entryPrice = t.entry_price || t.entryPrice || 0;
+            const atrAtEntry = t.atr_at_entry || t.atr || 0;
+            const leverage = t.leverage || 1;
+            const isLong = side === 'buy' || side === 'long';
+            let recalcSl = t.stop_loss || t.stopLoss || 0;
+            let recalcTp = t.take_profit || t.takeProfit || 0;
+
+            if (entryPrice > 0 && atrAtEntry > 0) {
+                // ATR multipliers: same formula as config.get_atr_multipliers(leverage)
+                let slMult: number, tpMult: number;
+                if (leverage >= 50) { slMult = 0.5; tpMult = 1.0; }
+                else if (leverage >= 10) { slMult = 1.0; tpMult = 2.0; }
+                else if (leverage >= 5) { slMult = 1.2; tpMult = 2.4; }
+                else { slMult = 1.5; tpMult = 3.0; } // default 1-4x
+
+                if (isLong) {
+                    recalcSl = Math.round((entryPrice - atrAtEntry * slMult) * 1e6) / 1e6;
+                    recalcTp = Math.round((entryPrice + atrAtEntry * tpMult) * 1e6) / 1e6;
+                } else {
+                    recalcSl = Math.round((entryPrice + atrAtEntry * slMult) * 1e6) / 1e6;
+                    recalcTp = Math.round((entryPrice - atrAtEntry * tpMult) * 1e6) / 1e6;
+                }
+            }
+
             // Upsert: create if not exists, update PNL/status if exists
             await prisma.trade.upsert({
                 where: {
@@ -92,8 +119,8 @@ export async function syncEngineTrades(
                     entryPrice: t.entry_price || t.entryPrice || 0,
                     currentPrice: t.current_price || t.currentPrice || null,
                     exitPrice: t.exit_price || t.exitPrice || null,
-                    stopLoss: t.stop_loss || t.stopLoss || 0,
-                    takeProfit: t.take_profit || t.takeProfit || 0,
+                    stopLoss: recalcSl,
+                    takeProfit: recalcTp,
                     slType: t.sl_type || t.slType || 'fixed',
                     status,
                     activePnl: t.unrealized_pnl || t.active_pnl || 0,
@@ -131,8 +158,8 @@ export async function syncEngineTrades(
                     totalPnlPercent: t.pnl_pct || t.totalPnlPercent || 0,
                     exitReason: t.exit_reason || t.exitReason || null,
                     exitTime,
-                    stopLoss: t.stop_loss || t.stopLoss || 0,
-                    takeProfit: t.take_profit || t.takeProfit || 0,
+                    stopLoss: recalcSl,
+                    takeProfit: recalcTp,
                     slType: t.sl_type || t.slType || 'fixed',
                     t1Hit: t.t1_hit || false,
                     t2Hit: t.t2_hit || false,
