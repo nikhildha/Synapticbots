@@ -223,14 +223,17 @@ export function DashboardClient({ user, stats, bots, recentTrades }: DashboardCl
 
   const liveActiveTrades = liveTrades.filter((t: any) => (t.status || '').toUpperCase() === 'ACTIVE');
   const liveClosedTrades = liveTrades.filter((t: any) => (t.status || '').toUpperCase() === 'CLOSED');
-  const liveTotalPnl = liveClosedTrades.reduce((sum: number, t: any) => sum + (t.realized_pnl || t.pnl || t.total_pnl || 0), 0);
 
-  // Compute active PNL from live Binance prices (same formula as tradebook)
+  // ═══ TRADEBOOK = SINGLE SOURCE OF TRUTH ═══
+  // All PnL numbers come directly from tradebook values — NO recalculation.
+  // Active trades → unrealized_pnl (engine-computed, synced every 15s)
+  // Closed trades → realized_pnl (final PnL from engine)
+
+  // computePnlFromPrices is ONLY used for per-row display in the trade table
+  // (visual updates between 15s refreshes). Never used for totals.
   const computePnlFromPrices = (t: any) => {
-    // Prefer engine-computed unrealized_pnl (same source as bot-card) for consistency
     const enginePnl = parseFloat(t.unrealized_pnl);
     if (!isNaN(enginePnl)) return enginePnl;
-    // Fallback: recalculate from live prices
     const entry = t.entry_price || t.entryPrice || 0;
     const sym = (t.symbol || (t.coin || '') + 'USDT').toUpperCase();
     const current = livePrices[sym] || t.current_price || t.currentPrice || entry;
@@ -239,29 +242,29 @@ export function DashboardClient({ user, stats, bots, recentTrades }: DashboardCl
     const pos = (t.side || t.position || '').toUpperCase();
     const isLong = pos === 'BUY' || pos === 'LONG';
     if (entry <= 0) return 0;
-    // E2 FIX: For LIVE CoinDCX trades, qty is already leveraged — don't multiply by leverage again
     const isLive = (t.mode || '').toUpperCase().includes('LIVE');
     const effectiveLev = isLive ? 1 : lev;
     return Math.round((isLong ? current - entry : entry - current) / entry * effectiveLev * cap * 10000) / 10000;
   };
 
-  const liveActivePnl = liveActiveTrades.reduce((sum: number, t: any) => sum + computePnlFromPrices(t), 0);
-
-  // Paper vs Live split — BOTH active (unrealized) + closed (realized) trades
+  // Paper vs Live splits
   const paperActiveTrades = liveActiveTrades.filter((t: any) => (t.mode || 'paper').toUpperCase() === 'PAPER');
   const paperClosedTrades = liveClosedTrades.filter((t: any) => (t.mode || 'paper').toUpperCase() === 'PAPER');
   const liveModeTrades = liveActiveTrades.filter((t: any) => (t.mode || '').toUpperCase().includes('LIVE'));
   const liveClosedModeTrades = liveClosedTrades.filter((t: any) => (t.mode || '').toUpperCase().includes('LIVE'));
 
-  // Unrealized PnL from active trades (via live prices)
-  const paperUnrealizedPnl = paperActiveTrades.reduce((sum: number, t: any) => sum + computePnlFromPrices(t), 0);
-  const liveUnrealizedPnl = liveModeTrades.reduce((sum: number, t: any) => sum + computePnlFromPrices(t), 0);
+  // PnL from tradebook — active uses unrealized_pnl, closed uses realized_pnl
+  const paperUnrealizedPnl = paperActiveTrades.reduce((sum: number, t: any) =>
+    sum + (parseFloat(t.unrealized_pnl) || parseFloat(t.activePnl) || 0), 0);
+  const liveUnrealizedPnl = liveModeTrades.reduce((sum: number, t: any) =>
+    sum + (parseFloat(t.unrealized_pnl) || parseFloat(t.activePnl) || 0), 0);
 
-  // Realized PnL from closed trades
-  const paperRealizedPnl = paperClosedTrades.reduce((sum: number, t: any) => sum + (t.realized_pnl || t.pnl || t.total_pnl || 0), 0);
-  const liveRealizedPnl = liveClosedModeTrades.reduce((sum: number, t: any) => sum + (t.realized_pnl || t.pnl || t.total_pnl || 0), 0);
+  const paperRealizedPnl = paperClosedTrades.reduce((sum: number, t: any) =>
+    sum + (parseFloat(t.realized_pnl) || parseFloat(t.totalPnl) || parseFloat(t.pnl) || 0), 0);
+  const liveRealizedPnl = liveClosedModeTrades.reduce((sum: number, t: any) =>
+    sum + (parseFloat(t.realized_pnl) || parseFloat(t.totalPnl) || parseFloat(t.pnl) || 0), 0);
 
-  // Total = realized + unrealized
+  // Total = realized + unrealized (all from tradebook)
   const paperTotalPnl = paperRealizedPnl + paperUnrealizedPnl;
   const liveTotalModePnl = liveRealizedPnl + liveUnrealizedPnl;
 
@@ -310,7 +313,7 @@ export function DashboardClient({ user, stats, bots, recentTrades }: DashboardCl
   const liveStats = {
     activeBots: stats?.activeBots ?? (bots?.filter((b: any) => b?.isActive)?.length ?? 0),
     activeTrades: liveActiveTrades.length || stats?.activeTrades || 0,
-    totalPnl: liveTotalPnl + liveActivePnl,
+    totalPnl: paperTotalPnl + liveTotalModePnl, // from tradebook, not recalculated
     paperTotalPnl,
     paperPnlPct,
     liveTotalPnl: liveTotalModePnl,

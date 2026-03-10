@@ -8,6 +8,9 @@ export const dynamic = 'force-dynamic';
 /**
  * GET /api/performance
  * Returns all bot sessions + all-time summary for the current user.
+ * PnL is computed from actual trades (tradebook = single source of truth),
+ * NOT from stale session-level totalPnl.
+ * Includes retired bots for historical tracking.
  */
 export async function GET() {
     try {
@@ -18,10 +21,10 @@ export async function GET() {
 
         const userId = (session.user as any)?.id;
 
-        // Get all bots for this user
+        // Get ALL bots (including retired) for complete performance history
         const userBots = await prisma.bot.findMany({
             where: { userId },
-            select: { id: true, name: true },
+            select: { id: true, name: true, status: true, exchange: true },
         });
         const botIds = userBots.map(b => b.id);
 
@@ -32,34 +35,44 @@ export async function GET() {
             });
         }
 
-        // Fetch all sessions
+        // Fetch all sessions with bot info (name, exchange, status)
         const sessions = await prisma.botSession.findMany({
             where: { botId: { in: botIds } },
             orderBy: { startedAt: 'desc' },
-            include: { bot: { select: { name: true, exchange: true } } },
+            include: { bot: { select: { name: true, exchange: true, status: true } } },
         });
 
-        // Enrich active sessions with live open-trade PnL
+        // Compute PnL from actual trades per session (tradebook = single source of truth)
         const enriched = await Promise.all(sessions.map(async (s) => {
-            if (s.status !== 'active') return { ...s, livePnl: s.totalPnl, liveRoi: s.roi, openTrades: 0 };
-
-            const openTrades = await prisma.trade.findMany({
-                where: { sessionId: s.id, status: 'active' },
-                select: { activePnl: true, capital: true },
+            // Fetch all trades for this session to compute accurate PnL
+            const sessionTrades = await prisma.trade.findMany({
+                where: { sessionId: s.id },
+                select: { status: true, totalPnl: true, activePnl: true, capital: true },
             });
-            const activePnl = openTrades.reduce((sum, t) => sum + t.activePnl, 0);
-            const activeCapital = openTrades.reduce((sum, t) => sum + t.capital, 0);
-            const livePnl = s.totalPnl + activePnl;
+
+            const closedTrades = sessionTrades.filter(t => (t.status || '').toLowerCase() === 'closed');
+            const openTrades = sessionTrades.filter(t => (t.status || '').toLowerCase() === 'active');
+
+            // PnL from tradebook: closed = totalPnl (realized), active = activePnl (unrealized)
+            const realizedPnl = closedTrades.reduce((sum, t) => sum + (t.totalPnl || 0), 0);
+            const unrealizedPnl = openTrades.reduce((sum, t) => sum + (t.activePnl || 0), 0);
+            const activeCapital = openTrades.reduce((sum, t) => sum + (t.capital || 0), 0);
+
+            const livePnl = realizedPnl + unrealizedPnl;
             const totalCap = s.totalCapital + activeCapital;
+
             return {
                 ...s,
-                livePnl,
-                liveRoi: totalCap > 0 ? (livePnl / totalCap) * 100 : 0,
+                // Override session PnL with actual trade PnL when we have trades
+                livePnl: sessionTrades.length > 0 ? livePnl : s.totalPnl,
+                liveRoi: totalCap > 0 ? (livePnl / totalCap) * 100 : (s.roi || 0),
                 openTrades: openTrades.length,
+                // Use trade-computed values to also update total for consistency
+                totalPnl: sessionTrades.length > 0 ? realizedPnl : s.totalPnl,
             };
         }));
 
-        // All-time summary
+        // All-time summary from enriched sessions
         const allTimePnl = enriched.reduce((s, ses) => s + (ses.livePnl || 0), 0);
         const allTimeTrades = enriched.reduce((s, ses) => s + ses.totalTrades, 0);
         const allTimeCapital = enriched.reduce((s, ses) => s + ses.totalCapital, 0);

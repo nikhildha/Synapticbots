@@ -5,7 +5,7 @@ import { Header } from '@/components/header';
 import { BotCard } from '@/components/bot-card';
 import {
   Plus, Trash2, Shield, TrendingUp, FlaskConical, Play, Rocket,
-  ChevronDown, ChevronUp, Activity
+  ChevronDown, ChevronUp, Activity, Archive
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useSession } from 'next-auth/react';
@@ -31,7 +31,7 @@ const BOT_MODELS = [
 interface BotsClientProps { bots: any[]; sessions?: any[]; perfSummary?: any; }
 
 /* ═══ Inline Performance Section ═══ */
-function PerformanceSection() {
+function PerformanceSection({ onRetire }: { onRetire?: (botId: string) => void }) {
   const [sessions, setSessions] = useState<any[]>([]);
   const [summary, setSummary] = useState<any>({ allTimePnl: 0, allTimeRoi: 0, totalSessions: 0, bestSessionPnl: 0 });
   const [expanded, setExpanded] = useState<string | null>(null);
@@ -89,10 +89,11 @@ function PerformanceSection() {
       <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
         {/* Header row */}
         <div style={{
-          display: 'grid', gridTemplateColumns: '140px 1fr 80px 80px 90px 90px',
+          display: 'grid', gridTemplateColumns: '100px 140px 1fr 80px 80px 90px 90px',
           gap: '8px', padding: '6px 14px', fontSize: '10px', fontWeight: 600,
           color: '#6B7280', textTransform: 'uppercase', letterSpacing: '0.8px',
         }}>
+          <span>Bot</span>
           <span>Status</span>
           <span>Date · Duration</span>
           <span style={{ textAlign: 'right' }}>Trades</span>
@@ -100,62 +101,73 @@ function PerformanceSection() {
           <span style={{ textAlign: 'right' }}>PnL</span>
           <span style={{ textAlign: 'right' }}>ROI</span>
         </div>
-        {sessions.map((s: any) => (
-          <div key={s.id} style={{
-            background: 'rgba(17,24,39,0.6)', border: '1px solid rgba(255,255,255,0.06)',
-            borderRadius: '12px', overflow: 'hidden',
-          }}>
-            <div onClick={() => setExpanded(expanded === s.id ? null : s.id)}
-              style={{
-                display: 'grid', gridTemplateColumns: '140px 1fr 80px 80px 90px 90px',
-                gap: '8px', alignItems: 'center', padding: '10px 14px', cursor: 'pointer',
-                fontSize: '13px',
-              }}>
-              <span style={{
-                fontSize: '10px', fontWeight: 600,
-                padding: '2px 8px', borderRadius: '4px', width: 'fit-content',
-                ...(s.status === 'active'
-                  ? { background: 'rgba(34,197,94,0.15)', color: '#22C55E' }
-                  : { background: 'rgba(107,114,128,0.15)', color: '#9CA3AF' }),
-              }}>
-                {s.status === 'active' ? '● Live' : `Run #${s.sessionIndex}`}
-              </span>
-              <span>{fmtDate(s.startedAt)} <span style={{ fontSize: '11px', color: '#6B7280' }}>· {duration(s.startedAt, s.endedAt)}</span></span>
-              <span style={{ textAlign: 'right' }}>{s.totalTrades}</span>
-              <span style={{ textAlign: 'right', fontFamily: 'monospace', color: (s.winRate || 0) >= 50 ? '#22C55E' : '#9CA3AF' }}>
-                {s.closedTrades > 0 ? `${(s.winRate || 0).toFixed(0)}%` : '—'}
-              </span>
-              <span style={{ textAlign: 'right', fontFamily: 'monospace', fontWeight: 600, color: (s.livePnl || s.totalPnl || 0) >= 0 ? '#22C55E' : '#EF4444' }}>
-                {fmt(s.livePnl || s.totalPnl || 0)}
-              </span>
-              <span style={{ textAlign: 'right', fontFamily: 'monospace', fontSize: '11px', color: (s.liveRoi || s.roi || 0) >= 0 ? '#22C55E' : '#EF4444' }}>
-                {fmt(s.liveRoi || s.roi || 0)}%
-              </span>
-            </div>
-            {expanded === s.id && (
-              <div style={{
-                borderTop: '1px solid rgba(255,255,255,0.06)', padding: '12px 14px',
-                display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '12px', fontSize: '12px',
-              }}>
-                {[
-                  { l: 'Closed Trades', v: s.closedTrades },
-                  { l: 'Open Trades', v: s.openTrades || 0 },
-                  { l: 'Best Trade', v: `${fmt(s.bestTrade || 0)} USDT` },
-                  { l: 'Worst Trade', v: `${fmt(s.worstTrade || 0)} USDT` },
-                  { l: 'Capital Deployed', v: `$${(s.totalCapital || 0).toFixed(0)}` },
-                  { l: 'Bot', v: s.bot?.name || s.name || '-' },
-                  { l: 'Exchange', v: s.bot?.exchange || s.exchange || '-' },
-                  ...(s.endedAt ? [{ l: 'Ended', v: fmtDate(s.endedAt) }] : []),
-                ].map((item, i) => (
-                  <div key={i}>
-                    <div style={{ fontSize: '10px', color: '#6B7280', marginBottom: '2px' }}>{item.l}</div>
-                    <div style={{ fontWeight: 600, color: '#D1D5DB' }}>{item.v}</div>
-                  </div>
-                ))}
+        {sessions.map((s: any) => {
+          const botName = s.bot?.name || s.name || 'Unknown Bot';
+          const isRetired = s.bot?.status === 'retired';
+          return (
+            <div key={s.id} style={{
+              background: isRetired ? 'rgba(107,114,128,0.08)' : 'rgba(17,24,39,0.6)',
+              border: `1px solid ${isRetired ? 'rgba(107,114,128,0.15)' : 'rgba(255,255,255,0.06)'}`,
+              borderRadius: '12px', overflow: 'hidden',
+            }}>
+              <div onClick={() => setExpanded(expanded === s.id ? null : s.id)}
+                style={{
+                  display: 'grid', gridTemplateColumns: '100px 140px 1fr 80px 80px 90px 90px',
+                  gap: '8px', alignItems: 'center', padding: '10px 14px', cursor: 'pointer',
+                  fontSize: '13px',
+                }}>
+                {/* Bot name */}
+                <span style={{ fontSize: '11px', fontWeight: 600, color: isRetired ? '#9CA3AF' : '#06B6D4', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {isRetired && '📦 '}{botName.replace('Synaptic ', '')}
+                </span>
+                <span style={{
+                  fontSize: '10px', fontWeight: 600,
+                  padding: '2px 8px', borderRadius: '4px', width: 'fit-content',
+                  ...(s.status === 'active'
+                    ? { background: 'rgba(34,197,94,0.15)', color: '#22C55E' }
+                    : isRetired
+                      ? { background: 'rgba(107,114,128,0.15)', color: '#9CA3AF' }
+                      : { background: 'rgba(107,114,128,0.15)', color: '#9CA3AF' }),
+                }}>
+                  {s.status === 'active' ? '● Live' : isRetired ? '📦 Retired' : `Run #${s.sessionIndex}`}
+                </span>
+                <span>{fmtDate(s.startedAt)} <span style={{ fontSize: '11px', color: '#6B7280' }}>· {duration(s.startedAt, s.endedAt)}</span></span>
+                <span style={{ textAlign: 'right' }}>{s.totalTrades}</span>
+                <span style={{ textAlign: 'right', fontFamily: 'monospace', color: (s.winRate || 0) >= 50 ? '#22C55E' : '#9CA3AF' }}>
+                  {s.closedTrades > 0 ? `${(s.winRate || 0).toFixed(0)}%` : '—'}
+                </span>
+                <span style={{ textAlign: 'right', fontFamily: 'monospace', fontWeight: 600, color: (s.livePnl || s.totalPnl || 0) >= 0 ? '#22C55E' : '#EF4444' }}>
+                  {fmt(s.livePnl || s.totalPnl || 0)}
+                </span>
+                <span style={{ textAlign: 'right', fontFamily: 'monospace', fontSize: '11px', color: (s.liveRoi || s.roi || 0) >= 0 ? '#22C55E' : '#EF4444' }}>
+                  {fmt(s.liveRoi || s.roi || 0)}%
+                </span>
               </div>
-            )}
-          </div>
-        ))}
+              {expanded === s.id && (
+                <div style={{
+                  borderTop: '1px solid rgba(255,255,255,0.06)', padding: '12px 14px',
+                  display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '12px', fontSize: '12px',
+                }}>
+                  {[
+                    { l: 'Closed Trades', v: s.closedTrades },
+                    { l: 'Open Trades', v: s.openTrades || 0 },
+                    { l: 'Best Trade', v: `${fmt(s.bestTrade || 0)} USDT` },
+                    { l: 'Worst Trade', v: `${fmt(s.worstTrade || 0)} USDT` },
+                    { l: 'Capital Deployed', v: `$${(s.totalCapital || 0).toFixed(0)}` },
+                    { l: 'Bot', v: botName },
+                    { l: 'Exchange', v: s.bot?.exchange || s.exchange || '-' },
+                    ...(s.endedAt ? [{ l: 'Ended', v: fmtDate(s.endedAt) }] : []),
+                  ].map((item, i) => (
+                    <div key={i}>
+                      <div style={{ fontSize: '10px', color: '#6B7280', marginBottom: '2px' }}>{item.l}</div>
+                      <div style={{ fontWeight: 600, color: '#D1D5DB' }}>{item.v}</div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          );
+        })}
       </div>
     </div>
   );
@@ -392,8 +404,17 @@ export function BotsClient({ bots: initialBots }: BotsClientProps) {
           {/* ── Deployed Bots List ── */}
           {bots && bots.length > 0 && (
             <div className="flex flex-col gap-4 mb-12">
-              {bots.map((bot) => {
+              {bots.filter((b: any) => b?.status !== 'retired').map((bot) => {
                 const botSessions = allSessions.filter((s: any) => s.botId === bot?.id);
+                // Filter trades for THIS bot only by botId
+                const botTrades = liveTrades.filter((t: any) => {
+                  if (t.bot_id && bot?.id && t.bot_id === bot.id) return true;
+                  if (t.botId && bot?.id && t.botId === bot.id) return true;
+                  return false;
+                });
+                // Fallback: if no trades matched by ID and only 1 non-retired bot, show all trades
+                const activeBots = bots.filter((b: any) => b?.status !== 'retired');
+                const displayTrades = botTrades.length > 0 ? botTrades : (activeBots.length === 1 ? liveTrades : []);
                 return (
                   <BotCard
                     key={bot?.id}
@@ -401,7 +422,7 @@ export function BotsClient({ bots: initialBots }: BotsClientProps) {
                     onToggle={handleBotToggle}
                     onDelete={handleDeleteBot}
                     liveTradeCount={liveTradeCount}
-                    trades={liveTrades}
+                    trades={displayTrades}
                     sessions={botSessions}
                   />
                 );
