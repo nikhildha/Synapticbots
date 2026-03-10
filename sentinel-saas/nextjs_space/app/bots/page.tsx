@@ -3,8 +3,14 @@ import { redirect } from 'next/navigation';
 import { authOptions } from '@/lib/auth-options';
 import prisma from '@/lib/prisma';
 import { BotsClient } from './bots-client';
+import type { Metadata } from 'next';
 
 export const dynamic = 'force-dynamic';
+
+export const metadata: Metadata = {
+  title: 'Cockpit — Synaptic',
+  description: 'Deploy and manage your automated HMM trading bots',
+};
 
 export default async function BotsPage() {
   const session = await getServerSession(authOptions);
@@ -16,7 +22,7 @@ export default async function BotsPage() {
   const bots = await prisma.bot.findMany({
     where: { userId: session.user.id },
     include: {
-      config: { select: { mode: true, maxOpenTrades: true, capitalPerTrade: true } },
+      config: true,  // full config to get brainType
       _count: {
         select: { trades: true },
       },
@@ -33,7 +39,12 @@ export default async function BotsPage() {
         status: bot.status,
         isActive: bot?.isActive ?? false,
         startedAt: bot?.startedAt ?? null,
-        config: bot?.config ? { mode: bot.config.mode, maxTrades: bot.config.maxOpenTrades, capitalPerTrade: bot.config.capitalPerTrade } : null,
+        config: bot?.config ? {
+          mode: bot.config.mode,
+          maxTrades: bot.config.maxOpenTrades,
+          capitalPerTrade: bot.config.capitalPerTrade,
+          brainType: (bot.config as any)?.brainType ?? 'adaptive',
+        } : null,
         _count: {
           trades: bot?._count?.trades ?? 0,
         },

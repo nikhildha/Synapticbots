@@ -5,7 +5,7 @@ import { Header } from '@/components/header';
 import { BotCard } from '@/components/bot-card';
 import {
   Plus, Trash2, Shield, TrendingUp, FlaskConical, Play, Rocket,
-  ChevronDown, ChevronUp, Activity, Archive
+  ChevronDown, ChevronUp, Activity, Archive, Zap
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useSession } from 'next-auth/react';
@@ -16,162 +16,21 @@ const BOT_MODELS = [
     id: 'adaptive',
     name: 'Synaptic Adaptive',
     color: '#22C55E',
-    description: 'HMM regime detection — auto-switches between Conservative, Balanced & Aggressive',
-    badge: '🧠',
+    icon: '🧠',
+    tagline: 'HMM-Powered · Auto-Regime Switching',
+    description: 'Automatically switches between Conservative, Balanced & Aggressive based on live market conditions.',
   },
   {
     id: 'athena',
     name: 'Athena AI',
     color: '#A78BFA',
-    description: 'HMM + Gemini AI reasoning — validates every signal with real-time contextual analysis',
-    badge: '🏛️',
+    icon: '🏛️',
+    tagline: 'HMM + Gemini AI · Contextual Reasoning',
+    description: 'Every signal is validated by Gemini AI with real-time market context before execution.',
   },
 ];
 
 interface BotsClientProps { bots: any[]; sessions?: any[]; perfSummary?: any; }
-
-/* ═══ Inline Performance Section ═══ */
-function PerformanceSection({ onRetire }: { onRetire?: (botId: string) => void }) {
-  const [sessions, setSessions] = useState<any[]>([]);
-  const [summary, setSummary] = useState<any>({ allTimePnl: 0, allTimeRoi: 0, totalSessions: 0, bestSessionPnl: 0 });
-  const [expanded, setExpanded] = useState<string | null>(null);
-  const [loaded, setLoaded] = useState(false);
-
-  useEffect(() => {
-    fetch('/api/performance', { cache: 'no-store' })
-      .then(r => r.ok ? r.json() : null)
-      .then(d => {
-        if (d) {
-          setSessions(d.sessions || []);
-          setSummary(d.summary || summary);
-        }
-        setLoaded(true);
-      })
-      .catch(() => setLoaded(true));
-  }, []);
-
-  const fmt = (n: number) => (n >= 0 ? '+' : '') + n.toFixed(2);
-  const fmtDate = (iso: string) => new Date(iso).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: '2-digit' });
-  const duration = (start: string, end: string | null) => {
-    const ms = (end ? new Date(end) : new Date()).getTime() - new Date(start).getTime();
-    const days = Math.floor(ms / 86400000);
-    const hours = Math.floor((ms % 86400000) / 3600000);
-    return days > 0 ? `${days}d ${hours}h` : `${hours}h`;
-  };
-
-  if (!loaded) return <div style={{ textAlign: 'center', padding: '24px', color: '#6B7280', fontSize: '13px' }}>Loading performance data...</div>;
-  if (sessions.length === 0) return (
-    <div style={{ textAlign: 'center', padding: '32px', color: '#6B7280', fontSize: '13px' }}>
-      No sessions yet. Start your bot to begin tracking performance.
-    </div>
-  );
-
-  return (
-    <div>
-      {/* Summary cards */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '12px', marginBottom: '16px' }}>
-        {[
-          { label: 'All-time PnL', value: `${fmt(summary.allTimePnl)} USDT`, color: summary.allTimePnl >= 0 ? '#22C55E' : '#EF4444' },
-          { label: 'All-time ROI', value: `${fmt(summary.allTimeRoi)}%`, color: summary.allTimeRoi >= 0 ? '#22C55E' : '#EF4444' },
-          { label: 'Total Sessions', value: String(summary.totalSessions), color: '#D1D5DB' },
-          { label: 'Best Session', value: `${fmt(summary.bestSessionPnl)} USDT`, color: summary.bestSessionPnl >= 0 ? '#22C55E' : '#EF4444' },
-        ].map(c => (
-          <div key={c.label} style={{
-            background: 'rgba(17,24,39,0.6)', border: '1px solid rgba(255,255,255,0.06)',
-            borderRadius: '12px', padding: '14px',
-          }}>
-            <div style={{ fontSize: '11px', color: '#6B7280', marginBottom: '4px' }}>{c.label}</div>
-            <div style={{ fontSize: '16px', fontWeight: 700, fontFamily: 'monospace', color: c.color }}>{c.value}</div>
-          </div>
-        ))}
-      </div>
-      {/* Session list */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-        {/* Header row */}
-        <div style={{
-          display: 'grid', gridTemplateColumns: '100px 140px 1fr 80px 80px 90px 90px',
-          gap: '8px', padding: '6px 14px', fontSize: '10px', fontWeight: 600,
-          color: '#6B7280', textTransform: 'uppercase', letterSpacing: '0.8px',
-        }}>
-          <span>Bot</span>
-          <span>Status</span>
-          <span>Date · Duration</span>
-          <span style={{ textAlign: 'right' }}>Trades</span>
-          <span style={{ textAlign: 'right' }}>Win Rate</span>
-          <span style={{ textAlign: 'right' }}>PnL</span>
-          <span style={{ textAlign: 'right' }}>ROI</span>
-        </div>
-        {sessions.map((s: any) => {
-          const botName = s.bot?.name || s.name || 'Unknown Bot';
-          const isRetired = s.bot?.status === 'retired';
-          return (
-            <div key={s.id} style={{
-              background: isRetired ? 'rgba(107,114,128,0.08)' : 'rgba(17,24,39,0.6)',
-              border: `1px solid ${isRetired ? 'rgba(107,114,128,0.15)' : 'rgba(255,255,255,0.06)'}`,
-              borderRadius: '12px', overflow: 'hidden',
-            }}>
-              <div onClick={() => setExpanded(expanded === s.id ? null : s.id)}
-                style={{
-                  display: 'grid', gridTemplateColumns: '100px 140px 1fr 80px 80px 90px 90px',
-                  gap: '8px', alignItems: 'center', padding: '10px 14px', cursor: 'pointer',
-                  fontSize: '13px',
-                }}>
-                {/* Bot name */}
-                <span style={{ fontSize: '11px', fontWeight: 600, color: isRetired ? '#9CA3AF' : '#06B6D4', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                  {isRetired && '📦 '}{botName.replace('Synaptic ', '')}
-                </span>
-                <span style={{
-                  fontSize: '10px', fontWeight: 600,
-                  padding: '2px 8px', borderRadius: '4px', width: 'fit-content',
-                  ...(s.status === 'active'
-                    ? { background: 'rgba(34,197,94,0.15)', color: '#22C55E' }
-                    : isRetired
-                      ? { background: 'rgba(107,114,128,0.15)', color: '#9CA3AF' }
-                      : { background: 'rgba(107,114,128,0.15)', color: '#9CA3AF' }),
-                }}>
-                  {s.status === 'active' ? '● Live' : isRetired ? '📦 Retired' : `Run #${s.sessionIndex}`}
-                </span>
-                <span>{fmtDate(s.startedAt)} <span style={{ fontSize: '11px', color: '#6B7280' }}>· {duration(s.startedAt, s.endedAt)}</span></span>
-                <span style={{ textAlign: 'right' }}>{s.totalTrades}</span>
-                <span style={{ textAlign: 'right', fontFamily: 'monospace', color: (s.winRate || 0) >= 50 ? '#22C55E' : '#9CA3AF' }}>
-                  {s.closedTrades > 0 ? `${(s.winRate || 0).toFixed(0)}%` : '—'}
-                </span>
-                <span style={{ textAlign: 'right', fontFamily: 'monospace', fontWeight: 600, color: (s.livePnl || s.totalPnl || 0) >= 0 ? '#22C55E' : '#EF4444' }}>
-                  {fmt(s.livePnl || s.totalPnl || 0)}
-                </span>
-                <span style={{ textAlign: 'right', fontFamily: 'monospace', fontSize: '11px', color: (s.liveRoi || s.roi || 0) >= 0 ? '#22C55E' : '#EF4444' }}>
-                  {fmt(s.liveRoi || s.roi || 0)}%
-                </span>
-              </div>
-              {expanded === s.id && (
-                <div style={{
-                  borderTop: '1px solid rgba(255,255,255,0.06)', padding: '12px 14px',
-                  display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '12px', fontSize: '12px',
-                }}>
-                  {[
-                    { l: 'Closed Trades', v: s.closedTrades },
-                    { l: 'Open Trades', v: s.openTrades || 0 },
-                    { l: 'Best Trade', v: `${fmt(s.bestTrade || 0)} USDT` },
-                    { l: 'Worst Trade', v: `${fmt(s.worstTrade || 0)} USDT` },
-                    { l: 'Capital Deployed', v: `$${(s.totalCapital || 0).toFixed(0)}` },
-                    { l: 'Bot', v: botName },
-                    { l: 'Exchange', v: s.bot?.exchange || s.exchange || '-' },
-                    ...(s.endedAt ? [{ l: 'Ended', v: fmtDate(s.endedAt) }] : []),
-                  ].map((item, i) => (
-                    <div key={i}>
-                      <div style={{ fontSize: '10px', color: '#6B7280', marginBottom: '2px' }}>{item.l}</div>
-                      <div style={{ fontWeight: 600, color: '#D1D5DB' }}>{item.v}</div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
 
 export function BotsClient({ bots: initialBots }: BotsClientProps) {
   const { data: session } = useSession();
@@ -181,26 +40,23 @@ export function BotsClient({ bots: initialBots }: BotsClientProps) {
   const [bots, setBots] = useState(initialBots);
   const [loading, setLoading] = useState(false);
 
-  // Deploy modal state
+  /* ── Deploy modal state ── */
   const [deployModel, setDeployModel] = useState('adaptive');
   const [deployExchange, setDeployExchange] = useState('binance');
   const [deployMode, setDeployMode] = useState('paper');
   const [deployMaxTrades, setDeployMaxTrades] = useState(25);
   const [deployCapitalPerTrade, setDeployCapitalPerTrade] = useState(100);
-
-  // Verify exchange connection (live mode pre-flight)
   const [verifying, setVerifying] = useState(false);
   const [verifyStatus, setVerifyStatus] = useState<'idle' | 'ok' | 'fail'>('idle');
   const [verifyBalance, setVerifyBalance] = useState<number | null>(null);
 
-  useEffect(() => { setMounted(true); }, []);
-
-  // Live active trade count from bot-state
+  /* ── Live state ── */
   const [liveTradeCount, setLiveTradeCount] = useState(0);
   const [liveTrades, setLiveTrades] = useState<any[]>([]);
-  const [perBotStats, setPerBotStats] = useState<Record<string, any>>({});
   const [allSessions, setAllSessions] = useState<any[]>([]);
-  const [perfSummary, setPerfSummary] = useState<any>({ allTimePnl: 0, allTimeRoi: 0, totalSessions: 0, bestSessionPnl: 0 });
+  const [perfSummary, setPerfSummary] = useState<any>({ allTimePnl: 0, allTimeRoi: 0, totalSessions: 0 });
+
+  useEffect(() => { setMounted(true); }, []);
 
   const fetchLiveCount = useCallback(async () => {
     try {
@@ -210,20 +66,15 @@ export function BotsClient({ bots: initialBots }: BotsClientProps) {
         const trades = d?.tradebook?.trades || [];
         setLiveTrades(trades);
         setLiveTradeCount(trades.filter((t: any) => (t.status || '').toUpperCase() === 'ACTIVE').length);
-        if (d?.perBot) setPerBotStats(d.perBot);
       }
     } catch { /* silent */ }
   }, []);
 
-  // Fetch performance sessions
   useEffect(() => {
     fetch('/api/performance', { cache: 'no-store' })
       .then(r => r.ok ? r.json() : null)
       .then(d => {
-        if (d) {
-          setAllSessions(d.sessions || []);
-          setPerfSummary(d.summary || perfSummary);
-        }
+        if (d) { setAllSessions(d.sessions || []); setPerfSummary(d.summary || perfSummary); }
       })
       .catch(() => { });
   }, []);
@@ -245,222 +96,191 @@ export function BotsClient({ bots: initialBots }: BotsClientProps) {
   };
 
   const handleVerifyConnection = async () => {
-    setVerifying(true);
-    setVerifyStatus('idle');
-    setVerifyBalance(null);
+    setVerifying(true); setVerifyStatus('idle'); setVerifyBalance(null);
     try {
-      // Use the user's saved API keys (from SaaS DB) — same as the balance shown in Settings
       const res = await fetch('/api/wallet-balance');
       const data = await res.json();
       const balance = deployExchange === 'coindcx' ? data.coindcx : data.binance;
       const isConnected = deployExchange === 'coindcx' ? data.coindcxConnected : data.binanceConnected;
-      // Connected = key saved + balance fetch succeeded (or key saved and balance=0 is still valid)
-      if (balance !== null && balance !== undefined) {
-        setVerifyStatus('ok');
-        setVerifyBalance(balance);
-      } else if (isConnected) {
-        // Key is saved but live balance fetch failed — treat as connected with unknown balance
-        setVerifyStatus('ok');
-        setVerifyBalance(null);
-      } else {
-        setVerifyStatus('fail');
-      }
-    } catch {
-      setVerifyStatus('fail');
-    } finally {
-      setVerifying(false);
-    }
+      if (balance !== null && balance !== undefined) { setVerifyStatus('ok'); setVerifyBalance(balance); }
+      else if (isConnected) { setVerifyStatus('ok'); setVerifyBalance(null); }
+      else { setVerifyStatus('fail'); }
+    } catch { setVerifyStatus('fail'); }
+    finally { setVerifying(false); }
   };
 
   const handleDeployBot = async () => {
     setLoading(true);
     try {
       const selectedModel = BOT_MODELS.find(m => m.id === deployModel);
-      const botName = selectedModel?.name || 'Synaptic Adaptive';
       const res = await fetch('/api/bots/create', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          name: botName,
-          exchange: deployExchange,
-          mode: deployMode,
-          maxTrades: deployMaxTrades,
-          capitalPerTrade: deployCapitalPerTrade,
+          name: selectedModel?.name || 'Synaptic Adaptive',
+          exchange: deployExchange, mode: deployMode,
+          maxTrades: deployMaxTrades, capitalPerTrade: deployCapitalPerTrade,
           brainType: deployModel,
         }),
       });
-      if (res.ok) {
-        setShowDeployModal(false);
-        window.location.reload();
-      } else {
-        const data = await res.json();
-        alert(data.error || 'Failed to deploy bot');
-      }
+      if (res.ok) { setShowDeployModal(false); window.location.reload(); }
+      else { const data = await res.json(); alert(data.error || 'Failed to deploy bot'); }
     } catch (error) { console.error('Error deploying bot:', error); }
     finally { setLoading(false); }
   };
 
   const handleDeleteBot = async (botId: string) => {
-    if (!confirm('Are you sure you want to delete this bot? All associated trades will be removed.')) return;
     try {
       const res = await fetch('/api/bots/delete', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ botId }),
       });
-      if (res.ok) {
-        window.location.reload();
-      } else {
+      if (res.ok) window.location.reload();
+      else {
         const data = await res.json().catch(() => ({}));
         alert(data.error || 'Failed to delete bot. Try stopping it first.');
       }
-    } catch (error) {
-      console.error('Error deleting bot:', error);
-      alert('Failed to delete bot. Please try again.');
-    }
+    } catch { alert('Failed to delete bot. Please try again.'); }
   };
 
-  const getModel = (botName: string) =>
-    BOT_MODELS.find(m => botName?.toLowerCase().includes(m.id)) || BOT_MODELS[0];
+  const activeBots = bots.filter((b: any) => b?.status !== 'retired');
+  const runningBots = activeBots.filter((b: any) => b?.isActive);
+  const signFmt = (n: number) => (n >= 0 ? '+' : '') + n.toFixed(2);
 
   if (!mounted) return null;
 
   return (
     <div className="min-h-screen">
       <Header />
-      <main className="pt-24 pb-12 px-4">
-        <div className="max-w-7xl mx-auto">
+      <main style={{ paddingTop: 88, paddingBottom: 48, paddingLeft: 16, paddingRight: 16 }}>
+        <div style={{ maxWidth: 1200, margin: '0 auto' }}>
 
-          {/* ═══ SECTION 1: BOT MANAGEMENT ═══ */}
-          <div className="flex items-center justify-between mb-6">
-            <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
-              <h1 className="text-3xl font-bold mb-1">
-                <span className="text-gradient">Bot Management</span>
-              </h1>
-              <p className="text-sm text-[var(--color-text-secondary)]">
-                Deploy and manage your automated trading bots
-              </p>
-            </motion.div>
-            <button
-              onClick={() => setShowDeployModal(true)}
-              style={{
-                display: 'flex', alignItems: 'center', gap: '8px',
-                padding: '10px 20px', borderRadius: '12px', border: 'none',
-                background: 'linear-gradient(135deg, var(--color-primary), var(--color-primary-dark, #0284c7))',
-                color: '#fff',
-                fontSize: '14px', fontWeight: 600, cursor: 'pointer',
-                transition: 'all 0.2s',
-              }}>
-              <Rocket size={16} />
-              Deploy Bot
-            </button>
-          </div>
+          {/* ════ COCKPIT HEADER ════ */}
+          <motion.div initial={{ opacity: 0, y: -12 }} animate={{ opacity: 1, y: 0 }}
+            style={{ marginBottom: 28 }}
+          >
+            {/* Engine status bar */}
+            <div style={{
+              display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16,
+              padding: '10px 18px', borderRadius: 'var(--radius-lg)',
+              background: 'rgba(13,20,32,0.6)', backdropFilter: 'blur(12px)',
+              border: '1px solid var(--color-border)', width: 'fit-content',
+            }}>
+              <span className="live-dot" style={runningBots.length === 0 ? { background: '#6B7280', boxShadow: 'none', animationPlayState: 'paused' } : {}} />
+              <span style={{ fontSize: 'var(--text-xs)', fontWeight: 700, color: runningBots.length > 0 ? 'var(--color-success)' : 'var(--color-text-muted)', letterSpacing: '0.5px' }}>
+                ENGINE {runningBots.length > 0 ? 'RUNNING' : 'IDLE'}
+              </span>
+              <span style={{ width: 1, height: 14, background: 'var(--color-border)' }} />
+              <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-secondary)' }}>
+                <strong style={{ color: 'var(--color-text)' }}>{runningBots.length}</strong> active bot{runningBots.length !== 1 ? 's' : ''}
+              </span>
+              <span style={{ width: 1, height: 14, background: 'var(--color-border)' }} />
+              <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-secondary)' }}>
+                <strong style={{ color: 'var(--color-info)', fontFamily: 'monospace' }}>{liveTradeCount}</strong> open positions
+              </span>
+              {perfSummary.allTimePnl !== 0 && (
+                <>
+                  <span style={{ width: 1, height: 14, background: 'var(--color-border)' }} />
+                  <span style={{ fontSize: 'var(--text-xs)', fontFamily: 'monospace', fontWeight: 700, color: perfSummary.allTimePnl >= 0 ? 'var(--color-success)' : 'var(--color-danger)' }}>
+                    {signFmt(perfSummary.allTimePnl)} USDT all-time
+                  </span>
+                </>
+              )}
+            </div>
 
-          {/* ── Synaptic Bot Card (shows when no bots yet) ── */}
-          {bots.length === 0 && (
-            <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
+            {/* Title row */}
+            <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 16 }}>
+              <div>
+                <h1 style={{ fontSize: 'var(--text-3xl)', fontWeight: 800, margin: 0, letterSpacing: '-0.03em' }}>
+                  <span className="text-gradient">Cockpit</span>
+                </h1>
+                <p style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-secondary)', margin: '4px 0 0' }}>
+                  Deploy, monitor &amp; manage your automated trading bots
+                </p>
+              </div>
+              <button
+                onClick={() => setShowDeployModal(true)}
+                className="btn-success"
+                style={{ fontSize: 'var(--text-base)', padding: '11px 22px' }}
+              >
+                <Rocket style={{ width: 16, height: 16 }} />
+                Deploy Bot
+              </button>
+            </div>
+          </motion.div>
+
+          {/* ════ EMPTY STATE ════ */}
+          {activeBots.length === 0 && (
+            <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }}
               style={{
-                background: 'linear-gradient(135deg, rgba(17,24,39,0.8), rgba(30,41,59,0.5))',
+                background: 'linear-gradient(135deg, rgba(17,24,39,0.7), rgba(30,41,59,0.5))',
                 backdropFilter: 'blur(12px)',
-                border: '1px solid rgba(34,197,94,0.15)',
-                borderRadius: '16px', padding: '32px', textAlign: 'center', marginBottom: '32px',
+                border: '1px solid rgba(34,197,94,0.2)',
+                borderRadius: 'var(--radius-xl)', padding: 48, textAlign: 'center',
+                marginBottom: 32, boxShadow: 'var(--shadow-card)',
               }}>
               <div style={{
-                width: '56px', height: '56px', borderRadius: '14px',
-                background: 'linear-gradient(135deg, rgba(34,197,94,0.15), rgba(16,185,129,0.1))',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                margin: '0 auto 16px',
-              }}>
-                <Shield size={28} color="#22C55E" />
-              </div>
-              <h3 style={{ fontSize: '20px', fontWeight: 700, marginBottom: '6px', color: '#E5E7EB' }}>
-                Synaptic Adaptive
+                width: 64, height: 64, borderRadius: 18, margin: '0 auto 20px',
+                background: 'linear-gradient(135deg, rgba(34,197,94,0.2), rgba(16,185,129,0.08))',
+                border: '1px solid rgba(34,197,94,0.25)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 28,
+              }}>🧠</div>
+              <h3 style={{ fontSize: 'var(--text-xl)', fontWeight: 700, margin: '0 0 8px', color: 'var(--color-text)' }}>
+                No bots deployed yet
               </h3>
-              <p style={{ fontSize: '12px', color: '#6B7280', marginBottom: '6px' }}>
+              <p style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-secondary)', margin: '0 0 8px' }}>
                 HMM-Powered Crypto Trading Engine
               </p>
-              <div style={{
-                display: 'inline-flex', alignItems: 'center', gap: '6px',
-                padding: '4px 12px', borderRadius: '20px', fontSize: '11px',
-                background: 'rgba(34,197,94,0.1)',
-                color: '#22C55E', fontWeight: 600,
-              }}>
-                <Activity size={12} /> Deploy your first bot to start trading
+              <div style={{ display: 'flex', justifyContent: 'center', gap: 24, margin: '20px 0 28px', flexWrap: 'wrap' }}>
+                {['Auto regime detection', 'Multi-timeframe HMM', 'Smart risk management'].map(f => (
+                  <div key={f} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 'var(--text-sm)', color: 'var(--color-text-secondary)' }}>
+                    <span style={{ color: 'var(--color-success)', fontSize: 12 }}>✓</span> {f}
+                  </div>
+                ))}
               </div>
-              <div style={{ marginTop: '20px' }}>
-                <button
-                  onClick={() => setShowDeployModal(true)}
-                  style={{
-                    display: 'inline-flex', alignItems: 'center', gap: '8px',
-                    padding: '12px 28px', borderRadius: '12px', border: 'none',
-                    background: 'linear-gradient(135deg, #22C55E, #16A34A)',
-                    color: '#fff', fontSize: '14px', fontWeight: 700, cursor: 'pointer',
-                    transition: 'all 0.2s',
-                  }}>
-                  <Rocket size={16} /> Deploy Bot
-                </button>
-              </div>
+              <button onClick={() => setShowDeployModal(true)} className="btn-success">
+                <Rocket style={{ width: 15, height: 15 }} /> Deploy Your First Bot
+              </button>
             </motion.div>
           )}
 
-          {/* ── Deployed Bots List ── */}
-          {bots && bots.length > 0 && (
-            <div className="flex flex-col gap-4 mb-12">
-              {bots.filter((b: any) => b?.status !== 'retired').map((bot) => {
+          {/* ════ BOT CARDS LIST ════ */}
+          {activeBots.length > 0 && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 14, marginBottom: 40 }}>
+              {activeBots.map((bot, i) => {
                 const botSessions = allSessions.filter((s: any) => s.botId === bot?.id);
-                // Filter trades for THIS bot only by botId
-                const botTrades = liveTrades.filter((t: any) => {
-                  if (t.bot_id && bot?.id && t.bot_id === bot.id) return true;
-                  if (t.botId && bot?.id && t.botId === bot.id) return true;
-                  return false;
-                });
-                // Fallback: if no trades matched by ID and only 1 non-retired bot, show all trades
-                const activeBots = bots.filter((b: any) => b?.status !== 'retired');
+                const botTrades = liveTrades.filter((t: any) =>
+                  (t.bot_id && bot?.id && t.bot_id === bot.id) ||
+                  (t.botId && bot?.id && t.botId === bot.id)
+                );
                 const displayTrades = botTrades.length > 0 ? botTrades : (activeBots.length === 1 ? liveTrades : []);
                 return (
-                  <BotCard
-                    key={bot?.id}
-                    bot={bot}
-                    onToggle={handleBotToggle}
-                    onDelete={handleDeleteBot}
-                    liveTradeCount={liveTradeCount}
-                    trades={displayTrades}
-                    sessions={botSessions}
-                  />
+                  <motion.div key={bot?.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.06 }}>
+                    <BotCard
+                      bot={bot}
+                      onToggle={handleBotToggle}
+                      onDelete={handleDeleteBot}
+                      liveTradeCount={liveTradeCount}
+                      trades={displayTrades}
+                      sessions={botSessions}
+                    />
+                  </motion.div>
                 );
               })}
             </div>
           )}
 
-          {/* ═══ SECTION 2: PERFORMANCE ANALYTICS (Inline) ═══ */}
-          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
-              <div style={{
-                width: '36px', height: '36px', borderRadius: '10px',
-                background: 'rgba(6, 182, 212, 0.15)', display: 'flex',
-                alignItems: 'center', justifyContent: 'center',
-              }}>
-                <TrendingUp size={18} color="#06B6D4" />
-              </div>
-              <div>
-                <div style={{ fontSize: '16px', fontWeight: 700, color: '#06B6D4' }}>Performance Analytics</div>
-                <div style={{ fontSize: '12px', color: '#6B7280' }}>All-time bot run records, session by session</div>
-              </div>
-            </div>
-            <PerformanceSection />
-          </motion.div>
-
         </div>
       </main>
 
-      {/* ═══ DEPLOY BOT MODAL ═══ */}
+      {/* ════ DEPLOY BOT MODAL ════ */}
       <AnimatePresence>
         {showDeployModal && (
           <div
             style={{
               position: 'fixed', inset: 0, zIndex: 50,
-              background: 'rgba(0,0,0,0.6)',
-              overflowY: 'auto', WebkitOverflowScrolling: 'touch',
-              display: 'flex', alignItems: 'flex-start', justifyContent: 'center',
-              padding: '24px 12px',
+              background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(4px)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              padding: '24px 16px',
             }}
             onClick={(e) => { if (e.target === e.currentTarget) setShowDeployModal(false); }}
           >
@@ -468,237 +288,235 @@ export function BotsClient({ bots: initialBots }: BotsClientProps) {
               initial={{ opacity: 0, scale: 0.95, y: 20 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              transition={{ type: 'spring', stiffness: 300, damping: 28 }}
               style={{
-                background: 'linear-gradient(135deg, rgba(17,24,39,0.98), rgba(30,41,59,0.95))',
-                backdropFilter: 'blur(20px)',
-                border: '1px solid rgba(255,255,255,0.1)',
-                borderRadius: '20px',
-                maxWidth: '520px', width: '100%',
-                margin: '0 auto',
-                display: 'flex', flexDirection: 'column' as const,
+                background: 'linear-gradient(145deg, #0D1420 0%, #111827 100%)',
+                border: '1px solid var(--color-border)',
+                borderRadius: 'var(--radius-xl)',
+                boxShadow: '0 24px 64px rgba(0,0,0,0.6), 0 0 0 1px rgba(255,255,255,0.04)',
+                maxWidth: 520, width: '100%',
+                maxHeight: 'calc(100vh - 48px)',
+                display: 'flex', flexDirection: 'column',
               }}
             >
-              {/* ── Modal Header (fixed at top) ── */}
+              {/* Modal Header */}
               <div style={{
-                display: 'flex', alignItems: 'center', gap: '12px',
-                padding: '20px 24px 16px',
-                borderBottom: '1px solid rgba(255,255,255,0.06)',
-                flexShrink: 0,
+                display: 'flex', alignItems: 'center', gap: 14,
+                padding: '20px 24px 18px',
+                borderBottom: '1px solid var(--color-border)',
               }}>
                 <div style={{
-                  width: '40px', height: '40px', borderRadius: '12px', flexShrink: 0,
-                  background: 'linear-gradient(135deg, rgba(34,197,94,0.2), rgba(16,185,129,0.1))',
+                  width: 42, height: 42, borderRadius: 'var(--radius-md)', flexShrink: 0,
+                  background: 'linear-gradient(135deg, rgba(34,197,94,0.2), rgba(16,185,129,0.08))',
+                  border: '1px solid rgba(34,197,94,0.25)',
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
                 }}>
-                  <Rocket size={20} color="#22C55E" />
+                  <Rocket style={{ width: 20, height: 20, color: '#22C55E' }} />
                 </div>
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <h2 style={{ fontSize: '18px', fontWeight: 700, color: '#E5E7EB', margin: 0 }}>Deploy Synaptic Bot</h2>
-                  <p style={{ fontSize: '11px', color: '#6B7280', margin: '2px 0 0' }}>Configure and launch your trading bot</p>
+                  <h2 style={{ fontSize: 'var(--text-lg)', fontWeight: 700, color: 'var(--color-text)', margin: 0 }}>
+                    Deploy Synaptic Bot
+                  </h2>
+                  <p style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)', margin: '2px 0 0' }}>
+                    Configure your trading engine
+                  </p>
                 </div>
                 <button
                   onClick={() => setShowDeployModal(false)}
                   style={{
-                    width: '32px', height: '32px', borderRadius: '8px', border: 'none',
-                    background: 'rgba(255,255,255,0.06)', color: '#9CA3AF',
-                    fontSize: '18px', cursor: 'pointer', display: 'flex',
-                    alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+                    width: 32, height: 32, border: 'none', borderRadius: 'var(--radius-sm)',
+                    background: 'rgba(255,255,255,0.06)', color: 'var(--color-text-secondary)',
+                    fontSize: 18, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    transition: 'background 0.2s',
                   }}
                 >✕</button>
               </div>
 
-              {/* ── Scrollable Content ── */}
-              <div style={{
-                overflowY: 'auto', padding: '16px 24px',
-                flex: 1, WebkitOverflowScrolling: 'touch' as any,
-              }}>
+              {/* Scrollable content */}
+              <div style={{ overflowY: 'auto', padding: '20px 24px', flex: 1 }}>
 
-                {/* Step 1: Select Model */}
-                <div style={{ marginBottom: '16px' }}>
-                  <div style={{ fontSize: '10px', fontWeight: 700, color: '#6B7280', textTransform: 'uppercase' as const, letterSpacing: '1.5px', marginBottom: '8px' }}>
-                    1. Select Model
-                  </div>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '8px' }}>
-                    {BOT_MODELS.map(model => (
-                      <div key={model.id}
-                        onClick={() => setDeployModel(model.id)}
-                        style={{
-                          padding: '12px', borderRadius: '12px', cursor: 'pointer',
-                          background: deployModel === model.id ? model.color + '12' : 'rgba(255,255,255,0.03)',
-                          border: `2px solid ${deployModel === model.id ? model.color : 'rgba(255,255,255,0.06)'}`,
-                          transition: 'all 0.2s', textAlign: 'center' as const,
-                        }}>
-                        <div style={{ fontSize: '13px', fontWeight: 700, color: deployModel === model.id ? model.color : '#9CA3AF' }}>{model.name}</div>
-                        <div style={{ fontSize: '9px', color: '#6B7280', marginTop: '2px', lineHeight: '1.3' }}>{model.description}</div>
-                      </div>
-                    ))}
+                {/* ── AI Model ── */}
+                <div style={{ marginBottom: 20 }}>
+                  <div className="section-title" style={{ marginBottom: 10 }}>AI Brain Model</div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                    {BOT_MODELS.map(model => {
+                      const selected = deployModel === model.id;
+                      return (
+                        <button key={model.id}
+                          onClick={() => setDeployModel(model.id)}
+                          style={{
+                            padding: '14px', borderRadius: 'var(--radius-md)', cursor: 'pointer',
+                            background: selected ? `${model.color}12` : 'rgba(255,255,255,0.03)',
+                            border: `2px solid ${selected ? model.color : 'var(--color-border)'}`,
+                            transition: 'all 0.2s', textAlign: 'left',
+                            boxShadow: selected ? `0 0 16px ${model.color}22` : 'none',
+                          }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+                            <span style={{ fontSize: 18 }}>{model.icon}</span>
+                            <div>
+                              <div style={{ fontSize: 'var(--text-sm)', fontWeight: 700, color: selected ? model.color : 'var(--color-text)' }}>
+                                {model.name}
+                              </div>
+                              <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)', marginTop: 1 }}>
+                                {model.tagline}
+                              </div>
+                            </div>
+                          </div>
+                          <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)', lineHeight: 1.4 }}>
+                            {model.description}
+                          </div>
+                        </button>
+                      );
+                    })}
                   </div>
                 </div>
 
-                {/* Step 2: Select Exchange */}
-                <div style={{ marginBottom: '16px' }}>
-                  <div style={{ fontSize: '10px', fontWeight: 700, color: '#6B7280', textTransform: 'uppercase' as const, letterSpacing: '1.5px', marginBottom: '8px' }}>
-                    2. Select Exchange
-                  </div>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '8px' }}>
-                    {[
-                      { id: 'binance', name: 'Binance', icon: '🔶', desc: 'Largest crypto exchange' },
-                      { id: 'coindcx', name: 'CoinDCX', icon: '🇮🇳', desc: "India's crypto exchange" },
-                    ].map(ex => (
-                      <div key={ex.id}
-                        onClick={() => setDeployExchange(ex.id)}
-                        style={{
-                          padding: '12px', borderRadius: '10px', cursor: 'pointer',
-                          background: deployExchange === ex.id ? 'rgba(14,165,233,0.1)' : 'rgba(255,255,255,0.03)',
-                          border: `2px solid ${deployExchange === ex.id ? '#0EA5E9' : 'rgba(255,255,255,0.06)'}`,
-                          transition: 'all 0.2s', textAlign: 'center' as const,
-                        }}>
-                        <div style={{ fontSize: '12px', fontWeight: 700, color: deployExchange === ex.id ? '#0EA5E9' : '#9CA3AF' }}>{ex.name}</div>
-                        <div style={{ fontSize: '9px', color: '#6B7280', marginTop: '2px' }}>{ex.desc}</div>
-                      </div>
-                    ))}
-                  </div>
-                  <p style={{ fontSize: '9px', color: '#4B5563', marginTop: '6px' }}>
-                    ℹ️ Make sure your API key is configured in Settings for the selected exchange
-                  </p>
-                </div>
-
-                {/* Step 3: Trading Mode */}
-                <div style={{ marginBottom: '16px' }}>
-                  <div style={{ fontSize: '10px', fontWeight: 700, color: '#6B7280', textTransform: 'uppercase' as const, letterSpacing: '1.5px', marginBottom: '8px' }}>
-                    3. Trading Mode
-                  </div>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '8px' }}>
-                    {[
-                      { id: 'paper', name: 'Paper Trading', icon: '📝', desc: 'Simulated trades, no real money', color: '#0EA5E9' },
-                      { id: 'live', name: 'Live Trading', icon: '💰', desc: 'Real trades with your capital', color: '#EF4444' },
-                    ].map(mode => (
-                      <div key={mode.id}
-                        onClick={() => setDeployMode(mode.id)}
-                        style={{
-                          padding: '12px', borderRadius: '10px', cursor: 'pointer',
-                          background: deployMode === mode.id ? mode.color + '10' : 'rgba(255,255,255,0.03)',
-                          border: `2px solid ${deployMode === mode.id ? mode.color : 'rgba(255,255,255,0.06)'}`,
-                          transition: 'all 0.2s', textAlign: 'center' as const,
-                        }}>
-                        <div style={{ fontSize: '12px', fontWeight: 700, color: deployMode === mode.id ? mode.color : '#9CA3AF' }}>{mode.name}</div>
-                        <div style={{ fontSize: '9px', color: '#6B7280', marginTop: '2px' }}>{mode.desc}</div>
-                      </div>
-                    ))}
-                  </div>
-                  {deployMode === 'live' && (
-                    <div style={{ marginTop: '8px', display: 'flex', flexDirection: 'column' as const, gap: '6px' }}>
-                      <div style={{
-                        padding: '8px 10px', borderRadius: '8px',
-                        background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)',
-                        fontSize: '10px', color: '#F87171', lineHeight: '1.4',
-                      }}>
-                        ⚠️ Live trading uses real capital. Ensure your risk settings are configured in Settings.
-                      </div>
-                      {/* Verify Exchange Connection */}
-                      <button
-                        onClick={handleVerifyConnection}
-                        disabled={verifying}
-                        style={{
-                          width: '100%', padding: '8px 0', borderRadius: '8px', cursor: verifying ? 'wait' : 'pointer',
-                          border: `1px solid ${verifyStatus === 'ok' ? '#22C55E' : verifyStatus === 'fail' ? '#EF4444' : 'rgba(255,255,255,0.12)'}`,
-                          background: verifyStatus === 'ok' ? 'rgba(34,197,94,0.1)' : verifyStatus === 'fail' ? 'rgba(239,68,68,0.08)' : 'rgba(255,255,255,0.04)',
-                          color: verifyStatus === 'ok' ? '#22C55E' : verifyStatus === 'fail' ? '#F87171' : '#9CA3AF',
-                          fontSize: '11px', fontWeight: 700, transition: 'all 0.2s',
-                          opacity: verifying ? 0.7 : 1,
-                        }}
-                      >
-                        {verifying ? 'Checking connection...' :
-                          verifyStatus === 'ok' ? `✓ ${deployExchange === 'coindcx' ? 'CoinDCX' : 'Binance'} Connected${verifyBalance != null ? ` · $${verifyBalance.toFixed(2)} USDT` : ''}` :
-                            verifyStatus === 'fail' ? '✗ Connection failed — check API keys' :
-                              `Verify ${deployExchange === 'coindcx' ? 'CoinDCX' : 'Binance'} Connection`}
-                      </button>
+                {/* ── Exchange + Mode (inline 2-col) ── */}
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 20 }}>
+                  {/* Exchange */}
+                  <div>
+                    <div className="section-title" style={{ marginBottom: 10 }}>Exchange</div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
+                      {[
+                        { id: 'binance', name: 'Binance', icon: '🔶', sub: 'Global · Largest' },
+                        { id: 'coindcx', name: 'CoinDCX', icon: '🇮🇳', sub: 'India · INR' },
+                      ].map(ex => {
+                        const sel = deployExchange === ex.id;
+                        return (
+                          <button key={ex.id} onClick={() => setDeployExchange(ex.id)} style={{
+                            display: 'flex', alignItems: 'center', gap: 10,
+                            padding: '10px 12px', borderRadius: 'var(--radius-md)', cursor: 'pointer',
+                            background: sel ? 'rgba(14,165,233,0.1)' : 'rgba(255,255,255,0.03)',
+                            border: `1.5px solid ${sel ? '#0EA5E9' : 'var(--color-border)'}`,
+                            transition: 'all 0.2s', textAlign: 'left',
+                          }}>
+                            <span style={{ fontSize: 16 }}>{ex.icon}</span>
+                            <div>
+                              <div style={{ fontSize: 'var(--text-sm)', fontWeight: 700, color: sel ? '#0EA5E9' : 'var(--color-text)' }}>{ex.name}</div>
+                              <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)' }}>{ex.sub}</div>
+                            </div>
+                          </button>
+                        );
+                      })}
                     </div>
-                  )}
+                  </div>
+
+                  {/* Mode */}
+                  <div>
+                    <div className="section-title" style={{ marginBottom: 10 }}>Trading Mode</div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
+                      {[
+                        { id: 'paper', name: 'Paper', icon: '📝', sub: 'Simulated · No risk', color: '#0EA5E9' },
+                        { id: 'live', name: 'Live', icon: '⚡', sub: 'Real capital · Live P&L', color: '#EF4444' },
+                      ].map(mode => {
+                        const sel = deployMode === mode.id;
+                        return (
+                          <button key={mode.id} onClick={() => setDeployMode(mode.id)} style={{
+                            display: 'flex', alignItems: 'center', gap: 10,
+                            padding: '10px 12px', borderRadius: 'var(--radius-md)', cursor: 'pointer',
+                            background: sel ? `${mode.color}10` : 'rgba(255,255,255,0.03)',
+                            border: `1.5px solid ${sel ? mode.color : 'var(--color-border)'}`,
+                            transition: 'all 0.2s', textAlign: 'left',
+                          }}>
+                            <span style={{ fontSize: 16 }}>{mode.icon}</span>
+                            <div>
+                              <div style={{ fontSize: 'var(--text-sm)', fontWeight: 700, color: sel ? mode.color : 'var(--color-text)' }}>{mode.name}</div>
+                              <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)' }}>{mode.sub}</div>
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
                 </div>
 
-                {/* Step 4: Trade Settings */}
-                <div style={{ marginBottom: '4px' }}>
-                  <div style={{ fontSize: '10px', fontWeight: 700, color: '#6B7280', textTransform: 'uppercase' as const, letterSpacing: '1.5px', marginBottom: '8px' }}>
-                    4. Trade Settings
-                  </div>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                {/* ── Live mode warnings ── */}
+                {deployMode === 'live' && (
+                  <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }}
+                    style={{ marginBottom: 20, overflow: 'hidden' }}>
+                    <div style={{
+                      padding: '10px 14px', borderRadius: 'var(--radius-md)',
+                      background: 'var(--color-danger-bg)', border: '1px solid rgba(239,68,68,0.25)',
+                      fontSize: 'var(--text-xs)', color: '#F87171', lineHeight: 1.5, marginBottom: 8,
+                    }}>
+                      ⚠️ Live trading uses real capital. Ensure your API keys are set in Settings and risk parameters are configured.
+                    </div>
+                    <button onClick={handleVerifyConnection} disabled={verifying} style={{
+                      width: '100%', padding: '9px 0', borderRadius: 'var(--radius-md)',
+                      border: `1px solid ${verifyStatus === 'ok' ? 'rgba(16,185,129,0.4)' : verifyStatus === 'fail' ? 'rgba(239,68,68,0.4)' : 'var(--color-border)'}`,
+                      background: verifyStatus === 'ok' ? 'var(--color-success-bg)' : verifyStatus === 'fail' ? 'var(--color-danger-bg)' : 'rgba(255,255,255,0.04)',
+                      color: verifyStatus === 'ok' ? 'var(--color-success)' : verifyStatus === 'fail' ? 'var(--color-danger)' : 'var(--color-text-secondary)',
+                      fontSize: 'var(--text-sm)', fontWeight: 700, cursor: verifying ? 'wait' : 'pointer',
+                      transition: 'all 0.2s', opacity: verifying ? 0.7 : 1,
+                    }}>
+                      {verifying ? '⏳ Checking connection…' :
+                        verifyStatus === 'ok' ? `✓ ${deployExchange === 'coindcx' ? 'CoinDCX' : 'Binance'} Connected${verifyBalance != null ? ` · $${verifyBalance.toFixed(2)} USDT` : ''}` :
+                          verifyStatus === 'fail' ? '✗ Connection failed — check API keys' :
+                            `Verify ${deployExchange === 'coindcx' ? 'CoinDCX' : 'Binance'} Connection`}
+                    </button>
+                  </motion.div>
+                )}
+
+                {/* ── Capital Settings ── */}
+                <div style={{ marginBottom: 4 }}>
+                  <div className="section-title" style={{ marginBottom: 10 }}>Capital Settings</div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                     <div>
-                      <label style={{ display: 'block', fontSize: '11px', color: '#9CA3AF', marginBottom: '4px', fontWeight: 600 }}>
+                      <label style={{ display: 'block', fontSize: 'var(--text-xs)', color: 'var(--color-text-secondary)', marginBottom: 5, fontWeight: 600 }}>
                         Max Concurrent Trades
                       </label>
-                      <input
-                        type="number" min={1} max={100}
-                        value={deployMaxTrades}
+                      <input type="number" min={1} max={100} value={deployMaxTrades}
                         onChange={(e) => setDeployMaxTrades(Math.max(1, parseInt(e.target.value) || 1))}
-                        style={{
-                          width: '100%', padding: '8px 10px', borderRadius: '8px', boxSizing: 'border-box' as const,
-                          background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)',
-                          color: '#F0F4F8', fontSize: '14px', fontWeight: 600, outline: 'none',
-                        }}
+                        className="input-field"
+                        style={{ fontFamily: 'monospace' }}
                       />
-                      <p style={{ fontSize: '9px', color: '#4B5563', marginTop: '3px' }}>
-                        Max positions open at the same time
-                      </p>
                     </div>
                     <div>
-                      <label style={{ display: 'block', fontSize: '11px', color: '#9CA3AF', marginBottom: '4px', fontWeight: 600 }}>
+                      <label style={{ display: 'block', fontSize: 'var(--text-xs)', color: 'var(--color-text-secondary)', marginBottom: 5, fontWeight: 600 }}>
                         Capital Per Trade ($)
                       </label>
-                      <input
-                        type="number" min={10} max={10000} step={10}
-                        value={deployCapitalPerTrade}
+                      <input type="number" min={10} max={10000} step={10} value={deployCapitalPerTrade}
                         onChange={(e) => setDeployCapitalPerTrade(Math.max(10, parseInt(e.target.value) || 10))}
-                        style={{
-                          width: '100%', padding: '8px 10px', borderRadius: '8px', boxSizing: 'border-box' as const,
-                          background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)',
-                          color: '#F0F4F8', fontSize: '14px', fontWeight: 600, outline: 'none',
-                        }}
+                        className="input-field"
+                        style={{ fontFamily: 'monospace' }}
                       />
-                      <p style={{ fontSize: '9px', color: '#4B5563', marginTop: '3px' }}>
-                        Amount allocated per trade entry
-                      </p>
                     </div>
                   </div>
+                  {/* Max exposure strip */}
                   <div style={{
-                    marginTop: '8px', padding: '6px 10px', borderRadius: '8px',
-                    background: 'rgba(8,145,178,0.08)', border: '1px solid rgba(8,145,178,0.2)',
-                    fontSize: '10px', color: '#06B6D4',
+                    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                    marginTop: 10, padding: '8px 14px', borderRadius: 'var(--radius-md)',
+                    background: 'var(--color-info-bg)', border: '1px solid rgba(6,182,212,0.2)',
+                    fontSize: 'var(--text-xs)', color: 'var(--color-info)',
                   }}>
-                    💡 Max capital exposure: ${deployMaxTrades * deployCapitalPerTrade} ({deployMaxTrades} × ${deployCapitalPerTrade})
+                    <span>Max capital exposure</span>
+                    <span style={{ fontFamily: 'monospace', fontWeight: 800, fontSize: 'var(--text-sm)' }}>
+                      ${(deployMaxTrades * deployCapitalPerTrade).toLocaleString()}
+                      <span style={{ fontWeight: 400, color: 'var(--color-text-muted)', marginLeft: 4 }}>
+                        ({deployMaxTrades} × ${deployCapitalPerTrade})
+                      </span>
+                    </span>
                   </div>
                 </div>
-
               </div>
 
-              {/* ── Sticky Action Buttons (always visible) ── */}
+              {/* Modal Footer */}
               <div style={{
-                display: 'flex', gap: '10px',
+                display: 'flex', gap: 10,
                 padding: '16px 24px 20px',
-                borderTop: '1px solid rgba(255,255,255,0.06)',
-                flexShrink: 0,
+                borderTop: '1px solid var(--color-border)',
               }}>
-                <button
-                  onClick={() => setShowDeployModal(false)}
-                  style={{
-                    flex: 1, padding: '11px', borderRadius: '10px', border: '1px solid rgba(255,255,255,0.1)',
-                    background: 'rgba(255,255,255,0.05)', color: '#9CA3AF',
-                    fontSize: '13px', fontWeight: 600, cursor: 'pointer', transition: 'all 0.2s',
-                  }}>
+                <button onClick={() => setShowDeployModal(false)} className="btn-ghost" style={{ flex: 1, padding: '11px 0' }}>
                   Cancel
                 </button>
                 <button
                   onClick={handleDeployBot}
                   disabled={loading}
-                  style={{
-                    flex: 1, padding: '11px', borderRadius: '10px', border: 'none',
-                    background: 'linear-gradient(135deg, #22C55E, #16A34A)',
-                    color: '#fff', fontSize: '13px', fontWeight: 700, cursor: 'pointer',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px',
-                    transition: 'all 0.2s', opacity: loading ? 0.6 : 1,
-                  }}>
-                  <Rocket size={14} />
-                  {loading ? 'Deploying...' : 'Deploy Bot'}
+                  className="btn-success"
+                  style={{ flex: 1, padding: '11px 0', opacity: loading ? 0.7 : 1, cursor: loading ? 'wait' : 'pointer' }}
+                >
+                  <Rocket style={{ width: 15, height: 15 }} />
+                  {loading ? 'Launching…' : 'Launch Bot'}
                 </button>
               </div>
             </motion.div>
@@ -708,10 +526,6 @@ export function BotsClient({ bots: initialBots }: BotsClientProps) {
 
       <style jsx>{`
         @keyframes spin { to { transform: rotate(360deg); } }
-        @keyframes pulse {
-          0%, 100% { opacity: 1; }
-          50% { opacity: 0.5; }
-        }
       `}</style>
     </div>
   );

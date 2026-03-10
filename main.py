@@ -804,8 +804,18 @@ class RegimeMasterBot:
                 return None
 
             # ── Athena LLM Reasoning Gate ──
+            # Only activate Athena for "athena" brain type — adaptive users use HMM-only signals.
+            # ENGINE_BRAIN_TYPE is set per-bot via /api/set-bot-id (brain_type param).
+            # Multi-bot: only use Athena if ALL active bots want it (otherwise it would
+            # silently veto signals for Adaptive-model users sharing the same engine).
             athena_action = None
-            if self._athena and config.LLM_REASONING_ENABLED:
+            _active_bots = config.ENGINE_ACTIVE_BOTS
+            if _active_bots:
+                _all_athena = all(b.get("brain_type") == "athena" for b in _active_bots)
+            else:
+                _all_athena = config.ENGINE_BRAIN_TYPE == "athena"
+            _use_athena = self._athena and config.LLM_REASONING_ENABLED and _all_athena
+            if _use_athena:
                 try:
                     llm_ctx = {
                         "ticker": symbol,
