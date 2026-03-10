@@ -207,6 +207,10 @@ export function DashboardClient({ user, stats, bots, recentTrades }: DashboardCl
 
   // Compute active PNL from live Binance prices (same formula as tradebook)
   const computePnlFromPrices = (t: any) => {
+    // Prefer engine-computed unrealized_pnl (same source as bot-card) for consistency
+    const enginePnl = parseFloat(t.unrealized_pnl);
+    if (!isNaN(enginePnl)) return enginePnl;
+    // Fallback: recalculate from live prices
     const entry = t.entry_price || t.entryPrice || 0;
     const sym = (t.symbol || (t.coin || '') + 'USDT').toUpperCase();
     const current = livePrices[sym] || t.current_price || t.currentPrice || entry;
@@ -314,7 +318,7 @@ export function DashboardClient({ user, stats, bots, recentTrades }: DashboardCl
             <div className="flex items-center justify-between">
               <div>
                 <h1 className="text-3xl font-bold mb-1">
-                  Welcome back, <span className="text-gradient">{user?.name ?? 'Trader'}</span>
+                  Welcome, <span className="text-gradient">{user?.name ?? 'Trader'}</span>
                 </h1>
                 <p className="text-[var(--color-text-secondary)] text-sm">
                   AI Trading Command Center — Monitor your bots and market signals
