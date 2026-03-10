@@ -41,7 +41,7 @@ export function Header() {
             {session ? (
               <>
                 <Link href="/dashboard" className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)] transition-colors">
-                  Command Center
+                  Cockpit
                 </Link>
                 <Link href="/bots" className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)] transition-colors">
                   Bots
@@ -102,7 +102,7 @@ export function Header() {
             {session ? (
               <>
                 <Link href="/dashboard" className="block text-[var(--color-text-secondary)] hover:text-[var(--color-primary)] transition-colors">
-                  Command Center
+                  Cockpit
                 </Link>
                 <Link href="/bots" className="block text-[var(--color-text-secondary)] hover:text-[var(--color-primary)] transition-colors">
                   Bots
