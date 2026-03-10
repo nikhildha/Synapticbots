@@ -419,16 +419,16 @@ export function DashboardClient({ user, stats, bots, recentTrades }: DashboardCl
                     position: 'relative' as const,
                   }}>
                     {/* Title on top */}
-                    <div style={{ fontSize: '10px', fontWeight: 800, letterSpacing: '3px', textTransform: 'uppercase' as const, color: bc, marginBottom: '2px' }}>
+                    <div style={{ fontSize: '13px', fontWeight: 800, letterSpacing: '3px', textTransform: 'uppercase' as const, color: bc, marginBottom: '2px' }}>
                       Synaptic Core Brain
                     </div>
                     {isOn && (
-                      <div style={{ fontSize: '10px', color: '#6B7280', marginBottom: '2px', fontFamily: 'monospace' }}>
+                      <div style={{ fontSize: '12px', color: '#6B7280', marginBottom: '2px', fontFamily: 'monospace' }}>
                         Cycle #{cycle} Completed
                       </div>
                     )}
                     {/* SVG Wireframe Brain */}
-                    <svg viewBox="0 0 200 180" style={{ width: '240px', height: '160px' }}>
+                    <svg viewBox="0 0 200 180" style={{ width: '312px', height: '208px' }}>
                       <defs>
                         <filter id="brainGlow2">
                           <feGaussianBlur stdDeviation="3" result="blur" />
@@ -647,7 +647,59 @@ export function DashboardClient({ user, stats, bots, recentTrades }: DashboardCl
               transition={{ delay: 0.27 }}
               className="mt-6 mb-8"
             >
-              <AthenaPanel athena={botState?.athena || { enabled: true, recent_decisions: [], model: 'gemini-2.5-flash' }} coinStates={multi?.coin_states} />
+              <div style={{ display: 'grid', gridTemplateColumns: '3fr 2fr', gap: '20px' }}>
+                <AthenaPanel athena={botState?.athena || { enabled: true, recent_decisions: [], model: 'gemini-2.5-flash' }} coinStates={multi?.coin_states} />
+
+                {/* Notification Card */}
+                <div style={{
+                  background: 'rgba(17, 24, 39, 0.90)',
+                  backdropFilter: 'blur(20px)',
+                  border: '1px solid rgba(6,182,212,0.2)',
+                  borderRadius: '16px',
+                  overflow: 'hidden',
+                  display: 'flex', flexDirection: 'column' as const,
+                }}>
+                  <div style={{
+                    padding: '16px 24px',
+                    background: 'linear-gradient(135deg, rgba(6,182,212,0.12) 0%, rgba(59,130,246,0.06) 100%)',
+                    borderBottom: '1px solid rgba(6,182,212,0.15)',
+                    display: 'flex', alignItems: 'center', gap: '10px',
+                  }}>
+                    <span style={{ fontSize: '18px' }}>🔔</span>
+                    <h2 style={{ fontSize: '16px', fontWeight: 800, color: '#06B6D4', margin: 0 }}>Notifications</h2>
+                  </div>
+                  <div style={{
+                    flex: 1, padding: '16px',
+                    maxHeight: '480px', overflowY: 'auto',
+                    display: 'flex', flexDirection: 'column' as const, gap: '8px',
+                  }}>
+                    {/* Placeholder notifications */}
+                    {[
+                      { icon: '🟢', text: 'Engine running — Cycle analysis active', time: 'Now', color: '#10B981' },
+                      { icon: '🏛️', text: 'Athena analyzing eligible coins', time: '1m ago', color: '#A78BFA' },
+                      { icon: '📊', text: 'BTC regime: Monitoring macro conditions', time: '5m ago', color: '#06B6D4' },
+                    ].map((n, i) => (
+                      <div key={i} style={{
+                        display: 'flex', alignItems: 'flex-start', gap: '10px',
+                        padding: '10px 12px', borderRadius: '10px',
+                        background: 'rgba(255,255,255,0.03)',
+                        border: '1px solid rgba(255,255,255,0.05)',
+                      }}>
+                        <span style={{ fontSize: '14px', marginTop: '1px' }}>{n.icon}</span>
+                        <div style={{ flex: 1 }}>
+                          <div style={{ fontSize: '13px', color: '#D1D5DB', lineHeight: '1.4' }}>{n.text}</div>
+                          <div style={{ fontSize: '11px', color: '#4B5563', marginTop: '3px', fontFamily: 'monospace' }}>{n.time}</div>
+                        </div>
+                      </div>
+                    ))}
+                    <div style={{
+                      textAlign: 'center', padding: '20px', color: '#4B5563', fontSize: '12px',
+                    }}>
+                      System notifications will appear here
+                    </div>
+                  </div>
+                </div>
+              </div>
             </motion.div>
           )}
 

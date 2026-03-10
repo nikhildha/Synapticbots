@@ -119,7 +119,7 @@ export function AthenaPanel({ athena, coinStates }: Props) {
                 <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                     <span style={{ fontSize: '24px' }}>🏛️</span>
                     <div>
-                        <h2 style={{ fontSize: '17px', fontWeight: 800, color: '#A78BFA', margin: 0, letterSpacing: '0.5px' }}>
+                        <h2 style={{ fontSize: '20px', fontWeight: 800, color: '#A78BFA', margin: 0, letterSpacing: '0.5px' }}>
                             Athena.AI
                         </h2>
                     </div>
@@ -127,7 +127,7 @@ export function AthenaPanel({ athena, coinStates }: Props) {
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                     {athena.initialized ? (
                         <span style={{
-                            fontSize: '11px', padding: '3px 10px', borderRadius: '8px',
+                            fontSize: '12px', padding: '4px 12px', borderRadius: '8px',
                             background: 'rgba(16,185,129,0.15)', color: '#10B981', fontWeight: 700,
                             border: '1px solid rgba(16,185,129,0.2)',
                         }}>
@@ -135,21 +135,21 @@ export function AthenaPanel({ athena, coinStates }: Props) {
                         </span>
                     ) : (
                         <span style={{
-                            fontSize: '11px', padding: '3px 10px', borderRadius: '8px',
+                            fontSize: '12px', padding: '4px 12px', borderRadius: '8px',
                             background: 'rgba(245,158,11,0.15)', color: '#F59E0B', fontWeight: 700,
                         }}>
                             ○ STANDBY
                         </span>
                     )}
                     <span style={{
-                        fontSize: '10px', color: '#4B5563', fontFamily: 'monospace',
+                        fontSize: '11px', color: '#4B5563', fontFamily: 'monospace',
                         padding: '2px 8px', borderRadius: '6px',
                         background: 'rgba(255,255,255,0.03)',
                     }}>
                         {athena.model || 'gemini-2.5-flash'}
                     </span>
                     {(athena.cycle_calls ?? 0) > 0 && (
-                        <span style={{ fontSize: '10px', color: '#6B7280' }}>
+                        <span style={{ fontSize: '11px', color: '#6B7280' }}>
                             {athena.cycle_calls} calls
                         </span>
                     )}
@@ -165,7 +165,7 @@ export function AthenaPanel({ athena, coinStates }: Props) {
                 {!hasData ? (
                     <div style={{
                         textAlign: 'center', padding: '40px 20px',
-                        color: '#4B5563', fontSize: '13px',
+                        color: '#4B5563', fontSize: '14px',
                     }}>
                         <span style={{ fontSize: '40px', display: 'block', marginBottom: '12px', opacity: 0.4 }}>🏛️</span>
                         <span style={{ color: '#6B7280', fontWeight: 600 }}>Awaiting eligible coins…</span>
@@ -199,13 +199,13 @@ export function AthenaPanel({ athena, coinStates }: Props) {
                                         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                                             <span style={{ fontSize: '16px' }}>{config.icon}</span>
                                             <span style={{
-                                                fontWeight: 800, fontSize: '15px', color: '#F9FAFB',
+                                                fontWeight: 800, fontSize: '18px', color: '#F9FAFB',
                                                 letterSpacing: '0.3px',
                                             }}>
                                                 {d.symbol?.replace('USDT', '')}
                                             </span>
                                             <span style={{
-                                                fontSize: '11px', fontWeight: 700, color: config.text,
+                                                fontSize: '13px', fontWeight: 700, color: config.text,
                                                 padding: '2px 8px', borderRadius: '6px',
                                                 background: 'rgba(0,0,0,0.2)',
                                                 letterSpacing: '0.5px',
@@ -214,7 +214,7 @@ export function AthenaPanel({ athena, coinStates }: Props) {
                                             </span>
                                             {d.side && (
                                                 <span style={{
-                                                    fontSize: '11px', fontWeight: 700,
+                                                    fontSize: '13px', fontWeight: 700,
                                                     color: d.side === 'BUY' || d.side === 'LONG' ? '#10B981' : '#EF4444',
                                                     padding: '2px 8px', borderRadius: '6px',
                                                     background: d.side === 'BUY' || d.side === 'LONG'
@@ -239,14 +239,14 @@ export function AthenaPanel({ athena, coinStates }: Props) {
                                                     }} />
                                                 </div>
                                                 <span style={{
-                                                    fontSize: '12px', fontWeight: 700, color: config.text,
+                                                    fontSize: '14px', fontWeight: 700, color: config.text,
                                                     fontFamily: 'monospace',
                                                 }}>
                                                     {confPct}%
                                                 </span>
                                             </div>
                                             <span style={{
-                                                fontSize: '10px', color: '#4B5563',
+                                                fontSize: '12px', color: '#4B5563',
                                                 fontFamily: 'monospace',
                                             }}>
                                                 {formatTimestamp(d.time)}
@@ -257,7 +257,7 @@ export function AthenaPanel({ athena, coinStates }: Props) {
                                     {/* Reasoning Body */}
                                     <div style={{ padding: '12px 16px' }}>
                                         <p style={{
-                                            fontSize: '12px', lineHeight: '1.6', color: '#D1D5DB',
+                                            fontSize: '14px', lineHeight: '1.6', color: '#D1D5DB',
                                             margin: '0 0 10px 0',
                                         }}>
                                             {parsed.mainReasoning}
@@ -288,7 +288,7 @@ export function AthenaPanel({ athena, coinStates }: Props) {
                                                 )}
                                                 {d.latency_ms > 0 && (
                                                     <span style={{
-                                                        fontSize: '10px', fontWeight: 600, padding: '3px 10px',
+                                                        fontSize: '12px', fontWeight: 600, padding: '4px 12px',
                                                         borderRadius: '6px', background: 'rgba(255,255,255,0.04)',
                                                         color: '#6B7280',
                                                     }}>
@@ -338,7 +338,7 @@ export function AthenaPanel({ athena, coinStates }: Props) {
                                             }}>
                                                 {d.risk_flags.map((flag: string, fi: number) => (
                                                     <span key={fi} style={{
-                                                        fontSize: '9px', fontWeight: 600, padding: '2px 8px',
+                                                        fontSize: '11px', fontWeight: 600, padding: '3px 10px',
                                                         borderRadius: '4px',
                                                         background: 'rgba(245,158,11,0.08)',
                                                         color: '#D97706',

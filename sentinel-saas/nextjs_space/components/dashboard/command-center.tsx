@@ -588,8 +588,8 @@ export function SignalSummaryTable({ coinStates, multi }: SignalSummaryProps) {
         <div>
             {/* Header */}
             <div style={{ marginBottom: '16px' }}>
-                <h2 style={{ fontSize: '20px', fontWeight: 700, color: '#06B6D4', margin: 0 }}>Bot Scan Summary <span style={{ fontSize: '13px', fontWeight: 600, color: '#6B7280' }}>· Cycle #{liveMulti?.cycle || 0}</span></h2>
-                <p style={{ fontSize: '12px', color: '#6B7280', marginTop: '4px' }}>Synaptic Adaptive · Auto-refreshes every {Math.round(refreshMs / 1000)}s</p>
+                <h2 style={{ fontSize: '22px', fontWeight: 700, color: '#06B6D4', margin: 0 }}>Bot Scan Summary <span style={{ fontSize: '14px', fontWeight: 600, color: '#6B7280' }}>· Cycle #{liveMulti?.cycle || 0}</span></h2>
+                <p style={{ fontSize: '13px', color: '#6B7280', marginTop: '4px' }}>Synaptic Adaptive · Auto-refreshes every {Math.round(refreshMs / 1000)}s</p>
             </div>
 
             {/* Stats Bar */}
@@ -676,7 +676,7 @@ export function SignalSummaryTable({ coinStates, multi }: SignalSummaryProps) {
             {/* Table */}
             <div className="card-gradient rounded-xl overflow-hidden">
                 <div style={{ overflowX: 'auto', maxHeight: '480px', overflowY: 'auto' }}>
-                    <table style={{ width: '100%', minWidth: '900px', borderCollapse: 'collapse', fontSize: '12px' }}>
+                    <table style={{ width: '100%', minWidth: '900px', borderCollapse: 'collapse', fontSize: '14px' }}>
                         <thead>
                             <tr style={{ borderBottom: '2px solid rgba(255,255,255,0.08)' }}>
                                 {['#', 'Bot', 'Coin', 'Regime', 'Conf %', 'Deploy', 'Reason', 'Cycle #', 'Scan Time'].map(h => (
@@ -706,13 +706,13 @@ export function SignalSummaryTable({ coinStates, multi }: SignalSummaryProps) {
                                     <tr key={c.symbol} style={{ borderBottom: '1px solid rgba(255,255,255,0.04)', background: isE ? 'rgba(34,197,94,0.04)' : 'transparent' }}>
                                         <td style={{ padding: '8px 8px', color: '#4B5563', fontSize: '10px', fontWeight: 600 }}>{idx + 1}</td>
                                         <td style={{ padding: '8px 8px' }}><span style={{ fontSize: '10px', color: '#06B6D4', fontWeight: 600 }}>Synaptic Adaptive</span></td>
-                                        <td style={{ padding: '8px 8px' }}><div style={{ fontWeight: 700, color: '#F0F4F8', fontSize: '13px' }}>{(c.symbol || '').replace('USDT', '')}</div></td>
-                                        <td style={{ padding: '8px 8px', textAlign: 'center' }}><span style={{ background: regBg, color: regColor(regime), padding: '3px 10px', borderRadius: '10px', fontSize: '9px', fontWeight: 700 }}>{regime}</span></td>
-                                        <td style={{ padding: '8px 8px', textAlign: 'center', fontWeight: 700, fontSize: '13px', color: conf > 80 ? '#22C55E' : conf > 60 ? '#0EA5E9' : conf > 40 ? '#F59E0B' : '#6B7280' }}>{conf.toFixed(1)}%</td>
-                                        <td style={{ padding: '8px 8px', textAlign: 'center' }}><span style={{ background: dBg, color: dColor, padding: '4px 12px', borderRadius: '10px', fontSize: '10px', fontWeight: 700 }}>{dLabel}</span></td>
-                                        <td style={{ padding: '8px 8px', fontSize: '11px', color: '#9CA3AF', maxWidth: '200px' }}>{getReason(c)}</td>
-                                        <td style={{ padding: '8px 8px', textAlign: 'center', fontFamily: 'monospace', fontSize: '11px', fontWeight: 700, color: '#A78BFA' }}>{liveMulti?.cycle || '—'}</td>
-                                        <td style={{ padding: '8px 8px', textAlign: 'center', fontFamily: 'monospace', fontSize: '10px', color: '#6B7280' }}>{formatIST(lastCycle)}</td>
+                                        <td style={{ padding: '8px 8px' }}><div style={{ fontWeight: 700, color: '#F0F4F8', fontSize: '15px' }}>{(c.symbol || '').replace('USDT', '')}</div></td>
+                                        <td style={{ padding: '8px 8px', textAlign: 'center' }}><span style={{ background: regBg, color: regColor(regime), padding: '3px 10px', borderRadius: '10px', fontSize: '11px', fontWeight: 700 }}>{regime}</span></td>
+                                        <td style={{ padding: '8px 8px', textAlign: 'center', fontWeight: 700, fontSize: '15px', color: conf > 80 ? '#22C55E' : conf > 60 ? '#0EA5E9' : conf > 40 ? '#F59E0B' : '#6B7280' }}>{conf.toFixed(1)}%</td>
+                                        <td style={{ padding: '8px 8px', textAlign: 'center' }}><span style={{ background: dBg, color: dColor, padding: '4px 12px', borderRadius: '10px', fontSize: '12px', fontWeight: 700 }}>{dLabel}</span></td>
+                                        <td style={{ padding: '8px 8px', fontSize: '13px', color: '#9CA3AF', maxWidth: '200px' }}>{getReason(c)}</td>
+                                        <td style={{ padding: '8px 8px', textAlign: 'center', fontFamily: 'monospace', fontSize: '13px', fontWeight: 700, color: '#A78BFA' }}>{liveMulti?.cycle || '—'}</td>
+                                        <td style={{ padding: '8px 8px', textAlign: 'center', fontFamily: 'monospace', fontSize: '12px', color: '#6B7280' }}>{formatIST(lastCycle)}</td>
                                     </tr>
                                 );
                             })}
