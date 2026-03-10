@@ -59,33 +59,19 @@ export function BotCard({ bot, onToggle, onDelete, liveTradeCount, trades = [], 
   const activeTrades = trades.filter((t: any) => (t.status || '').toLowerCase() === 'active');
   const totalTrades = trades.length;
 
-  // PnL calculations — use engine unrealized_pnl when available, recalculate as fallback
-  const calcPnl = (t: any) => {
-    const entry = parseFloat(t.entry_price) || 0;
-    const current = parseFloat(t.current_price) || entry;
-    const lev = parseFloat(t.leverage) || 1;
-    const cap = parseFloat(t.capital) || 0;
-    if (!entry || !cap) return 0;
-    const side = (t.side || t.position || '').toUpperCase();
-    const isLong = side === 'LONG' || side === 'BUY';
-    const diff = isLong ? (current - entry) : (entry - current);
-    return Math.round(diff / entry * lev * cap * 10000) / 10000;
-  };
-
+  // PnL: Single source of truth from tradebook — NO recalculation.
+  // Uses the exact values synced from the engine tradebook (unrealized_pnl / realized_pnl).
   const activePnl = isRunning
     ? activeTrades.reduce((sum: number, t: any) => {
-      // Prefer engine-computed value, fallback to manual calc
-      const enginePnl = parseFloat(t.unrealized_pnl);
-      return sum + (isNaN(enginePnl) ? calcPnl(t) : enginePnl);
+      return sum + (parseFloat(t.unrealized_pnl) || parseFloat(t.activePnl) || 0);
     }, 0)
     : 0;
   const totalPnl = trades.reduce((sum: number, t: any) => {
     const isActive = (t.status || '').toLowerCase() === 'active';
     if (isActive) {
-      const enginePnl = parseFloat(t.unrealized_pnl);
-      return sum + (isNaN(enginePnl) ? calcPnl(t) : enginePnl);
+      return sum + (parseFloat(t.unrealized_pnl) || parseFloat(t.activePnl) || 0);
     }
-    return sum + (parseFloat(t.total_pnl) || parseFloat(t.realized_pnl) || parseFloat(t.totalPnl) || parseFloat(t.pnl) || 0);
+    return sum + (parseFloat(t.realized_pnl) || parseFloat(t.totalPnl) || parseFloat(t.pnl) || 0);
   }, 0);
 
   const botMode = bot?.config?.mode || 'paper';

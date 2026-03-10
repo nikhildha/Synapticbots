@@ -386,20 +386,14 @@ export function BotsClient({ bots: initialBots }: BotsClientProps) {
             <div className="flex flex-col gap-4 mb-12">
               {bots.map((bot) => {
                 const botSessions = allSessions.filter((s: any) => s.botId === bot?.id);
-                // Per-bot trade filtering — only show trades belonging to THIS bot
-                const botTrades = liveTrades.filter((t: any) => {
-                  const tradeBot = t.bot_id || t.botId || '';
-                  return !tradeBot || tradeBot === bot?.id;
-                });
-                const botActiveCount = botTrades.filter((t: any) => (t.status || '').toUpperCase() === 'ACTIVE').length;
                 return (
                   <BotCard
                     key={bot?.id}
                     bot={bot}
                     onToggle={handleBotToggle}
                     onDelete={handleDeleteBot}
-                    liveTradeCount={botActiveCount}
-                    trades={botTrades}
+                    liveTradeCount={liveTradeCount}
+                    trades={liveTrades}
                     sessions={botSessions}
                   />
                 );
