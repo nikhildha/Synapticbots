@@ -629,10 +629,10 @@ export function SignalSummaryTable({ coinStates, multi }: SignalSummaryProps) {
                                 // Check if this coin has an active trade (deployed)
                                 const activePositions = liveMulti?.active_positions || liveMulti?.positions || {};
                                 const isDeployed = Object.keys(activePositions).some(k => k === c.symbol || k.endsWith(':' + c.symbol));
-                                let dLabel = '⏳ PENDING', dColor = '#6B7280', dBg = 'rgba(107,114,128,0.08)';
-                                if (isDeployed) { dLabel = '🚀 DEPLOYED'; dColor = '#06B6D4'; dBg = 'rgba(6,182,212,0.12)'; }
-                                else if (isE) { dLabel = '🟢 READY'; dColor = '#22C55E'; dBg = 'rgba(34,197,94,0.12)'; }
-                                else if (action.includes('SKIP') || action.includes('VETO') || action.includes('CONFLICT') || action.includes('CRASH')) { dLabel = '🔴 FILTERED'; dColor = '#EF4444'; dBg = 'rgba(239,68,68,0.08)'; }
+                                let dLabel = 'PENDING', dColor = '#6B7280', dBg = 'rgba(107,114,128,0.08)';
+                                if (isDeployed) { dLabel = 'DEPLOYED'; dColor = '#06B6D4'; dBg = 'rgba(6,182,212,0.12)'; }
+                                else if (isE) { dLabel = 'READY'; dColor = '#22C55E'; dBg = 'rgba(34,197,94,0.12)'; }
+                                else if (action.includes('SKIP') || action.includes('VETO') || action.includes('CONFLICT') || action.includes('CRASH')) { dLabel = 'FILTERED'; dColor = '#EF4444'; dBg = 'rgba(239,68,68,0.08)'; }
 
                                 return (
                                     <tr key={c.symbol} style={{ borderBottom: '1px solid rgba(255,255,255,0.04)', background: isE ? 'rgba(34,197,94,0.04)' : 'transparent' }}>

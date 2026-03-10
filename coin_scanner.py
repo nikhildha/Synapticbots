@@ -29,6 +29,53 @@ COIN_EXCLUDE = {
     "USTUSDT", "DAIUSDT", "FDUSDUSDT", "CVCUSDT", "USD1USDT",
 }
 
+# ─── Dynamic exclusion list (auto-learned from insufficient data) ───────────
+COIN_EXCLUSION_FILE = os.path.join(config.DATA_DIR, "coin_exclusions.json")
+_dynamic_exclusions: set = set()
+
+
+def _load_dynamic_exclusions():
+    """Load dynamic exclusion list from disk."""
+    global _dynamic_exclusions
+    try:
+        if os.path.exists(COIN_EXCLUSION_FILE):
+            with open(COIN_EXCLUSION_FILE, "r") as f:
+                data = json.load(f)
+            _dynamic_exclusions = set(data.get("excluded_coins", []))
+            logger.info("Loaded %d dynamically excluded coins.", len(_dynamic_exclusions))
+    except Exception as e:
+        logger.warning("Failed to load coin exclusions: %s", e)
+
+
+def _save_dynamic_exclusions():
+    """Persist dynamic exclusion list to disk."""
+    try:
+        with open(COIN_EXCLUSION_FILE, "w") as f:
+            json.dump({
+                "excluded_coins": sorted(_dynamic_exclusions),
+                "count": len(_dynamic_exclusions),
+                "last_updated": datetime.utcnow().isoformat() + "Z",
+            }, f, indent=2)
+    except Exception as e:
+        logger.warning("Failed to save coin exclusions: %s", e)
+
+
+def auto_exclude_coin(symbol: str, reason: str = "insufficient_data"):
+    """Add a coin to the dynamic exclusion list (persisted across restarts)."""
+    global _dynamic_exclusions
+    if symbol not in _dynamic_exclusions:
+        _dynamic_exclusions.add(symbol)
+        _save_dynamic_exclusions()
+        logger.info("⚠️  Auto-excluded %s (%s). Total exclusions: %d",
+                    symbol, reason, len(_dynamic_exclusions))
+
+
+def get_all_exclusions() -> set:
+    """Return combined static + dynamic exclusion set."""
+    _load_dynamic_exclusions()
+    return COIN_EXCLUDE | _dynamic_exclusions
+
+
 # ─── Coin tier cache (loaded once from data/coin_tiers.csv) ──────────────────
 _coin_tiers: dict = {}   # symbol → {"tier": "A"|"B"|"C", "pattern": str}
 
@@ -86,7 +133,7 @@ def _get_top_coins_binance(limit=50, quote="USDT"):
         t for t in tickers
         if t["symbol"].endswith(quote)
         and not any(kw in t["symbol"].replace(quote, "") for kw in exclude_keywords)
-        and t["symbol"] not in COIN_EXCLUDE
+        and t["symbol"] not in get_all_exclusions()
     ]
     usdt_tickers.sort(key=lambda t: float(t.get("quoteVolume", 0)), reverse=True)
     top_symbols = [t["symbol"] for t in usdt_tickers[:limit]]
@@ -121,7 +168,7 @@ def _get_top_coins_coindcx(limit=50):
     # Convert to Binance-style symbols and take top N
     top_pairs = scored[:limit]
     top_symbols = [cdx.from_coindcx_pair(pair) for pair, vol in top_pairs]
-    top_symbols = [s for s in top_symbols if s not in COIN_EXCLUDE]
+    top_symbols = [s for s in top_symbols if s not in get_all_exclusions()]
 
     logger.info("CoinDCX: Top %d coins by volume (%d total instruments).", len(top_symbols), len(instruments))
     return top_symbols
@@ -187,6 +234,7 @@ def scan_all_regimes(symbols=None, limit=50, timeframe="1h", kline_limit=500):
             df = fetch_klines(symbol, timeframe, limit=kline_limit)
             if df is None or len(df) < 60:
                 logger.debug("Skipping %s — insufficient data.", symbol)
+                auto_exclude_coin(symbol, "insufficient_data")
                 continue
 
             # Compute features & train per-coin HMM
