@@ -67,10 +67,12 @@ export async function syncEngineTrades(
                 if (!isNaN(d.getTime())) exitTime = d;
             }
 
-            // BROADCAST FIX: Always attribute engine trades to the calling user's bot.
-            // User-level isolation is maintained by getUserTrades(userId) — each user
-            // only sees trades linked to their own bots. The engine's bot_id stamp
-            // is ignored; every active bot gets a copy of every engine trade.
+            // BOT ISOLATION: Only sync engine trades that belong to THIS bot.
+            // The engine stamps every trade with bot_id (from config.ENGINE_BOT_ID).
+            // Trades with matching bot_id go to this bot; unmatched trades are skipped.
+            // Legacy trades with no bot_id are synced to this bot for backward compat.
+            const engineBotId = t.bot_id || t.botId || null;
+            if (engineBotId && engineBotId !== botId) continue; // belongs to a different bot
             const resolvedBotId = botId;
 
             // Upsert: create if not exists, update PNL/status if exists

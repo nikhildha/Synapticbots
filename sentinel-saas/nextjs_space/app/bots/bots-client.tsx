@@ -186,6 +186,7 @@ export function BotsClient({ bots: initialBots }: BotsClientProps) {
   // Live active trade count from bot-state
   const [liveTradeCount, setLiveTradeCount] = useState(0);
   const [liveTrades, setLiveTrades] = useState<any[]>([]);
+  const [perBotStats, setPerBotStats] = useState<Record<string, any>>({});
   const [allSessions, setAllSessions] = useState<any[]>([]);
   const [perfSummary, setPerfSummary] = useState<any>({ allTimePnl: 0, allTimeRoi: 0, totalSessions: 0, bestSessionPnl: 0 });
 
@@ -197,6 +198,7 @@ export function BotsClient({ bots: initialBots }: BotsClientProps) {
         const trades = d?.tradebook?.trades || [];
         setLiveTrades(trades);
         setLiveTradeCount(trades.filter((t: any) => (t.status || '').toUpperCase() === 'ACTIVE').length);
+        if (d?.perBot) setPerBotStats(d.perBot);
       }
     } catch { /* silent */ }
   }, []);
@@ -384,14 +386,20 @@ export function BotsClient({ bots: initialBots }: BotsClientProps) {
             <div className="flex flex-col gap-4 mb-12">
               {bots.map((bot) => {
                 const botSessions = allSessions.filter((s: any) => s.botId === bot?.id);
+                // Per-bot trade filtering — only show trades belonging to THIS bot
+                const botTrades = liveTrades.filter((t: any) => {
+                  const tradeBot = t.bot_id || t.botId || '';
+                  return !tradeBot || tradeBot === bot?.id;
+                });
+                const botActiveCount = botTrades.filter((t: any) => (t.status || '').toUpperCase() === 'ACTIVE').length;
                 return (
                   <BotCard
                     key={bot?.id}
                     bot={bot}
                     onToggle={handleBotToggle}
                     onDelete={handleDeleteBot}
-                    liveTradeCount={liveTradeCount}
-                    trades={liveTrades}
+                    liveTradeCount={botActiveCount}
+                    trades={botTrades}
                     sessions={botSessions}
                   />
                 );

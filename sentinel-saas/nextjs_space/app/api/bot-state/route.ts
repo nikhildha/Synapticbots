@@ -136,6 +136,22 @@ export async function GET() {
             } catch { /* silent */ }
         }
 
+        // ─── Per-Bot Stats for bot cards ────────────────────────────
+        const perBot: Record<string, { activeTrades: number; totalTrades: number; activePnl: number; totalPnl: number; capital: number }> = {};
+        for (const t of trades) {
+            const bid = t.bot_id || t.botId || 'unknown';
+            if (!perBot[bid]) perBot[bid] = { activeTrades: 0, totalTrades: 0, activePnl: 0, totalPnl: 0, capital: 0 };
+            perBot[bid].totalTrades++;
+            const isActive = (t.status || '').toUpperCase() === 'ACTIVE';
+            if (isActive) {
+                perBot[bid].activeTrades++;
+                perBot[bid].activePnl += t.activePnl || t.unrealized_pnl || 0;
+                perBot[bid].capital += t.capital || 100;
+            } else {
+                perBot[bid].totalPnl += t.totalPnl || t.realized_pnl || 0;
+            }
+        }
+
         return NextResponse.json({
             state: {
                 regime: multi.macro_regime || coinStates?.BTCUSDT?.regime || 'WAITING',
@@ -166,6 +182,8 @@ export async function GET() {
             },
             scanner: { coins: Object.keys(coinStates) },
             athena: engineState?.athena || { enabled: false, recent_decisions: [] },
+            perBot,
+
             tradebook: {
                 trades,
                 // F2 FIX: compute per-user summary from user's trades, not engine-wide
