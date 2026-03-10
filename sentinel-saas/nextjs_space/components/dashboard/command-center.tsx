@@ -594,18 +594,26 @@ export function SignalSummaryTable({ coinStates, multi }: SignalSummaryProps) {
             {/* Stats Bar */}
             {(() => {
                 const engineTs = liveMulti?.last_analysis_time || liveMulti?.timestamp || null;
-                const isEngineOn = engineTs && (Date.now() - new Date(String(engineTs)).getTime()) < 600000;
+                // Multi-signal engine detection:
+                // 1. Engine status field from health endpoint (most reliable)
+                // 2. Uptime > 0 means Flask is serving
+                // 3. Timestamp staleness fallback (generous 20-min to cover long cycles)
+                const engineStatus = liveMulti?.status || '';
+                const engineUptime = liveMulti?.uptime_seconds || 0;
+                const tsAge = engineTs ? (Date.now() - new Date(String(engineTs)).getTime()) : Infinity;
+                const isEngineOn = engineStatus === 'running' || engineUptime > 0 || tsAge < 1200000;
+                // Detect if engine is mid-cycle (ON but no recent completed cycle)
+                const isScanning = isEngineOn && (!engineTs || tsAge > 600000);
                 const nextCycleLabel = (() => {
                     const nextRaw = liveMulti?.next_analysis_time;
                     try {
+                        // Countdown timer to next cycle
                         if (nextRaw) {
-                            // Normalize: if already has Z or ±HH:MM, don't append; else assume UTC
-                            const raw = String(nextRaw);
-                            const normalized = /Z$|[+-]\d{2}:\d{2}$/.test(raw) ? raw : raw + 'Z';
+                            const ts = String(nextRaw);
+                            const normalized = /Z$|[+-]\d{2}:\d{2}$/.test(ts) ? ts : ts + 'Z';
                             const nextMs = new Date(normalized).getTime();
-                            if (isNaN(nextMs)) return '—';
-                            if (nextMs <= Date.now()) return 'Running…';
-                            const secsLeft = Math.floor((nextMs - Date.now()) / 1000);
+                            const secsLeft = Math.max(0, Math.round((nextMs - Date.now()) / 1000));
+                            if (secsLeft <= 0) return 'Running…';
                             const m = Math.floor(secsLeft / 60);
                             const s = secsLeft % 60;
                             const timeStr = new Date(nextMs).toLocaleTimeString('en-IN', {
@@ -614,7 +622,7 @@ export function SignalSummaryTable({ coinStates, multi }: SignalSummaryProps) {
                             return m > 0 ? `${m}m ${s}s · ${timeStr} IST` : `${s}s · ${timeStr} IST`;
                         }
                         // Fallback: compute from last_analysis_time + interval
-                        if (!engineTs || !intervalSec) return '—';
+                        if (!engineTs || !intervalSec) return isScanning ? 'Scanning…' : '—';
                         const ts = String(engineTs);
                         const normalized = /Z$|[+-]\d{2}:\d{2}$/.test(ts) ? ts : ts + 'Z';
                         const nextMs = new Date(normalized).getTime() + (intervalSec * 1000);
@@ -624,8 +632,10 @@ export function SignalSummaryTable({ coinStates, multi }: SignalSummaryProps) {
                         }) + ' IST';
                     } catch { return '—'; }
                 })();
+                const engineLabel = isScanning ? '🔄 SCANNING' : isEngineOn ? '🟢 ON' : '🔴 OFF';
+                const engineColor = isScanning ? '#A78BFA' : isEngineOn ? '#22C55E' : '#EF4444';
                 const statsItems = [
-                    { label: 'Engine', value: isEngineOn ? '🟢 ON' : '🔴 OFF', color: isEngineOn ? '#22C55E' : '#EF4444', isText: true },
+                    { label: 'Engine', value: engineLabel, color: engineColor, isText: true },
                     { label: 'Next Cycle', value: nextCycleLabel, color: '#A78BFA', isText: true },
                     { label: 'Coins Scanned', value: coins.length, color: '#06B6D4' },
                     { label: 'Eligible', value: eligible.length, color: '#22C55E' },

@@ -155,6 +155,9 @@ export async function GET() {
                 ),
                 coin_states: coinStates,
                 cycle: multi.cycle || 0,
+                // Engine health signals for frontend status detection
+                status: engineState?.status || 'unknown',
+                uptime_seconds: engineState?.uptime_seconds || 0,
                 // Timing fields — always populated
                 last_analysis_time: lastAnalysis,
                 next_analysis_time: nextAnalysis,
