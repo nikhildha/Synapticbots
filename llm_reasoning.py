@@ -45,56 +45,54 @@ class AthenaDecision:
 
 # ─── System Prompt ────────────────────────────────────────────────────────────
 
-ATHENA_SYSTEM_PROMPT = """You are **Athena**, a strategic AI risk analyst for a crypto futures trading engine.
+ATHENA_SYSTEM_PROMPT = """You are the **Lead Investment Officer (Athena)**. Below is a list of crypto assets that have passed our HMM-Score threshold (>50%).
 
-Your role: Validate trade signals from a Hidden Markov Model (HMM) and decide whether to EXECUTE, REDUCE_SIZE, or VETO.
+## Your Goal
 
-## Your Decision Framework
+Analyze the following for EACH coin presented:
 
-1. **EXECUTE** — The signal is solid. Market conditions support the trade.
-   - HMM regime aligns with broader context
-   - No major adverse events detected
-   - Risk/reward is acceptable
+1. **Technical Price Action Analysis** — Study recent price action, candlestick patterns, and momentum
+2. **Support & Resistance** — Is price approaching key support or resistance levels? How close?
+3. **FVG (Fair Value Gaps)** — Are there unfilled fair value gaps above or below the current price?
+4. **Order Blocks** — Identify institutional order blocks that could act as magnets or barriers
+5. **Global News** — Search for any breaking news, macro events, regulatory actions, or token-specific events
+6. **BTC Macro Regime** — Ensure the trade aligns with BTC's current regime (if BTC is bearish, be cautious on long altcoin trades)
 
-2. **REDUCE_SIZE** — The signal has merit but warrants caution.
-   - Assign `adjusted_confidence` between 0.30 and 0.85
-   - Use when: mixed signals, approaching key events, elevated volatility
+## Your Output
 
-3. **VETO** — The signal is likely to fail. Block the trade.
-   - Assign `adjusted_confidence` below 0.30
-   - Use when: signal contradicts strong fundamental evidence, major event risk,
-     or extreme market conditions that the HMM cannot capture
+For each coin, provide:
+- **Final Conviction**: LONG or SHORT (or SKIP if neither)
+- **Confidence Rating**: 1-10 (10 = extremely confident)
+- **Leverage Recommendation**: Suggested leverage (e.g., 3x, 5x, 10x, 20x)
+- **Size Recommendation**: What % of available capital (e.g., 25%, 50%, 100%)
+- **GIVE 40% BIAS TO HMM OUTPUT AS WELL** — The HMM model's signal direction and conviction score should carry 40% weight in your final decision. Your own analysis (price action, news, S/R, etc.) carries 60%.
+- **Key Reasoning**: 2-3 sentence summary of your analysis
 
-## What to Evaluate
+## Constraints
 
-Given the HMM signal context, reason about:
-- **Regime Validity**: Is the detected regime (BULL/BEAR) a fundamental shift or noise?
-- **Macro Context**: Is BTC trending in a way that supports altcoin trades?
-- **Volatility Assessment**: Is current volatility normal or extreme?
-- **Event Risk**: Are there imminent events (Fed meetings, CPI, token unlocks, exchange issues)?
-- **Over-Crowding**: Does the funding rate suggest crowded positioning?
-- **Technical Confluence**: Do multiple timeframes agree genuinely, or is it random alignment?
-
-## Important Rules
-
-- You are a RISK FILTER, not a signal generator. Only validate or reject signals.
-- Be decisive. If you're uncertain, use REDUCE_SIZE, not VETO.
-- Never VETO based solely on "I'm not sure." Only VETO when you have specific contrary evidence.
-- Keep reasoning to 1-2 SHORT sentences. Do NOT write paragraphs.
-- Your adjusted_confidence should reflect how much you trust the HMM signal:
-  - 1.0 = full trust, proceed at full conviction
-  - 0.5 = half trust, reduce position size
-  - 0.0 = no trust, veto the trade
+- Ensure the BTC Macro Regime aligns with the trade
+- Be SPECIFIC — cite price levels, news events, pattern names
+- If news is negative for a coin, recommend SKIP regardless of HMM score
+- Search for REAL current news and data, do not make assumptions
+- The HMM output carries 40% weight — respect its signal direction unless your 60% analysis strongly contradicts it
 
 ## Response Format
 
-You MUST respond with ONLY valid JSON (no markdown, no backticks):
+Return ONLY a valid JSON object:
 {
-  "action": "EXECUTE" | "REDUCE_SIZE" | "VETO",
-  "adjusted_confidence": 0.0 to 1.0,
-  "reasoning": "Brief explanation (1-3 sentences)",
-  "risk_flags": ["flag1", "flag2"]
-}"""
+  "ticker": "BTCUSDT",
+  "action": "LONG" | "SHORT" | "SKIP",
+  "confidence_rating": 1-10,
+  "adjusted_confidence": 0.0-1.0,
+  "leverage_recommendation": "5x",
+  "size_recommendation": "50%",
+  "reasoning": "Brief 2-3 sentence analysis.",
+  "risk_flags": ["flag1", "flag2"],
+  "support_levels": "$80,000, $78,500",
+  "resistance_levels": "$85,000, $87,200"
+}
+
+IMPORTANT: Return ONLY the JSON object. No markdown, no backticks, no extra text."""
 
 
 # ─── Main Engine ──────────────────────────────────────────────────────────────
@@ -180,7 +178,7 @@ class AthenaEngine:
             return self._default_execute(symbol, reason=f"API error: {str(e)[:100]}")
 
     def _call_gemini(self, symbol: str, ctx: dict) -> AthenaDecision:
-        """Make the actual Gemini API call and parse the response."""
+        """Make the actual Gemini API call with Google Search grounding."""
         from google.genai import types
 
         # Build the prompt with signal context
@@ -193,8 +191,9 @@ class AthenaEngine:
             config=types.GenerateContentConfig(
                 system_instruction=ATHENA_SYSTEM_PROMPT,
                 temperature=0.3,
-                max_output_tokens=2048,
-                response_mime_type="application/json",
+                max_output_tokens=4096,
+                # NOTE: response_mime_type incompatible with google_search tool
+                tools=[types.Tool(google_search=types.GoogleSearch())],
             ),
         )
         latency_ms = int((time.time() - start) * 1000)
@@ -227,27 +226,49 @@ class AthenaEngine:
                 raw = raw.split("\n", 1)[-1]
                 raw = raw.rsplit("```", 1)[0].strip()
 
-            data = json.loads(raw)
-        except (json.JSONDecodeError, ValueError) as e:
-            logger.warning("🏛️ Athena [%s] malformed response: %s | raw=%s", symbol, str(e)[:80], repr(raw[:200] if raw else '<empty>'))
-            return self._default_execute(symbol, reason=f"Parse error: {str(e)[:80]}")
+            # Try to extract valid JSON from the response
+            data = self._extract_json(raw)
+            if data is None:
+                logger.warning("🏛️ Athena [%s] could not extract JSON | raw=%s", symbol, repr(raw[:400]))
+                return self._default_execute(symbol, reason="Could not extract JSON from response")
         except Exception as e:
             logger.warning("🏛️ Athena [%s] response error: %s", symbol, str(e)[:100])
             return self._default_execute(symbol, reason=f"Response error: {str(e)[:80]}")
 
-        # Build decision
-        action = data.get("action", "EXECUTE").upper()
-        if action not in ("EXECUTE", "REDUCE_SIZE", "VETO"):
-            action = "EXECUTE"
+        # Handle JSON array (prompt asks for array format) — take first element
+        if isinstance(data, list):
+            data = data[0] if data else {}
 
-        adj_conf = float(data.get("adjusted_confidence", 1.0))
+        # Map LONG/SHORT/SKIP → EXECUTE/REDUCE_SIZE/VETO for engine compatibility
+        raw_action = data.get("action", "SKIP").upper()
+        if raw_action in ("LONG", "SHORT"):
+            action = "EXECUTE"
+        elif raw_action == "SKIP":
+            action = "VETO"
+        else:
+            action = raw_action  # fallback: EXECUTE/REDUCE_SIZE/VETO
+
+        # Use confidence_rating (1-10) → adjusted_confidence (0-1)
+        conf_rating = data.get("confidence_rating", 5)
+        adj_conf = float(data.get("adjusted_confidence", conf_rating / 10.0))
         adj_conf = max(0.0, min(1.0, adj_conf))
 
         # Apply veto threshold
         if adj_conf < config.LLM_VETO_THRESHOLD and action != "VETO":
             action = "VETO"
 
-        reasoning = data.get("reasoning", "No reasoning provided")
+        # Build rich reasoning with Athena's analysis
+        parts = [data.get("reasoning", "No reasoning provided")]
+        if data.get("leverage_recommendation"):
+            parts.append(f"Leverage: {data['leverage_recommendation']}")
+        if data.get("size_recommendation"):
+            parts.append(f"Size: {data['size_recommendation']}")
+        if data.get("support_levels"):
+            parts.append(f"Support: {data['support_levels']}")
+        if data.get("resistance_levels"):
+            parts.append(f"Resistance: {data['resistance_levels']}")
+        reasoning = " | ".join(parts)
+
         risk_flags = data.get("risk_flags", [])
 
         decision = AthenaDecision(
@@ -270,6 +291,63 @@ class AthenaEngine:
 
         return decision
 
+    @staticmethod
+    def _extract_json(raw: str):
+        """Extract JSON from response text, handling prose, markdown, and truncation."""
+        import re
+
+        # Stage 1: Direct parse
+        try:
+            return json.loads(raw)
+        except (json.JSONDecodeError, ValueError):
+            pass
+
+        # Stage 2: Find JSON between outermost braces (handles prose before/after)
+        brace_start = raw.find('{')
+        bracket_start = raw.find('[')
+        # Pick whichever comes first
+        start = -1
+        if brace_start >= 0 and bracket_start >= 0:
+            start = min(brace_start, bracket_start)
+        elif brace_start >= 0:
+            start = brace_start
+        elif bracket_start >= 0:
+            start = bracket_start
+
+        if start >= 0:
+            end_char = '}' if raw[start] == '{' else ']'
+            end = raw.rfind(end_char)
+            if end > start:
+                try:
+                    return json.loads(raw[start:end + 1])
+                except (json.JSONDecodeError, ValueError):
+                    pass
+
+        # Stage 3: Truncated JSON repair — find opening brace, close it
+        if brace_start >= 0:
+            fragment = raw[brace_start:]
+            # Try to close truncated strings and the object
+            # Count unclosed quotes
+            in_string = False
+            for ch in fragment:
+                if ch == '"' and (not fragment or fragment[fragment.index(ch)-1:fragment.index(ch)] != '\\'):
+                    in_string = not in_string
+            repair = fragment
+            if in_string:
+                repair += '"'
+            # Close any open arrays
+            open_brackets = repair.count('[') - repair.count(']')
+            repair += ']' * max(0, open_brackets)
+            # Close any open objects
+            open_braces = repair.count('{') - repair.count('}')
+            repair += '}' * max(0, open_braces)
+            try:
+                return json.loads(repair)
+            except (json.JSONDecodeError, ValueError):
+                pass
+
+        return None
+
     def _build_prompt(self, ctx: dict) -> str:
         """Build the user prompt with all signal context."""
         sentiment_str = "Not available"
@@ -280,27 +358,33 @@ class AthenaEngine:
             elif isinstance(s, dict):
                 sentiment_str = f"score={s.get('score', 'N/A')}, alert={s.get('alert', False)}"
 
-        return f"""Analyze this trade signal and decide: EXECUTE, REDUCE_SIZE, or VETO.
+        return f"""The following crypto asset has passed our HMM-Score threshold. Perform your full analysis.
 
-## HMM Signal
+## Asset Under Review
 - **Ticker**: {ctx.get('ticker', 'N/A')}
-- **Side**: {ctx.get('side', 'N/A')}
+- **HMM Signal Direction**: {ctx.get('side', 'N/A')}
 - **HMM Regime**: {ctx.get('hmm_regime', 'N/A')}
 - **HMM Confidence**: {ctx.get('hmm_confidence', 0):.4f}
-- **Multi-TF Conviction**: {ctx.get('conviction', 0):.1f}/100
-- **TF Agreement**: {ctx.get('tf_agreement', 0)}/3 timeframes agree
-
-## Market Context
-- **Current Price**: ${ctx.get('current_price', 0):,.2f}
+- **Multi-TF Conviction Score**: {ctx.get('conviction', 0):.1f}/100
+- **Timeframe Agreement**: {ctx.get('tf_agreement', 0)}/3 timeframes agree
+- **Current Price**: ${ctx.get('current_price', 0):,.4f}
 - **ATR (hourly)**: ${ctx.get('atr', 0):,.4f}
-- **BTC Regime**: {ctx.get('btc_regime', 'N/A')} (margin: {ctx.get('btc_margin', 0):.3f})
 - **Volatility Percentile**: {ctx.get('vol_percentile', 0):.1%}
 
-## Brain Selection
-- **Active Brain**: {ctx.get('brain_id', 'N/A')}
-- **Sentiment**: {sentiment_str}
+## BTC Macro Context
+- **BTC Regime**: {ctx.get('btc_regime', 'N/A')}
+- **BTC Margin**: {ctx.get('btc_margin', 0):.3f}
 
-Given this data, should this trade be executed?"""
+## Your Tasks
+1. Analyze the PRICE ACTION for {ctx.get('ticker', 'this coin').replace('USDT', '')} — recent candles, patterns, momentum
+2. Identify KEY SUPPORT & RESISTANCE levels
+3. Check for FVG (Fair Value Gaps) and ORDER BLOCKS
+4. Search for CURRENT NEWS about {ctx.get('ticker', 'this coin').replace('USDT', '')} and the broader crypto market
+5. Verify BTC macro regime alignment
+6. Give your FINAL CONVICTION: LONG, SHORT, or SKIP
+7. Recommend LEVERAGE and POSITION SIZE
+
+Return your analysis as a JSON object (single object, not array)."""
 
     def _check_cache(self, symbol: str) -> Optional[AthenaDecision]:
         """Return cached decision if still valid."""
