@@ -188,7 +188,7 @@ HMMBOT/
 
 ### P6 · Mode Consistency
 
-**Files**: `config.py`, `data/engine_mode.json`, `tradebook.json`
+**Files**: `config.py`, `data/engine_mode.json`, `tradebook.json`, `engine_api.py`
 **What it checks**:
 - `config.PAPER_TRADE` current value
 - `data/engine_mode.json` current `mode` field
@@ -196,9 +196,14 @@ HMMBOT/
 - All open tradebook trades match current mode
 - If `PAPER_TRADE=False`: `EXCHANGE_LIVE` env var must be set to `"coindcx"` or `"binance"`
 - No mixed-mode trades (paper and live trades open simultaneously)
+- **P16 cross-check**: If `engine_mode.json` says `"live"`, verify `ALLOW_LIVE_TRADING=true` env var is set
 
-**Pass criteria**: 3-way agreement, no mixed mode
+**Pass criteria**: 3-way agreement, no mixed mode, safety guard active
 **Severity if failed**: CRITICAL — live orders placed in wrong mode
+
+> **History**: 2026-03-10 — Engine ran in `live:coindcx` for 7+ hours placing real CoinDCX orders.
+> Root cause: `engine_mode.json` persisted `{mode: "live"}` on Railway volume across restarts,
+> overriding `PAPER_TRADE=true` env var. Fixed by adding `ALLOW_LIVE_TRADING` safety guard.
 
 ---
 
@@ -763,6 +768,34 @@ HMMBOT/
 
 ---
 
+### P16 · Live Trading Safety Guard
+
+**Files**: `engine_api.py` (`_restore_mode_on_startup`, `api_set_mode`), Railway env vars
+**What it checks**:
+- `ALLOW_LIVE_TRADING` env var is **NOT set** (or `"false"`) unless intentional live trading is enabled
+- `_restore_mode_on_startup()` blocks live mode restore when `ALLOW_LIVE_TRADING != "true"`
+- `POST /api/set-mode {mode: "live"}` returns **403** when `ALLOW_LIVE_TRADING != "true"`
+- `engine_mode.json` on Railway volume: if it says `"live"`, verify it was intentional
+- `toggle/route.ts` line 206-214: when bot with `mode=live` is started, `/api/set-mode` is called — verify safety guard blocks it
+- No CoinDCX positions exist unless `ALLOW_LIVE_TRADING=true` is explicitly set
+
+**Pass criteria**: Safety guard blocks all live mode transitions unless explicitly enabled
+**Severity if failed**: CRITICAL — real money traded without user intent
+
+> **History**: 2026-03-10 — Engine ran `live:coindcx` for 7h placing real orders on CoinDCX.
+> **Root cause chain**:
+> 1. A bot in Prisma DB had `BotConfig.mode = "live"`
+> 2. When the bot was started via dashboard, `toggle/route.ts` called `POST /api/set-mode {mode: "live", exchange: "coindcx"}`
+> 3. Engine wrote `{mode: "live"}` to `engine_mode.json` on Railway's persistent volume
+> 4. On engine restart, `_restore_mode_on_startup()` read this file and set `config.PAPER_TRADE = False`
+> 5. Bot stop's revert to paper mode (line 155-163) is fire-and-forget `.catch(() => {})` — failures are silent
+> 6. Result: engine kept switching back to live on every restart, placing real CoinDCX orders
+>
+> **Fix**: Added `ALLOW_LIVE_TRADING` env var guard in commit `7d40458`. Engine refuses live mode
+> at both startup restore and `/api/set-mode` unless `ALLOW_LIVE_TRADING=true` is explicitly set.
+
+---
+
 ## Priority Matrix
 
 ```
@@ -771,8 +804,8 @@ HMMBOT/
 ├──────────────────────┼───────────────────┼────────────────────┤
 │  CRITICAL            │ P1, P2, P4, P6,   │ Telegram + stop    │
 │  (fix immediately)   │ P8, P11, P13,     │ bot if live        │
-│                      │ P15, I1, I3, I9,  │                    │
-│                      │ S2, S8, S9        │                    │
+│                      │ P15, P16, I1, I3, │                    │
+│                      │ I9, S2, S8, S9    │                    │
 ├──────────────────────┼───────────────────┼────────────────────┤
 │  HIGH                │ P3, P5, P7, P10,  │ Telegram alert     │
 │  (fix within 24h)    │ P12, P14, S1, S3, │                    │
@@ -965,9 +998,10 @@ model AuditReport {
 | 36 | I10 | HMM Signal Quality | Integration | MEDIUM |
 | 37 | P14 | **Deployment Pipeline Verification** | Engine | **HIGH** |
 | 38 | P15 | **LIVE Balance API Health** | Engine (live) | **CRITICAL** |
-| 39 | S14 | **Timestamp Timezone Normalization** | SaaS | **HIGH** |
-| 40 | S15 | **Deploy Status Accuracy** | SaaS | **HIGH** |
+| 39 | P16 | **Live Trading Safety Guard** | Engine | **CRITICAL** |
+| 40 | S14 | **Timestamp Timezone Normalization** | SaaS | **HIGH** |
+| 41 | S15 | **Deploy Status Accuracy** | SaaS | **HIGH** |
 
 ---
 
-*Last updated: 2026-03-09 · 40 checks · 3 sections · 04:00 UTC daily run*
+*Last updated: 2026-03-10 · 41 checks · 3 sections · 04:00 UTC daily run*
