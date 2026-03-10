@@ -255,7 +255,7 @@ export function BotsClient({ bots: initialBots }: BotsClientProps) {
     setLoading(true);
     try {
       const selectedModel = BOT_MODELS.find(m => m.id === deployModel);
-      const botName = `Synaptic Marshal — ${selectedModel?.name || 'Standard'}`;
+      const botName = `Synaptic Marshal — ${selectedModel?.name || 'Synaptic Adaptive'}`;
       const res = await fetch('/api/bots/create', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

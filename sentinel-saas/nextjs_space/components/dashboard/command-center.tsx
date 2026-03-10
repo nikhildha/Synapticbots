@@ -533,7 +533,7 @@ export function SignalSummaryTable({ coinStates, multi }: SignalSummaryProps) {
             {/* Header */}
             <div style={{ marginBottom: '16px' }}>
                 <h2 style={{ fontSize: '20px', fontWeight: 700, color: '#06B6D4', margin: 0 }}>Bot Scan Summary <span style={{ fontSize: '13px', fontWeight: 600, color: '#6B7280' }}>· Cycle #{liveMulti?.cycle || 0}</span></h2>
-                <p style={{ fontSize: '12px', color: '#6B7280', marginTop: '4px' }}>SM-Standard · Auto-refreshes every {Math.round(refreshMs / 1000)}s</p>
+                <p style={{ fontSize: '12px', color: '#6B7280', marginTop: '4px' }}>Synaptic Adaptive · Auto-refreshes every {Math.round(refreshMs / 1000)}s</p>
             </div>
 
             {/* Stats Bar */}
@@ -637,7 +637,7 @@ export function SignalSummaryTable({ coinStates, multi }: SignalSummaryProps) {
                                 return (
                                     <tr key={c.symbol} style={{ borderBottom: '1px solid rgba(255,255,255,0.04)', background: isE ? 'rgba(34,197,94,0.04)' : 'transparent' }}>
                                         <td style={{ padding: '8px 8px', color: '#4B5563', fontSize: '10px', fontWeight: 600 }}>{idx + 1}</td>
-                                        <td style={{ padding: '8px 8px' }}><span style={{ fontSize: '10px', color: '#06B6D4', fontWeight: 600 }}>SM-Standard</span></td>
+                                        <td style={{ padding: '8px 8px' }}><span style={{ fontSize: '10px', color: '#06B6D4', fontWeight: 600 }}>Synaptic Adaptive</span></td>
                                         <td style={{ padding: '8px 8px' }}><div style={{ fontWeight: 700, color: '#F0F4F8', fontSize: '13px' }}>{(c.symbol || '').replace('USDT', '')}</div></td>
                                         <td style={{ padding: '8px 8px', textAlign: 'center' }}><span style={{ background: regBg, color: regColor(regime), padding: '3px 10px', borderRadius: '10px', fontSize: '9px', fontWeight: 700 }}>{regime}</span></td>
                                         <td style={{ padding: '8px 8px', textAlign: 'center', fontWeight: 700, fontSize: '13px', color: conf > 80 ? '#22C55E' : conf > 60 ? '#0EA5E9' : conf > 40 ? '#F59E0B' : '#6B7280' }}>{conf.toFixed(1)}%</td>

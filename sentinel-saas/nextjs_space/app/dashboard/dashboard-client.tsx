@@ -580,8 +580,8 @@ export function DashboardClient({ user, stats, bots, recentTrades }: DashboardCl
                     // Bot name matching — handle engine format 'SM-Standard' vs DB 'Synaptic Marshal — Standard'
                     const tradeBotName = (t.bot_name || t.botName || '').toLowerCase();
                     if (!tradeBotName) return false;
-                    // Check if the model keyword (standard/conservative) appears in both
-                    const modelKeywords = ['standard', 'conservative', 'aggressive'];
+                    // Check if the model keyword (adaptive/standard/conservative) appears in both
+                    const modelKeywords = ['adaptive', 'standard', 'conservative', 'aggressive'];
                     const tradeModel = modelKeywords.find(k => tradeBotName.includes(k));
                     const botModel = modelKeywords.find(k => botNameLower.includes(k));
                     if (tradeModel && botModel) return tradeModel === botModel;
@@ -708,7 +708,7 @@ export function DashboardClient({ user, stats, bots, recentTrades }: DashboardCl
                               onMouseLeave={(e) => (e.currentTarget.style.background = rowBg)}
                             >
                               <td style={{ padding: '10px 14px', color: '#0891B2', fontWeight: 600, fontSize: '11px' }}>
-                                {trade.bot_name || trade.profile_id || 'SM-Standard'}
+                                {trade.bot_name || trade.profile_id || 'Synaptic Adaptive'}
                               </td>
                               <td style={{ padding: '10px 14px', fontWeight: 700, color: '#F0F4F8' }}>{sym}</td>
                               <td style={{ padding: '10px 14px' }}>
