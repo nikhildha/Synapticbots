@@ -1,6 +1,6 @@
 'use client';
 
-import { Bot, Play, Square, ChevronDown, ChevronUp, Trash2 } from 'lucide-react';
+import { Bot, Play, Square, ChevronDown, ChevronUp, Trash2, Settings } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useState } from 'react';
 
@@ -27,7 +27,33 @@ interface BotCardProps {
 export function BotCard({ bot, onToggle, onDelete, liveTradeCount, trades = [], sessions = [] }: BotCardProps) {
   const [expanded, setExpanded] = useState(false);
   const [tab, setTab] = useState<'trades' | 'sessions'>('trades');
+  const [showSettings, setShowSettings] = useState(false);
+  const [settingsMode, setSettingsMode] = useState(bot?.config?.mode || 'paper');
+  const [settingsCPT, setSettingsCPT] = useState(bot?.config?.capitalPerTrade || 100);
+  const [settingsMaxTrades, setSettingsMaxTrades] = useState(bot?.config?.maxTrades || 25);
+  const [saving, setSaving] = useState(false);
   const isRunning = bot?.isActive ?? false;
+
+  const handleSaveSettings = async () => {
+    setSaving(true);
+    try {
+      const res = await fetch('/api/bots/config', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          botId: bot?.id,
+          mode: settingsMode,
+          capitalPerTrade: settingsCPT,
+          maxOpenTrades: settingsMaxTrades,
+        }),
+      });
+      if (res.ok) {
+        setShowSettings(false);
+        window.location.reload();
+      }
+    } catch (e) { console.error('Settings save error:', e); }
+    setSaving(false);
+  };
 
   // Separate active/closed trades
   const activeTrades = trades.filter((t: any) => (t.status || '').toLowerCase() === 'active');
@@ -173,11 +199,106 @@ export function BotCard({ bot, onToggle, onDelete, liveTradeCount, trades = [], 
               <Trash2 className="w-4 h-4 text-red-400" />
             </button>
           )}
+          <button
+            onClick={(e) => { e.stopPropagation(); setShowSettings(!showSettings); }}
+            title="Bot Settings"
+            className="p-2 rounded-lg transition-colors flex-shrink-0 hover:bg-cyan-500/20"
+            style={{ background: showSettings ? 'rgba(6,182,212,0.2)' : 'rgba(6,182,212,0.08)', border: '1px solid rgba(6,182,212,0.2)' }}
+          >
+            <Settings className="w-4 h-4 text-cyan-400" />
+          </button>
           <div className="text-[var(--color-text-secondary)]">
             {expanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
           </div>
         </div>
       </div>
+
+      {/* Settings Panel */}
+      <AnimatePresence>
+        {showSettings && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            style={{ overflow: 'hidden' }}
+          >
+            <div style={{ borderTop: '1px solid rgba(6,182,212,0.15)', padding: '16px 20px', background: 'rgba(6,182,212,0.03)' }}>
+              <div style={{ fontSize: '11px', fontWeight: 700, color: '#06B6D4', marginBottom: '12px', textTransform: 'uppercase', letterSpacing: '1px' }}>⚙️ Bot Settings</div>
+              <div style={{ display: 'flex', gap: '16px', alignItems: 'flex-end', flexWrap: 'wrap' }}>
+                {/* Mode */}
+                <div style={{ flex: 1, minWidth: '120px' }}>
+                  <label style={{ fontSize: '10px', color: '#9CA3AF', display: 'block', marginBottom: '4px', fontWeight: 600 }}>Trading Mode</label>
+                  <select
+                    value={settingsMode}
+                    onChange={(e) => setSettingsMode(e.target.value)}
+                    style={{
+                      width: '100%', padding: '8px 12px', borderRadius: '8px', fontSize: '12px', fontWeight: 600,
+                      background: 'rgba(17,24,39,0.8)', border: '1px solid rgba(255,255,255,0.1)', color: '#E5E7EB',
+                      cursor: 'pointer', outline: 'none',
+                    }}
+                  >
+                    <option value="paper">🟢 Paper</option>
+                    <option value="live">🔴 Live</option>
+                  </select>
+                </div>
+                {/* Capital Per Trade */}
+                <div style={{ flex: 1, minWidth: '120px' }}>
+                  <label style={{ fontSize: '10px', color: '#9CA3AF', display: 'block', marginBottom: '4px', fontWeight: 600 }}>Capital Per Trade ($)</label>
+                  <input
+                    type="number"
+                    value={settingsCPT}
+                    onChange={(e) => setSettingsCPT(Number(e.target.value))}
+                    style={{
+                      width: '100%', padding: '8px 12px', borderRadius: '8px', fontSize: '12px', fontWeight: 600,
+                      background: 'rgba(17,24,39,0.8)', border: '1px solid rgba(255,255,255,0.1)', color: '#E5E7EB',
+                      outline: 'none', fontFamily: 'monospace',
+                    }}
+                  />
+                </div>
+                {/* Max Trades */}
+                <div style={{ flex: 1, minWidth: '120px' }}>
+                  <label style={{ fontSize: '10px', color: '#9CA3AF', display: 'block', marginBottom: '4px', fontWeight: 600 }}>Max Open Trades</label>
+                  <input
+                    type="number"
+                    value={settingsMaxTrades}
+                    onChange={(e) => setSettingsMaxTrades(Number(e.target.value))}
+                    style={{
+                      width: '100%', padding: '8px 12px', borderRadius: '8px', fontSize: '12px', fontWeight: 600,
+                      background: 'rgba(17,24,39,0.8)', border: '1px solid rgba(255,255,255,0.1)', color: '#E5E7EB',
+                      outline: 'none', fontFamily: 'monospace',
+                    }}
+                  />
+                </div>
+                {/* Save / Cancel */}
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <button
+                    onClick={handleSaveSettings}
+                    disabled={saving}
+                    style={{
+                      padding: '8px 20px', borderRadius: '8px', fontSize: '11px', fontWeight: 700,
+                      background: 'rgba(6,182,212,0.15)', border: '1px solid rgba(6,182,212,0.3)',
+                      color: '#06B6D4', cursor: 'pointer', letterSpacing: '0.5px',
+                    }}
+                  >
+                    {saving ? 'Saving...' : 'Save'}
+                  </button>
+                  <button
+                    onClick={() => setShowSettings(false)}
+                    style={{
+                      padding: '8px 16px', borderRadius: '8px', fontSize: '11px', fontWeight: 700,
+                      background: 'rgba(107,114,128,0.1)', border: '1px solid rgba(107,114,128,0.2)',
+                      color: '#6B7280', cursor: 'pointer',
+                    }}
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Expandable content */}
       <AnimatePresence>

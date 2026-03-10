@@ -151,6 +151,17 @@ export function DashboardClient({ user, stats, bots, recentTrades }: DashboardCl
     }
   };
 
+  const handleDeleteBot = async (botId: string) => {
+    if (!confirm('Are you sure you want to delete this bot?')) return;
+    try {
+      const res = await fetch('/api/bots/delete', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ botId }),
+      });
+      if (res.ok) window.location.reload();
+    } catch (error) { console.error('Error deleting bot:', error); }
+  };
+
   if (!mounted) {
     return null;
   }
@@ -595,7 +606,7 @@ export function DashboardClient({ user, stats, bots, recentTrades }: DashboardCl
                   // If no trades matched, fall back to all trades only if there's exactly 1 bot
                   const displayTrades = botTrades.length > 0 ? botTrades : (bots.length === 1 ? trades : []);
                   return (
-                    <BotCard key={bot?.id} bot={bot} onToggle={handleBotToggle} liveTradeCount={liveActiveTrades.length} trades={displayTrades} />
+                    <BotCard key={bot?.id} bot={bot} onToggle={handleBotToggle} onDelete={handleDeleteBot} liveTradeCount={liveActiveTrades.length} trades={displayTrades} />
                   );
                 })}
               </div>
