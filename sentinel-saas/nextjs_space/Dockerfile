@@ -39,6 +39,10 @@ COPY --from=builder /app/public ./public
 COPY --from=builder /app/prisma ./prisma
 COPY --from=builder /app/next.config.js ./next.config.js
 
+# Startup script: push schema changes to DB then start Next.js
+RUN printf '#!/bin/sh\necho "🔄 Applying Prisma schema to database..."\nnpx prisma db push --skip-generate --accept-data-loss 2>&1 || echo "⚠️ prisma db push failed (continuing)"\necho "🚀 Starting Next.js..."\nexec npx next start -p 8080\n' > /app/start.sh && chmod +x /app/start.sh
+
 EXPOSE 8080
 
-CMD ["npx", "next", "start", "-p", "8080"]
+CMD ["/bin/sh", "/app/start.sh"]
+
