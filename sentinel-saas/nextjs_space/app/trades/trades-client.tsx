@@ -251,7 +251,10 @@ export function TradesClient({ trades: initialTrades }: TradesClientProps) {
       const pos = (t.position || '').toLowerCase();
       const isLong = pos === 'long' || pos === 'buy';
       const diff = isLong ? (cp - t.entryPrice) : (t.entryPrice - cp);
-      const pnl = Math.round(diff / t.entryPrice * t.leverage * t.capital * 10000) / 10000;
+      // E2 FIX: CoinDCX live trades have already-leveraged qty — don't multiply by leverage again
+      const isLive = (t.mode || '').toLowerCase().includes('live');
+      const effectiveLev = isLive ? 1 : t.leverage;
+      const pnl = Math.round(diff / t.entryPrice * effectiveLev * t.capital * 10000) / 10000;
       return s + pnl;
     }, 0);
     const combinedPnl = realizedPnl + unrealizedPnl;
@@ -264,7 +267,10 @@ export function TradesClient({ trades: initialTrades }: TradesClientProps) {
       const pos = (t.position || '').toLowerCase();
       const isLong = pos === 'long' || pos === 'buy';
       const diff = isLong ? (cp - t.entryPrice) : (t.entryPrice - cp);
-      const pnl = Math.round(diff / t.entryPrice * t.leverage * t.capital * 10000) / 10000;
+      // E2 FIX: CoinDCX live trades have already-leveraged qty
+      const isLive = (t.mode || '').toLowerCase().includes('live');
+      const effectiveLev = isLive ? 1 : t.leverage;
+      const pnl = Math.round(diff / t.entryPrice * effectiveLev * t.capital * 10000) / 10000;
       return Math.round(pnl / t.capital * 100 * 100) / 100;
     });
     const allPnlPcts = [
@@ -594,7 +600,10 @@ export function TradesClient({ trades: initialTrades }: TradesClientProps) {
                         let pnl: number, pnlPct: number;
                         if (isActive && currentPrice) {
                           const diff = isLong ? (currentPrice - t.entryPrice) : (t.entryPrice - currentPrice);
-                          pnl = t.entryPrice > 0 ? Math.round(diff / t.entryPrice * t.leverage * t.capital * 10000) / 10000 : 0;
+                          // E2 FIX: CoinDCX live trades have already-leveraged qty
+                          const isLive = (t.mode || '').toLowerCase().includes('live');
+                          const effectiveLev = isLive ? 1 : t.leverage;
+                          pnl = t.entryPrice > 0 ? Math.round(diff / t.entryPrice * effectiveLev * t.capital * 10000) / 10000 : 0;
                           pnlPct = t.capital > 0 ? Math.round(pnl / t.capital * 100 * 100) / 100 : 0;
                         } else {
                           pnl = t.totalPnl;
