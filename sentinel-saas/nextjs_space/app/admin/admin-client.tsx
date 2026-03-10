@@ -17,7 +17,7 @@ import SubscriptionMgmt from './components/subscription-mgmt';
 import SystemHealth from './components/system-health';
 import UserAnalytics from './components/user-analytics';
 import RevenueDashboard from './components/revenue-dashboard';
-import KernelView from './components/kernel-view';
+import UserBotMonitor from './components/user-bot-monitor';
 
 interface UserData {
     id: string;
@@ -40,7 +40,7 @@ interface SystemStats {
     revenueEstimate: number;
 }
 
-type TabId = 'overview' | 'users' | 'engine' | 'kernel' | 'subscriptions' | 'analytics' | 'revenue' | 'audit' | 'health';
+type TabId = 'overview' | 'users' | 'engine' | 'botMonitor' | 'subscriptions' | 'analytics' | 'revenue' | 'audit' | 'health';
 
 export default function AdminDashboard() {
     const { data: session } = useSession();
@@ -72,7 +72,7 @@ export default function AdminDashboard() {
         { id: 'overview' as TabId, label: 'Overview', icon: BarChart3 },
         { id: 'users' as TabId, label: 'Users', icon: Users },
         { id: 'engine' as TabId, label: 'Engine', icon: Bot },
-        { id: 'kernel' as TabId, label: 'Kernel', icon: Activity },
+        { id: 'botMonitor' as TabId, label: 'Bot Monitor', icon: Activity },
         { id: 'subscriptions' as TabId, label: 'Subs', icon: CreditCard },
         { id: 'analytics' as TabId, label: 'Analytics', icon: LineChart },
         { id: 'revenue' as TabId, label: 'Revenue', icon: DollarSign },
@@ -248,7 +248,7 @@ export default function AdminDashboard() {
 
             {/* Delegated Tabs */}
             {activeTab === 'engine' && <EngineControl />}
-            {activeTab === 'kernel' && <KernelView />}
+            {activeTab === 'botMonitor' && <UserBotMonitor />}
             {activeTab === 'subscriptions' && <SubscriptionMgmt />}
             {activeTab === 'analytics' && <UserAnalytics />}
             {activeTab === 'revenue' && <RevenueDashboard />}
