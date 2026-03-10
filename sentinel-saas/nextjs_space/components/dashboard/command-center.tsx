@@ -7,13 +7,14 @@ const REGIME_MAP: Record<string, { emoji: string; color: string; bgGlow: string 
     'BEARISH': { emoji: '🔴', color: '#EF4444', bgGlow: 'rgba(239, 68, 68, 0.15)' },
     'SIDEWAYS/CHOP': { emoji: '🟡', color: '#F59E0B', bgGlow: 'rgba(245, 158, 11, 0.15)' },
     'CRASH/PANIC': { emoji: '💀', color: '#DC2626', bgGlow: 'rgba(220, 38, 38, 0.2)' },
-    'WAITING': { emoji: '⏳', color: '#F59E0B', bgGlow: 'rgba(245, 158, 11, 0.1)' },
-    'SCANNING': { emoji: '🔍', color: '#3B82F6', bgGlow: 'rgba(59, 130, 246, 0.15)' },
+    'WAITING': { emoji: '🔍', color: '#A78BFA', bgGlow: 'rgba(167, 139, 250, 0.1)' },
+    'SCANNING': { emoji: '🔍', color: '#A78BFA', bgGlow: 'rgba(167, 139, 250, 0.1)' },
     'OFFLINE': { emoji: '⚫', color: '#6B7280', bgGlow: 'rgba(107, 114, 128, 0.1)' },
 };
 
 function getRegimeInfo(regime: string) {
-    return REGIME_MAP[regime] || REGIME_MAP['WAITING'];
+    const key = regime.toUpperCase();
+    return REGIME_MAP[key] || (key.includes('WAIT') || key.includes('SCAN') ? REGIME_MAP['SCANNING'] : REGIME_MAP['SCANNING']);
 }
 
 interface RegimeCardProps {
@@ -58,7 +59,7 @@ export function RegimeCard({ regime, confidence, symbol, macroRegime, trend15m, 
     else if (pct >= 50) gaugeColor = '#F59E0B';
 
     // SVG ring constants
-    const ringRadius = 28;
+    const ringRadius = 36;
     const ringCircumference = 2 * Math.PI * ringRadius;
     const ringOffset = ringCircumference - (pct / 100) * ringCircumference;
 
@@ -109,7 +110,7 @@ export function RegimeCard({ regime, confidence, symbol, macroRegime, trend15m, 
             backdropFilter: 'blur(16px)',
             border: `1px solid ${info.color}22`,
             borderRadius: '20px',
-            padding: '20px 24px',
+            padding: '14px 20px',
             position: 'relative',
             overflow: 'hidden',
         }}>
@@ -120,7 +121,7 @@ export function RegimeCard({ regime, confidence, symbol, macroRegime, trend15m, 
             }} />
 
             {/* Header row: Label + BTC price */}
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
                 <div style={{
                     fontSize: '10px', fontWeight: 700, textTransform: 'uppercase' as const,
                     letterSpacing: '2px', color: '#6B7280',
@@ -146,12 +147,12 @@ export function RegimeCard({ regime, confidence, symbol, macroRegime, trend15m, 
             </div>
 
             {/* Main content: Confidence ring + Regime info */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '20px', marginBottom: '16px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '8px' }}>
                 {/* SVG Confidence Ring */}
-                <div style={{ position: 'relative', width: '72px', height: '72px', flexShrink: 0 }}>
-                    <svg width="72" height="72" viewBox="0 0 72 72" style={{ transform: 'rotate(-90deg)' }}>
-                        <circle cx="36" cy="36" r={ringRadius} fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth="5" />
-                        <circle cx="36" cy="36" r={ringRadius} fill="none" stroke={gaugeColor}
+                <div style={{ position: 'relative', width: '90px', height: '90px', flexShrink: 0 }}>
+                    <svg width="90" height="90" viewBox="0 0 90 90" style={{ transform: 'rotate(-90deg)' }}>
+                        <circle cx="45" cy="45" r={ringRadius} fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth="5" />
+                        <circle cx="45" cy="45" r={ringRadius} fill="none" stroke={gaugeColor}
                             strokeWidth="5" strokeLinecap="round"
                             strokeDasharray={ringCircumference} strokeDashoffset={ringOffset}
                             style={{ transition: 'stroke-dashoffset 1s ease, stroke 0.5s ease' }} />
@@ -167,8 +168,8 @@ export function RegimeCard({ regime, confidence, symbol, macroRegime, trend15m, 
 
                 {/* Dominant regime + Timeframe badges */}
                 <div style={{ flex: 1 }}>
-                    <div style={{ fontSize: '20px', fontWeight: 800, color: info.color, marginBottom: '10px', letterSpacing: '-0.3px' }}>
-                        {dominantRegime}
+                    <div style={{ fontSize: '18px', fontWeight: 800, color: info.color, marginBottom: '8px', letterSpacing: '-0.3px' }}>
+                        {dominantRegime === 'WAITING' ? 'SCANNING' : dominantRegime}
                     </div>
                     {tfEntries.length > 0 ? (
                         <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' as const }}>
@@ -356,7 +357,7 @@ export function PnlCard({ trades, coinDcxBalance, binanceBalance }: PnlCardProps
             backdropFilter: 'blur(12px)',
             border: '1px solid rgba(255,255,255,0.06)',
             borderRadius: '16px',
-            padding: '16px 20px',
+            padding: '12px 16px',
             position: 'relative' as const,
             overflow: 'hidden',
         }}>
