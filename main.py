@@ -59,8 +59,21 @@ class RegimeMasterBot:
     """
 
     def __init__(self):
-        self.executor = ExecutionEngine()
-        self.risk = RiskManager()
+        self._running = True  # Graceful shutdown flag (checked in run() loop)
+
+        # ── Critical deps — wrapped to prevent init crashes from burning retries ──
+        try:
+            self.executor = ExecutionEngine()
+        except Exception as e:
+            logger.error("⚠️ ExecutionEngine init failed: %s — using fallback", e)
+            self.executor = ExecutionEngine()  # retry once
+
+        try:
+            self.risk = RiskManager()
+        except Exception as e:
+            logger.error("⚠️ RiskManager init failed: %s — using fallback", e)
+            self.risk = RiskManager()
+
         self._trade_count = 0
         self._cycle_count = 0
         self._last_cycle_duration = 0
@@ -79,6 +92,7 @@ class RegimeMasterBot:
         self._multi_tf_brains = {}   # symbol → MultiTFHMMBrain (3 TFs per coin)
         self._coin_states = {}       # symbol → latest state dict (for dashboard)
         self._live_prices = {}       # symbol → {ls, fr, ...} (fetched each cycle)
+        self._BRAIN_CACHE_MAX = 60   # LRU eviction cap for HMM brain caches
 
         # Adaptive Brain Switcher
         self._brain_switcher = BrainSwitcher()
@@ -87,7 +101,10 @@ class RegimeMasterBot:
         self._reclassify_thread: threading.Thread | None = None
 
         # ── Startup: sync _active_positions from tradebook ──────────
-        self._load_positions_from_tradebook()
+        try:
+            self._load_positions_from_tradebook()
+        except Exception as e:
+            logger.error("⚠️ Failed to load positions from tradebook on startup: %s", e)
 
         # ── Sentiment Engine (lazy singleton) ─────────────────────────
         self._sentiment = None
@@ -132,17 +149,21 @@ class RegimeMasterBot:
             config.LOOP_INTERVAL_SECONDS, config.ANALYSIS_INTERVAL_SECONDS,
         )
 
-        while True:
+        while self._running:
             try:
                 self._heartbeat()
+                self._evict_brain_cache()  # Memory safeguard
                 time.sleep(config.LOOP_INTERVAL_SECONDS)
 
             except KeyboardInterrupt:
-                logger.info("⏹ Bot stopped by user.")
-                break
+                logger.info("⏹ Bot stopped (SIGTERM/KeyboardInterrupt).")
+                self._running = False
+                raise  # Re-raise so _run_engine() sees it as a signal, not clean exit
             except Exception as e:
                 logger.error("⚠️ Loop error: %s", e, exc_info=True)
                 time.sleep(config.ERROR_RETRY_SECONDS)
+
+        logger.info("🛑 Engine loop exited (self._running = False).")
 
     def _heartbeat(self):
         """1-minute heartbeat: lightweight checks + trigger full analysis on schedule."""
@@ -1555,6 +1576,23 @@ class RegimeMasterBot:
                 json.dump(multi_state, f, indent=2)
         except Exception as e:
             logger.error("Failed to save multi state: %s", e)
+
+    def _evict_brain_cache(self):
+        """LRU eviction: cap HMM brain caches to prevent OOM kills on Railway."""
+        cap = self._BRAIN_CACHE_MAX
+        if len(self._coin_brains) > cap:
+            # Evict oldest entries (dict preserves insertion order in Python 3.7+)
+            excess = len(self._coin_brains) - cap
+            keys_to_drop = list(self._coin_brains.keys())[:excess]
+            for k in keys_to_drop:
+                del self._coin_brains[k]
+            logger.info("🧹 Evicted %d old HMM brains (cache: %d/%d)", excess, len(self._coin_brains), cap)
+        if len(self._multi_tf_brains) > cap:
+            excess = len(self._multi_tf_brains) - cap
+            keys_to_drop = list(self._multi_tf_brains.keys())[:excess]
+            for k in keys_to_drop:
+                del self._multi_tf_brains[k]
+            logger.info("🧹 Evicted %d old MTF brains (cache: %d/%d)", excess, len(self._multi_tf_brains), cap)
 
     def _process_commands(self):
         """Check for external commands (from dashboard kill switch)."""

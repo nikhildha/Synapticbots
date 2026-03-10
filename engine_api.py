@@ -843,40 +843,70 @@ def _run_engine():
     global _engine_bot, _engine_crash_count, _engine_last_crash
     MAX_RETRIES = 5
     BASE_BACKOFF = 10  # seconds
+    RECOVERY_COOLDOWN = 300  # 5 minutes before infinite recovery attempt
 
-    retry = 0
-    while retry < MAX_RETRIES:
-        loop_start = time.time()
-        try:
-            from main import RegimeMasterBot
-            _engine_bot = RegimeMasterBot()
-            logger.info("🚀 Engine loop starting (attempt %d/%d)", retry + 1, MAX_RETRIES)
-            _engine_bot.run()
-            # If run() returns cleanly, break out
-            logger.info("Engine run() returned cleanly")
-            break
-        except Exception as e:
-            _engine_crash_count += 1
-            _engine_last_crash = datetime.now(timezone.utc).isoformat()
-            logger.critical("💥 Engine thread crashed (attempt %d/%d): %s", retry + 1, MAX_RETRIES, e, exc_info=True)
-            _save_crash(str(e), crash_type="thread_crash")
-
-            # If engine ran for > 5 minutes, reset retry counter (it was healthy)
-            run_duration = time.time() - loop_start
-            if run_duration > 300:
-                logger.info("Engine ran for %.0fs before crash — resetting retry counter", run_duration)
+    while True:  # Outer infinite loop for recovery after retry exhaustion
+        retry = 0
+        while retry < MAX_RETRIES:
+            loop_start = time.time()
+            try:
+                from main import RegimeMasterBot
+                _engine_bot = RegimeMasterBot()
+                logger.info("🚀 Engine loop starting (attempt %d/%d)", retry + 1, MAX_RETRIES)
+                _engine_bot.run()
+                # If run() returns cleanly (self._running set to False), break out
+                logger.info("Engine run() returned (self._running = False)")
+                return  # Graceful shutdown requested — don't restart
+            except KeyboardInterrupt:
+                # SIGTERM from Railway during redeploy — NOT a crash
+                logger.warning("⚡ Engine received SIGTERM/KeyboardInterrupt — will restart")
+                _engine_crash_count += 1
+                _engine_last_crash = datetime.now(timezone.utc).isoformat()
+                _save_crash("SIGTERM/KeyboardInterrupt", crash_type="signal")
+                # Reset retry counter — signals are not bugs
                 retry = 0
-            else:
-                retry += 1
+                time.sleep(5)  # Brief pause before restart
+                continue
+            except Exception as e:
+                _engine_crash_count += 1
+                _engine_last_crash = datetime.now(timezone.utc).isoformat()
+                logger.critical("💥 Engine thread crashed (attempt %d/%d): %s", retry + 1, MAX_RETRIES, e, exc_info=True)
+                _save_crash(str(e), crash_type="thread_crash")
 
-            if retry < MAX_RETRIES:
-                backoff = min(BASE_BACKOFF * (2 ** (retry - 1)), 160)
-                logger.info("⏳ Restarting engine in %ds...", backoff)
-                time.sleep(backoff)
+                # If engine ran for > 5 minutes, reset retry counter (it was healthy)
+                run_duration = time.time() - loop_start
+                if run_duration > 300:
+                    logger.info("Engine ran for %.0fs before crash — resetting retry counter", run_duration)
+                    retry = 0
+                else:
+                    retry += 1
 
-    if retry >= MAX_RETRIES:
-        logger.critical("❌ Engine exhausted all %d restart attempts — giving up", MAX_RETRIES)
+                if retry < MAX_RETRIES:
+                    backoff = min(BASE_BACKOFF * (2 ** (retry - 1)), 160)
+                    logger.info("⏳ Restarting engine in %ds...", backoff)
+                    time.sleep(backoff)
+
+        # All retries exhausted — send Telegram alert
+        logger.critical("❌ Engine exhausted all %d restart attempts", MAX_RETRIES)
         _save_crash("Exhausted all restart attempts", crash_type="permanent_failure")
+
+        # Send Telegram alert about engine death
+        try:
+            import telegram as tg
+            tg.send_message(
+                "🚨 *ENGINE DEAD*\n\n"
+                f"Engine exhausted all {MAX_RETRIES} restart attempts.\n"
+                f"Last crash: {_engine_last_crash}\n"
+                f"Total crashes this boot: {_engine_crash_count}\n\n"
+                "⏳ Auto-recovery in 5 minutes..."
+            )
+        except Exception:
+            pass
+
+        # Wait 5 minutes then try again (infinite recovery)
+        logger.info("⏳ Waiting %ds before infinite recovery attempt...", RECOVERY_COOLDOWN)
+        time.sleep(RECOVERY_COOLDOWN)
+        logger.info("🔄 Attempting infinite recovery restart...")
 
 
 def start_engine():
@@ -898,7 +928,7 @@ def api_restart():
     global _engine_thread, _engine_start_time, _engine_crash_count, _engine_bot
     logger.info("🔄 Manual engine restart requested")
 
-    # Try to stop the current engine gracefully
+    # Gracefully stop the current engine via _running flag
     if _engine_bot:
         try:
             _engine_bot._running = False
@@ -907,7 +937,7 @@ def api_restart():
 
     # Wait briefly for thread to die
     if _engine_thread and _engine_thread.is_alive():
-        _engine_thread.join(timeout=5)
+        _engine_thread.join(timeout=10)  # Give it more time to stop cleanly
 
     _engine_thread = None
     _engine_bot = None
@@ -929,6 +959,28 @@ def api_logs():
     return jsonify({"lines": lines[-n:], "total": len(lines)})
 
 
+# ─── Engine Watchdog ──────────────────────────────────────────────────
+
+def _engine_watchdog():
+    """Background watchdog: check if engine thread is alive every 60s.
+    If dead, auto-restart it. This eliminates the 'Flask alive but engine dead' scenario."""
+    WATCHDOG_INTERVAL = 60  # seconds
+    while True:
+        time.sleep(WATCHDOG_INTERVAL)
+        if _engine_thread is None or not _engine_thread.is_alive():
+            logger.warning("🐕 WATCHDOG: Engine thread is dead — auto-restarting...")
+            try:
+                import telegram as tg
+                tg.send_message(
+                    "🐕 *WATCHDOG ALERT*\n\n"
+                    "Engine thread was found dead.\n"
+                    "Auto-restarting now..."
+                )
+            except Exception:
+                pass
+            start_engine()
+
+
 # ─── Entry Point ──────────────────────────────────────────────────────
 
 if __name__ == "__main__":
@@ -940,6 +992,11 @@ if __name__ == "__main__":
 
     # Start the trading engine in background
     start_engine()
+
+    # Start watchdog thread to auto-restart engine if it dies
+    _watchdog_thread = threading.Thread(target=_engine_watchdog, daemon=True, name="EngineWatchdog")
+    _watchdog_thread.start()
+    logger.info("🐕 Engine watchdog started (checks every 60s)")
 
     # Start Flask API server
     port = int(os.environ.get("PORT", 3001))
