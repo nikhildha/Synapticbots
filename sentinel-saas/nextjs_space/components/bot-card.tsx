@@ -113,10 +113,9 @@ export function BotCard({ bot, onToggle, onDelete, liveTradeCount, trades = [], 
         boxShadow: isRunning
           ? `0 0 32px ${brain.glow}, 0 0 0 1px ${brain.color}15, var(--shadow-card)`
           : 'var(--shadow-card)',
+        animation: isRunning ? 'breatheBorder 2.5s ease-in-out infinite' : 'none',
         overflow: 'hidden',
-        transition: 'border-color 0.3s, box-shadow 0.3s, transform 0.3s',
-        position: 'relative',
-        animation: isRunning ? 'breatheBorder 3s ease-in-out infinite' : undefined,
+
       }}
       whileHover={{
         boxShadow: `0 0 48px ${brain.glow}, 0 8px 40px rgba(0,0,0,0.7)`,

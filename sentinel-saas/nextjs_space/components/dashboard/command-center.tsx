@@ -240,23 +240,6 @@ export function RegimeCard({ regime, confidence, symbol, macroRegime, trend15m, 
                             }}
                         />
 
-                        {/* ECG sparkline inside the gauge */}
-                        <g clipPath={`url(#gaugeClip)`}>
-                            <clipPath id="gaugeClip">
-                                <circle cx={GAUGE_CX} cy={GAUGE_CY} r={INNER_R - 4} />
-                            </clipPath>
-                            <svg x={GAUGE_CX - 50} y={GAUGE_CY + 8} width="100" height="36" viewBox="0 0 100 70" preserveAspectRatio="none">
-                                {/* Gradient fill under ECG */}
-                                <defs>
-                                    <linearGradient id="ecgFill" x1="0" y1="0" x2="0" y2="1">
-                                        <stop offset="0%" stopColor={gaugeColor} stopOpacity="0.3" />
-                                        <stop offset="100%" stopColor={gaugeColor} stopOpacity="0" />
-                                    </linearGradient>
-                                </defs>
-                                <polyline points={ecgPoints} fill="none" stroke={gaugeColor} strokeWidth="1.5" strokeLinejoin="round" opacity="0.8" />
-                                <polygon points={`5,70 ${ecgPoints} 95,70`} fill="url(#ecgFill)" opacity="0.5" />
-                            </svg>
-                        </g>
 
                         {/* Center text — ~15% CONFID */}
                         <text x={GAUGE_CX} y={GAUGE_CY - 8} textAnchor="middle"
