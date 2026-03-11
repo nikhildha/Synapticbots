@@ -95,6 +95,15 @@ class RegimeMasterBot:
         self._live_prices = {}       # symbol → {ls, fr, ...} (fetched each cycle)
         self._BRAIN_CACHE_MAX = 20   # LRU eviction cap (15 coins × 3 TFs = 45 max; cap at 20 prevents OOM)
 
+        # ─── Rotating coin pool (45 total ÷ 3 groups of 15) ──────────────────
+        # Pool of 45 high-volume coins (refreshed every 3 cycles from Binance)
+        # Each cycle scans a rotating slice of 15 — saves CPU + RAM, covers all
+        # coins every 3 cycles (~30 min at 10 min/cycle).
+        self._full_coin_pool: list = []    # 45 top coins by volume
+        self._scan_rotation: int = 0       # 0, 1, 2 → rotates to next slice each cycle
+        self._SCAN_BATCH_SIZE: int = 15    # Coins to actually train + analyze per cycle
+        self._SCAN_POOL_SIZE: int = 45     # Total coins fetched (3 × batch size)
+
         # Adaptive Brain Switcher
         self._brain_switcher = BrainSwitcher()
 
@@ -334,20 +343,52 @@ class RegimeMasterBot:
         if self._athena:
             self._athena.reset_cycle()
 
-        # ── 1. Refresh coin list periodically ────────────────────
+        # ── 1. Rotating coin scan: 45 pool ÷ 3 groups of 15 ─────────
         if config.MULTI_COIN_MODE:
-            if not self._coin_list or self._cycle_count % config.SCAN_INTERVAL_CYCLES == 1:
-                logger.info("🔍 Refreshing top %d coins by volume...", config.TOP_COINS_LIMIT)
-                self._coin_list = get_top_coins_by_volume(limit=config.TOP_COINS_LIMIT)
-                logger.info("📋 Tracking %d coins: %s ...", len(self._coin_list),
-                            ", ".join(self._coin_list[:5]))
-            # Slice coin list by active brain's scan_limit (C=15, B=30, A=50)
+            num_rotations = self._SCAN_POOL_SIZE // self._SCAN_BATCH_SIZE  # = 3
+
+            # Refresh the full 45-coin pool every 3 cycles (or on first run)
+            if not self._full_coin_pool or self._cycle_count % (config.SCAN_INTERVAL_CYCLES * num_rotations) == 1:
+                logger.info("🔄 Refreshing full coin pool (%d coins) from Binance...", self._SCAN_POOL_SIZE)
+                self._full_coin_pool = get_top_coins_by_volume(limit=self._SCAN_POOL_SIZE)
+                logger.info("📋 Full pool (%d coins): %s ...",
+                            len(self._full_coin_pool), ", ".join(self._full_coin_pool[:8]))
+
+            # Which 15-coin slice this cycle? (0→1→2→0→...)
+            self._scan_rotation = (self._cycle_count - 1) % num_rotations
+            batch_start = self._scan_rotation * self._SCAN_BATCH_SIZE
+            batch_end   = batch_start + self._SCAN_BATCH_SIZE
+            batch_raw   = self._full_coin_pool[batch_start:batch_end]
+
+            # Skip already-deployed coins — they are being managed; no need to retrain HMM
+            deployed_symbols = set(self._active_positions.keys())
+            batch_undeployed = [s for s in batch_raw if s not in deployed_symbols]
+
+            # Fill any gaps left by skipped deployed coins from the overflow slice
+            gap = self._SCAN_BATCH_SIZE - len(batch_undeployed)
+            if gap > 0:
+                next_start = batch_end % len(self._full_coin_pool) if self._full_coin_pool else 0
+                overflow   = self._full_coin_pool[next_start:next_start + gap]
+                extra      = [s for s in overflow if s not in deployed_symbols and s not in batch_undeployed]
+                batch_undeployed += extra[:gap]
+
+            symbols = batch_undeployed
+            logger.info(
+                "🔄 Rotation %d/3 | Batch #%d–%d | Scanning %d coins%s | Deployed (skipped): %d",
+                self._scan_rotation + 1, batch_start + 1, batch_end,
+                len(symbols),
+                " (+ overflow fill)" if gap > 0 else "",
+                len(deployed_symbols),
+            )
+
+            # Keep _coin_list for dashboard / health endpoint compatibility
+            self._coin_list = symbols
+
+            # Brain scan limit (conservative brain caps at 15 anyway)
             brain_scan_limit = config.BRAIN_PROFILES.get(
                 self._brain_switcher.active_brain, {}
-            ).get("scan_limit", config.TOP_COINS_LIMIT)
-            symbols = self._coin_list[:brain_scan_limit]
-            logger.info("🧠 Brain=%s → scanning %d/%d coins",
-                        self._brain_switcher.active_brain, len(symbols), len(self._coin_list))
+            ).get("scan_limit", self._SCAN_BATCH_SIZE)
+            symbols = symbols[:brain_scan_limit]
         else:
             symbols = [config.PRIMARY_SYMBOL]
 
