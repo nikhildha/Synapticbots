@@ -9,7 +9,7 @@ import { EngineConsole } from '@/components/dashboard/engine-console';
 import { AthenaPanel } from '@/components/dashboard/athena-panel';
 import { SynapticHub } from '@/components/dashboard/synaptic-hub';
 import { TerminalFeed } from '@/components/dashboard/terminal-feed';
-import { AthenaCockpit } from '@/components/dashboard/athena-cockpit';
+
 import { DigitalDust, PerspectiveGrid } from '@/components/effects/digital-dust';
 import { Bot, TrendingUp, Activity, DollarSign, Zap } from 'lucide-react';
 import Link from 'next/link';
