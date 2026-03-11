@@ -104,13 +104,13 @@ export function RegimeCard({ regime, confidence, symbol, macroRegime, trend15m, 
         { label: 'Crash', coins: regimeCoins.crash, color: '#DC2626', emoji: '💀' },
     ].filter(c => c.coins.length > 0);
 
-    // Gauge dimensions — upscaled for visual impact
-    const GAUGE_SIZE = 220;
+    // Gauge dimensions — reduced 40%
+    const GAUGE_SIZE = 132;
     const GAUGE_CX = GAUGE_SIZE / 2;
     const GAUGE_CY = GAUGE_SIZE / 2;
-    const OUTER_R = 96;
-    const INNER_R = 74;
-    const ARC_R = 85;
+    const OUTER_R = 58;
+    const INNER_R = 44;
+    const ARC_R = 51;
     const arcCirc = 2 * Math.PI * ARC_R;
     // Arc spans 240° (starting from 150° → 390°) for the C-shape gauge
     const ARC_SPAN_DEG = 240;
