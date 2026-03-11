@@ -534,10 +534,6 @@ export function SignalSummaryTable({ coinStates, multi }: SignalSummaryProps) {
         } catch { return '—'; }
     };
 
-    if (coins.length === 0) {
-        return null;
-    }
-
 
     const filtered = selectedCoins.length > 0 ? coins.filter((c: any) => selectedCoins.includes(c.symbol)) : coins;
     const sorted = [...filtered].sort((a: any, b: any) => {
@@ -659,7 +655,7 @@ export function SignalSummaryTable({ coinStates, multi }: SignalSummaryProps) {
                         {statsItems.map((s, i) => (
                             <div key={i} style={{ background: 'rgba(255,255,255,0.03)', border: `1px solid ${s.label === 'Engine' ? (isEngineOn ? 'rgba(34,197,94,0.2)' : 'rgba(239,68,68,0.2)') : 'rgba(255,255,255,0.06)'}`, borderRadius: '10px', padding: '10px 12px', textAlign: 'center' }}>
                                 <div style={{ fontSize: '9px', textTransform: 'uppercase', letterSpacing: '1px', color: '#6B7280', marginBottom: '4px' }}>{s.label}</div>
-                                <div style={{ fontSize: (s as any).isText ? '12px' : '20px', fontWeight: 700, color: s.color, fontFamily: (s as any).isText ? 'monospace' : 'inherit' }}>{s.value}</div>
+                                <div style={{ fontSize: (s as any).isText ? '12px' : '20px', fontWeight: 700, color: '#FFFFFF', fontFamily: (s as any).isText ? 'monospace' : 'inherit' }}>{s.value}</div>
                             </div>
                         ))}
                     </div>
