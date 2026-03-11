@@ -124,7 +124,7 @@ export function EngineConsole() {
             <div
                 ref={containerRef}
                 style={{
-                    height: '400px',
+                    height: '800px',
                     overflowY: 'auto',
                     padding: '12px 16px',
                     fontSize: '11px',

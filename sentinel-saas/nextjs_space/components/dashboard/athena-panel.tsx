@@ -134,7 +134,7 @@ export function AthenaPanel({ athena, perBot = {} }: Props) {
 
 
             {/* ── Decision List ── */}
-            <div style={{ maxHeight: 480, overflowY: 'auto', padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: 10 }}>
+            <div style={{ maxHeight: 960, overflowY: 'auto', padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: 10 }}>
                 {!hasData ? (
                     <div style={{ textAlign: 'center', padding: '36px 20px', color: 'var(--color-text-muted)' }}>
                         <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text-secondary)' }}>Awaiting eligible coins…</div>
