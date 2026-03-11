@@ -8,6 +8,7 @@ import { RegimeCard, PnlCard, ActivePositionsCard, SignalSummaryTable } from '@/
 import { EngineConsole } from '@/components/dashboard/engine-console';
 import { AthenaPanel } from '@/components/dashboard/athena-panel';
 import { TerminalFeed } from '@/components/dashboard/terminal-feed';
+import { TradeChart } from '@/components/dashboard/trade-chart';
 import { Bot, TrendingUp, Activity, DollarSign, Zap } from 'lucide-react';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
@@ -63,6 +64,8 @@ export function DashboardClient({ user, stats, bots, recentTrades }: DashboardCl
   const [pnlScope, setPnlScope] = useState<'session' | 'all'>('all');
   const [walletBalance, setWalletBalance] = useState<{ binance: number | null; coindcx: number | null }>({ binance: null, coindcx: null });
   const [livePrices, setLivePrices] = useState<Record<string, number>>({});
+  const [chartSymbol, setChartSymbol] = useState('BTCUSDT');
+  const [chartLevels, setChartLevels] = useState<{ entry?: number; sl?: number; tp?: number; side?: string } | undefined>(undefined);
 
   const fetchBotState = useCallback(async () => {
     try {
@@ -524,9 +527,53 @@ export function DashboardClient({ user, stats, bots, recentTrades }: DashboardCl
             </div>
           </motion.div>
 
+          {/* ═══ Trade Chart ═══ */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.22 }} className="mb-8"
+          >
+            {(() => {
+              // Build coin tab list from active trades
+              const chartCoins = trades
+                .filter((t: any) => (t.status || '').toUpperCase() === 'ACTIVE' || (t.status || '').toUpperCase() === 'OPEN')
+                .map((t: any) => ({
+                  symbol: (t.symbol || t.coin || '').toUpperCase().replace('_', ''),
+                  side: t.side || t.position || '',
+                  entry: parseFloat(t.entry_price || t.entryPrice || 0) || undefined,
+                  sl: parseFloat(t.stop_loss || t.stopLoss || 0) || undefined,
+                  tp: parseFloat(t.take_profit || t.takeProfit || 0) || undefined,
+                }))
+                .filter(c => c.symbol.length > 0);
 
+              return (
+                <TradeChart
+                  symbol={chartSymbol}
+                  levels={chartLevels}
+                  coins={chartCoins}
+                  onCoinSelect={(sym) => {
+                    setChartSymbol(sym);
+                    const trade = trades.find((t: any) =>
+                      (t.symbol || t.coin || '').toUpperCase().replace('_', '') === sym &&
+                      ((t.status || '').toUpperCase() === 'ACTIVE' || (t.status || '').toUpperCase() === 'OPEN')
+                    );
+                    if (trade) {
+                      setChartLevels({
+                        entry: parseFloat(trade.entry_price || trade.entryPrice || 0) || undefined,
+                        sl: parseFloat(trade.stop_loss || trade.stopLoss || 0) || undefined,
+                        tp: parseFloat(trade.take_profit || trade.takeProfit || 0) || undefined,
+                        side: trade.side || trade.position || '',
+                      });
+                    } else {
+                      setChartLevels(undefined);
+                    }
+                  }}
+                />
+              );
+            })()}
+          </motion.div>
 
           {/* ═══ Row 3: Bots Section ═══ */}
+
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
