@@ -419,11 +419,11 @@ export function DashboardClient({ user, stats, bots, recentTrades }: DashboardCl
                     position: 'relative' as const,
                   }}>
                     {/* Title on top */}
-                    <div style={{ fontSize: '13px', fontWeight: 800, letterSpacing: '3px', textTransform: 'uppercase' as const, color: bc, marginBottom: '2px' }}>
+                    <div style={{ fontSize: '15px', fontWeight: 800, letterSpacing: '3px', textTransform: 'uppercase' as const, color: bc, marginBottom: '2px' }}>
                       Synaptic Core Brain
                     </div>
                     {isOn && (
-                      <div style={{ fontSize: '12px', color: '#6B7280', marginBottom: '2px', fontFamily: 'monospace' }}>
+                      <div style={{ fontSize: '14px', color: '#6B7280', marginBottom: '2px', fontFamily: 'var(--font-mono, monospace)' }}>
                         Cycle #{cycle} Completed
                       </div>
                     )}

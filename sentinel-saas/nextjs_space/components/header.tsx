@@ -61,13 +61,13 @@ export function Header() {
             <nav className="hidden md:flex items-center space-x-6">
               {session ? (
                 <>
-                  <Link href="/dashboard" className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)] transition-colors">
+                  <Link href="/dashboard" className="text-[15px] font-medium text-[var(--color-text-secondary)] hover:text-[var(--color-primary)] transition-colors">
                     Cockpit
                   </Link>
-                  <Link href="/bots" className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)] transition-colors">
+                  <Link href="/bots" className="text-[15px] font-medium text-[var(--color-text-secondary)] hover:text-[var(--color-primary)] transition-colors">
                     Bots
                   </Link>
-                  <Link href="/trades" className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)] transition-colors">
+                  <Link href="/trades" className="text-[15px] font-medium text-[var(--color-text-secondary)] hover:text-[var(--color-primary)] transition-colors">
                     Trade Book
                   </Link>
                   {/* Intelligence page disabled for now
@@ -75,10 +75,10 @@ export function Header() {
                   Intelligence
                 </Link>
                 */}
-                  <Link href="/howto" className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)] transition-colors">
+                  <Link href="/howto" className="text-[15px] font-medium text-[var(--color-text-secondary)] hover:text-[var(--color-primary)] transition-colors">
                     How To?
                   </Link>
-                  <Link href="/account" className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)] transition-colors">
+                  <Link href="/account" className="text-[15px] font-medium text-[var(--color-text-secondary)] hover:text-[var(--color-primary)] transition-colors">
                     Account
                   </Link>
                   {(session.user as any)?.role === 'admin' && (
