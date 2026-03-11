@@ -111,6 +111,7 @@ export function TerminalFeed({ coinStates, cycle, activeTrades = [], athenaEnabl
     return (
         <div style={{
             display: 'flex', flexDirection: 'column',
+            height: '100%',
             background: 'rgba(5,10,18,0.85)',
             backdropFilter: 'blur(14px)',
             WebkitBackdropFilter: 'blur(14px)',
@@ -125,12 +126,6 @@ export function TerminalFeed({ coinStates, cycle, activeTrades = [], athenaEnabl
                 borderBottom: '1px solid rgba(0,229,255,0.1)',
                 display: 'flex', alignItems: 'center', gap: 10,
             }}>
-                {/* Terminal dot row */}
-                <div style={{ display: 'flex', gap: 5 }}>
-                    {['#FF3B5C', '#FFB300', '#00FF88'].map((c, i) => (
-                        <div key={i} style={{ width: 8, height: 8, borderRadius: '50%', background: c, opacity: 0.8 }} />
-                    ))}
-                </div>
                 <span style={{ fontSize: 11, fontWeight: 800, letterSpacing: '2px', textTransform: 'uppercase', color: '#00E5FF', fontFamily: 'var(--font-ui)' }}>
                     Engine Terminal
                 </span>
