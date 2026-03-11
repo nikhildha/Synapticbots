@@ -85,6 +85,7 @@ export function AthenaPanel({ athena, perBot = {} }: Props) {
 
     return (
         <div style={{
+            height: '100%',
             background: 'rgba(5,10,18,0.90)',
             backdropFilter: 'blur(20px)',
             border: '1px solid rgba(0,229,255,0.12)',
