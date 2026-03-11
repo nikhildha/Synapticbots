@@ -160,17 +160,13 @@ export function RegimeCard({ regime, confidence, symbol, macroRegime, trend15m, 
                     fontSize: '11px', fontWeight: 700, textTransform: 'uppercase' as const,
                     letterSpacing: '2.5px', color: '#4B6080',
                 }}>Market Regime</div>
-                <div style={{
-                    fontSize: '11px', fontWeight: 700, color: '#4B6080',
-                    fontFamily: 'var(--font-mono)',
-                }}>{btcDom}%</div>
             </div>
 
-            {/* ── Gauge + Regime info side by side ── */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '20px', marginBottom: '6px' }}>
+            {/* ── Gauge + Regime info stacked and centered ── */}
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '16px', marginBottom: '6px' }}>
 
                 {/* Gauge */}
-                <div style={{ flexShrink: 0, position: 'relative', width: GAUGE_SIZE, height: GAUGE_SIZE }}>
+                <div style={{ position: 'relative', width: GAUGE_SIZE, height: GAUGE_SIZE }}>
                     <svg width={GAUGE_SIZE} height={GAUGE_SIZE} viewBox={`0 0 ${GAUGE_SIZE} ${GAUGE_SIZE}`}>
                         <defs>
                             <radialGradient id="bezelGrad" cx="50%" cy="45%">
@@ -197,13 +193,13 @@ export function RegimeCard({ regime, confidence, symbol, macroRegime, trend15m, 
                         <circle cx={GAUGE_CX} cy={GAUGE_CY} r={INNER_R + 2} fill="none" stroke="rgba(0,0,0,0.8)" strokeWidth="8" />
                         <circle cx={GAUGE_CX} cy={GAUGE_CY} r={INNER_R} fill="rgba(2,6,14,0.95)" />
                         <circle cx={GAUGE_CX} cy={GAUGE_CY} r={ARC_R}
-                            fill="none" stroke="rgba(0,229,255,0.05)" strokeWidth="5" strokeLinecap="round"
+                            fill="none" stroke="rgba(0,229,255,0.05)" strokeWidth="7.5" strokeLinecap="round"
                             strokeDasharray={`${ARC_SPAN} ${arcCirc - ARC_SPAN}`}
                             strokeDashoffset={arcCirc * (1 - startDeg / 360)}
                             style={{ transform: `rotate(${startDeg}deg)`, transformOrigin: `${GAUGE_CX}px ${GAUGE_CY}px` }}
                         />
                         <circle cx={GAUGE_CX} cy={GAUGE_CY} r={ARC_R}
-                            fill="none" stroke={gaugeColor} strokeWidth="5" strokeLinecap="round"
+                            fill="none" stroke={gaugeColor} strokeWidth="7.5" strokeLinecap="round"
                             strokeDasharray={`${(pct / 100) * ARC_SPAN} ${arcCirc - (pct / 100) * ARC_SPAN}`}
                             strokeDashoffset={arcCirc * (1 - startDeg / 360)}
                             filter="url(#arcGlow)"
@@ -227,8 +223,8 @@ export function RegimeCard({ regime, confidence, symbol, macroRegime, trend15m, 
                     </svg>
                 </div>
 
-                {/* Regime label + BTC info — to the right of gauge */}
-                <div style={{ flex: 1, minWidth: 0 }}>
+                {/* Regime label + BTC info — centered vertically under gauge */}
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
                     <div style={{ marginBottom: '4px' }}>
                         <span style={{
                             fontSize: '20px', fontWeight: 700, letterSpacing: '1.5px',
@@ -306,11 +302,6 @@ export function PnlCard({ trades, coinDcxBalance, binanceBalance, paperPnl = 0, 
                 <div style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase' as const, letterSpacing: '2.5px', color: '#4B6080' }}>
                     Wallet Balance
                 </div>
-                {(binanceBalance != null || coinDcxBalance != null) && (
-                    <div style={{ fontSize: '11px', fontWeight: 700, color: '#6B7280', fontFamily: 'var(--font-mono)' }}>
-                        ${totalBalance.toFixed(2)}
-                    </div>
-                )}
             </div>
 
             {/* Grid: exchange row | partition | pnl row | bots row */}
@@ -590,7 +581,7 @@ export function SignalSummaryTable({ coinStates, multi }: SignalSummaryProps) {
         if (a.includes('ELIGIBLE_SELL')) return `Bearish @ ${pct.toFixed(0)}% — SHORT ready`;
         if (a.includes('ELIGIBLE')) return `${r} @ ${pct.toFixed(0)}% — trade ready`;
         if (a.includes('CRASH_SKIP') || a.includes('MACRO_CRASH')) return 'Crash regime — safety skip';
-        if (a.includes('MTF_CONFLICT')) return '1H vs 4H regime conflict';
+        if (a.includes('MTF_CONFLICT')) return 'Volatile (Multi-TF)';
         if (a.includes('15M_FILTER')) return '15m momentum opposes direction';
         if (a.includes('SENTIMENT_VETO') || a.includes('SENTIMENT_ALERT')) return 'Sentiment filter — vetoed';
         if (a.includes('CHOP_NO_SIGNAL')) return 'Sideways — no mean-rev signal';
@@ -598,7 +589,7 @@ export function SignalSummaryTable({ coinStates, multi }: SignalSummaryProps) {
         if (a.includes('LOW_CONVICTION')) return 'Conviction too low';
         if (a.includes('VOL_TOO_HIGH')) return 'ATR too high — risky';
         if (a.includes('VOL_TOO_LOW')) return 'ATR too low — no opportunity';
-        return 'Awaiting analysis';
+        return 'Analyzing market conditions...';
     };
 
     const toggleCoin = (sym: string) => setSelectedCoins(prev => prev.includes(sym) ? prev.filter(s => s !== sym) : [...prev, sym]);
@@ -698,8 +689,8 @@ export function SignalSummaryTable({ coinStates, multi }: SignalSummaryProps) {
                     <table style={{ width: '100%', minWidth: '900px', borderCollapse: 'collapse', fontSize: '14px' }}>
                         <thead>
                             <tr style={{ borderBottom: '2px solid rgba(255,255,255,0.08)' }}>
-                                {['#', 'Bot', 'Coin', 'Regime', 'Conf %', 'Deploy', 'Reason', 'Cycle #', 'Scan Time'].map(h => (
-                                    <th key={h} style={{ padding: '10px 8px', textAlign: h === '#' || h === 'Coin' || h === 'Bot' || h === 'Reason' ? 'left' : 'center', fontSize: '9px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '1px', color: '#4B5563', position: 'sticky' as const, top: 0, background: 'var(--color-surface, rgba(17,24,39,0.98))' }}>{h}</th>
+                                {['#', 'Coin', 'Regime', 'Conf %', 'Deploy', 'Reason', 'Cycle #', 'Scan Time'].map(h => (
+                                    <th key={h} style={{ padding: '10px 8px', textAlign: h === '#' || h === 'Coin' || h === 'Reason' ? 'left' : 'center', fontSize: '9px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '1px', color: '#4B5563', position: 'sticky' as const, top: 0, background: 'var(--color-surface, rgba(17,24,39,0.98))' }}>{h}</th>
                                 ))}
                             </tr>
                         </thead>
@@ -727,7 +718,6 @@ export function SignalSummaryTable({ coinStates, multi }: SignalSummaryProps) {
                                         onMouseEnter={e => (e.currentTarget.style.background = isE ? 'rgba(0,255,136,0.06)' : 'rgba(0,229,255,0.04)')}
                                         onMouseLeave={e => (e.currentTarget.style.background = isE ? 'rgba(0,255,136,0.03)' : 'transparent')}>
                                         <td style={{ padding: '8px 8px', color: 'rgba(0,229,255,0.3)', fontSize: 10, fontWeight: 600, fontFamily: 'var(--font-mono, monospace)' }}>{idx + 1}</td>
-                                        <td style={{ padding: '8px 8px' }}><span style={{ fontSize: 10, color: '#00E5FF', fontWeight: 700 }}>Synaptic Adaptive</span></td>
                                         <td style={{ padding: '8px 8px' }}><div style={{ fontWeight: 800, color: '#E8EDF5', fontSize: 14, fontFamily: 'var(--font-mono, monospace)', letterSpacing: '-0.3px' }}>{(c.symbol || '').replace('USDT', '')}</div></td>
                                         <td style={{ padding: '8px 8px', textAlign: 'center' }}><span style={{ background: regBg, color: regColor(regime), padding: '3px 10px', borderRadius: 10, fontSize: 10, fontWeight: 700, textShadow: `0 0 6px ${regColor(regime)}66` }}>{regime}</span></td>
                                         <td style={{ padding: '8px 8px', textAlign: 'center', fontWeight: 800, fontSize: 14, fontFamily: 'var(--font-mono, monospace)', color: conf > 80 ? '#00FF88' : conf > 60 ? '#00E5FF' : conf > 40 ? '#FFB300' : '#4B5563', textShadow: conf > 80 ? '0 0 8px rgba(0,255,136,0.4)' : undefined }}>{conf.toFixed(1)}%</td>

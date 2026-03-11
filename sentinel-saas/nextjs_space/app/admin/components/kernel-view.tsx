@@ -208,7 +208,7 @@ export default function KernelView() {
                                     } else if (action.includes('ELIGIBLE')) {
                                         reason = `✓ ${regime} @ ${conf.toFixed(0)}%`;
                                     } else {
-                                        reason = 'Awaiting analysis';
+                                        reason = 'Analyzing market conditions...';
                                     }
 
                                     const regBg = regime.includes('BULL') ? 'rgba(34,197,94,0.15)'

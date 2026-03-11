@@ -785,23 +785,25 @@ def api_set_config():
 
 @app.route("/api/set-bot-id", methods=["POST"])
 def api_set_bot_id():
-    """Add a bot to the active bots list — called by dashboard when user starts a bot.
-    All subsequent trades are stamped with bot_ids from this list (multi-bot support)."""
+    """
+    Set the active Bot ID and Brain Type from the Next.js UI.
+    Supports multi-bot operations (appends to active list).
+    """
     data = request.get_json() or {}
     bot_id = data.get("bot_id", "")
-    user_id = data.get("user_id", "")
+    bot_name = data.get("bot_name", "")
     brain_type = data.get("brain_type", "adaptive")
+    user_id = data.get("user_id", "")
 
     if not bot_id:
         return jsonify({"error": "bot_id is required"}), 400
 
-    # Update legacy single bot_id for backward compat
     old_id = config.ENGINE_BOT_ID
     config.ENGINE_BOT_ID = bot_id
 
-    # Set brain type (adaptive = HMM-only, athena = HMM + Gemini AI)
+    # Set brain type (adaptive = HMM-only, athena = HMM + Gemini AI, quickscalper = Fast Scalps)
     old_brain = config.ENGINE_BRAIN_TYPE
-    config.ENGINE_BRAIN_TYPE = brain_type if brain_type in ("adaptive", "athena") else "adaptive"
+    config.ENGINE_BRAIN_TYPE = brain_type if brain_type in ("adaptive", "athena", "quickscalper") else "adaptive"
 
     # Also update user_id if provided
     if user_id:
@@ -813,19 +815,21 @@ def api_set_bot_id():
     ]
     config.ENGINE_ACTIVE_BOTS.append({
         "bot_id": bot_id,
+        "bot_name": bot_name,
         "user_id": user_id or config.ENGINE_USER_ID,
         "brain_type": config.ENGINE_BRAIN_TYPE,
     })
 
     logger.info(
-        "🔑 Bot added: %s → active_bots=%d (user: %s, brain: %s → %s)",
-        bot_id, len(config.ENGINE_ACTIVE_BOTS), user_id or "<unchanged>",
+        "🔑 Bot added: %s (%s) → active_bots=%d (user: %s, brain: %s → %s)",
+        bot_id, bot_name, len(config.ENGINE_ACTIVE_BOTS), user_id or "<unchanged>",
         old_brain, config.ENGINE_BRAIN_TYPE,
     )
 
     return jsonify({
         "success": True,
         "bot_id": bot_id,
+        "bot_name": bot_name,
         "previous_bot_id": old_id,
         "user_id": user_id or config.ENGINE_USER_ID,
         "brain_type": config.ENGINE_BRAIN_TYPE,

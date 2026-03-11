@@ -196,12 +196,13 @@ export async function POST(request: Request) {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             bot_id: botId,
+            bot_name: bot.name,
             user_id: session.user.id,
             brain_type: (bot.config as any)?.brainType || 'adaptive',
           }),
           signal: AbortSignal.timeout(5000),
         });
-        console.log(`[toggle] set-bot-id: pushed botId=${botId} brain=${(bot.config as any)?.brainType || 'adaptive'} to engine`);
+        console.log(`[toggle] set-bot-id: pushed botId=${botId} name=${bot.name} brain=${(bot.config as any)?.brainType || 'adaptive'} to engine`);
       } catch (e) {
         console.warn('[toggle] set-bot-id failed (continuing):', e);
       }

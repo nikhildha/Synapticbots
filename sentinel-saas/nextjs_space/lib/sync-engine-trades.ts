@@ -69,7 +69,13 @@ export async function syncEngineTrades(
 
             // ENGINE BROADCAST: The engine is a signal broadcaster — ALL user bots
             // receive ALL engine trades. User-level isolation is maintained by
-            // getUserTrades(userId) at query time. Bot_id is NOT used for scoping.
+            // getUserTrades(userId) at query time. Bot_id IS NOW used for scoping
+            // to separate Adaptive, Athena, and Scalper trades properly.
+            if (t.bot_id && t.bot_id !== botId) {
+                // This trade belongs to a different bot instance (e.g. Scalper vs Athena)
+                continue;
+            }
+
             const resolvedBotId = botId;
 
             // ── SL/TP Sanity Check (fixes engine-side cross-contamination bug) ──

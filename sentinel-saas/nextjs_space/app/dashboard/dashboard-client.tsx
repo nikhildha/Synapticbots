@@ -594,7 +594,7 @@ export function DashboardClient({ user, stats, bots, recentTrades }: DashboardCl
             )}
           </motion.div>
 
-          {/* ═══ Row 4: Athena Intelligence ═══ */}
+          {/* ═══ Row 4: Athena Intelligence & Engine Terminal ═══ */}
           {(botState?.athena?.enabled || bots?.some((b: any) => (b.name || '').toLowerCase().includes('athena'))) && (
             <motion.div
               initial={{ opacity: 0, y: 20 }}
@@ -602,8 +602,8 @@ export function DashboardClient({ user, stats, bots, recentTrades }: DashboardCl
               transition={{ delay: 0.27 }}
               className="mt-6 mb-8"
             >
-              <div className="grid grid-cols-1 gap-6">
-                <div className="lg:col-span-1 border border-white/5 rounded-xl bg-gray-900/60 p-5">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <div className="border border-white/5 rounded-xl bg-gray-900/60 p-5 flex flex-col h-full min-h-[400px]">
                   <AthenaPanel
                     athena={botState?.athena || { enabled: true, recent_decisions: [], model: 'gemini-2.5-flash' }}
                     coinStates={multi?.coin_states}
@@ -611,12 +611,14 @@ export function DashboardClient({ user, stats, bots, recentTrades }: DashboardCl
                   />
                 </div>
                 {/* Engine Activity Feed */}
-                <TerminalFeed
-                  coinStates={multi?.coin_states}
-                  cycle={multi?.cycle}
-                  activeTrades={botState?.tradebook?.trades || []}
-                  athenaEnabled={botState?.athena?.enabled}
-                />
+                <div className="border border-white/5 rounded-xl flex flex-col h-full min-h-[400px]">
+                  <TerminalFeed
+                    coinStates={multi?.coin_states}
+                    cycle={multi?.cycle}
+                    activeTrades={botState?.tradebook?.trades || []}
+                    athenaEnabled={botState?.athena?.enabled}
+                  />
+                </div>
               </div>
             </motion.div>
           )}

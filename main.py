@@ -485,158 +485,170 @@ class RegimeMasterBot:
                 logger.debug("Error analyzing %s: %s", symbol, e)
                 continue
 
-        # ── 5. Deploy across all active profiles ─────────────────
+        # ── 5. Deploy across all active profiles/bots ─────────────────
         # Sort raw results by conviction (highest first)
         raw_results.sort(key=lambda x: x.get("conviction", 0), reverse=True)
-        logger.info("📋 Deployment pipeline: %d eligible coins after analysis: %s",
-                    len(raw_results), [r['symbol'] for r in raw_results])
+        # Note: If no bots exist in config.ENGINE_ACTIVE_BOTS, fall back to self._active_profiles
+        eval_targets = _tick_active_bots if _tick_active_bots else [
+            {"bot_id": config.ENGINE_BOT_ID, "bot_name": p["label"], "user_id": config.ENGINE_USER_ID, "brain_type": "adaptive"} 
+            for pid, p in self._active_profiles.items()
+        ]
+        
+        logger.info("🔄 Deploying across %d active bots/profiles | tradebook_active_keys: %s",
+                    len(eval_targets), len(tradebook_active_keys))
 
-        # ── 4b. QuickScalper — Gemini-powered execution specialist ────────
-        # Calls Gemini with L2 order book, VWAP, RSI, spread for EXECUTE/IGNORE.
-        # HMM state is passed as CONTEXT only — Gemini makes the full decision.
-        # Uses separate position cap (SCALPER_MAX_POSITIONS).
-        if config.SCALPER_ENABLED:
-            try:
-                from data_pipeline import _get_binance_client
-                scalper_client = _get_binance_client()
-                active_scalps = [t for t in tradebook.get_active_trades()
-                                 if t.get("bot_name", "").startswith("QuickScalper")]
-                scalp_slots = max(0, config.SCALPER_MAX_POSITIONS - len(active_scalps))
+        for target in eval_targets:
+            bot_id = target.get("bot_id", config.ENGINE_BOT_ID)
+            bot_name = target.get("bot_name", "Adaptive Bot")
+            user_id = target.get("user_id", config.ENGINE_USER_ID)
+            brain_type = target.get("brain_type", "adaptive")
+            
+            # Skip scalper in this traditional loop (already handled above)
+            if brain_type == "quickscalper":
+                continue
+                
+            # Match the Next.js profile string to the engine's internal configuration
+            profile_name = bot_name.lower()
+            if "conservative" in profile_name:
+                active_profile = config.BRAIN_PROFILES["conservative"]
+                profile_id = "conservative"
+            elif "aggressive" in profile_name:
+                active_profile = config.BRAIN_PROFILES["aggressive"]
+                profile_id = "aggressive"
+            else:
+                active_profile = config.BRAIN_PROFILES["balanced"]
+                profile_id = "balanced"
+                
+            bot_deployed = 0
 
-                if scalp_slots > 0 and scalper_client:
-                    # HMM brain name as context label for Gemini (not decision input)
-                    current_hmm_state = getattr(self._brain_switcher, "active_brain", "UNKNOWN")
-
-                    for sym in symbols[:config.SCALPER_MAX_POSITIONS + 2]:
-                        if scalp_slots <= 0:
-                            break
-                        if any(t["symbol"] == sym for t in active_scalps):
-                            continue
-                        try:
-                            brain = QuickScalperBrain(
-                                exchange_client=scalper_client,
-                                symbol=sym,
-                                leverage=config.SCALPER_LEVERAGE,
-                                athena_engine=self._athena,   # Gemini decision engine
-                                hmm_state=current_hmm_state,  # Context-only (not decision)
-                            )
-                            result = brain.analyze()
-                            sig  = result.get("signal", "VETO")
-                            conf = result.get("confidence", 0.0)
-                            meta = result.get("meta", {})
-
-                            if sig in ("BUY", "SELL") and conf >= 0.55:
-                                side  = "BUY" if sig == "BUY" else "SELL"
-                                price = meta.get("close", 0)
-                                if price <= 0:
-                                    continue
-
-                                # Use Gemini's computed sl/tp prices directly
-                                sl = meta.get("sl_price")
-                                tp = meta.get("tp_price")
-
-                                # Fallback if Gemini didn't provide valid prices
-                                if not sl or float(sl) <= 0:
-                                    sl_pct = 0.004  # 0.4% max stop (from system prompt)
-                                    sl = price * (1 - sl_pct) if side == "BUY" else price * (1 + sl_pct)
-                                if not tp or float(tp) <= 0:
-                                    tp_pct = 0.007  # 0.7% target (mid 0.6-1.0% range)
-                                    tp = price * (1 + tp_pct) if side == "BUY" else price * (1 - tp_pct)
-
-                                qty     = (config.SCALPER_CAPITAL * config.SCALPER_LEVERAGE) / price
-                                atr_est = price * meta.get("atr_pct", 0.002)
-                                user_id = _tick_active_bots[0]["user_id"] if _tick_active_bots else config.ENGINE_USER_ID
-                                entry_type = meta.get("entry_type", "MARKET")
-
-                                tradebook.open_trade(
-                                    symbol=sym, side=side, leverage=config.SCALPER_LEVERAGE,
-                                    quantity=round(qty, 6), entry_price=price,
-                                    stop_loss=round(float(sl), 6), take_profit=round(float(tp), 6),
-                                    atr=atr_est,
-                                    regime="SCALP",
-                                    confidence=conf,
-                                    reason=result.get("reason", "QuickScalper/Gemini"),
-                                    capital=config.SCALPER_CAPITAL,
-                                    mode="PAPER" if config.PAPER_TRADE else "LIVE",
-                                    user_id=user_id,
-                                    bot_name=f"QuickScalper {config.SCALPER_LEVERAGE}x",
-                                )
-                                logger.info(
-                                    "⚡ QuickScalper ENTRY [Gemini]: %s %s @ %.6f "
-                                    "conf=%.0f%% entry=%s SL=%.6f TP=%.6f",
-                                    sym, side, price, conf * 100, entry_type, float(sl), float(tp)
-                                )
-                                scalp_slots -= 1
-                        except Exception as e:
-                            logger.debug("QuickScalper error for %s: %s", sym, e)
-            except Exception as e:
-                logger.warning("⚡ QuickScalper scan failed: %s", e)
-
-
-        # ── Loss streak cooldown: pause 30 min after 5 consecutive losses ──
-        LOSS_STREAK_LIMIT = 5
-        COOLDOWN_MINUTES = 30
-        streak, last_loss_ts = tradebook.get_current_loss_streak()
-        if streak >= LOSS_STREAK_LIMIT and last_loss_ts:
-            from datetime import datetime as _dt
-            try:
-                last_loss_time = _dt.fromisoformat(last_loss_ts.replace("Z", "+00:00"))
-                elapsed = (datetime.now(IST).replace(tzinfo=None) - last_loss_time.replace(tzinfo=None)).total_seconds() / 60
-                if elapsed < COOLDOWN_MINUTES:
-                    remaining = COOLDOWN_MINUTES - elapsed
-                    logger.warning(
-                        "⏸️  COOLDOWN: %d consecutive losses — pausing new deployments for %.0f more min",
-                        streak, remaining,
-                    )
-                    return
-                else:
-                    logger.info("✅ Cooldown expired (%.0f min elapsed). Resuming deployments.", elapsed)
-            except Exception:
-                pass  # If timestamp parse fails, don't block
-
-        deployed = 0
-        deployed_trades = []  # Collect for batch Telegram alert
-        eligible_trades = []  # For backward compat with _save_multi_state
-
-        logger.info("🔄 Deploying across %d profiles: %s | tradebook_active_keys: %s",
-                    len(self._active_profiles),
-                    list(self._active_profiles.keys()),
-                    tradebook_active_keys)
-
-        for profile_id, profile in self._active_profiles.items():
-            profile_deployed = 0
             for raw in raw_results:
                 sym = raw["symbol"]
-                pos_key = f"{profile_id}:{sym}"
+                # Scope position checks to THIS specific bot instance
+                pos_key = f"{bot_id}:{sym}"
 
-                # Skip if already have active trade for this profile:symbol
+                # Skip if already have active trade for this bot:symbol
                 if pos_key in tradebook_active_keys:
-                    self._coin_states.setdefault(sym, {})["deploy_status"] = "ACTIVE"
+                    self._coin_states.setdefault(sym, {})["deploy_status"] = "FILTERED: active trade exists"
                     continue
 
-                # Evaluate raw analysis through this profile's lens
-                trade = self._evaluate_for_profile(raw, profile_id, profile, balance)
+                # Evaluate raw analysis through this bot's specific profile lens
+                trade = self._evaluate_for_profile(raw, profile_id, active_profile, balance)
                 if not trade:
-                    logger.warning("   ⛔ [%s] %s: FILTERED by profile evaluation", profile_id, sym)
+                    logger.warning("   ⛔ [%s] %s: FILTERED by profile evaluation", bot_name, sym)
                     continue
 
-                self._coin_states.setdefault(sym, {})["deploy_status"] = "DEPLOYING"
-                eligible_trades.append(trade)
+                if self.risk.check_kill_switch(balance, self._peak_balance):
+                    return
+
+                logger.info("   ✅ [%s] %s: PASSED evaluation — preparing to deploy", bot_name, sym)
+
+                # Cap total concurrent positions for this specific bot
+                current_total = sum(1 for k in self._active_positions if k.startswith(f"{bot_id}:"))
+                max_pos = active_profile.get("max_positions", config.MAX_CONCURRENT_POSITIONS)
+                
+                if current_total >= max_pos:
+                    logger.warning("   ⛔ %s max positions reached (%d/%d) — skipping %s %s %d×",
+                        bot_name, current_total, max_pos, trade["side"], sym, trade["leverage"])
+                    self._coin_states.setdefault(sym, {})["deploy_status"] = f"FILTERED: overall max pos ({current_total}/{max_pos})"
+                    continue
                 logger.info("   ✅ [%s] %s: PASSED evaluation — preparing to deploy", profile_id, sym)
 
-                # Re-check hard limit from tradebook
-                current_total = len(tradebook.get_active_trades())
-                if current_total >= config.MAX_CONCURRENT_POSITIONS * len(self._active_profiles):
-                    logger.warning(
-                        "🛑 Global hard limit reached: %d active trades. Halting deployment.",
-                        current_total,
-                    )
-                    break
+                # Track eligible trades before max position cap
+                eligible_trades.append(trade)
+
+                # ── Athena LLM Reasoning Gate (Per-Bot) ──
+                # Only activate Athena if this specific bot requests the "athena" brain.
+                athena_action = None
+                athena_decision = None
+                _use_athena = self._athena and config.LLM_REASONING_ENABLED and (brain_type == "athena")
+
+                if _use_athena:
+                    try:
+                        llm_ctx = {
+                            "symbol": sym, "side": trade["side"], "leverage": trade["leverage"],
+                            "confidence": trade["confidence"], "regime": trade["regime"],
+                            "price": self._coin_states.get(sym, {}).get("price", 0),
+                            "atr": trade["atr"],
+                            "atr_pct": (trade["atr"] / self._coin_states.get(sym, {}).get("price", 1)) * 100,
+                            "trend": self._coin_states.get(sym, {}).get("context", {}).get("trend_alignment", "UNKNOWN")
+                        }
+                        athena_decision = self._athena.validate_signal(llm_ctx)
+                        athena_action = athena_decision.action
+
+                        if athena_decision.action == "VETO":
+                            logger.warning(
+                                "   ⛔ [%s] 🏛️ ATHENA VETO: %s (conf: %.0f%%) — %s",
+                                bot_name, sym, athena_decision.adjusted_confidence * 100, athena_decision.reasoning[:80]
+                            )
+                            self._coin_states.setdefault(sym, {})["deploy_status"] = "FILTERED: Athena Veto"
+                            self._coin_states[sym]["athena_state"] = {
+                                "action": f"ATHENA_VETO:{athena_decision.reasoning[:60]}",
+                                "confidence": athena_decision.adjusted_confidence,
+                                "reasoning": athena_decision.reasoning,
+                            }
+                            continue
+                            
+                        # Compare HMM side (BUY/SELL) with Athena's direction (LONG/SHORT)
+                        athena_dir = getattr(athena_decision, "athena_direction", "").upper()
+                        hmm_as_dir = "LONG" if trade["side"] == "BUY" else "SHORT"
+                        
+                        if athena_dir in ("LONG", "SHORT") and athena_dir != hmm_as_dir:
+                            # Athena disagrees with HMM on direction
+                            if athena_decision.adjusted_confidence >= 0.8:
+                                # Strong Athena conviction (≥8/10) → OVERRIDE HMM direction
+                                old_side = trade["side"]
+                                side = "BUY" if athena_dir == "LONG" else "SELL"
+                                logger.info(
+                                    "   ⚠️ [%s] 🏛️ ATHENA DIRECTION OVERRIDE: HMM=%s → Athena=%s (Conf: %.0f%% | %s)",
+                                    bot_name, old_side, side,
+                                    athena_decision.adjusted_confidence * 100,
+                                    athena_decision.reasoning[:80],
+                                )
+                                trade["side"] = side
+                                trade["reason"] = f"Athena Override: {trade['reason']}"
+                            else:
+                                # Weak Athena conviction → VETO due to conflict (too risky to guess)
+                                logger.warning(
+                                    "   ⛔ [%s] 🏛️ ATHENA CONFLICT VETO: HMM=%s vs Athena=%s (Conf: %.0f%% too weak to override)",
+                                    bot_name, old_side, athena_dir,
+                                    athena_decision.adjusted_confidence * 100,
+                                )
+                                self._coin_states.setdefault(sym, {})["deploy_status"] = "FILTERED: Athena Conflict"
+                                self._coin_states[sym]["athena_state"] = {
+                                    "action": f"ATHENA_CONFLICT:{old_side}vs{athena_dir}",
+                                    "confidence": athena_decision.adjusted_confidence,
+                                    "reasoning": athena_decision.reasoning,
+                                }
+                                continue
+
+                        if athena_decision.action == "REDUCE_SIZE":
+                            old_conv = trade["conviction"]
+                            trade["conviction"] *= athena_decision.adjusted_confidence
+                            logger.info(
+                                "   📉 [%s] 🏛️ ATHENA REDUCE_SIZE: conviction %.1f → %.1f (×%.2f)",
+                                bot_name, old_conv, trade["conviction"], athena_decision.adjusted_confidence,
+                            )
+                    except Exception as e:
+                        logger.debug("Athena error for %s (fail-open): %s", sym, e)
+                        
+                # Update UI state with intention
+                self._coin_states.setdefault(sym, {})["deploy_status"] = "DEPLOY_QUEUED"
+                if _use_athena and athena_decision:
+                    self._coin_states[sym]["athena_state"] = {
+                        "action": athena_decision.action,
+                        "confidence": athena_decision.adjusted_confidence,
+                        "reasoning": athena_decision.reasoning,
+                        "risk_flags": getattr(athena_decision, "risk_flags", []),
+                        "model": getattr(athena_decision, "model", "unknown_model"),
+                        "latency_ms": getattr(athena_decision, "latency_ms", 0),
+                    }
+                elif "athena_state" in self._coin_states.setdefault(sym, {}):
+                    del self._coin_states[sym]["athena_state"]
 
                 # Execute the trade
                 logger.info(
                     "🔥 DEPLOYING [%s]: %s %s @ %dx | Regime: %s (%.0f%%) | Qty: %.6f",
-                    profile["label"], trade["side"], sym, trade["leverage"],
+                    bot_name, trade["side"], sym, trade["leverage"],
                     trade["regime_name"], trade["confidence"] * 100, trade["quantity"],
                 )
                 result = self.executor.execute_trade(
@@ -655,7 +667,7 @@ class RegimeMasterBot:
                 if result is None and not config.PAPER_TRADE:
                     logger.warning(
                         "⚠️ DEPLOYMENT_FAILED [%s]: %s %s — order rejected/failed, NOT recording",
-                        profile["label"], trade["side"], sym,
+                        bot_name, trade["side"], sym,
                     )
                     continue
 
@@ -670,10 +682,11 @@ class RegimeMasterBot:
                 if entry_price <= 0 and not config.PAPER_TRADE:
                     logger.warning(
                         "⚠️ DEPLOYMENT_FAILED [%s]: %s %s — zero entry price, NOT recording",
-                        profile["label"], trade["side"], sym,
+                        bot_name, trade["side"], sym,
                     )
                     continue
 
+                # STRICTLY RECORD ONLY TO THIS BOT_ID
                 tradebook.open_trade(
                     symbol=sym,
                     side=trade["side"],
@@ -685,15 +698,14 @@ class RegimeMasterBot:
                     confidence=trade["confidence"],
                     reason=trade["reason"],
                     capital=fill_capital,
-                    user_id=getattr(config, 'ENGINE_USER_ID', None),
+                    user_id=user_id,
                     profile_id=profile_id,
-                    bot_name=config.ENGINE_BOT_NAME or profile["label"],
+                    bot_name=bot_name,
                     exchange=result.get("exchange") if result else None,
                     pair=result.get("pair") if result else None,
                     position_id=result.get("position_id") if result else None,
-                    bot_id=_tick_bot_id,
-                    # Multi-bot: also record all active bot IDs so SaaS can sync to all bots
-                    all_bot_ids=[b["bot_id"] for b in _tick_active_bots] if len(_tick_active_bots) > 1 else None,
+                    bot_id=bot_id,
+                    all_bot_ids=None, # DO NOT CLONE TRADES
                 )
 
                 self._active_positions[pos_key] = {
