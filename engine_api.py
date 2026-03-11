@@ -14,6 +14,7 @@ import json
 import os
 import sys
 import time
+import signal
 import logging
 import threading
 from datetime import datetime, timezone, timedelta
@@ -901,12 +902,10 @@ def _run_engine():
                 return  # Graceful shutdown requested — don't restart
             except KeyboardInterrupt:
                 # SIGTERM from Railway during redeploy — NOT a crash
-                logger.warning("⚡ Engine received SIGTERM/KeyboardInterrupt — will restart")
+                # IMPORTANT: do NOT reset retry counter — this allows clean shutdown
+                logger.warning("⚡ Engine received SIGTERM/KeyboardInterrupt — shutting down gracefully")
                 _save_crash("SIGTERM/KeyboardInterrupt", crash_type="signal")
-                # Reset retry counter — signals are not bugs
-                retry = 0
-                time.sleep(5)  # Brief pause before restart
-                continue
+                return  # Exit cleanly — Flask process will also be stopped
             except Exception as e:
                 _engine_crash_count += 1
                 _engine_last_crash = datetime.now(timezone.utc).isoformat()
@@ -950,6 +949,25 @@ def _run_engine():
         logger.info("🔄 Attempting infinite recovery restart...")
 
 
+def _setup_sigterm_handler():
+    """Install SIGTERM handler so Railway container stops cleanly, not like a crash."""
+    def _handle_sigterm(signum, frame):
+        logger.warning("🛑 SIGTERM received — initiating graceful shutdown")
+        if _engine_bot:
+            try:
+                _engine_bot._running = False
+            except Exception:
+                pass
+        # Give the engine thread 15s to wind down
+        if _engine_thread and _engine_thread.is_alive():
+            _engine_thread.join(timeout=15)
+        logger.info("👋 Engine shut down cleanly after SIGTERM")
+        sys.exit(0)
+
+    signal.signal(signal.SIGTERM, _handle_sigterm)
+    logger.info("🛡️ SIGTERM handler installed")
+
+
 def start_engine():
     """Start the engine in a background thread."""
     global _engine_thread, _engine_start_time, _engine_crash_count
@@ -958,7 +976,7 @@ def start_engine():
         return
     _engine_crash_count = 0
     logger.info("🚀 Starting engine thread...")
-    _engine_thread = threading.Thread(target=_run_engine, daemon=True, name="EngineThread")
+    _engine_thread = threading.Thread(target=_run_engine, daemon=False, name="EngineThread")
     _engine_thread.start()
     _engine_start_time = time.time()
 
@@ -1031,6 +1049,10 @@ if __name__ == "__main__":
         datefmt="%Y-%m-%d %H:%M:%S",
     )
 
+    # Install SIGTERM handler BEFORE starting anything else
+    # This ensures Railway container stops cleanly (not as a crash)
+    _setup_sigterm_handler()
+
     # Start the trading engine in background
     start_engine()
 
@@ -1043,3 +1065,4 @@ if __name__ == "__main__":
     port = int(os.environ.get("PORT", 3001))
     logger.info("🌐 Engine API listening on port %d", port)
     app.run(host="0.0.0.0", port=port, debug=False, use_reloader=False)
+
