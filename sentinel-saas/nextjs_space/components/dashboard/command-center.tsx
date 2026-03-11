@@ -166,23 +166,22 @@ export function RegimeCard({ regime, confidence, symbol, macroRegime, trend15m, 
                 }}>{btcDom}%</div>
             </div>
 
-            {/* ── Premium 3D Bezel Gauge ── */}
-            <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '14px' }}>
-                <div style={{ position: 'relative', width: GAUGE_SIZE, height: GAUGE_SIZE }}>
+            {/* ── Gauge + Regime info side by side ── */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '6px' }}>
+
+                {/* Gauge */}
+                <div style={{ flexShrink: 0, position: 'relative', width: GAUGE_SIZE, height: GAUGE_SIZE }}>
                     <svg width={GAUGE_SIZE} height={GAUGE_SIZE} viewBox={`0 0 ${GAUGE_SIZE} ${GAUGE_SIZE}`}>
                         <defs>
-                            {/* Deep bezel gradient — dark center gives depth */}
                             <radialGradient id="bezelGrad" cx="50%" cy="45%">
                                 <stop offset="0%" stopColor="#0A1428" stopOpacity="1" />
                                 <stop offset="60%" stopColor="#050A14" stopOpacity="1" />
                                 <stop offset="100%" stopColor="#020608" stopOpacity="1" />
                             </radialGradient>
-                            {/* Outer rim gradient for 3D sheen */}
                             <radialGradient id="rimGrad" cx="30%" cy="25%">
                                 <stop offset="0%" stopColor="rgba(0,229,255,0.25)" />
                                 <stop offset="100%" stopColor="rgba(0,80,120,0.04)" />
                             </radialGradient>
-                            {/* Arc glow filter */}
                             <filter id="arcGlow" x="-30%" y="-30%" width="160%" height="160%">
                                 <feGaussianBlur in="SourceGraphic" stdDeviation="3" result="blur" />
                                 <feMerge>
@@ -192,44 +191,19 @@ export function RegimeCard({ regime, confidence, symbol, macroRegime, trend15m, 
                                 </feMerge>
                             </filter>
                         </defs>
-
-                        {/* Outer ambient glow ring */}
-                        <circle cx={GAUGE_CX} cy={GAUGE_CY} r={OUTER_R + 6}
-                            fill="none" stroke={info.color} strokeWidth="16"
-                            strokeOpacity="0.04" />
-
-                        {/* Outer bezel ring — dark glassy */}
-                        <circle cx={GAUGE_CX} cy={GAUGE_CY} r={OUTER_R + 2}
-                            fill="url(#rimGrad)" stroke="rgba(0,229,255,0.08)" strokeWidth="1" />
-
-                        {/* Main bezel body */}
-                        <circle cx={GAUGE_CX} cy={GAUGE_CY} r={OUTER_R}
-                            fill="url(#bezelGrad)"
-                            stroke="rgba(0,229,255,0.06)" strokeWidth="0.5" />
-
-                        {/* Inner dark well — creates the concave depth illusion */}
-                        <circle cx={GAUGE_CX} cy={GAUGE_CY} r={INNER_R + 2}
-                            fill="none" stroke="rgba(0,0,0,0.8)" strokeWidth="8" />
-                        <circle cx={GAUGE_CX} cy={GAUGE_CY} r={INNER_R}
-                            fill="rgba(2,6,14,0.95)" />
-
-                        {/* Track arc — faint background sweep */}
+                        <circle cx={GAUGE_CX} cy={GAUGE_CY} r={OUTER_R + 6} fill="none" stroke={info.color} strokeWidth="16" strokeOpacity="0.04" />
+                        <circle cx={GAUGE_CX} cy={GAUGE_CY} r={OUTER_R + 2} fill="url(#rimGrad)" stroke="rgba(0,229,255,0.08)" strokeWidth="1" />
+                        <circle cx={GAUGE_CX} cy={GAUGE_CY} r={OUTER_R} fill="url(#bezelGrad)" stroke="rgba(0,229,255,0.06)" strokeWidth="0.5" />
+                        <circle cx={GAUGE_CX} cy={GAUGE_CY} r={INNER_R + 2} fill="none" stroke="rgba(0,0,0,0.8)" strokeWidth="8" />
+                        <circle cx={GAUGE_CX} cy={GAUGE_CY} r={INNER_R} fill="rgba(2,6,14,0.95)" />
                         <circle cx={GAUGE_CX} cy={GAUGE_CY} r={ARC_R}
-                            fill="none"
-                            stroke="rgba(0,229,255,0.05)"
-                            strokeWidth="5"
-                            strokeLinecap="round"
+                            fill="none" stroke="rgba(0,229,255,0.05)" strokeWidth="5" strokeLinecap="round"
                             strokeDasharray={`${ARC_SPAN} ${arcCirc - ARC_SPAN}`}
                             strokeDashoffset={arcCirc * (1 - startDeg / 360)}
                             style={{ transform: `rotate(${startDeg}deg)`, transformOrigin: `${GAUGE_CX}px ${GAUGE_CY}px` }}
                         />
-
-                        {/* Active arc — glowing colored fill */}
                         <circle cx={GAUGE_CX} cy={GAUGE_CY} r={ARC_R}
-                            fill="none"
-                            stroke={gaugeColor}
-                            strokeWidth="5"
-                            strokeLinecap="round"
+                            fill="none" stroke={gaugeColor} strokeWidth="5" strokeLinecap="round"
                             strokeDasharray={`${(pct / 100) * ARC_SPAN} ${arcCirc - (pct / 100) * ARC_SPAN}`}
                             strokeDashoffset={arcCirc * (1 - startDeg / 360)}
                             filter="url(#arcGlow)"
@@ -239,59 +213,52 @@ export function RegimeCard({ regime, confidence, symbol, macroRegime, trend15m, 
                                 transition: 'stroke-dasharray 1.5s cubic-bezier(0.4,0,0.2,1)',
                             }}
                         />
-
-
-                        {/* Center text — ~15% CONFID */}
-                        <text x={GAUGE_CX} y={GAUGE_CY - 8} textAnchor="middle"
-                            fontSize="20" fontWeight="800" fill={gaugeColor}
+                        <text x={GAUGE_CX} y={GAUGE_CY - 4} textAnchor="middle"
+                            fontSize="18" fontWeight="800" fill={gaugeColor}
                             fontFamily="monospace"
                             style={{ filter: `drop-shadow(0 0 6px ${gaugeColor}88)` }}>
                             ~{pct}%
                         </text>
-                        <text x={GAUGE_CX} y={GAUGE_CY + 8} textAnchor="middle"
-                            fontSize="9" fontWeight="700" fill="rgba(100,160,200,0.6)"
+                        <text x={GAUGE_CX} y={GAUGE_CY + 10} textAnchor="middle"
+                            fontSize="8" fontWeight="700" fill="rgba(100,160,200,0.6)"
                             fontFamily="sans-serif" letterSpacing="2">
                             CONFID
                         </text>
                     </svg>
                 </div>
-            </div>
 
-            {/* Regime label + BTC price */}
-            <div style={{ textAlign: 'center' }}>
-                {/* "REGIME: HIGH VOLATILITY" */}
-                <div style={{ marginBottom: '6px' }}>
-                    <span style={{
-                        fontSize: '11px', fontWeight: 700, letterSpacing: '1.5px',
-                        color: '#4B6080', textTransform: 'uppercase' as const,
-                    }}>Regime: </span>
-                    <span style={{
-                        fontSize: '11px', fontWeight: 800, letterSpacing: '1.5px',
-                        color: info.color, textTransform: 'uppercase' as const,
-                        textShadow: `0 0 8px ${info.color}88`,
-                    }}>{displayRegime}</span>
-                </div>
-
-                {/* BTC price — large dominant */}
-                <div style={{
-                    fontSize: '26px', fontWeight: 900,
-                    fontFamily: 'var(--font-mono, monospace)',
-                    color: '#E8EDF5', letterSpacing: '-1.5px', lineHeight: 1,
-                    textShadow: '0 0 20px rgba(0,229,255,0.15)',
-                }}>
-                    {btcPrice ? `$${btcPrice.toLocaleString('en-US', { maximumFractionDigits: 0 })}` : '—'}
-                </div>
-
-                {btcPrice && (
-                    <div style={{
-                        fontSize: 12, fontWeight: 700, marginTop: 5,
-                        fontFamily: 'var(--font-mono, monospace)',
-                        color: btcChange >= 0 ? '#00FF88' : '#FF3B5C',
-                        textShadow: btcChange >= 0 ? '0 0 8px rgba(0,255,136,0.5)' : '0 0 8px rgba(255,59,92,0.5)',
-                    }}>
-                        {btcChange >= 0 ? '▲' : '▼'} {Math.abs(btcChange).toFixed(2)}%
+                {/* Regime label + BTC info — to the right of gauge */}
+                <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ marginBottom: '4px' }}>
+                        <span style={{
+                            fontSize: '10px', fontWeight: 700, letterSpacing: '1.5px',
+                            color: '#4B6080', textTransform: 'uppercase' as const,
+                        }}>Regime: </span>
+                        <span style={{
+                            fontSize: '10px', fontWeight: 800, letterSpacing: '1.5px',
+                            color: info.color, textTransform: 'uppercase' as const,
+                            textShadow: `0 0 8px ${info.color}88`,
+                        }}>{displayRegime}</span>
                     </div>
-                )}
+                    <div style={{
+                        fontSize: '24px', fontWeight: 900,
+                        fontFamily: 'var(--font-mono, monospace)',
+                        color: '#E8EDF5', letterSpacing: '-1.5px', lineHeight: 1,
+                        textShadow: '0 0 20px rgba(0,229,255,0.15)',
+                    }}>
+                        {btcPrice ? `$${btcPrice.toLocaleString('en-US', { maximumFractionDigits: 0 })}` : '—'}
+                    </div>
+                    {btcPrice && (
+                        <div style={{
+                            fontSize: 12, fontWeight: 700, marginTop: 4,
+                            fontFamily: 'var(--font-mono, monospace)',
+                            color: btcChange >= 0 ? '#00FF88' : '#FF3B5C',
+                            textShadow: btcChange >= 0 ? '0 0 8px rgba(0,255,136,0.5)' : '0 0 8px rgba(255,59,92,0.5)',
+                        }}>
+                            {btcChange >= 0 ? '▲' : '▼'} {Math.abs(btcChange).toFixed(2)}%
+                        </div>
+                    )}
+                </div>
             </div>
 
 
