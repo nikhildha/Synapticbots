@@ -160,10 +160,41 @@ export function RegimeCard({ regime, confidence, symbol, macroRegime, trend15m, 
                     fontSize: '11px', fontWeight: 700, textTransform: 'uppercase' as const,
                     letterSpacing: '2.5px', color: '#4B6080',
                 }}>Market Regime</div>
+
+                {/* ── Top Right Text: Regime, Price, Delta ── */}
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '2px' }}>
+                    <div style={{
+                        fontSize: '10px', fontWeight: 800, letterSpacing: '1px',
+                        color: info.color, textTransform: 'uppercase' as const,
+                        textShadow: `0 0 8px ${info.color}88`,
+                    }}>
+                        Regime: {displayRegime}
+                    </div>
+                    {btcPrice && (
+                        <div style={{ display: 'flex', alignItems: 'baseline', gap: '6px' }}>
+                            <div style={{
+                                fontSize: '13px', fontWeight: 900,
+                                fontFamily: 'var(--font-mono, monospace)',
+                                color: '#E8EDF5', letterSpacing: '-0.5px',
+                                textShadow: '0 0 10px rgba(0,229,255,0.15)',
+                            }}>
+                                ${btcPrice.toLocaleString('en-US', { maximumFractionDigits: 0 })}
+                            </div>
+                            <div style={{
+                                fontSize: '10px', fontWeight: 700,
+                                fontFamily: 'var(--font-mono, monospace)',
+                                color: btcChange >= 0 ? '#00FF88' : '#FF3B5C',
+                                textShadow: btcChange >= 0 ? '0 0 8px rgba(0,255,136,0.5)' : '0 0 8px rgba(255,59,92,0.5)',
+                            }}>
+                                {btcChange >= 0 ? '▲' : '▼'}{Math.abs(btcChange).toFixed(2)}%
+                            </div>
+                        </div>
+                    )}
+                </div>
             </div>
 
-            {/* ── Gauge + Regime info stacked and centered ── */}
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '16px', marginBottom: '6px' }}>
+            {/* ── Gauge (Centered alone) ── */}
+            <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '6px' }}>
 
                 {/* Gauge */}
                 <div style={{ position: 'relative', width: GAUGE_SIZE, height: GAUGE_SIZE }}>
@@ -223,38 +254,6 @@ export function RegimeCard({ regime, confidence, symbol, macroRegime, trend15m, 
                     </svg>
                 </div>
 
-                {/* Regime label + BTC info — centered vertically under gauge */}
-                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                    <div style={{ marginBottom: '4px' }}>
-                        <span style={{
-                            fontSize: '20px', fontWeight: 700, letterSpacing: '1.5px',
-                            color: '#4B6080', textTransform: 'uppercase' as const,
-                        }}>Regime: </span>
-                        <span style={{
-                            fontSize: '20px', fontWeight: 800, letterSpacing: '1.5px',
-                            color: info.color, textTransform: 'uppercase' as const,
-                            textShadow: `0 0 8px ${info.color}88`,
-                        }}>{displayRegime}</span>
-                    </div>
-                    <div style={{
-                        fontSize: '24px', fontWeight: 900,
-                        fontFamily: 'var(--font-mono, monospace)',
-                        color: '#E8EDF5', letterSpacing: '-1.5px', lineHeight: 1,
-                        textShadow: '0 0 20px rgba(0,229,255,0.15)',
-                    }}>
-                        {btcPrice ? `$${btcPrice.toLocaleString('en-US', { maximumFractionDigits: 0 })}` : '—'}
-                    </div>
-                    {btcPrice && (
-                        <div style={{
-                            fontSize: 12, fontWeight: 700, marginTop: 4,
-                            fontFamily: 'var(--font-mono, monospace)',
-                            color: btcChange >= 0 ? '#00FF88' : '#FF3B5C',
-                            textShadow: btcChange >= 0 ? '0 0 8px rgba(0,255,136,0.5)' : '0 0 8px rgba(255,59,92,0.5)',
-                        }}>
-                            {btcChange >= 0 ? '▲' : '▼'} {Math.abs(btcChange).toFixed(2)}%
-                        </div>
-                    )}
-                </div>
             </div>
 
 
