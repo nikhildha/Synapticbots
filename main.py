@@ -96,14 +96,12 @@ class RegimeMasterBot:
         self._live_prices = {}       # symbol → {ls, fr, ...} (fetched each cycle)
         self._BRAIN_CACHE_MAX = 20   # LRU eviction cap (15 coins × 3 TFs = 45 max; cap at 20 prevents OOM)
 
-        # ─── Rotating coin pool (45 total ÷ 3 groups of 15) ──────────────────
-        # Pool of 45 high-volume coins (refreshed every 3 cycles from Binance)
-        # Each cycle scans a rotating slice of 15 — saves CPU + RAM, covers all
-        # coins every 3 cycles (~30 min at 10 min/cycle).
-        self._full_coin_pool: list = []    # 45 top coins by volume
-        self._scan_rotation: int = 0       # 0, 1, 2 → rotates to next slice each cycle
-        self._SCAN_BATCH_SIZE: int = 15    # Coins to actually train + analyze per cycle
-        self._SCAN_POOL_SIZE: int = 45     # Total coins fetched (3 × batch size)
+        # ─── Coin pool configuration ─────────────────────────────────────────
+        # Pool size matches config.TOP_COINS_LIMIT to scan all coins per cycle
+        self._full_coin_pool: list = []
+        self._scan_rotation: int = 0
+        self._SCAN_BATCH_SIZE: int = config.TOP_COINS_LIMIT
+        self._SCAN_POOL_SIZE: int = config.TOP_COINS_LIMIT
 
         # Adaptive Brain Switcher
         self._brain_switcher = BrainSwitcher()
@@ -344,18 +342,18 @@ class RegimeMasterBot:
         if self._athena:
             self._athena.reset_cycle()
 
-        # ── 1. Rotating coin scan: 45 pool ÷ 3 groups of 15 ─────────
+        # ── 1. Coin scan pool ─────────
         if config.MULTI_COIN_MODE:
-            num_rotations = self._SCAN_POOL_SIZE // self._SCAN_BATCH_SIZE  # = 3
+            num_rotations = max(1, self._SCAN_POOL_SIZE // self._SCAN_BATCH_SIZE)
 
-            # Refresh the full 45-coin pool every 3 cycles (or on first run)
-            if not self._full_coin_pool or self._cycle_count % (config.SCAN_INTERVAL_CYCLES * num_rotations) == 1:
+            # Refresh the full coin pool every N cycles (or on first run)
+            if not self._full_coin_pool or self._cycle_count % max(1, config.SCAN_INTERVAL_CYCLES * num_rotations) == 1:
                 logger.info("🔄 Refreshing full coin pool (%d coins) from Binance...", self._SCAN_POOL_SIZE)
                 self._full_coin_pool = get_top_coins_by_volume(limit=self._SCAN_POOL_SIZE)
                 logger.info("📋 Full pool (%d coins): %s ...",
                             len(self._full_coin_pool), ", ".join(self._full_coin_pool[:8]))
 
-            # Which 15-coin slice this cycle? (0→1→2→0→...)
+            # Determine slice based on rotation
             self._scan_rotation = (self._cycle_count - 1) % num_rotations
             batch_start = self._scan_rotation * self._SCAN_BATCH_SIZE
             batch_end   = batch_start + self._SCAN_BATCH_SIZE
@@ -472,11 +470,8 @@ class RegimeMasterBot:
             deployed_symbols.add(t["symbol"])
         raw_results = []
 
-        # Filter out already-deployed coins (no need to re-scan) and cap at 15
+        # Filter out already-deployed coins (no need to re-scan)
         scan_symbols = [s for s in symbols if s not in deployed_symbols]
-        SCAN_LIMIT = 15
-        if len(scan_symbols) > SCAN_LIMIT:
-            scan_symbols = scan_symbols[:SCAN_LIMIT]
         logger.info("📡 Scanning %d coins (%d deployed, skipped): %s",
                     len(scan_symbols), len(deployed_symbols),
                     ", ".join(s.replace("USDT", "") for s in scan_symbols[:8]))

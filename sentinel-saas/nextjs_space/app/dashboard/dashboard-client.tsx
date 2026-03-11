@@ -52,6 +52,13 @@ interface BotState {
     cache_size?: number;
     recent_decisions?: any[];
   };
+  perBot?: Record<string, {
+    activeTrades: number;
+    totalTrades: number;
+    activePnl: number;
+    totalPnl: number;
+    capital: number;
+  }>;
 }
 
 export function DashboardClient({ user, stats, bots, recentTrades }: DashboardClientProps) {
@@ -595,9 +602,14 @@ export function DashboardClient({ user, stats, bots, recentTrades }: DashboardCl
               transition={{ delay: 0.27 }}
               className="mt-6 mb-8"
             >
-              <div style={{ display: 'grid', gridTemplateColumns: '3fr 2fr', gap: '20px' }}>
-                <AthenaPanel athena={botState?.athena || { enabled: true, recent_decisions: [], model: 'gemini-2.5-flash' }} coinStates={multi?.coin_states} />
-
+              <div className="grid grid-cols-1 gap-6">
+                <div className="lg:col-span-1 border border-white/5 rounded-xl bg-gray-900/60 p-5">
+                  <AthenaPanel
+                    athena={botState?.athena || { enabled: true, recent_decisions: [], model: 'gemini-2.5-flash' }}
+                    coinStates={multi?.coin_states}
+                    perBot={botState?.perBot || {}}
+                  />
+                </div>
                 {/* Engine Activity Feed */}
                 <TerminalFeed
                   coinStates={multi?.coin_states}

@@ -30,6 +30,7 @@ interface AthenaState {
 interface Props {
     athena: AthenaState;
     coinStates?: Record<string, any>;
+    perBot?: Record<string, { activeTrades: number; totalTrades: number; activePnl: number; totalPnl: number; capital: number }>;
 }
 
 const ACTION_CONFIG: Record<string, { border: string; badge: string; badgeBg: string; label: string; dot: string }> = {
@@ -62,10 +63,25 @@ function parseReasoning(r: string) {
     return { main, leverage, size, support, resistance };
 }
 
-export function AthenaPanel({ athena }: Props) {
+export function AthenaPanel({ athena, perBot = {} }: Props) {
     const enabled = !!athena?.enabled;
     const decisions = (athena?.recent_decisions || []).slice().reverse();
     const hasData = decisions.length > 0;
+
+    // Calculate Bot Summary from perBot data
+    let totalBots = 0;
+    let totalActiveTrades = 0;
+    let totalActivePnl = 0;
+    let totalCapital = 0;
+
+    Object.values(perBot).forEach(botStats => {
+        totalBots++;
+        totalActiveTrades += botStats.activeTrades;
+        totalActivePnl += botStats.activePnl;
+        totalCapital += botStats.capital;
+    });
+
+    const isRunning = hasData || totalActiveTrades > 0;
 
     return (
         <div style={{
@@ -93,9 +109,14 @@ export function AthenaPanel({ athena }: Props) {
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                     <span style={{
                         fontSize: 10, padding: '3px 10px', borderRadius: 20,
-                        background: 'rgba(255,179,0,0.10)', color: '#FFB300', fontWeight: 700,
-                        border: '1px solid rgba(255,179,0,0.20)', letterSpacing: '0.5px',
-                    }}>○ {enabled ? 'STANDBY' : 'OFFLINE'}</span>
+                        background: enabled ? (isRunning ? 'rgba(0,255,136,0.10)' : 'rgba(255,179,0,0.10)') : 'rgba(255,59,92,0.10)',
+                        color: enabled ? (isRunning ? '#00FF88' : '#FFB300') : '#FF3B5C',
+                        fontWeight: 700,
+                        border: `1px solid ${enabled ? (isRunning ? 'rgba(0,255,136,0.20)' : 'rgba(255,179,0,0.20)') : 'rgba(255,59,92,0.20)'}`,
+                        letterSpacing: '0.5px',
+                    }}>
+                        ○ {enabled ? (isRunning ? 'ACTIVE' : 'STANDBY') : 'OFFLINE'}
+                    </span>
                     <span style={{
                         fontSize: 10, color: 'var(--color-text-muted)', fontFamily: 'var(--font-mono)',
                         padding: '2px 7px', borderRadius: 6, background: 'rgba(255,255,255,0.03)',
@@ -106,6 +127,41 @@ export function AthenaPanel({ athena }: Props) {
                             {athena.cycle_calls} calls
                         </span>
                     )}
+                </div>
+            </div>
+
+            {/* ── Bot Summary ── */}
+            <div style={{
+                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                padding: '12px 20px',
+                background: 'rgba(255,255,255,0.02)',
+                borderBottom: '1px solid rgba(0,229,255,0.05)',
+            }}>
+                <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: 10, color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 2 }}>
+                        Bots Managed
+                    </div>
+                    <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--color-text)', fontFamily: 'var(--font-mono)' }}>
+                        {totalBots}
+                    </div>
+                </div>
+                <div style={{ width: 1, height: 24, background: 'rgba(255,255,255,0.06)' }} />
+                <div style={{ flex: 1, textAlign: 'center' }}>
+                    <div style={{ fontSize: 10, color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 2 }}>
+                        Open Positions
+                    </div>
+                    <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--color-info)', fontFamily: 'var(--font-mono)' }}>
+                        {totalActiveTrades}
+                    </div>
+                </div>
+                <div style={{ width: 1, height: 24, background: 'rgba(255,255,255,0.06)' }} />
+                <div style={{ flex: 1, textAlign: 'right' }}>
+                    <div style={{ fontSize: 10, color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 2 }}>
+                        Capital Risk
+                    </div>
+                    <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--color-text)', fontFamily: 'var(--font-mono)' }}>
+                        ${totalCapital.toLocaleString()}
+                    </div>
                 </div>
             </div>
 
