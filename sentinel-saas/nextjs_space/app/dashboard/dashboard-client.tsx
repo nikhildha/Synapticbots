@@ -7,6 +7,7 @@ import { BotCard } from '@/components/bot-card';
 import { RegimeCard, PnlCard, ActivePositionsCard, SignalSummaryTable } from '@/components/dashboard/command-center';
 import { EngineConsole } from '@/components/dashboard/engine-console';
 import { AthenaPanel } from '@/components/dashboard/athena-panel';
+import { TerminalFeed } from '@/components/dashboard/terminal-feed';
 import { Bot, TrendingUp, Activity, DollarSign, Zap } from 'lucide-react';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
@@ -597,55 +598,13 @@ export function DashboardClient({ user, stats, bots, recentTrades }: DashboardCl
               <div style={{ display: 'grid', gridTemplateColumns: '3fr 2fr', gap: '20px' }}>
                 <AthenaPanel athena={botState?.athena || { enabled: true, recent_decisions: [], model: 'gemini-2.5-flash' }} coinStates={multi?.coin_states} />
 
-                {/* Notification Card */}
-                <div style={{
-                  background: 'rgba(17, 24, 39, 0.90)',
-                  backdropFilter: 'blur(20px)',
-                  border: '1px solid rgba(6,182,212,0.2)',
-                  borderRadius: '16px',
-                  overflow: 'hidden',
-                  display: 'flex', flexDirection: 'column' as const,
-                }}>
-                  <div style={{
-                    padding: '16px 24px',
-                    background: 'linear-gradient(135deg, rgba(6,182,212,0.12) 0%, rgba(59,130,246,0.06) 100%)',
-                    borderBottom: '1px solid rgba(6,182,212,0.15)',
-                    display: 'flex', alignItems: 'center', gap: '10px',
-                  }}>
-                    <span style={{ fontSize: '18px' }}>🔔</span>
-                    <h2 style={{ fontSize: '16px', fontWeight: 800, color: '#06B6D4', margin: 0 }}>Notifications</h2>
-                  </div>
-                  <div style={{
-                    flex: 1, padding: '16px',
-                    maxHeight: '480px', overflowY: 'auto',
-                    display: 'flex', flexDirection: 'column' as const, gap: '8px',
-                  }}>
-                    {/* Placeholder notifications */}
-                    {[
-                      { icon: '🟢', text: 'Engine running — Cycle analysis active', time: 'Now', color: '#10B981' },
-                      { icon: '🏛️', text: 'Athena analyzing eligible coins', time: '1m ago', color: '#A78BFA' },
-                      { icon: '📊', text: 'BTC regime: Monitoring macro conditions', time: '5m ago', color: '#06B6D4' },
-                    ].map((n, i) => (
-                      <div key={i} style={{
-                        display: 'flex', alignItems: 'flex-start', gap: '10px',
-                        padding: '10px 12px', borderRadius: '10px',
-                        background: 'rgba(255,255,255,0.03)',
-                        border: '1px solid rgba(255,255,255,0.05)',
-                      }}>
-                        <span style={{ fontSize: '14px', marginTop: '1px' }}>{n.icon}</span>
-                        <div style={{ flex: 1 }}>
-                          <div style={{ fontSize: '13px', color: '#D1D5DB', lineHeight: '1.4' }}>{n.text}</div>
-                          <div style={{ fontSize: '11px', color: '#4B5563', marginTop: '3px', fontFamily: 'monospace' }}>{n.time}</div>
-                        </div>
-                      </div>
-                    ))}
-                    <div style={{
-                      textAlign: 'center', padding: '20px', color: '#4B5563', fontSize: '12px',
-                    }}>
-                      System notifications will appear here
-                    </div>
-                  </div>
-                </div>
+                {/* Engine Activity Feed */}
+                <TerminalFeed
+                  coinStates={multi?.coin_states}
+                  cycle={multi?.cycle}
+                  activeTrades={botState?.tradebook?.trades || []}
+                  athenaEnabled={botState?.athena?.enabled}
+                />
               </div>
             </motion.div>
           )}

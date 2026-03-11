@@ -5,13 +5,14 @@ import prisma from '@/lib/prisma';
 
 export interface Notification {
     id: string;
-    type: 'trade_open' | 'trade_close' | 'bot_start' | 'bot_stop' | 'sl_hit' | 'tp_hit' | 'engine_alert';
+    type: 'trade_open' | 'trade_close' | 'bot_start' | 'bot_stop' | 'sl_hit' | 'tp_hit' | 'engine_alert' | 'engine_cycle' | 'athena_decision';
     title: string;
     body: string;
     time: string;
     read: boolean;
     meta?: Record<string, any>;
 }
+
 
 export async function GET() {
     const session = await getServerSession(authOptions);
@@ -97,7 +98,54 @@ export async function GET() {
             });
         }
 
+        // ── Engine + Athena notifications from bot-state ──────────────────────
+        try {
+            const baseUrl = process.env.NEXTAUTH_URL || 'http://localhost:3000';
+            const stateRes = await fetch(`${baseUrl}/api/bot-state`, { cache: 'no-store' });
+            if (stateRes.ok) {
+                const state = await stateRes.json();
+                const multi = state?.multi;
+                const athena = state?.athena;
+
+                // Engine cycle notification
+                if (multi?.cycle) {
+                    const cycleTime = multi?.timestamp ? new Date(multi.timestamp).toISOString() : new Date().toISOString();
+                    const isStale = multi?.timestamp && (Date.now() - new Date(multi.timestamp).getTime()) > 10 * 60 * 1000;
+                    notifications.push({
+                        id: `engine-cycle-${multi.cycle}`,
+                        type: isStale ? 'engine_alert' : 'engine_cycle',
+                        title: isStale ? `⚠️ Engine Stale · Cycle #${multi.cycle}` : `⚙️ Engine Active · Cycle #${multi.cycle}`,
+                        body: isStale
+                            ? `Last seen ${Math.round((Date.now() - new Date(multi.timestamp).getTime()) / 60000)}m ago — may be offline`
+                            : `${multi.coins_scanned || 0} coins scanned · ${multi.eligible_count || 0} eligible · BTC ${multi.btc_regime || '—'}`,
+                        time: cycleTime,
+                        read: !isStale,
+                        meta: { cycle: multi.cycle, regime: multi.btc_regime },
+                    });
+                }
+
+                // Athena decision notifications (last 3)
+                if (athena?.enabled && Array.isArray(athena.recent_decisions)) {
+                    for (const d of athena.recent_decisions.slice(-3).reverse()) {
+                        const sym = (d.symbol || '').replace('USDT', '');
+                        const confPct = Math.round((d.adjusted_confidence || 0) * 100);
+                        const isVeto = d.action === 'VETO';
+                        notifications.push({
+                            id: `athena-${d.symbol}-${d.time}`,
+                            type: 'athena_decision',
+                            title: `${isVeto ? '🔴' : '🏛️'} Athena · ${sym} ${d.action}`,
+                            body: `${d.side || ''} · conf ${confPct}% · ${(d.reasoning || '').split(' | ')[0].slice(0, 80)}`,
+                            time: d.time,
+                            read: false,
+                            meta: { symbol: d.symbol, action: d.action, confidence: confPct },
+                        });
+                    }
+                }
+            }
+        } catch { /* silent — engine offline is ok */ }
+
         // Sort newest first
+
         notifications.sort((a, b) => new Date(b.time).getTime() - new Date(a.time).getTime());
 
         return NextResponse.json({ notifications: notifications.slice(0, 20) });
