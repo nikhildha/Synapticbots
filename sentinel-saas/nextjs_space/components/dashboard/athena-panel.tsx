@@ -131,40 +131,7 @@ export function AthenaPanel({ athena, perBot = {} }: Props) {
                 </div>
             </div>
 
-            {/* ── Bot Summary ── */}
-            <div style={{
-                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                padding: '12px 20px',
-                background: 'rgba(255,255,255,0.02)',
-                borderBottom: '1px solid rgba(0,229,255,0.05)',
-            }}>
-                <div style={{ flex: 1 }}>
-                    <div style={{ fontSize: 10, color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 2 }}>
-                        Bots Managed
-                    </div>
-                    <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--color-text)', fontFamily: 'var(--font-mono)' }}>
-                        {totalBots}
-                    </div>
-                </div>
-                <div style={{ width: 1, height: 24, background: 'rgba(255,255,255,0.06)' }} />
-                <div style={{ flex: 1, textAlign: 'center' }}>
-                    <div style={{ fontSize: 10, color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 2 }}>
-                        Open Positions
-                    </div>
-                    <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--color-info)', fontFamily: 'var(--font-mono)' }}>
-                        {totalActiveTrades}
-                    </div>
-                </div>
-                <div style={{ width: 1, height: 24, background: 'rgba(255,255,255,0.06)' }} />
-                <div style={{ flex: 1, textAlign: 'right' }}>
-                    <div style={{ fontSize: 10, color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 2 }}>
-                        Capital Risk
-                    </div>
-                    <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--color-text)', fontFamily: 'var(--font-mono)' }}>
-                        ${totalCapital.toLocaleString()}
-                    </div>
-                </div>
-            </div>
+
 
             {/* ── Decision List ── */}
             <div style={{ maxHeight: 480, overflowY: 'auto', padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: 10 }}>
