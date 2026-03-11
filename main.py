@@ -497,6 +497,10 @@ class RegimeMasterBot:
         logger.info("🔄 Deploying across %d active bots/profiles | tradebook_active_keys: %s",
                     len(eval_targets), len(tradebook_active_keys))
 
+        deployed_trades = []
+        eligible_trades = []
+        deployed = 0
+
         for target in eval_targets:
             bot_id = target.get("bot_id", config.ENGINE_BOT_ID)
             bot_name = target.get("bot_name", "Adaptive Bot")
@@ -537,7 +541,7 @@ class RegimeMasterBot:
                     logger.warning("   ⛔ [%s] %s: FILTERED by profile evaluation", bot_name, sym)
                     continue
 
-                if self.risk.check_kill_switch(balance, self._peak_balance):
+                if self.risk.check_kill_switch():
                     return
 
                 logger.info("   ✅ [%s] %s: PASSED evaluation — preparing to deploy", bot_name, sym)
@@ -1177,11 +1181,6 @@ class RegimeMasterBot:
             if regime_name == "BEARISH" and macro_regime_name == "BULLISH":
                 self._coin_states[symbol]["action"] = "MTF_CONFLICT"
                 return None
-
-        # ── CHOP → skip (no mean-reversion trades) ──
-        if regime == config.REGIME_CHOP:
-            self._coin_states[symbol]["action"] = "CHOP_SKIP"
-            return None
 
         # ── TREND (BULL / BEAR) — 8-factor conviction flow ──────────────────────
 
