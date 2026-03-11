@@ -528,6 +528,11 @@ export function TradesClient({ trades: initialTrades }: TradesClientProps) {
             </div>
           </motion.div>
 
+          {/* ═══ BTC/USDT Candlestick Chart ═══ */}
+          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.08 }} className="mb-6">
+            <BtcCandlestickChart />
+          </motion.div>
+
           {/* ═══ Filter Bar ═══ */}
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className="mb-6">
             <Card>
@@ -995,11 +1000,6 @@ export function TradesClient({ trades: initialTrades }: TradesClientProps) {
               </motion.div>
             );
           })()}
-
-          {/* ═══ BTC/USDT Candlestick Chart ═══ */}
-          <div className="mt-8">
-            <BtcCandlestickChart />
-          </div>
 
         </div>
       </main>

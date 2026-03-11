@@ -50,7 +50,11 @@ export function Header() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
             <Link href={session ? '/dashboard' : '/'} className="flex items-center space-x-2 hover:opacity-80 transition-opacity">
-              <Shield className="w-8 h-8 text-[var(--color-primary)]" />
+              <span style={{
+                fontSize: '28px', fontWeight: 900, lineHeight: 1,
+                background: 'linear-gradient(90deg, #00E5FF 0%, #00FF88 100%)',
+                WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text',
+              }}>⬡</span>
               <div>
                 <span className="text-2xl font-bold text-gradient">Synaptic</span>
                 <div style={{ fontSize: '8px', fontWeight: 700, letterSpacing: '2.5px', textTransform: 'uppercase' as any, color: '#F0B90B', marginTop: '-2px', animation: 'blink 2s ease-in-out infinite' }}>AI · Crypto · Bots</div>

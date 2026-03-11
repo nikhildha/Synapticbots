@@ -85,30 +85,18 @@ export function AthenaPanel({ athena }: Props) {
                 display: 'flex', alignItems: 'center', justifyContent: 'space-between',
             }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                    <span style={{ fontSize: 18 }}>🏛️</span>
                     <div>
                         <div style={{ fontSize: 14, fontWeight: 800, color: '#00E5FF', letterSpacing: '1px', textTransform: 'uppercase' }}>
                             Athena AI
                         </div>
-                        <div style={{ fontSize: 10, color: 'var(--color-text-muted)', letterSpacing: '0.5px', marginTop: 1 }}>
-                            Lead Investment Officer
-                        </div>
                     </div>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    {athena.initialized ? (
-                        <span style={{
-                            fontSize: 10, padding: '3px 10px', borderRadius: 20,
-                            background: 'rgba(0,255,136,0.10)', color: '#00FF88', fontWeight: 700,
-                            border: '1px solid rgba(0,255,136,0.20)', letterSpacing: '0.5px',
-                        }}>● ONLINE</span>
-                    ) : (
-                        <span style={{
-                            fontSize: 10, padding: '3px 10px', borderRadius: 20,
-                            background: 'rgba(255,179,0,0.10)', color: '#FFB300', fontWeight: 700,
-                            border: '1px solid rgba(255,179,0,0.20)', letterSpacing: '0.5px',
-                        }}>○ STANDBY</span>
-                    )}
+                    <span style={{
+                        fontSize: 10, padding: '3px 10px', borderRadius: 20,
+                        background: 'rgba(255,179,0,0.10)', color: '#FFB300', fontWeight: 700,
+                        border: '1px solid rgba(255,179,0,0.20)', letterSpacing: '0.5px',
+                    }}>○ STANDBY</span>
                     <span style={{
                         fontSize: 10, color: 'var(--color-text-muted)', fontFamily: 'var(--font-mono)',
                         padding: '2px 7px', borderRadius: 6, background: 'rgba(255,255,255,0.03)',
@@ -126,7 +114,6 @@ export function AthenaPanel({ athena }: Props) {
             <div style={{ maxHeight: 480, overflowY: 'auto', padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: 10 }}>
                 {!hasData ? (
                     <div style={{ textAlign: 'center', padding: '36px 20px', color: 'var(--color-text-muted)' }}>
-                        <div style={{ fontSize: 32, marginBottom: 10, opacity: 0.3 }}>🏛️</div>
                         <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text-secondary)' }}>Awaiting eligible coins…</div>
                         <div style={{ fontSize: 11, color: 'var(--color-text-muted)', marginTop: 4 }}>
                             Athena analyzes coins passing HMM conviction threshold

@@ -22,7 +22,7 @@ interface Candle {
 }
 
 export function BtcCandlestickChart() {
-    const [tf, setTf] = useState('1h');
+    const [tf, setTf] = useState('5m');
     const [candles, setCandles] = useState<Candle[]>([]);
     const [loading, setLoading] = useState(true);
     const [currentPrice, setCurrentPrice] = useState<number | null>(null);
