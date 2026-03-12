@@ -946,10 +946,15 @@ class RegimeMasterBot:
             athena_action = None
             _active_bots = config.ENGINE_ACTIVE_BOTS
             if _active_bots:
-                _all_athena = all(b.get("brain_type") == "athena" for b in _active_bots)
+                # FIX: Use `any` instead of `all`.
+                # If ANY bot asks for Athena, we must evaluate it.
+                # The later loop (lines 564-620) decides if a *specific* bot
+                # uses the result or ignores it based on its own brain_type.
+                _any_athena = any(b.get("brain_type") == "athena" for b in _active_bots)
             else:
-                _all_athena = config.ENGINE_BRAIN_TYPE == "athena"
-            _use_athena = self._athena and config.LLM_REASONING_ENABLED and _all_athena
+                _any_athena = config.ENGINE_BRAIN_TYPE == "athena"
+            
+            _use_athena = self._athena and config.LLM_REASONING_ENABLED and _any_athena
             if _use_athena:
                 try:
                     llm_ctx = {
