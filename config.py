@@ -136,6 +136,9 @@ STRATEGY_PROFILES = {
     },
 }
 
+# Active profiles — only 'standard' active to prevent multi-profile ghost trades
+ACTIVE_PROFILES = ["standard"]
+
 # ─── Static Bot Profiles ────────────────────────────────────────────────────────
 # Maps the UI bot string ("conservative", "aggressive") to its static configuration.
 BRAIN_PROFILES = {
