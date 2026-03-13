@@ -98,22 +98,22 @@ export function SegmentHeatmap({ heatmapData, loading = false }: SegmentHeatmapP
               className="relative p-4 rounded-xl flex flex-col justify-between"
               style={{
                 background: bgColor,
-                border: \`1px solid \${borderColor}\`,
-                boxShadow: isHot ? \`0 0 15px \${primaryColor}, 0.15)\` : 'none'
+                border: `1px solid ${borderColor}`,
+                boxShadow: isHot ? `0 0 15px ${primaryColor}, 0.15)` : 'none'
               }}
             >
               {isHot && (
-                <div className="absolute -top-1.5 -right-1.5 w-3 h-3 rounded-full animate-ping" style={{ background: \`\${primaryColor}, 0.8)\` }} />
+                <div className="absolute -top-1.5 -right-1.5 w-3 h-3 rounded-full animate-ping" style={{ background: `${primaryColor}, 0.8)` }} />
               )}
               {isHot && (
-                <div className="absolute -top-1.5 -right-1.5 w-3 h-3 rounded-full" style={{ background: \`\${primaryColor}, 1)\` }} />
+                <div className="absolute -top-1.5 -right-1.5 w-3 h-3 rounded-full" style={{ background: `${primaryColor}, 1)` }} />
               )}
 
               <div className="flex justify-between items-start mb-3">
                 <span className="text-sm font-bold text-white tracking-wide">{seg.segment}</span>
                 <div className="flex items-center gap-1">
                   {isPositive ? <TrendingUp className="w-3.5 h-3.5 text-green-400" /> : <TrendingDown className="w-3.5 h-3.5 text-red-400" />}
-                  <span className={\`text-sm font-bold \${isPositive ? 'text-green-400' : 'text-red-400'}\`}>
+                  <span className={`text-sm font-bold ${isPositive ? 'text-green-400' : 'text-red-400'}`}>
                     {isPositive ? '+' : ''}{seg.composite_score.toFixed(2)}
                   </span>
                 </div>
@@ -122,13 +122,13 @@ export function SegmentHeatmap({ heatmapData, loading = false }: SegmentHeatmapP
               <div className="space-y-1.5 mt-auto">
                 <div className="flex justify-between items-center text-[11px]">
                   <span className="text-gray-400">Vol-W Return (VW-RR)</span>
-                  <span className={\`font-medium \${seg.vw_rr >= 0 ? 'text-green-400/80' : 'text-red-400/80'}\`}>
+                  <span className={`font-medium ${seg.vw_rr >= 0 ? 'text-green-400/80' : 'text-red-400/80'}`}>
                     {seg.vw_rr >= 0 ? '+' : ''}{seg.vw_rr.toFixed(1)}%
                   </span>
                 </div>
                 <div className="flex justify-between items-center text-[11px]">
                   <span className="text-gray-400">BTC Alpha</span>
-                  <span className={\`font-medium \${seg.btc_alpha >= 0 ? 'text-green-400/80' : 'text-red-400/80'}\`}>
+                  <span className={`font-medium ${seg.btc_alpha >= 0 ? 'text-green-400/80' : 'text-red-400/80'}`}>
                     {seg.btc_alpha >= 0 ? '+' : ''}{seg.btc_alpha.toFixed(1)}%
                   </span>
                 </div>
