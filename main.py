@@ -533,6 +533,15 @@ class RegimeMasterBot:
                 
             bot_deployed = 0
 
+            # --- Per-Bot Segment Filter ---
+            # Determine which segments this bot is responsible for
+            bot_segment_filter = target.get("segment_filter", "ALL")  # "ALL" or e.g. "L1", "DeFi"
+            if bot_segment_filter == "ALL":
+                bot_allowed_coins = None  # No restriction — ALL coins eligible
+            else:
+                bot_allowed_coins = set(config.CRYPTO_SEGMENTS.get(bot_segment_filter, []))
+                logger.debug("🗂 [%s] segment_filter=%s → %d coins", bot_name, bot_segment_filter, len(bot_allowed_coins))
+
             # --- Correlation Control: Track Active Segments for this bot ---
             from segment_features import get_segment_for_coin
             active_segments = {} # segment -> count
@@ -546,6 +555,12 @@ class RegimeMasterBot:
                 sym = raw["symbol"]
                 # Scope position checks to THIS specific bot instance
                 pos_key = f"{bot_id}:{sym}"
+
+                # ── Per-Bot Segment Gate ──────────────────────────────────
+                # If this bot has a specific segment, skip coins outside it.
+                if bot_allowed_coins is not None and sym not in bot_allowed_coins:
+                    logger.debug("   ⛔ [%s] %s not in segment %s — SKIPPED", bot_name, sym, bot_segment_filter)
+                    continue
 
                 # Skip if already have active trade for this bot:symbol
                 if pos_key in tradebook_active_keys:
@@ -1084,10 +1099,22 @@ class RegimeMasterBot:
                 "athena": athena_action,
             }
 
+            # Compute ema_15m_20 for ATR pullback limit orders (multi-TF path)
+            # Without this, execution_engine always falls back to MARKET orders.
+            _ema_15m_20 = None
+            try:
+                df_15m_for_ema = fetch_klines(symbol, "15m", limit=50)
+                if df_15m_for_ema is not None and len(df_15m_for_ema) >= 20:
+                    from feature_engine import compute_ema
+                    _ema_15m_20 = float(compute_ema(compute_all_features(df_15m_for_ema)["close"], 20).iloc[-1])
+            except Exception:
+                pass
+
             return {
                 "symbol": symbol,
                 "side": side,
                 "atr": current_atr,
+                "ema_15m_20": _ema_15m_20,
                 "regime": regime,
                 "regime_name": regime_name,
                 "confidence": conf,
