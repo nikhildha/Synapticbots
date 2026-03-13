@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth-options';
 import { prisma } from '@/lib/prisma';
 import { getEngineUrl } from '@/lib/engine-url';
+import { buildCloseData, computeClosePnl } from '@/lib/trade-utils';
 
 export const dynamic = 'force-dynamic';
 
@@ -90,32 +91,13 @@ export async function POST(request: Request) {
         // ─── Close each trade in Prisma DB ────────────────────────────────
         for (const trade of activeTrades) {
             try {
-                const currentPrice = trade.currentPrice || trade.entryPrice;
-                const entry = trade.entryPrice;
-                const capital = trade.capital;
-                const lev = trade.leverage;
-                const isLong = trade.position === 'long';
-
-                const priceDiff = isLong ? (currentPrice - entry) : (entry - currentPrice);
-                // PnL FIX: use quantity (already leveraged) — don't multiply by lev again
-                const quantity = (trade as any).quantity || (capital * lev / entry);
-                const rawPnl = priceDiff * quantity;
-                const netPnl = Math.round(rawPnl * 10000) / 10000;
-                const pnlPct = capital > 0 ? Math.round(netPnl / capital * 100 * 100) / 100 : 0;
+                const closeData = buildCloseData(trade as any, 'EXIT_ALL');
+                const { pnl: netPnl, pnlPct } = computeClosePnl(trade as any);
 
                 // Update in Prisma
                 await prisma.trade.update({
                     where: { id: trade.id },
-                    data: {
-                        status: 'closed',
-                        exitPrice: currentPrice,
-                        exitTime: new Date(),
-                        exitReason: 'EXIT_ALL',
-                        totalPnl: netPnl,
-                        totalPnlPercent: pnlPct,
-                        activePnl: 0,
-                        activePnlPercent: 0,
-                    },
+                    data: closeData,
                 });
 
                 results.push({

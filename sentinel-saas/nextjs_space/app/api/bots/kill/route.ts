@@ -4,6 +4,7 @@ import { authOptions } from '@/lib/auth-options';
 import prisma from '@/lib/prisma';
 import { closeBotSession } from '@/lib/bot-session';
 import { getEngineUrl } from '@/lib/engine-url';
+import { buildCloseData } from '@/lib/trade-utils';
 
 export const dynamic = 'force-dynamic';
 
@@ -79,14 +80,7 @@ export async function POST(request: Request) {
         for (const trade of activeTrades) {
             await prisma.trade.update({
                 where: { id: trade.id },
-                data: {
-                    status: 'closed',
-                    exitReason: 'KILL_SWITCH',
-                    exitPrice: trade.currentPrice || trade.entryPrice,
-                    exitTime: closeTime,
-                    totalPnl: trade.activePnl,
-                    totalPnlPercent: trade.activePnlPercent,
-                },
+                data: { ...buildCloseData(trade, 'KILL_SWITCH'), exitTime: closeTime },
             });
         }
 

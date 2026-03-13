@@ -61,7 +61,7 @@ export async function POST(req: NextRequest) {
             await prisma.botSession.update({
                 where: { id: activeSession.id },
                 data: {
-                    status: 'ended',
+                    status: 'closed',
                     endedAt: new Date(),
                     totalPnl: finalPnl,
                     totalCapital: totalCapital || activeSession.totalCapital,

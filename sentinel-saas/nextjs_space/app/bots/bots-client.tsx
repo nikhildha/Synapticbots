@@ -10,31 +10,117 @@ import {
 import { motion, AnimatePresence } from 'framer-motion';
 import { useSession } from 'next-auth/react';
 
-/* ═══ Bot Model Definitions ═══ */
+/* ═══ Bot Model Definitions — 11 Segment Bots ═══ */
 const BOT_MODELS = [
   {
     id: 'adaptive',
-    name: 'Synaptic Adaptive',
+    segment: 'ALL',
+    name: 'Synaptic Adaptive — ALL',
     color: '#22C55E',
     icon: '🧠',
-    tagline: 'HMM-Powered · Auto-Regime Switching',
-    description: 'Automatically switches between Conservative, Balanced & Aggressive based on live market conditions.',
+    tagline: 'All Segments · Heatmap Router · Auto-Regime',
+    description: 'Dynamically picks the top 2 hottest market segments each cycle using Institutional 3-Pillar scoring. Best for users who want full market coverage.',
+    coins: ['BTC', 'ETH', 'SOL', 'DOGE', 'UNI', 'FET', '...'],
   },
   {
-    id: 'athena',
-    name: 'Athena AI',
-    color: '#A78BFA',
-    icon: '🏛️',
-    tagline: 'HMM + Gemini AI · Contextual Reasoning',
-    description: 'Every signal is validated by Gemini AI with real-time market context before execution.',
+    id: 'adaptive',
+    segment: 'L1',
+    name: 'L1 Specialist',
+    color: '#3B82F6',
+    icon: '🔵',
+    tagline: 'Layer-1 · BTC · ETH · SOL · SUI',
+    description: 'Focused on the largest Layer-1 chains. Stable, high-liquidity assets with deep market structure.',
+    coins: ['BTC', 'ETH', 'SOL', 'BNB', 'AVAX', 'SUI'],
   },
   {
-    id: 'quickscalper',
-    name: 'QuickScalper',
-    color: '#F59E0B',
-    icon: '⚡',
-    tagline: '1m/5m · VWAP + StochRSI · Micro-Momentum',
-    description: 'Ultra-fast scalper targeting 0.5% micro-moves using order book L2 spread, StochRSI exhaustion, and buy/sell tape analysis. 20x–50x virtual leverage.',
+    id: 'adaptive',
+    segment: 'L2',
+    name: 'L2 Specialist',
+    color: '#8B5CF6',
+    icon: '🟣',
+    tagline: 'Layer-2 · ARB · OP · POL · STRK',
+    description: 'Targets Ethereum scaling solutions — high beta to ETH with independent catalysts.',
+    coins: ['ARB', 'OP', 'POL', 'MNT', 'STRK'],
+  },
+  {
+    id: 'adaptive',
+    segment: 'DeFi',
+    name: 'DeFi Specialist',
+    color: '#10B981',
+    icon: '🌊',
+    tagline: 'DeFi · UNI · AAVE · CRV · RUNE',
+    description: 'Decentralized Finance protocols. Highly reactive to DEX volume and TVL shifts.',
+    coins: ['UNI', 'AAVE', 'CRV', 'JUP', 'RUNE'],
+  },
+  {
+    id: 'adaptive',
+    segment: 'AI',
+    name: 'AI Specialist',
+    color: '#06B6D4',
+    icon: '🤖',
+    tagline: 'AI Tokens · TAO · FET · WLD · AKT',
+    description: 'AI/ML narrative tokens. Strong trend-following behavior during AI hype cycles.',
+    coins: ['TAO', 'FET', 'INJ', 'WLD', 'AKT'],
+  },
+  {
+    id: 'adaptive',
+    segment: 'Meme',
+    name: 'Meme Specialist',
+    color: '#F97316',
+    icon: '🐸',
+    tagline: 'Meme · DOGE · PEPE · WIF · BONK',
+    description: 'High-volatility meme tokens. Explosive moves — sized conservatively with tight stops.',
+    coins: ['DOGE', 'SHIB', 'PEPE', 'WIF', 'BONK'],
+  },
+  {
+    id: 'adaptive',
+    segment: 'RWA',
+    name: 'RWA Specialist',
+    color: '#EAB308',
+    icon: '🏦',
+    tagline: 'Real World Assets · ONDO · LINK · PENDLE',
+    description: 'Real World Asset tokens tracking tokenized bonds, credit, and yield protocols.',
+    coins: ['ONDO', 'PENDLE', 'LINK', 'POLYX', 'TRU'],
+  },
+  {
+    id: 'adaptive',
+    segment: 'Gaming',
+    name: 'Gaming Specialist',
+    color: '#EC4899',
+    icon: '🎮',
+    tagline: 'Gaming/Metaverse · IMX · AXS · SAND',
+    description: 'GameFi and metaverse tokens. Trend with gaming narrative cycles and NFT market activity.',
+    coins: ['IMX', 'AXS', 'SAND', 'RONIN', 'PIXEL'],
+  },
+  {
+    id: 'adaptive',
+    segment: 'DePIN',
+    name: 'DePIN Specialist',
+    color: '#14B8A6',
+    icon: '📡',
+    tagline: 'DePIN · FIL · AR · HNT · IOTX',
+    description: 'Decentralized Physical Infrastructure Networks — data storage, wireless, IoT.',
+    coins: ['FIL', 'AR', 'HNT', 'IOTX'],
+  },
+  {
+    id: 'adaptive',
+    segment: 'Modular',
+    name: 'Modular Specialist',
+    color: '#6366F1',
+    icon: '🧩',
+    tagline: 'Modular · TIA · DYM',
+    description: 'Modular blockchain infrastructure — data availability layers with high growth potential.',
+    coins: ['TIA', 'DYM'],
+  },
+  {
+    id: 'adaptive',
+    segment: 'Oracles',
+    name: 'Oracles Specialist',
+    color: '#F43F5E',
+    icon: '🔮',
+    tagline: 'Oracles · PYTH · TRB · API3',
+    description: 'Oracle networks supplying on-chain data feeds. Reactive to DeFi adoption and cross-chain activity.',
+    coins: ['PYTH', 'TRB', 'API3'],
   },
 ];
 
@@ -50,6 +136,7 @@ export function BotsClient({ bots: initialBots }: BotsClientProps) {
 
   /* ── Deploy modal state ── */
   const [deployModel, setDeployModel] = useState('adaptive');
+  const [deploySegment, setDeploySegment] = useState('ALL');
   const [deployExchange, setDeployExchange] = useState('binance');
   const [deployMode, setDeployMode] = useState('paper');
   const [deployMaxTrades, setDeployMaxTrades] = useState(25);
@@ -121,14 +208,15 @@ export function BotsClient({ bots: initialBots }: BotsClientProps) {
   const handleDeployBot = async () => {
     setLoading(true);
     try {
-      const selectedModel = BOT_MODELS.find(m => m.id === deployModel);
+      const selectedModel = BOT_MODELS.find(m => m.id === deployModel && (m as any).segment === deploySegment);
       const res = await fetch('/api/bots/create', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          name: selectedModel?.name || 'Synaptic Adaptive',
+          name: selectedModel?.name || 'Synaptic Adaptive — ALL',
           exchange: deployExchange, mode: deployMode,
           maxTrades: deployMaxTrades, capitalPerTrade: deployCapitalPerTrade,
           brainType: deployModel,
+          segment: deploySegment,
         }),
       });
       if (res.ok) { setShowDeployModal(false); window.location.reload(); }
@@ -344,35 +432,49 @@ export function BotsClient({ bots: initialBots }: BotsClientProps) {
               {/* Scrollable content */}
               <div style={{ overflowY: 'auto', padding: '20px 24px', flex: 1 }}>
 
-                {/* ── AI Model ── */}
+                {/* ── Bot Model Selector — 11 Segment Bots ── */}
                 <div style={{ marginBottom: 20 }}>
-                  <div className="section-title" style={{ marginBottom: 10 }}>AI Brain Model</div>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                  <div className="section-title" style={{ marginBottom: 10 }}>Select Bot Type</div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxHeight: 320, overflowY: 'auto', paddingRight: 4 }}>
                     {BOT_MODELS.map(model => {
-                      const selected = deployModel === model.id;
+                      const selected = deployModel === model.id && deploySegment === (model as any).segment;
                       return (
-                        <button key={model.id}
-                          onClick={() => setDeployModel(model.id)}
+                        <button key={`${model.id}-${(model as any).segment}`}
+                          onClick={() => { setDeployModel(model.id); setDeploySegment((model as any).segment); }}
                           style={{
-                            padding: '14px', borderRadius: 'var(--radius-md)', cursor: 'pointer',
+                            padding: '12px 14px', borderRadius: 'var(--radius-md)', cursor: 'pointer',
                             background: selected ? `${model.color}12` : 'rgba(255,255,255,0.03)',
                             border: `2px solid ${selected ? model.color : 'var(--color-border)'}`,
                             transition: 'all 0.2s', textAlign: 'left',
-                            boxShadow: selected ? `0 0 16px ${model.color}22` : 'none',
+                            boxShadow: selected ? `0 0 14px ${model.color}22` : 'none',
                           }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
-                            <span style={{ fontSize: 18 }}>{model.icon}</span>
-                            <div>
-                              <div style={{ fontSize: 'var(--text-sm)', fontWeight: 700, color: selected ? model.color : 'var(--color-text)' }}>
-                                {model.name}
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                            <span style={{ fontSize: 20, flexShrink: 0 }}>{model.icon}</span>
+                            <div style={{ flex: 1, minWidth: 0 }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                                <span style={{ fontSize: 'var(--text-sm)', fontWeight: 700, color: selected ? model.color : 'var(--color-text)' }}>
+                                  {model.name}
+                                </span>
+                                {/* Coin tags */}
+                                <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+                                  {((model as any).coins || []).map((coin: string) => (
+                                    <span key={coin} style={{
+                                      fontSize: 10, fontWeight: 700, padding: '1px 6px',
+                                      borderRadius: 20, fontFamily: 'monospace',
+                                      background: selected ? `${model.color}20` : 'rgba(255,255,255,0.06)',
+                                      color: selected ? model.color : 'var(--color-text-muted)',
+                                      border: `1px solid ${selected ? model.color + '40' : 'var(--color-border)'}`,
+                                    }}>{coin}</span>
+                                  ))}
+                                </div>
                               </div>
-                              <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)', marginTop: 1 }}>
+                              <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)', marginTop: 2 }}>
                                 {model.tagline}
                               </div>
                             </div>
-                          </div>
-                          <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)', lineHeight: 1.4 }}>
-                            {model.description}
+                            {selected && (
+                              <span style={{ fontSize: 16, color: model.color, flexShrink: 0 }}>✓</span>
+                            )}
                           </div>
                         </button>
                       );
@@ -466,36 +568,18 @@ export function BotsClient({ bots: initialBots }: BotsClientProps) {
                   </motion.div>
                 )}
 
-                {/* ── QuickScalper: high-leverage warning + leverage tier ── */}
-                {deployModel === 'quickscalper' && (
+                {/* ── Segment-specific info strip ── */}
+                {deploySegment !== 'ALL' && (
                   <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }}
                     style={{ marginBottom: 20, overflow: 'hidden' }}>
                     <div style={{
-                      padding: '12px 14px', borderRadius: 'var(--radius-md)',
-                      background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.3)',
-                      fontSize: 'var(--text-xs)', color: '#FCD34D', lineHeight: 1.6, marginBottom: 12,
+                      padding: '10px 14px', borderRadius: 'var(--radius-md)',
+                      background: 'rgba(34,197,94,0.06)', border: '1px solid rgba(34,197,94,0.2)',
+                      fontSize: 'var(--text-xs)', color: '#86EFAC', lineHeight: 1.5,
                     }}>
-                      ⚡ <strong>QuickScalper uses 20x–50x virtual leverage.</strong> This brain targets
-                      0.5% micro-moves on 1m candles using VWAP, StochRSI and L2 order-book spread
-                      analysis. <strong>Paper mode is strongly recommended</strong> before going live.
-                    </div>
-                    <div>
-                      <label style={{ display: 'block', fontSize: 'var(--text-xs)', color: 'var(--color-text-secondary)', marginBottom: 6, fontWeight: 600 }}>
-                        Leverage Tier
-                      </label>
-                      <div style={{ display: 'flex', gap: 8 }}>
-                        {[20, 30, 50].map(lev => (
-                          <button key={lev} onClick={() => setDeployLeverage(lev)} style={{
-                            flex: 1, padding: '8px 0', borderRadius: 'var(--radius-md)',
-                            background: deployLeverage === lev ? 'rgba(245,158,11,0.15)' : 'rgba(255,255,255,0.03)',
-                            border: `1.5px solid ${deployLeverage === lev ? '#F59E0B' : 'var(--color-border)'}`,
-                            color: deployLeverage === lev ? '#F59E0B' : 'var(--color-text-secondary)',
-                            fontSize: 'var(--text-sm)', fontWeight: 700, cursor: 'pointer', transition: 'all 0.2s',
-                          }}>
-                            {lev}×
-                          </button>
-                        ))}
-                      </div>
+                      🎯 <strong>{deploySegment} Specialist</strong> will only scan coins in the {deploySegment} segment,
+                      using per-coin optimized HMM features from Likelihood Permutation analysis.
+                      Correlation control limits to 1 open position per segment.
                     </div>
                   </motion.div>
                 )}

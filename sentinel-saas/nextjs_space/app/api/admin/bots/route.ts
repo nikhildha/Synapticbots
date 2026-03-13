@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth-options';
 import prisma from '@/lib/prisma';
+import { buildCloseData } from '@/lib/trade-utils';
 
 export const dynamic = 'force-dynamic';
 
@@ -138,25 +139,9 @@ export async function POST(request: Request) {
             });
 
             for (const trade of activeTrades) {
-                const currentPrice = trade.currentPrice || trade.entryPrice;
-                const isLong = trade.position === 'long' || trade.position === 'LONG';
-                const priceDiff = isLong ? (currentPrice - trade.entryPrice) : (trade.entryPrice - currentPrice);
-                const rawPnl = priceDiff / trade.entryPrice * trade.leverage * trade.capital;
-                const leveragedPnl = Math.round(rawPnl * 10000) / 10000;
-                const pnlPct = trade.capital > 0 ? Math.round(leveragedPnl / trade.capital * 100 * 100) / 100 : 0;
-
                 await prisma.trade.update({
                     where: { id: trade.id },
-                    data: {
-                        status: 'closed',
-                        exitPrice: currentPrice,
-                        exitTime: new Date(),
-                        exitReason: 'ADMIN_STOPPED',
-                        totalPnl: leveragedPnl,
-                        totalPnlPercent: pnlPct,
-                        activePnl: 0,
-                        activePnlPercent: 0,
-                    },
+                    data: buildCloseData(trade, 'ADMIN_STOPPED'),
                 });
             }
 

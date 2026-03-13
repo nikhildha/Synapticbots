@@ -242,6 +242,7 @@ model Trade {
   @@index([coin])
   @@index([mode])
   @@index([sessionId])
+  @@index([entryTime])
 }
 
 // ─── Bot Session (start-to-stop run record) ──────────────────────────────────

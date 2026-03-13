@@ -5,6 +5,7 @@ import prisma from '@/lib/prisma';
 import { checkSubscription, hasFeature } from '@/lib/subscription';
 import { createBotSession, closeBotSession } from '@/lib/bot-session';
 import { getEngineUrl } from '@/lib/engine-url';
+import { buildCloseData } from '@/lib/trade-utils';
 
 export const dynamic = 'force-dynamic';
 
@@ -141,25 +142,9 @@ export async function POST(request: Request) {
           );
         } else {
           for (const trade of activeTrades) {
-            const currentPrice = trade.currentPrice || trade.entryPrice;
-            const isLong = trade.position === 'long';
-            const priceDiff = isLong ? (currentPrice - trade.entryPrice) : (trade.entryPrice - currentPrice);
-            // UNIFIED PnL FIX: use quantity path (same as trades/close) — handles E2 CoinDCX correctly
-            const quantity = trade.quantity || (trade.capital * trade.leverage / trade.entryPrice);
-            const leveragedPnl = Math.round(priceDiff * quantity * 10000) / 10000;
-            const pnlPct = trade.capital > 0 ? Math.round(leveragedPnl / trade.capital * 100 * 100) / 100 : 0;
             await prisma.trade.update({
               where: { id: trade.id },
-              data: {
-                status: 'closed',
-                exitPrice: currentPrice,
-                exitTime: new Date(),
-                exitReason: 'BOT_STOPPED',
-                totalPnl: leveragedPnl,
-                totalPnlPercent: pnlPct,
-                activePnl: 0,
-                activePnlPercent: 0,
-              },
+              data: buildCloseData(trade, 'BOT_STOPPED'),
             });
           }
           if (activeTrades.length > 0) {
