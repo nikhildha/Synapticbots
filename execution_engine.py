@@ -87,7 +87,7 @@ class ExecutionEngine:
     # ─── Trade Execution ─────────────────────────────────────────────────────
 
     def execute_trade(self, symbol, side, leverage, quantity, atr,
-                      regime=None, confidence=None, reason=""):
+                      regime=None, confidence=None, reason="", swing_l=None, swing_h=None):
         """
         Execute a futures trade with protective SL/TP.
 
@@ -120,7 +120,7 @@ class ExecutionEngine:
         if config.PAPER_TRADE:
             from data_pipeline import get_current_price
             price = get_current_price(symbol) or 0
-            sl, tp = self.risk.calculate_atr_stops(price, atr, side)
+            sl, tp, rm_id = self.risk.calculate_optimal_stops(symbol, price, atr, side, leverage, swing_l, swing_h)
 
             log_entry = {
                 "timestamp":  datetime.utcnow().isoformat(),
@@ -135,6 +135,7 @@ class ExecutionEngine:
                 "regime":     regime_name,
                 "confidence": f"{confidence:.2f}" if confidence else "N/A",
                 "reason":     reason,
+                "rm_id":      rm_id,
                 "mode":       "PAPER",
             }
             self._log_trade(log_entry)
@@ -148,13 +149,13 @@ class ExecutionEngine:
         exchange = getattr(config, 'EXCHANGE_LIVE', '').lower()
         if exchange == 'binance':
             return self._execute_binance_live(symbol, side, leverage, quantity, atr,
-                                              regime, regime_name, confidence, reason)
+                                              regime, regime_name, confidence, reason, swing_l, swing_h)
         # Default to CoinDCX
         return self._execute_coindcx(symbol, side, leverage, quantity, atr,
-                                     regime, regime_name, confidence, reason)
+                                     regime, regime_name, confidence, reason, swing_l, swing_h)
 
     def _execute_binance_live(self, symbol, side, leverage, quantity, atr,
-                               regime, regime_name, confidence, reason):
+                               regime, regime_name, confidence, reason, swing_l=None, swing_h=None):
         """Execute a live trade on Binance Futures."""
         client = get_exchange_client()
         if not client:
@@ -163,7 +164,7 @@ class ExecutionEngine:
 
         from data_pipeline import get_current_price
         price = get_current_price(symbol) or 0
-        sl, tp = self.risk.calculate_atr_stops(price, atr, side)
+        sl, tp, rm_id = self.risk.calculate_optimal_stops(symbol, price, atr, side, leverage, swing_l, swing_h)
 
         result = client.open_position(
             symbol=symbol, side=side, quantity=quantity,
@@ -188,6 +189,7 @@ class ExecutionEngine:
                 "regime":       regime_name,
                 "confidence":   confidence if confidence else 0,
                 "reason":       reason,
+                "rm_id":        rm_id,
                 "mode":         "LIVE-BINANCE",
                 "exchange":     "binance",
                 "order_id":     result.get("order_id"),
@@ -372,7 +374,7 @@ class ExecutionEngine:
         return confirmed
 
     def _execute_coindcx(self, symbol, side, leverage, quantity, atr,
-                         regime, regime_name, confidence, reason):
+                         regime, regime_name, confidence, reason, swing_l=None, swing_h=None):
         """Execute a live trade on CoinDCX Futures. Returns a trade log dict or None."""
         import coindcx_client as cdx
 
@@ -383,7 +385,7 @@ class ExecutionEngine:
                 return None
             price, quantity, leverage, wallet = validated
 
-            sl, tp = self.risk.calculate_atr_stops(price, atr, side)
+            sl, tp, rm_id = self.risk.calculate_optimal_stops(symbol, price, atr, side, leverage, swing_l, swing_h)
             sl = self._cdx_price_round(sl)
             tp = self._cdx_price_round(tp)
 
@@ -420,6 +422,7 @@ class ExecutionEngine:
                 "regime":       regime_name,
                 "confidence":   confidence if confidence else 0,
                 "reason":       reason,
+                "rm_id":        rm_id,
                 "mode":         "LIVE",  # P6 FIX: was 'LIVE-COINDCX' — exchange tracked in 'exchange' field
                 "exchange":     "coindcx",
                 "pair":         pair,

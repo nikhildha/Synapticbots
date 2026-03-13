@@ -34,6 +34,20 @@ except ImportError:
 
 logger = logging.getLogger("Athena")
 
+# Setup dedicated file logger for Athena
+if not logger.handlers:
+    try:
+        import os
+        import config
+        os.makedirs(config.DATA_DIR, exist_ok=True)
+        athena_log_file = os.path.join(config.DATA_DIR, "athena_system.log")
+        file_handler = logging.FileHandler(athena_log_file, encoding="utf-8")
+        file_handler.setFormatter(logging.Formatter("%(asctime)s [%(name)s] %(levelname)s: %(message)s", datefmt="%Y-%m-%d %H:%M:%S"))
+        logger.addHandler(file_handler)
+        logger.setLevel(logging.DEBUG)  # Ensure debug logs are captured
+    except Exception as e:
+        pass
+
 
 # ─── Output dataclass ────────────────────────────────────────────────────────
 

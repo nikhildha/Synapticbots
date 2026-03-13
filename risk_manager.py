@@ -195,6 +195,57 @@ class RiskManager:
 
         return stop_loss, take_profit
 
+    @staticmethod
+    def calculate_optimal_stops(symbol, entry_price, atr, side, leverage=1, swing_l=None, swing_h=None):
+        """
+        Compute Stop Loss and Take Profit optimally selected per coin segment.
+        Returns (stop_loss, take_profit, rm_id).
+        """
+        rm_id = config.get_optimal_rm(symbol)
+        
+        if entry_price >= 100:
+            decimals = 2
+        elif entry_price >= 1:
+            decimals = 4
+        else:
+            decimals = 6
+
+        direction = 1 if side == "BUY" else -1
+
+        if rm_id == "RM1_Static":
+            sl = entry_price * (1 - direction * 0.05)
+            tp = entry_price * (1 + direction * 0.10)
+        elif rm_id == "RM2_ATR":
+            segment = None
+            for seg, coins in config.CRYPTO_SEGMENTS.items():
+                if symbol in coins:
+                    segment = seg
+                    break
+            m = 3.5 if segment in ["Meme", "AI"] else 2.5
+            sl = entry_price - direction * (m * atr)
+            tp = entry_price + direction * (m * 2.0 * atr)
+        elif rm_id == "RM3_Swing":
+            swing_lh = swing_l if side == "BUY" else swing_h
+            if swing_lh is not None and not np.isnan(swing_lh) and swing_lh > 0:
+                sl = swing_lh
+                # Ensure the swing stop isn't placed ON the wrong side of the entry price (highly unlikely but protects bounds)
+                if (side == "BUY" and sl >= entry_price) or (side == "SELL" and sl <= entry_price):
+                    sl = entry_price - direction * (3.0 * atr)
+            else:
+                sl = entry_price - direction * (3.0 * atr)
+            
+            risk_dist = abs(entry_price - sl)
+            tp = entry_price + direction * (risk_dist * 2.5) # Generous 2.5 RR for swings
+        elif rm_id == "RM5_Trailing":
+            sl = entry_price - direction * (1.5 * atr)
+            tp = entry_price + direction * (5.0 * atr) # Actual trailing happens dynamically in tradebook
+        else:
+            # Fallback
+            sl_val, tp_val = RiskManager.calculate_atr_stops(entry_price, atr, side, leverage)
+            return sl_val, tp_val, rm_id
+
+        return round(sl, decimals), round(tp, decimals), rm_id
+
     # ─── Kill Switch ─────────────────────────────────────────────────────────
 
     def record_equity(self, balance):

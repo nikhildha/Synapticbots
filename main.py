@@ -664,6 +664,8 @@ class RegimeMasterBot:
                     regime=trade["regime"],
                     confidence=trade["confidence"],
                     reason=trade["reason"],
+                    swing_l=trade.get("swing_l"),
+                    swing_h=trade.get("swing_h"),
                 )
 
                 # Record in tradebook — use CoinDCX-confirmed values for live mode
@@ -710,6 +712,9 @@ class RegimeMasterBot:
                     position_id=result.get("position_id") if result else None,
                     bot_id=bot_id,
                     all_bot_ids=None, # DO NOT CLONE TRADES
+                    rm_id=result.get("rm_id") if result else None,
+                    override_sl=fill_sl if fill_sl > 0 else None,
+                    override_tp=fill_tp if fill_tp > 0 else None,
                 )
 
                 self._active_positions[pos_key] = {
@@ -1199,6 +1204,8 @@ class RegimeMasterBot:
 
         current_atr   = df_1h_feat["atr"].iloc[-1]   if "atr"   in df_1h_feat.columns else 0.0
         current_price = float(df_1h_feat["close"].iloc[-1])
+        current_swing_l = float(df_1h_feat["swing_l"].iloc[-1]) if "swing_l" in df_1h_feat.columns else None
+        current_swing_h = float(df_1h_feat["swing_h"].iloc[-1]) if "swing_h" in df_1h_feat.columns else None
 
         # 2. Volatility filter
         if config.VOL_FILTER_ENABLED and current_atr > 0:
@@ -1330,6 +1337,8 @@ class RegimeMasterBot:
             "symbol": symbol,
             "side": side,
             "atr": current_atr,
+            "swing_l": current_swing_l,
+            "swing_h": current_swing_h,
             "regime": regime,
             "regime_name": regime_name,
             "confidence": conf,
@@ -1420,6 +1429,8 @@ class RegimeMasterBot:
             "leverage": leverage,
             "quantity": quantity,
             "atr": raw["atr"],
+            "swing_l": raw.get("swing_l"),
+            "swing_h": raw.get("swing_h"),
             "regime": raw["regime"],
             "regime_name": raw["regime_name"],
             "confidence": raw["confidence"],

@@ -13,42 +13,77 @@ logger = logging.getLogger("FeatureEngine")
 
 # ─── HMM Features ───────────────────────────────────────────────────────────────
 
-def compute_hmm_features(df):
+def compute_hmm_features(df, btc_df=None):
     """
-    Add HMM-ready features to an OHLCV DataFrame.
+    Add HMM-ready institutional flow features to an OHLCV DataFrame.
 
     Adds:
-      - log_return     : log(close / prev_close)
-      - volatility     : intraday range = (high - low) / close
-      - volume_change  : log(volume / prev_volume), clamped [-3, 3]
-      - rsi_norm       : (RSI_14 - 50) / 50, range [-1, +1]
-      - funding_proxy  : 8-bar cum-return clipped to [-1, +1] (crowding proxy)
-      - adx            : ADX(14) / 100, range [0, 1] (trend strength)
-
-    Parameters
-    ----------
-    df : pd.DataFrame with columns ['open', 'high', 'low', 'close', 'volume']
-
-    Returns
-    -------
-    pd.DataFrame with added feature columns (NaN rows NOT dropped)
+      - log_return
+      - volatility
+      - volume_change
+      - vol_zscore      : Z-score of volume vs 24-period SMA
+      - rel_strength_btc: Asset Return - BTC Return (requires `btc_df`)
     """
     df = df.copy()
     df["log_return"] = np.log(df["close"] / df["close"].shift(1))
     df["volatility"] = (df["high"] - df["low"]) / df["close"]
-    # Volume momentum — captures volume spikes signaling regime shifts
     df["volume_change"] = np.log(df["volume"] / df["volume"].shift(1).replace(0, np.nan))
     df["volume_change"] = df["volume_change"].fillna(0).clip(-3, 3)
-    # Normalized RSI — momentum context for state classification
-    rsi = compute_rsi(df["close"], length=14)
-    df["rsi_norm"] = (rsi - 50) / 50  # Range: -1 to +1
-    df["rsi_norm"] = df["rsi_norm"].fillna(0)
-    # Funding-rate proxy: 8-bar cum-return normalized → crowding signal
-    df["funding_proxy"] = df["close"].pct_change(8).clip(-0.3, 0.3) / 0.3
-    df["funding_proxy"] = df["funding_proxy"].fillna(0)
-    # ADX trend strength normalized to [0, 1]
-    df["adx"] = compute_adx(df, length=14)
-    df["adx"] = df["adx"].fillna(0)
+
+    # 2. Volume Z-Score
+    vol_sma = df["volume"].rolling(24).mean()
+    vol_std = df["volume"].rolling(24).std().replace(0, np.nan)
+    df["vol_zscore"] = ((df["volume"] - vol_sma) / vol_std).fillna(0).clip(-5, 5)
+
+    # 4. Relative Strength vs BTC
+    if btc_df is not None and not btc_df.empty:
+        # Align lengths if mismatched
+        min_len = min(len(df), len(btc_df))
+        asset_ret = df["close"].iloc[-min_len:].pct_change().fillna(0).values
+        btc_ret = btc_df["close"].iloc[-min_len:].pct_change().fillna(0).values
+        rs = asset_ret - btc_ret
+        
+        df_rs = np.zeros(len(df))
+        df_rs[-min_len:] = rs
+        df["rel_strength_btc"] = df_rs + np.random.normal(0, 1e-6, len(df)) # Jitter to prevent singular matrix
+    else:
+        df["rel_strength_btc"] = np.random.normal(0, 1e-6, len(df))
+        
+    # 6. Liquidity Vacuum (Range Expansion Velocity)
+    # Absolute close-to-close return divided by the 14-period ATR
+    # High values mean price moved through air pockets
+    atr_14 = compute_atr(df, 14)
+    df["liquidity_vacuum"] = (df["log_return"].abs() / (atr_14 / df["close"])).fillna(0).clip(0, 5)
+    if df["liquidity_vacuum"].std() < 1e-6: df["liquidity_vacuum"] += np.random.normal(0, 1e-6, len(df))
+
+    # 7. Exhaustion Tail
+    # Wick size relative to body size, multiplied by volume z-score
+    body = (df["close"] - df["open"]).abs()
+    # Replace 0 body with a tiny number to prevent inf
+    body = body.replace(0, 1e-8)
+    upper_wick = df["high"] - df[["open", "close"]].max(axis=1)
+    lower_wick = df[["open", "close"]].min(axis=1) - df["low"]
+    
+    # + if lower wick is huge (bullish rejection), - if upper wick is huge (bearish rejection)
+    wick_skew = (lower_wick - upper_wick) / body
+    # Only matters if volume is abnormally high
+    df["exhaustion_tail"] = (wick_skew * df["vol_zscore"].clip(0, 5)).fillna(0).clip(-10, 10)
+    if df["exhaustion_tail"].std() < 1e-6: df["exhaustion_tail"] += np.random.normal(0, 1e-6, len(df))
+
+    # 9. Amihud Illiquidity (Price Impact per unit of volume)
+    dollar_volume = df["close"] * (df["volume"].replace(0, np.nan))
+    df["amihud_illiquidity"] = (df["log_return"].abs() / dollar_volume).fillna(0)
+    df["amihud_illiquidity"] = (df["amihud_illiquidity"] * 1e8).clip(0, 10)
+
+    # 10. Volume Trend Intensity
+    vol_ema_short = df["volume"].ewm(span=5, adjust=False).mean()
+    vol_ema_long = df["volume"].ewm(span=20, adjust=False).mean()
+    df["volume_trend_intensity"] = (vol_ema_short / vol_ema_long.replace(0, np.nan)).fillna(1.0).clip(0, 5)
+
+    # 11. Swing High/Low for RM3_Swing (10-candle local structure)
+    df["swing_l"] = df["low"].rolling(10).min()
+    df["swing_h"] = df["high"].rolling(10).max()
+
     return df
 
 

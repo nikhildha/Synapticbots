@@ -102,7 +102,8 @@ def _compute_summary(book):
 def open_trade(symbol, side, leverage, quantity, entry_price, atr,
                regime, confidence, reason="", capital=100.0, mode=None, user_id=None,
                profile_id="standard", bot_name="Synaptic Adaptive",
-               exchange=None, pair=None, position_id=None, bot_id=None, all_bot_ids=None):
+               exchange=None, pair=None, position_id=None, bot_id=None, all_bot_ids=None,
+               rm_id=None, override_sl=None, override_tp=None):
     """
     Record a new trade entry in the tradebook.
 
@@ -139,33 +140,45 @@ def open_trade(symbol, side, leverage, quantity, entry_price, atr,
     position = "LONG" if side == "BUY" else "SHORT"
 
     # Compute SL/TP based on ATR (adjusted for leverage)
-    sl_mult, tp_mult = config.get_atr_multipliers(leverage)
-
-    # ── Multi-Target System (0304_v1) ──
-    if getattr(config, 'MULTI_TARGET_ENABLED', False):
-        sl_dist = atr * sl_mult
-        t3_dist = sl_dist * config.MT_RR_RATIO  # 1:5 R:R
-        if position == "LONG":
-            stop_loss = round(entry_price - sl_dist, 6)
-            t1_price = round(entry_price + t3_dist * config.MT_T1_FRAC, 6)
-            t2_price = round(entry_price + t3_dist * config.MT_T2_FRAC, 6)
-            t3_price = round(entry_price + t3_dist, 6)
-        else:
-            stop_loss = round(entry_price + sl_dist, 6)
-            t1_price = round(entry_price - t3_dist * config.MT_T1_FRAC, 6)
-            t2_price = round(entry_price - t3_dist * config.MT_T2_FRAC, 6)
-            t3_price = round(entry_price - t3_dist, 6)
-        take_profit = t3_price  # TP = T3 for display
-    else:
-        if position == "LONG":
-            stop_loss = round(entry_price - atr * sl_mult, 6)
-            take_profit = round(entry_price + atr * tp_mult, 6)
-        else:
-            stop_loss = round(entry_price + atr * sl_mult, 6)
-            take_profit = round(entry_price - atr * tp_mult, 6)
+    if override_sl is not None and override_tp is not None:
+        stop_loss = round(override_sl, 6)
+        take_profit = round(override_tp, 6)
         t1_price = None
         t2_price = None
         t3_price = None
+        
+        # RM5_Trailing locks 50% at 2% and trails the rest
+        if rm_id == "RM5_Trailing":
+            direction = 1 if position == "LONG" else -1
+            t1_price = round(entry_price + direction * (entry_price * 0.02), 6)
+    else:
+        sl_mult, tp_mult = config.get_atr_multipliers(leverage)
+
+        # ── Multi-Target System (0304_v1) ──
+        if getattr(config, 'MULTI_TARGET_ENABLED', False):
+            sl_dist = atr * sl_mult
+            t3_dist = sl_dist * config.MT_RR_RATIO  # 1:5 R:R
+            if position == "LONG":
+                stop_loss = round(entry_price - sl_dist, 6)
+                t1_price = round(entry_price + t3_dist * config.MT_T1_FRAC, 6)
+                t2_price = round(entry_price + t3_dist * config.MT_T2_FRAC, 6)
+                t3_price = round(entry_price + t3_dist, 6)
+            else:
+                stop_loss = round(entry_price + sl_dist, 6)
+                t1_price = round(entry_price - t3_dist * config.MT_T1_FRAC, 6)
+                t2_price = round(entry_price - t3_dist * config.MT_T2_FRAC, 6)
+                t3_price = round(entry_price - t3_dist, 6)
+            take_profit = t3_price  # TP = T3 for display
+        else:
+            if position == "LONG":
+                stop_loss = round(entry_price - atr * sl_mult, 6)
+                take_profit = round(entry_price + atr * tp_mult, 6)
+            else:
+                stop_loss = round(entry_price + atr * sl_mult, 6)
+                take_profit = round(entry_price - atr * tp_mult, 6)
+            t1_price = None
+            t2_price = None
+            t3_price = None
 
     now_iso = datetime.utcnow().isoformat()
     trade = {
@@ -223,6 +236,7 @@ def open_trade(symbol, side, leverage, quantity, entry_price, atr,
         "exchange":         exchange,
         "pair":             pair,
         "position_id":      position_id,
+        "rm_id":            rm_id,
     }
 
     book["trades"].append(trade)

@@ -59,7 +59,7 @@ ENGINE_EXIT=0
 if $RUN_ENGINE; then
   echo "  [1/3] Running Python engine checks..."
   cd "$ROOT_DIR"
-  python tools/daily_audit.py || ENGINE_EXIT=$?
+  python3 tools/daily_audit.py || ENGINE_EXIT=$?
   echo ""
 
   if [[ ! -f "$ENGINE_REPORT" ]]; then

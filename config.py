@@ -36,6 +36,18 @@ MAKER_FEE = 0.0002            # 0.02% maker per leg
 PRIMARY_SYMBOL = "BTCUSDT"
 SECONDARY_SYMBOLS = ["ETHUSDT"]
 
+# ─── Crypto Segments (for Segment-Level Analysis) ───────────────────────────────
+CRYPTO_SEGMENTS = {
+    "L1": ["BTCUSDT", "ETHUSDT", "SOLUSDT"],
+    "L2": ["ARBUSDT", "OPUSDT", "MATICUSDT"],
+    "DeFi": ["UNIUSDT", "AAVEUSDT", "LDOUSDT"],
+    "AI": ["FETUSDT", "RNDRUSDT", "OCEANUSDT"],
+    "Meme": ["DOGEUSDT", "PEPEUSDT", "WIFUSDT"],
+    "RWA": ["ONDOUSDT", "PENDLEUSDT", "LINKUSDT"],
+    "Gaming": ["GALAUSDT", "IMXUSDT", "SANDUSDT"],
+    "DePIN": ["FILUSDT", "ARUSDT", "RUNEUSDT"]
+}
+
 # ─── Timeframes ─────────────────────────────────────────────────────────────────
 TIMEFRAME_EXECUTION = "15m"   # Entry / exit timing (optimized from 5m)
 TIMEFRAME_CONFIRMATION = "1h" # Trend confirmation
@@ -44,10 +56,29 @@ TIMEFRAME_MACRO = "4h"        # Macro regime (legacy — replaced by Multi-TF HM
 # ─── Multi-Timeframe HMM (backtest-proven: +$2,421 PnL, PF 1.49) ────────────
 MULTI_TF_ENABLED = True               # Use 3 separate HMM brains per coin
 MULTI_TF_TIMEFRAMES = ["1d", "1h", "15m"]   # Daily (macro), Hourly (swing), 15min (momentum)
-MULTI_TF_CANDLE_LIMIT = 250           # Candles to fetch per TF (reduced from 1000 for faster processing)
+MULTI_TF_CANDLE_LIMIT = 1000          # Candles to fetch per TF (1000 Daily = 2.7 years)
 MULTI_TF_WEIGHTS = {"1d": 40, "1h": 35, "15m": 25}  # Conviction weights (sum=100)
 MULTI_TF_MIN_AGREEMENT = 2            # Minimum TFs agreeing on direction (2 of 3)
 MULTI_TF_MIN_MODELS = 2               # Minimum trained models required
+
+# ─── Optimal Risk Managers per Segment ──────────────────────────────────────────
+OPTIMAL_RISK_MANAGERS = {
+    "AI": "RM3_Swing",
+    "Meme": "RM3_Swing",
+    "L2": "RM3_Swing",
+    "DePIN": "RM3_Swing",
+    "Gaming": "RM5_Trailing",
+    "RWA": "RM5_Trailing",
+    "L1": "RM2_ATR",
+    "DeFi": "RM3_Swing"
+}
+
+def get_optimal_rm(symbol):
+    """Retrieve the optimal risk manager ID (e.g. RM3_Swing) for a given coin based on its segment."""
+    for segment, coins in CRYPTO_SEGMENTS.items():
+        if symbol in coins:
+            return OPTIMAL_RISK_MANAGERS.get(segment, "RM3_Swing")
+    return "RM3_Swing" # Default for unmapped/new coins
 
 # ─── Weekend Skip ───────────────────────────────────────────────────────────────
 WEEKEND_SKIP_ENABLED = True            # Skip new entries on Saturday + Sunday (UTC)
@@ -107,33 +138,33 @@ ACTIVE_PROFILES = ["standard"]
 BRAIN_PROFILES = {
     "conservative": {
         "label": "🟢 Conservative",
-        "leverage": 10,
+        "leverage": 4,
         "conviction_min": 70,
         "atr_sl_mult": 1.5,
         "atr_tp_mult": 3.0,
-        "max_loss_pct": 8,
+        "max_loss_pct": 20,
         "max_positions": 10,
         "capital_per_trade": 100,
         "scan_limit": 15,             # Fewer coins = highest liquidity only
     },
     "balanced": {
         "label": "🟡 Balanced",
-        "leverage": 15,
+        "leverage": 8,
         "conviction_min": 60,
         "atr_sl_mult": 2.0,
         "atr_tp_mult": 4.0,
-        "max_loss_pct": 8,
+        "max_loss_pct": 20,
         "max_positions": 10,
         "capital_per_trade": 100,
         "scan_limit": 30,             # Mid-range scan for normal conditions
     },
     "aggressive": {
         "label": "🔴 Aggressive",
-        "leverage": 25,
+        "leverage": 10,
         "conviction_min": 50,
         "atr_sl_mult": 2.0,
         "atr_tp_mult": 3.0,
-        "max_loss_pct": 10,
+        "max_loss_pct": 25,
         "max_positions": 10,
         "capital_per_trade": 100,
         "scan_limit": 50,             # Wide net during strong trends
@@ -143,7 +174,7 @@ BRAIN_PROFILES = {
 # ─── Risk Management ────────────────────────────────────────────────────────────
 RISK_PER_TRADE = 0.04
 KILL_SWITCH_DRAWDOWN = 0.10   # Pause bot if 10% drawdown in 24h
-MAX_LOSS_PER_TRADE_PCT = -10     # Hard max-loss per trade (brain switcher may use -8%)
+MAX_LOSS_PER_TRADE_PCT = -35     # Hard max-loss per trade (widened so ATR stops catch before margin call)
 MIN_LEVERAGE_FLOOR = 5           # Skip trade if leverage must drop below this
 MIN_HOLD_MINUTES = 30         # Minimum hold time before regime-change exits
 DEFAULT_QUANTITY = 0.002      # BTC quantity (overridden by position sizer)
@@ -172,7 +203,7 @@ def get_atr_multipliers(leverage=1):
 # Each step: (trigger_pnl_pct, lock_pnl_pct)
 #   When leveraged P&L >= trigger → move SL to lock that % profit
 #   lock 0% = breakeven (entry price)
-TRAILING_SL_ENABLED = False       # Disabled — backtest shows no trailing yields better PnL
+TRAILING_SL_ENABLED = True       # Enabled to lock in profit before reversion
 TRAILING_SL_STEPS = [
     (5.0,   0.0),   # At +5%  leveraged P&L → SL to Breakeven
     (10.0,  5.0),   # At +10% leveraged P&L → Lock +5% profit
@@ -231,6 +262,10 @@ TOP_COINS_LIMIT = 50            # Max coins to scan (brain switcher may reduce: 
 CAPITAL_PER_COIN_PCT = 0.05     # 5% of balance per coin (max 15 = 75% deployed)
 SCAN_INTERVAL_CYCLES = 4        # Re-scan top coins every N analysis cycles (4 × 15m = 1h)
 MULTI_COIN_MODE = True          # Enable multi-coin scanning
+
+# ─── Dynamic Segment Scanner ─────────────────────────────────────────────────────
+SCANNER_SEGMENT_ROTATION = True     # Rotate market segments every hour
+SCANNER_COINS_PER_SEGMENT = 5       # Scan top 5 highest-volume coins within the active segment
 
 # ─── QuickScalper ──────────────────────────────────────────────────────────────────────────────────
 SCALPER_ENABLED = os.getenv("SCALPER_ENABLED", "true").lower() == "true"
@@ -344,10 +379,12 @@ CONVICTION_FLOW_STRONG_PENALTY     = 7    # Strong opposing order flow
 # Uses MARGIN confidence: best_prob - 2nd_best_prob (range 0.0–1.0)
 # Replaces raw max-posterior which was always 99%+ (uncalibrated).
 # Experiment results: 3-state+margin Sharpe +1.22 vs 4-state+raw +0.72
-HMM_CONF_TIER_HIGH     = 0.60   # Margin > 0.60 → full weight (100%)
-HMM_CONF_TIER_MED_HIGH = 0.40   # Margin > 0.40 → 85% weight
-HMM_CONF_TIER_MED      = 0.25   # Margin > 0.25 → 65% weight
-HMM_CONF_TIER_LOW      = 0.10   # Margin > 0.10 → 40% weight (below = no contribution)
+
+# ─── Margin scoring tiers (used to weight multi-TF agreement) ─────────────────
+HMM_CONF_TIER_HIGH     = 0.30   # Margin > 0.30 → full weight (100%)
+HMM_CONF_TIER_MED_HIGH = 0.20   # Margin > 0.20 → 85% weight
+HMM_CONF_TIER_MED      = 0.10   # Margin > 0.10 → 65% weight
+HMM_CONF_TIER_LOW      = 0.05   # Margin > 0.05 → 40% weight (below = no contribution)
 
 # ─── Conviction Score: Funding Rate Thresholds ───────────────────────────────
 FUNDING_NEG_STRONG =  -0.0001  # Below: longs paid → BUY favorable (full score)

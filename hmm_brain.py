@@ -18,9 +18,10 @@ logger = logging.getLogger("HMMBrain")
 # Suppress noisy hmmlearn warnings (e.g. "transmat_ zero sum" for rare states)
 logging.getLogger("hmmlearn.base").setLevel(logging.ERROR)
 
-# Feature columns used for HMM training/prediction (must match feature_engine.compute_hmm_features)
-# EXP 2 greedy selection: funding_proxy+adx added → Sharpe 0.258 → 0.667
-HMM_FEATURES = ["log_return", "volatility", "volume_change", "rsi_norm", "funding_proxy", "adx"]
+from segment_features import ALL_HMM_FEATURES, get_features_for_coin, get_segment_for_coin
+
+# (Legacy fallback)
+HMM_FEATURES = ALL_HMM_FEATURES
 
 
 class HMMBrain:
@@ -34,8 +35,10 @@ class HMMBrain:
       - Lowest mean   → CRASH (state 3)
     """
 
-    def __init__(self, n_states=None):
+    def __init__(self, n_states=None, symbol=None, features_list=None):
         self.n_states = n_states or config.HMM_N_STATES
+        self.symbol = symbol or config.PRIMARY_SYMBOL
+        self.features = features_list or get_features_for_coin(self.symbol)
         self.model = None
         self._state_map = None        # raw_state → canonical_state
         self._last_trained = None
@@ -58,7 +61,7 @@ class HMMBrain:
         -------
         self
         """
-        features = df[HMM_FEATURES].dropna().values
+        features = df[self.features].dropna().values
 
         if len(features) < 50:
             logger.warning("Insufficient data for HMM training (%d rows). Need ≥50.", len(features))
@@ -149,7 +152,7 @@ class HMMBrain:
             logger.warning("HMM not trained yet. Returning CHOP with 0 confidence.")
             return config.REGIME_CHOP, 0.0
 
-        features = df[HMM_FEATURES].dropna().values
+        features = df[self.features].dropna().values
         if len(features) == 0:
             return config.REGIME_CHOP, 0.0
 
@@ -179,7 +182,7 @@ class HMMBrain:
         if not self._is_trained:
             return np.full(len(df), config.REGIME_CHOP)
 
-        features = df[HMM_FEATURES].dropna().values
+        features = df[self.features].dropna().values
         features_scaled = (features - self._feat_mean) / self._feat_std
         raw_states = self.model.predict(features_scaled)
 
@@ -198,7 +201,7 @@ class HMMBrain:
         if not self._is_trained:
             return np.zeros((len(df), self.n_states))
 
-        features = df[HMM_FEATURES].dropna().values
+        features = df[self.features].dropna().values
         features_scaled = (features - self._feat_mean) / self._feat_std
         return self.model.predict_proba(features_scaled)
 
@@ -241,6 +244,7 @@ class MultiTFHMMBrain:
 
     def __init__(self, symbol):
         self.symbol = symbol
+        self.segment = get_segment_for_coin(symbol)
         self._brains = {}        # timeframe → HMMBrain
         self._predictions = {}   # timeframe → (regime, margin)
 
@@ -343,8 +347,8 @@ class MultiTFHMMBrain:
                 else:
                     total += w * 0.20
             else:
-                # Disagreement penalty
-                total -= w * 0.5
+                # Disagreement adds nothing (penalty removed to allow higher conviction tiers)
+                total += 0
 
         conviction = max(0.0, min(100.0, total))
         return round(conviction, 1), consensus, agreement

@@ -124,11 +124,29 @@ def get_coin_tier(symbol: str) -> str:
     return _coin_tiers.get(symbol, {}).get("tier", "B")
 
 
-def _get_top_coins_binance(limit=15, quote="USDT"):
-    """Fetch top coins from Binance by 24h quote volume (paper mode).
-    Only includes coins with >= MIN_QUOTE_VOLUME_USD 24h volume to ensure
-    tight spreads and high liquidity for HMM regime analysis.
-    """
+ROTATION_STATE_FILE = os.path.join(config.DATA_DIR, "segment_rotation.json")
+
+def _load_rotation_state():
+    if os.path.exists(ROTATION_STATE_FILE):
+        try:
+            with open(ROTATION_STATE_FILE, "r") as f:
+                return json.load(f)
+        except Exception:
+            pass
+    return {
+        "last_shortlist_time": 0,
+        "master_shortlist": {}
+    }
+
+def _save_rotation_state(state):
+    try:
+        with open(ROTATION_STATE_FILE, "w") as f:
+            json.dump(state, f, indent=2)
+    except Exception as e:
+        logger.error("Failed to save rotation state: %s", e)
+
+def _get_segment_coins_binance(segment_coins, limit=5):
+    """Fetch top coins for a specific segment from Binance by 24h volume."""
     client = _get_binance_client()
     try:
         tickers = client.get_ticker()
@@ -137,100 +155,121 @@ def _get_top_coins_binance(limit=15, quote="USDT"):
         return [config.PRIMARY_SYMBOL]
 
     exclude_keywords = ("UP", "DOWN", "BULL", "BEAR")
+    exclusions = get_all_exclusions()
+    
     usdt_tickers = [
         t for t in tickers
-        if t["symbol"].endswith(quote)
-        and not any(kw in t["symbol"].replace(quote, "") for kw in exclude_keywords)
-        and t["symbol"] not in get_all_exclusions()
-        and float(t.get("quoteVolume", 0)) >= MIN_QUOTE_VOLUME_USD  # High-volume filter
+        if t["symbol"] in segment_coins
+        and not any(kw in t["symbol"] for kw in exclude_keywords)
+        and t["symbol"] not in exclusions
+        # Dropped MIN_QUOTE_VOLUME_USD filter here to ensure segment coins can be found even if volume drops across the board
     ]
     usdt_tickers.sort(key=lambda t: float(t.get("quoteVolume", 0)), reverse=True)
-    top_symbols = [t["symbol"] for t in usdt_tickers[:limit]]
-    logger.info(
-        "Binance: Top %d coins by volume (>$%.0fM 24h) from %d total USDT pairs.",
-        len(top_symbols), MIN_QUOTE_VOLUME_USD / 1_000_000, len(usdt_tickers)
-    )
-    return top_symbols
+    return [t["symbol"] for t in usdt_tickers[:limit]]
 
-
-def _get_top_coins_coindcx(limit=15):
-    """
-    Fetch top coins from CoinDCX Futures by 24h volume (live mode).
-    Returns Binance-style symbols (BTCUSDT) for compatibility.
-    """
+def _get_segment_coins_coindcx(segment_coins, limit=5):
+    """Fetch top coins for a specific segment from CoinDCX Futures by 24h volume."""
     import coindcx_client as cdx
 
     instruments = cdx.get_active_instruments()
     if not instruments:
-        logger.warning("No CoinDCX instruments — falling back to primary symbol.")
         return [config.PRIMARY_SYMBOL]
 
-    # Get current prices with volume data
     prices = cdx.get_current_prices()
+    exclusions = get_all_exclusions()
 
-    # Build (instrument, volume) list and sort by 24h volume
     scored = []
     for inst in instruments:
-        info = prices.get(inst, {})
-        volume = float(info.get("v", 0))
-        scored.append((inst, volume))
+        binance_sym = cdx.from_coindcx_pair(inst)
+        if binance_sym in segment_coins and binance_sym not in exclusions:
+            volume = float(prices.get(inst, {}).get("v", 0))
+            scored.append((binance_sym, volume))
 
     scored.sort(key=lambda x: x[1], reverse=True)
+    return [sym for sym, vol in scored[:limit]]
 
-    # Convert to Binance-style symbols and take top N
-    top_pairs = scored[:limit]
-    top_symbols = [cdx.from_coindcx_pair(pair) for pair, vol in top_pairs]
-    top_symbols = [s for s in top_symbols if s not in get_all_exclusions()]
-
-    logger.info("CoinDCX: Top %d coins by volume (%d total instruments).", len(top_symbols), len(instruments))
-    return top_symbols
-
-
-def get_top_coins_by_volume(limit=15, quote="USDT"):
-    """
-    Fetch top trading pairs ranked by 24h volume — limited to 15 high-liquidity coins.
-
-    Using 15 instead of 50:
-    • Cuts HMM training time from ~12 min → ~3-4 min per cycle
-    • Engine stays within Railway 600s health-check window
-    • Only coins with >$200M 24h volume are included (tight spreads, low slippage)
-    • Tier C (historically unprofitable) coins are removed
-    • Tier A coins are sorted to the front
-
-    Routes:
-      Paper mode → Binance
-      Live mode  → CoinDCX Futures
-
-    Returns
-    -------
-    list[str] — Binance-style symbols, e.g. ['BTCUSDT', 'ETHUSDT', ...]
-    """
+def update_hourly_shortlist(limit=2):
     _load_coin_tiers()
+    logger.info("🔄 Running hourly master shortlist for all segments...")
+    master_shortlist = {}
+    
+    for segment, candidate_coins in config.CRYPTO_SEGMENTS.items():
+        if config.PAPER_TRADE:
+            selected_coins = _get_segment_coins_binance(candidate_coins, limit=limit * 2)
+        else:
+            selected_coins = _get_segment_coins_coindcx(candidate_coins, limit=limit * 2)
+            
+        if _coin_tiers:
+            tier_c = {s for s, info in _coin_tiers.items() if info["tier"] == "C"}
+            selected_coins = [s for s in selected_coins if s not in tier_c]
+            
+            tier_a = {s for s, info in _coin_tiers.items() if info["tier"] == "A"}
+            selected_coins = (
+                [s for s in selected_coins if s in tier_a] +
+                [s for s in selected_coins if s not in tier_a]
+            )
 
-    if config.PAPER_TRADE:
-        symbols = _get_top_coins_binance(limit=limit * 2, quote=quote)
+        selected_coins = selected_coins[:limit]
+        if not selected_coins:
+            logger.warning("No valid coins found for segment %s.", segment)
+            
+        master_shortlist[segment] = selected_coins
+        
+    state = {
+        "last_shortlist_time": time.time(),
+        "master_shortlist": master_shortlist
+    }
+    _save_rotation_state(state)
+    logger.info("✅ Hourly master shortlist completed and saved.")
+    return state
+
+def get_active_segment_coins(limit=2):
+    """
+    Checks the rotation state. If 1 hour has passed, updates the master shortlist for all segments.
+    Then determines the current 15-minute block and returns the coins for the 2 active segments.
+    """
+    if not getattr(config, "SCANNER_SEGMENT_ROTATION", False):
+        logger.info("Segment rotation disabled. Falling back to L1 default.")
+        return config.CRYPTO_SEGMENTS["L1"][:limit]
+
+    state = _load_rotation_state()
+    now = time.time()
+    
+    # Update master shortlist every 1 hour (3600 seconds)
+    if now - state.get("last_shortlist_time", 0) > 3600 or not state.get("master_shortlist"):
+        state = update_hourly_shortlist(limit)
+        
+    master_shortlist = state.get("master_shortlist", {})
+    segments = list(config.CRYPTO_SEGMENTS.keys())
+    
+    # Determine the 15-minute execution block based on the current UTC minute
+    current_minute = datetime.utcnow().minute
+    block_index = current_minute // 15
+    
+    # Each block gets 2 segments (4 blocks per hour, 8 segments total)
+    start_idx = (block_index * 2) % len(segments)
+    end_idx = start_idx + 2
+    
+    if end_idx <= len(segments):
+        active_segments = segments[start_idx:end_idx]
     else:
-        symbols = _get_top_coins_coindcx(limit=limit * 2)
-
-    if _coin_tiers:
-        # Remove Tier C (chronically unprofitable) coins
-        tier_c = {s for s, info in _coin_tiers.items() if info["tier"] == "C"}
-        removed = [s for s in symbols if s in tier_c]
-        symbols = [s for s in symbols if s not in tier_c]
-        if removed:
-            logger.info("Coin tier filter: excluded %d Tier C coins: %s", len(removed), removed[:5])
-
-        # Sort: Tier A first, then B, then unranked — preserve relative volume order within each tier
-        tier_a = {s for s, info in _coin_tiers.items() if info["tier"] == "A"}
-        symbols = (
-            [s for s in symbols if s in tier_a] +
-            [s for s in symbols if s not in tier_a]
-        )
-
-    return symbols[:limit]
+        active_segments = segments[start_idx:] + segments[:end_idx % len(segments)]
+        
+    active_coins = []
+    for seg in active_segments:
+        active_coins.extend(master_shortlist.get(seg, []))
+        
+    logger.info("📍 Active block %d (:%.2d-:%.2d). Evaluating %d segments: %s", 
+                block_index, block_index * 15, block_index * 15 + 14, len(active_segments), ", ".join(active_segments))
+                
+    if not active_coins:
+        logger.warning("No active coins found in the mapped segments.")
+        return [config.PRIMARY_SYMBOL]
+        
+    return active_coins
 
 
-def scan_all_regimes(symbols=None, limit=15, timeframe="1h", kline_limit=500):
+def scan_all_regimes(symbols=None, limit=None, timeframe="1h", kline_limit=500):
     """
     Run HMM regime classification on each symbol.
 
@@ -240,7 +279,8 @@ def scan_all_regimes(symbols=None, limit=15, timeframe="1h", kline_limit=500):
         {symbol, regime, regime_name, confidence, price, volume_24h, timestamp}
     """
     if symbols is None:
-        symbols = get_top_coins_by_volume(limit=limit)
+        limit = limit or getattr(config, "SCANNER_COINS_PER_SEGMENT", 5)
+        symbols = get_active_segment_coins(limit=limit)
 
     results = []
     brain = HMMBrain()
@@ -343,6 +383,7 @@ def print_scanner_report(results):
 # ─── CLI ─────────────────────────────────────────────────────────────────────────
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(name)s] %(levelname)s: %(message)s")
-    print("Scanning top 15 high-volume coins...")
-    results = scan_all_regimes(limit=15)
+    limit = getattr(config, "SCANNER_COINS_PER_SEGMENT", 5)
+    print(f"Scanning up to {limit} coins for active narrative segment...")
+    results = scan_all_regimes(limit=limit)
     print_scanner_report(results)
