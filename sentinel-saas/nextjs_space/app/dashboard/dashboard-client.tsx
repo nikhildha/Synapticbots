@@ -5,7 +5,7 @@ import { Header } from '@/components/header';
 import { StatsCard } from '@/components/stats-card';
 import { BotCard } from '@/components/bot-card';
 import { RegimeCard, PnlCard, ActivePositionsCard, SignalSummaryTable } from '@/components/dashboard/command-center';
-import { EngineConsole } from '@/components/dashboard/engine-console';
+
 import { AthenaPanel } from '@/components/dashboard/athena-panel';
 import { TerminalFeed } from '@/components/dashboard/terminal-feed';
 import { SegmentHeatmap } from '@/components/dashboard/segment-heatmap';
@@ -757,14 +757,7 @@ export function DashboardClient({ user, stats, bots, recentTrades }: DashboardCl
         </div>
       )}
 
-      {/* ═══ Admin: Engine Console (live logs) ═══ */}
-      {(user as any)?.role === 'admin' && (
-        <div className="max-w-7xl mx-auto px-4 pb-12">
-          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.45 }}>
-            <EngineConsole />
-          </motion.div>
-        </div>
-      )}
+
 
       {/* ═══ Virtual Limit Orders (bottom of page) ═══ */}
       <div className="max-w-7xl mx-auto px-4 pb-12">
