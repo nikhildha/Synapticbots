@@ -17,16 +17,25 @@ const SEGMENT_MAP: Record<string, string> = {
     // L1
     BTC: 'L1', ETH: 'L1', SOL: 'L1', BNB: 'L1', AVAX: 'L1', SUI: 'L1',
     // L2
-    MATIC: 'L2', ARB: 'L2', OP: 'L2', IMX: 'L2', RONIN: 'L2', RON: 'L2', STRK: 'L2', MANTA: 'L2',
+    MATIC: 'L2', ARB: 'L2', OP: 'L2', POL: 'L2', MNT: 'L2', STRK: 'L2', IMX: 'L2', RONIN: 'L2', RON: 'L2', MANTA: 'L2',
     // DeFi
-    LINK: 'DeFi', UNI: 'DeFi', AAVE: 'DeFi', DYDX: 'DeFi', CRV: 'DeFi', JUP: 'DeFi', PENDLE: 'DeFi', GMX: 'DeFi', ENS: 'DeFi',
+    UNI: 'DeFi', AAVE: 'DeFi', DYDX: 'DeFi', CRV: 'DeFi', JUP: 'DeFi', RUNE: 'DeFi',
+    LINK: 'DeFi', PENDLE: 'DeFi', GMX: 'DeFi', ENS: 'DeFi',
     // Gaming
-    AXS: 'Gaming', SAND: 'Gaming', MANA: 'Gaming', GALA: 'Gaming', ILV: 'Gaming', BEAM: 'Gaming', PIXEL: 'Gaming', IOTX: 'Gaming',
+    AXS: 'Gaming', SAND: 'Gaming', MANA: 'Gaming', GALA: 'Gaming', ILV: 'Gaming',
+    BEAM: 'Gaming', PIXEL: 'Gaming', IOTX: 'Gaming',
     // AI
-    FET: 'AI', AGIX: 'AI', RENDER: 'AI', WLD: 'AI', TAO: 'AI', OCEAN: 'AI', NMR: 'AI', ALT: 'AI',
+    FET: 'AI', AGIX: 'AI', RENDER: 'AI', WLD: 'AI', TAO: 'AI', OCEAN: 'AI', NMR: 'AI', ALT: 'AI', INJ: 'AI', AKT: 'AI',
     // RWA
-    POLYX: 'RWA', ONDO: 'RWA', CPOOL: 'RWA', CFG: 'RWA', RIO: 'RWA',
+    POLYX: 'RWA', ONDO: 'RWA', TRU: 'RWA', CPOOL: 'RWA', CFG: 'RWA', RIO: 'RWA',
+    // DePIN
+    FIL: 'DePIN', AR: 'DePIN', HNT: 'DePIN',
+    // Oracles
+    PYTH: 'Oracles', TRB: 'Oracles', API3: 'Oracles',
+    // Modular
+    TIA: 'Modular', DYM: 'Modular',
 };
+
 
 function getSegment(symbol: string): string {
     const coin = symbol.replace('USDT', '').toUpperCase();
