@@ -1034,9 +1034,64 @@ def api_resume():
         return jsonify({"status": "error", "message": str(e)}), 500
 
 
+@app.route("/api/broadcast-log", methods=["GET"])
+def api_broadcast_log():
+    """Return last N lines of signal_broadcast.log as structured JSON."""
+    try:
+        n = min(int(request.args.get("n", 100)), 500)
+        log_path = os.path.join(config.DATA_DIR, "signal_broadcast.log")
+        if not os.path.exists(log_path):
+            return jsonify({"lines": [], "total": 0, "message": "No broadcast log yet — engine hasn't completed a cycle"})
+
+        with open(log_path, "r", encoding="utf-8") as f:
+            raw_lines = f.readlines()
+
+        # Take last N lines
+        tail = raw_lines[-n:] if len(raw_lines) > n else raw_lines
+        parsed = []
+        for line in tail:
+            line = line.strip()
+            if not line:
+                continue
+            # Try to parse the structured format:
+            # "2026-03-14T08:00:00 | cycle=1    | SIGNAL_DISPATCH       | bot=... | ..."
+            entry = {"raw": line}
+            try:
+                parts = [p.strip() for p in line.split("|")]
+                if len(parts) >= 7:
+                    entry["timestamp"] = parts[0].strip()
+                    def _val(s, prefix):
+                        for p in parts:
+                            if p.startswith(prefix):
+                                return p[len(prefix):].strip()
+                        return ""
+                    entry["cycle"]   = _val(line.split("|"), "cycle=").split()[0] if "cycle=" in line else ""
+                    entry["event"]   = parts[2].strip() if len(parts) > 2 else ""
+                    entry["bot"]     = _val(line.split("|"), "bot=")
+                    entry["bot_id"]  = _val(line.split("|"), "id=")
+                    entry["symbol"]  = _val(line.split("|"), "sym=")
+                    entry["side"]    = _val(line.split("|"), "side=")
+                    entry["segment"] = _val(line.split("|"), "seg=")
+                    entry["conf"]    = _val(line.split("|"), "conf=")
+                    # Last pipe-separated part is "detail"
+                    entry["detail"]  = parts[-1].strip()
+            except Exception:
+                pass
+            parsed.append(entry)
+
+        return jsonify({
+            "lines": list(reversed(parsed)),  # newest first
+            "total": len(raw_lines),
+            "showing": len(parsed),
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
 @app.route("/api/restart", methods=["POST"])
 def api_restart():
     """Force-restart the engine thread."""
+
     global _engine_thread, _engine_start_time, _engine_crash_count, _engine_bot
     logger.info("🔄 Manual engine restart requested")
 
