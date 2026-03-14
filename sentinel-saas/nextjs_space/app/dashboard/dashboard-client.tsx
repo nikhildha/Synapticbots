@@ -23,6 +23,7 @@ interface DashboardClientProps {
     name: string;
     email: string;
     subscription: any;
+    role?: string | null;
   };
   stats: {
     activeBots: number;
@@ -585,9 +586,7 @@ export function DashboardClient({ user, stats, bots, recentTrades }: DashboardCl
               <h2 className="text-xl font-bold text-cyan-400">Synaptic Bots</h2>
               <div className="flex items-center gap-3">
                 {/* ── SIGNAL BYPASS TOGGLE (EXPERIMENT — REMOVE THIS BLOCK WHEN DONE) ── */}
-                {(user as any)?.role === 'admin' && (
-                  <SignalBypassToggle />
-                )}
+                <SignalBypassToggle />
                 {/* ── END SIGNAL BYPASS TOGGLE ── */}
                 <Link
                   href="/bots"

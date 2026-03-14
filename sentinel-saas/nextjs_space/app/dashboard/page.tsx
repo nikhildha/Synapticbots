@@ -74,6 +74,7 @@ export default async function DashboardPage() {
           name: user?.name ?? '',
           email: user.email,
           subscription: user?.subscription ?? null,
+          role: (user as any)?.role ?? null,
         }}
         stats={{
           activeBots: user.bots.filter((b) => b?.isActive ?? false).length,
