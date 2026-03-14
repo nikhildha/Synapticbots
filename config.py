@@ -267,7 +267,7 @@ MULTI_COIN_MODE = True          # Enable multi-coin scanning
 # ─── Dynamic Segment Scanner ─────────────────────────────────────────────────────
 SCANNER_SEGMENT_ROTATION = True     # Rotate market segments every hour
 SCANNER_COINS_PER_SEGMENT = 5       # Scan top 5 highest-volume coins within the active segment
-SEGMENT_SCAN_LIMIT = 2              # Focus on the Top 2 hottest segments
+SEGMENT_SCAN_LIMIT = 3              # Focus on the Top 3 hottest segments (increased from 2)
 MAX_ACTIVE_PER_SEGMENT = 1          # Correlation control: max 1 trade per segment
 
 # ─── Institutional Execution Alpha ───────────────────────────────────────────────

@@ -241,46 +241,61 @@ def get_hottest_segments(segment_limit=2):
 def get_active_bot_segment_pool(active_bots):
     """
     Builds the coin scan pool based on the segment_filter of all active bots.
-    If any bot has segment_filter == "ALL", it dynamically fetches the Top 2 hottest segments.
+    If any bot has segment_filter == "ALL", or if no bots are registered,
+    it dynamically fetches the Top 2 hottest segments (and writes heatmap JSON).
     For all other bots, it appends the coins from their specific mapped segments.
     """
     logger.info("🔍 Compiling segment scan pool for %d active bots...", len(active_bots))
-    
+
     target_segments = set()
     needs_dynamic_all = False
-    
-    for bot in active_bots:
-        seg = bot.get("segment_filter", "ALL")
-        if seg == "ALL":
-            needs_dynamic_all = True
-        elif seg in config.CRYPTO_SEGMENTS:
-            target_segments.add(seg)
-            
+
+    if not active_bots:
+        # No bots registered yet — treat as 'ALL' mode so we still scan segments
+        # and write the heatmap for the dashboard
+        needs_dynamic_all = True
+        logger.info("⚡ No active bots registered — falling back to ALL/dynamic segment mode")
+    else:
+        for bot in active_bots:
+            seg = bot.get("segment_filter", "ALL")
+            if seg == "ALL":
+                needs_dynamic_all = True
+            elif seg in config.CRYPTO_SEGMENTS:
+                target_segments.add(seg)
+
     if needs_dynamic_all:
         segment_limit = getattr(config, "SEGMENT_SCAN_LIMIT", 2)
-        top_segments = get_hottest_segments(segment_limit)
-        logger.info("🎯 Bot requested 'ALL' segments. dynamically selected Top %d: %s", segment_limit, ", ".join(top_segments))
+        top_segments = get_hottest_segments(segment_limit)  # ← also writes heatmap JSON
+        logger.info("🎯 Dynamic segment selection — Top %d: %s", segment_limit, ", ".join(top_segments))
         for t_seg in top_segments:
             target_segments.add(t_seg)
-            
+
     # Compile the final unique list of coins from exactly these target segments
     candidates = set()
     for seg in target_segments:
         coins = config.CRYPTO_SEGMENTS.get(seg, [])
         candidates.update(coins)
-        
+
     # Clean out exclusions
     exclusions = get_all_exclusions()
     candidates = [c for c in candidates if c not in exclusions]
-    
-    logger.info("💎 Final Segment Pool: %d segments targeted -> %d total unique coins", len(target_segments), len(candidates))
-    
-    # Fallback if somehow empty
+
+    logger.info("💎 Final Segment Pool: %d segments targeted → %d total unique coins", len(target_segments), len(candidates))
+
+    # Fallback — should never happen with dynamic mode but keep as safety net
     if not candidates:
+        logger.warning("⚠️  Segment pool empty after filtering — using PRIMARY_SYMBOL as fallback")
         return [config.PRIMARY_SYMBOL]
-        
-    # Sort them for consistency
-    return sorted(list(candidates))
+
+    # Always include PRIMARY_SYMBOL (BTC) at the front for macro signal
+    pool = sorted(list(candidates))
+    if config.PRIMARY_SYMBOL in pool:
+        pool.remove(config.PRIMARY_SYMBOL)
+    pool.insert(0, config.PRIMARY_SYMBOL)
+
+    return pool
+
+
 
 def get_top_segment_candidates():
     """

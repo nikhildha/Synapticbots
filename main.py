@@ -343,6 +343,14 @@ class RegimeMasterBot:
 
         # ── 1. Coin scan pool ─────────
         if config.MULTI_COIN_MODE:
+            # Always refresh the segment heatmap JSON every cycle (cheap Binance ticker call)
+            # This keeps the dashboard heatmap live even when the pool is not being rebuilt
+            try:
+                from coin_scanner import get_hottest_segments as _refresh_heatmap
+                _refresh_heatmap(getattr(config, "SEGMENT_SCAN_LIMIT", 3))
+            except Exception as _he:
+                logger.warning("⚠️  Heatmap refresh failed (non-fatal): %s", _he)
+
             # Refresh the full coin pool every N cycles (or on first run)
             refresh_rotations = max(1, self._SCAN_POOL_SIZE // self._SCAN_BATCH_SIZE)
             if not self._full_coin_pool or self._cycle_count % max(1, config.SCAN_INTERVAL_CYCLES * refresh_rotations) == 1:
