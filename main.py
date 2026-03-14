@@ -624,6 +624,33 @@ class RegimeMasterBot:
 
         _tick_active_bots = list(config.ENGINE_ACTIVE_BOTS)
         if not _tick_active_bots:
+            # ── BYPASS FALLBACK: if bypass is active but no bots registered
+            # (happens after Railway restart), synthesize a temporary bot entry
+            # from the bypass_state.json so the deploy loop can run at least once.
+            try:
+                import os as _os2
+                _bpath = _os2.path.join(getattr(config, "DATA_DIR", "data"), "bypass_state.json")
+                if _os2.path.exists(_bpath):
+                    with open(_bpath) as _bf:
+                        _bs = json.load(_bf)
+                    if _bs.get("bypass_enabled"):
+                        _phantom_bot = {
+                            "bot_id":         getattr(config, "ENGINE_BOT_ID", "bypass-phantom"),
+                            "bot_name":       "Bypass Phantom Bot",
+                            "user_id":        getattr(config, "ENGINE_USER_ID", "admin"),
+                            "segment_filter": _bs.get("bypass_segment", "ALL"),
+                        }
+                        _tick_active_bots = [_phantom_bot]
+                        logger.warning(
+                            "⚗️  BYPASS FALLBACK: ENGINE_ACTIVE_BOTS empty — "
+                            "using phantom bot for deploy (segment=%s). "
+                            "Toggle your real bot OFF→ON on the dashboard to permanently re-register it.",
+                            _bs.get("bypass_segment", "ALL"),
+                        )
+            except Exception as _pherr:
+                logger.debug("Bypass phantom bot creation failed: %s", _pherr)
+
+        if not _tick_active_bots:
             logger.warning("⚠️  No bots registered in ENGINE_ACTIVE_BOTS — skipping deploy step")
 
         from segment_features import get_segment_for_coin
