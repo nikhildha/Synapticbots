@@ -588,7 +588,7 @@ class RegimeMasterBot:
             bot_id = target.get("bot_id", config.ENGINE_BOT_ID)
             bot_name = target.get("bot_name", "Athena Bot")
             user_id = target.get("user_id", config.ENGINE_USER_ID)
-            brain_type = target.get("brain_type", "athena")
+            # brain_type removed — all bots are the same brain (HMM), different only by segment
             
             # Match the Next.js profile string to the engine's internal configuration
             profile_name = bot_name.lower()
@@ -690,13 +690,11 @@ class RegimeMasterBot:
                 # Track eligible trades before max position cap
                 eligible_trades.append(trade)
 
-                # ── Athena LLM Reasoning Gate (Per-Bot) ──
-                # Only activate Athena if this specific bot requests the "athena" brain.
-                athena_action = None
+                # ── Athena: Background Analysis (display only — never gates trades) ──
+                # Athena runs for ALL bots regardless of segment. Results are shown in
+                # the panel and broadcast log, but NEVER block a trade from deploying.
                 athena_decision = None
-                _use_athena = self._athena and config.LLM_REASONING_ENABLED and (brain_type == "athena")
-
-                if _use_athena:
+                if self._athena and config.LLM_REASONING_ENABLED:
                     try:
                         llm_ctx = {
                             "ticker": sym,
@@ -707,91 +705,27 @@ class RegimeMasterBot:
                             "conviction": trade["conviction"],
                             "current_price": self._coin_states.get(sym, {}).get("price", 0),
                             "atr": trade["atr"],
-                            "atr_pct": (trade["atr"] / self._coin_states.get(sym, {}).get("price", 1)) * 100,
+                            "atr_pct": (trade["atr"] / max(self._coin_states.get(sym, {}).get("price", 1), 0.0001)) * 100,
                             "trend": self._coin_states.get(sym, {}).get("context", {}).get("trend_alignment", "UNKNOWN")
                         }
                         athena_decision = self._athena.validate_signal(llm_ctx)
-                        athena_action = athena_decision.action
-
-                        if athena_decision.action == "VETO":
-                            logger.warning(
-                                "   ⛔ [%s] 🏛️ ATHENA VETO: %s (conf: %.0f%%) — %s",
-                                bot_name, sym, athena_decision.adjusted_confidence * 100, athena_decision.reasoning[:80]
-                            )
-                            self._coin_states.setdefault(sym, {})["deploy_status"] = "FILTERED: Athena Veto"
-                            self._coin_states[sym]["athena_state"] = {
-                                "action": f"ATHENA_VETO:{athena_decision.reasoning[:60]}",
-                                "confidence": athena_decision.adjusted_confidence,
-                                "reasoning": athena_decision.reasoning,
-                            }
-                            _bcast("ATHENA_VETO", self._cycle_count, bot_name, bot_id, sym,
-                                   trade["side"], seg_name, athena_decision.adjusted_confidence,
-                                   f"reason={athena_decision.reasoning[:80]}")
-                            continue
-                            
-                        # Compare HMM side (BUY/SELL) with Athena's direction (LONG/SHORT)
-                        athena_dir = getattr(athena_decision, "athena_direction", "").upper()
-                        hmm_as_dir = "LONG" if trade["side"] == "BUY" else "SHORT"
-                        
-                        if athena_dir in ("LONG", "SHORT") and athena_dir != hmm_as_dir:
-                            # Athena disagrees with HMM on direction
-                            if athena_decision.adjusted_confidence >= 0.8:
-                                # Strong Athena conviction (≥8/10) → OVERRIDE HMM direction
-                                old_side = trade["side"]
-                                side = "BUY" if athena_dir == "LONG" else "SELL"
-                                logger.info(
-                                    "   ⚠️ [%s] 🏛️ ATHENA DIRECTION OVERRIDE: HMM=%s → Athena=%s (Conf: %.0f%% | %s)",
-                                    bot_name, old_side, side,
-                                    athena_decision.adjusted_confidence * 100,
-                                    athena_decision.reasoning[:80],
-                                )
-                                trade["side"] = side
-                                trade["reason"] = f"Athena Override: {trade['reason']}"
-                            else:
-                                # Weak Athena conviction → VETO due to conflict (too risky to guess)
-                                logger.warning(
-                                    "   ⛔ [%s] 🏛️ ATHENA CONFLICT VETO: HMM=%s vs Athena=%s (Conf: %.0f%% too weak to override)",
-                                    bot_name, old_side, athena_dir,
-                                    athena_decision.adjusted_confidence * 100,
-                                )
-                                self._coin_states.setdefault(sym, {})["deploy_status"] = "FILTERED: Athena Conflict"
-                                self._coin_states[sym]["athena_state"] = {
-                                    "action": f"ATHENA_CONFLICT:{old_side}vs{athena_dir}",
-                                    "confidence": athena_decision.adjusted_confidence,
-                                    "reasoning": athena_decision.reasoning,
-                                }
-                                _bcast("ATHENA_CONFLICT", self._cycle_count, bot_name, bot_id, sym,
-                                       trade["side"], seg_name, athena_decision.adjusted_confidence,
-                                       f"hmm={old_side} athena={athena_dir}")
-                                continue
-
-                        if athena_decision.action == "REDUCE_SIZE":
-                            old_conv = trade["conviction"]
-                            trade["conviction"] *= athena_decision.adjusted_confidence
-                            logger.info(
-                                "   📉 [%s] 🏛️ ATHENA REDUCE_SIZE: conviction %.1f → %.1f (×%.2f)",
-                                bot_name, old_conv, trade["conviction"], athena_decision.adjusted_confidence,
-                            )
+                        # Store result for display — but do NOT skip/continue based on it
+                        self._coin_states.setdefault(sym, {})["athena_state"] = {
+                            "action": athena_decision.action,
+                            "confidence": athena_decision.adjusted_confidence,
+                            "reasoning": athena_decision.reasoning,
+                            "risk_flags": getattr(athena_decision, "risk_flags", []),
+                            "model": getattr(athena_decision, "model", "unknown_model"),
+                            "latency_ms": getattr(athena_decision, "latency_ms", 0),
+                        }
+                        _bcast("ATHENA_INSIGHT", self._cycle_count, bot_name, bot_id, sym,
+                               trade["side"], seg_name, athena_decision.adjusted_confidence,
+                               f"action={athena_decision.action} model={getattr(athena_decision,'model','?')} reason={athena_decision.reasoning[:60]}")
+                        logger.info("🏛️ ATHENA INSIGHT [%s] %s → %s (conf=%.0f%%) [not gating]",
+                                    bot_name, sym, athena_decision.action, athena_decision.adjusted_confidence * 100)
                     except Exception as e:
-                        logger.debug("Athena error for %s (fail-open): %s", sym, e)
-                        
-                # Update UI state with intention
-                self._coin_states.setdefault(sym, {})["deploy_status"] = "DEPLOY_QUEUED"
-                if _use_athena and athena_decision:
-                    self._coin_states[sym]["athena_state"] = {
-                        "action": athena_decision.action,
-                        "confidence": athena_decision.adjusted_confidence,
-                        "reasoning": athena_decision.reasoning,
-                        "risk_flags": getattr(athena_decision, "risk_flags", []),
-                        "model": getattr(athena_decision, "model", "unknown_model"),
-                        "latency_ms": getattr(athena_decision, "latency_ms", 0),
-                    }
-                    # ── BROADCAST AUDIT: Athena EXECUTE verdict ──
-                    _bcast("ATHENA_EXECUTE", self._cycle_count, bot_name, bot_id, sym,
-                           trade["side"], seg_name, athena_decision.adjusted_confidence,
-                           f"action={athena_decision.action} model={getattr(athena_decision,'model','?')} reason={athena_decision.reasoning[:60]}")
-                elif "athena_state" in self._coin_states.setdefault(sym, {}):
-                    del self._coin_states[sym]["athena_state"]
+                        logger.debug("Athena background analysis error for %s: %s", sym, e)
+
                 
                 # ── BROADCAST AUDIT: signal dispatched to bot ──
                 _bcast("SIGNAL_DISPATCH", self._cycle_count, bot_name, bot_id, sym,
