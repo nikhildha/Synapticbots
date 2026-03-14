@@ -735,6 +735,9 @@ class RegimeMasterBot:
                        trade["side"], seg_name, trade["confidence"],
                        f"regime={trade['regime_name']} lev={trade['leverage']}x qty={trade['quantity']:.4f}")
 
+                # Mark as queued for deployment (UI shows this before execute_trade returns)
+                self._coin_states.setdefault(sym, {})["deploy_status"] = "DEPLOY_QUEUED"
+
                 # Execute the trade — catch ALL exceptions so one bad coin doesn't kill the entire deploy loop
                 logger.info(
                     "🔥 DEPLOYING [%s]: %s %s @ %dx | Regime: %s (%.0f%%) | Qty: %.6f",
@@ -770,9 +773,10 @@ class RegimeMasterBot:
                         "⚠️ DEPLOYMENT_FAILED [%s]: %s %s — order rejected/failed, NOT recording",
                         bot_name, trade["side"], sym,
                     )
-                    _bcast("EXEC_FAILED", self._cycle_count, bot_name, bot_id, sym,
+                    _bcast("EXEC_NULL", self._cycle_count, bot_name, bot_id, sym,
                            trade["side"], seg_name, trade["confidence"],
-                           "order rejected by exchange / executor returned None")
+                           f"execute_trade returned None (live mode) — order rejected by executor/exchange")
+                    self._coin_states.setdefault(sym, {})["deploy_status"] = "FILTERED: exec returned None"
                     continue
 
                 entry_price = result.get("entry_price", 0) if result else 0
