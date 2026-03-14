@@ -86,7 +86,7 @@ def get_optimal_rm(symbol):
     return "RM3_Swing" # Default for unmapped/new coins
 
 # ─── Weekend Skip ───────────────────────────────────────────────────────────────
-WEEKEND_SKIP_ENABLED = True            # Skip new entries on Saturday + Sunday (UTC)
+WEEKEND_SKIP_ENABLED = False           # Crypto trades 24/7 — no weekend skip
 WEEKEND_SKIP_DAYS = [5, 6]             # 5=Saturday, 6=Sunday (Python weekday convention)
 
 # ─── HMM Brain ──────────────────────────────────────────────────────────────────
