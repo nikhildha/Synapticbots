@@ -573,16 +573,6 @@ export function DashboardClient({ user, stats, bots, recentTrades }: DashboardCl
           </motion.div>
 
 
-          {/* ═══ Row 3: Institutional Segment Heatmap ═══ */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.2 }}
-            className="mb-8"
-          >
-            <SegmentHeatmap heatmapData={botState?.heatmap || null} loading={isRefreshing && !botState?.heatmap} />
-          </motion.div>
-
           {/* ═══ Row 4: Bots Section ═══ */}
 
           <motion.div
@@ -651,9 +641,6 @@ export function DashboardClient({ user, stats, bots, recentTrades }: DashboardCl
               </div>
             )}
           </motion.div>
-
-          {/* Virtual Limit Orders — after Bot Scan Summary */}
-          <VirtualLimitTracker trades={allTrades} />
 
           {/* ═══ Row 4: Athena Intelligence & Engine Terminal ═══ */}
           {(botState?.athena?.enabled || bots?.some((b: any) => (b.name || '').toLowerCase().includes('athena'))) && (
@@ -779,6 +766,13 @@ export function DashboardClient({ user, stats, bots, recentTrades }: DashboardCl
           </motion.div>
         </div>
       )}
+
+      {/* ═══ Virtual Limit Orders (bottom of page) ═══ */}
+      <div className="max-w-7xl mx-auto px-4 pb-12">
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.5 }}>
+          <VirtualLimitTracker trades={allTrades} />
+        </motion.div>
+      </div>
     </div>
   );
 }

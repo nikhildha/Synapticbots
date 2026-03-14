@@ -11,6 +11,7 @@
 1. [Why HMM?](#1-why-hmm)
 2. [HMM Architecture](#2-hmm-architecture)
 3. [Feature Engineering](#3-feature-engineering)
+   - 3a. [Per-Coin Feature Sets (Full Table)](#3a-per-coin-feature-sets-full-table)
 4. [State Labeling & Regime Classification](#4-state-labeling--regime-classification)
 5. [Confidence: Margin Score](#5-confidence-margin-score)
 6. [Multi-Timeframe Brain (MultiTFHMMBrain)](#6-multi-timeframe-brain-multitfhmmbrain)
@@ -18,7 +19,7 @@
 8. [Tiered MTF Signal Logic — Full Decision Table](#8-tiered-mtf-signal-logic--full-decision-table)
 9. [ATR Pullback Logic — Tier 2A & 2B](#9-atr-pullback-logic--tier-2a--2b)
 10. [Athena — AI Final Gatekeeper](#10-athena--ai-final-gatekeeper)
-11. [Retraining Schedule](#11-retraining-schedule)
+11. [Retraining Schedule & Intervals](#11-retraining-schedule--intervals)
 12. [Key Design Decisions](#12-key-design-decisions)
 
 ---
@@ -106,7 +107,94 @@ Starting from basic 4 features:
 
 **Final: Per-coin feature sets** via `get_features_for_coin(symbol)` in `segment_features.py`. Each coin uses the subset that maximizes its individual Sharpe on forward-test data.
 
----
+### Why Per-Coin, Not Per-Segment?
+
+Initially we thought segment-level features (e.g., one feature set for all DeFi coins) would be sufficient. Backtesting showed otherwise:
+
+- **AAVE** and **LINK** are both DeFi but have different microstructure — LINK has strong liquidity depth (oracle network, institutional demand); AAVE responds more to protocol TVL signals → different optimal features
+- **DOGE** and **WIF** are both meme coins but DOGE has massive retail volume → `rel_strength_btc` matters more; WIF is thinner → `amihud_illiquidity` matters more
+- **BTC and ETH** have no `rel_strength_btc` in their feature sets because they **are** the benchmark — comparing to themselves adds noise
+
+**Method: Likelihood Permutation Importance (LPI)**
+1. Train HMM on full feature set for each coin
+2. Permute one feature at a time (shuffle its values, breaking correlation)
+3. Measure drop in log-likelihood
+4. Rank features by importance drop
+5. Greedily add top features until Sharpe plateaus
+
+### 3a. Per-Coin Feature Sets (Full Table)
+
+> Source: `segment_features.py` · `COIN_FEATURES` dict (40 coins)  
+> Features listed **left = highest importance → right = lowest importance** (rank order from LPI backtesting)
+
+**Feature key:**
+| Short | Full Name | Signal |
+|---|---|---|
+| `vol_z` | `vol_zscore` | Abnormal volume vs 24-bar average |
+| `liq_vac` | `liquidity_vacuum` | Price moving through thin levels (momentum) |
+| `log_r` | `log_return` | Raw price momentum |
+| `amihud` | `amihud_illiquidity` | Market depth / thin book proxy |
+| `vol_ti` | `volume_trend_intensity` | EMA5/EMA20 volume acceleration |
+| `rel_btc` | `rel_strength_btc` | Outperformance vs BTC |
+| `exh_tail` | `exhaustion_tail` | Reversal wicks × volume |
+| `volatility` | `volatility` | (high-low)/close intrabar range |
+| `vol_chg` | `volume_change` | Log ratio of successive volume bars |
+
+| Coin | Rank 1 | Rank 2 | Rank 3 | Rank 4 | Rank 5 | Rank 6 | Rank 7 | Notes |
+|---|---|---|---|---|---|---|---|---|
+| **BTCUSDT** | vol_z | vol_ti | liq_vac | amihud | exh_tail | volatility | vol_chg | No rel_btc (IS benchmark). Depth + wick more important than momentum. |
+| **ETHUSDT** | vol_z | liq_vac | vol_ti | amihud | exh_tail | log_r | volatility | Similar to BTC microstructure, no rel_btc. |
+| **BNBUSDT** | vol_z | vol_ti | exh_tail | vol_chg | liq_vac | volatility | log_r | Exchange token — volume acceleration dominant. |
+| **SOLUSDT** | vol_z | liq_vac | amihud | vol_ti | exh_tail | log_r | rel_btc | High-speed chain, liquidity vacuum critical on breakouts. |
+| **AVAXUSDT** | vol_z | liq_vac | vol_ti | amihud | exh_tail | vol_chg | log_r | L1 — volume trend + vacuum dominant; no rel_btc. |
+| **AAVEUSDT** | vol_z | liq_vac | log_r | amihud | vol_ti | rel_btc | exh_tail | DeFi — price momentum + depth. rel_btc matters (risk-on alt). |
+| **LINKUSDT** | vol_z | amihud | liq_vac | vol_ti | exh_tail | vol_chg | log_r | Oracle token — thick book, depth proxy more important than momentum. |
+| **UNIUSDT** | log_r | vol_z | rel_btc | liq_vac | amihud | vol_ti | exh_tail | DeFi — log_return leads (protocol fee volume driver); rel_btc high. |
+| **CRVUSDT** | amihud | exh_tail | vol_z | log_r | rel_btc | vol_ti | liq_vac | Thin book DeFi — illiquidity + reversal wicks dominant. |
+| **LDOUSDT** | vol_z | amihud | liq_vac | log_r | vol_ti | rel_btc | exh_tail | Liquid staking — depth proxy similar to LINK. |
+| **PENDLEUSDT** | vol_z | liq_vac | amihud | vol_ti | log_r | rel_btc | exh_tail | Yield DeFi — momentum through vacuum; thinner market. |
+| **INJUSDT** | vol_z | vol_ti | liq_vac | amihud | log_r | rel_btc | exh_tail | DeFi perps — volume acceleration strong signal. |
+| **DOGEUSDT** | vol_z | vol_ti | liq_vac | log_r | exh_tail | rel_btc | amihud | Meme — volume vs retail BTC behaviour. Deep liquid book. |
+| **WIFUSDT** | vol_z | log_r | rel_btc | liq_vac | vol_ti | amihud | exh_tail | Meme — thinner, relative BTC strength more critical. |
+| **GALAUSDT** | vol_z | amihud | liq_vac | vol_ti | log_r | rel_btc | exh_tail | Gaming/Metaverse — thin market, illiquidity key. |
+| **SANDUSDT** | vol_z | liq_vac | vol_ti | log_r | exh_tail | amihud | rel_btc | Gaming — vacuum + wick reversal. |
+| **AXSUSDT** | vol_z | log_r | rel_btc | vol_ti | exh_tail | liq_vac | vol_chg | Gaming P2E — price momentum leads. |
+| **RONINUSDT** | vol_z | log_r | rel_btc | liq_vac | vol_ti | exh_tail | amihud | Gaming — strong rel_btc correlation (retail driven). |
+| **PIXELUSDT** | log_r | rel_btc | vol_z | vol_ti | exh_tail | volatility | liq_vac | Small-cap gaming — rel_btc and momentum primary. |
+| **IMXUSDT** | vol_z | vol_ti | log_r | liq_vac | rel_btc | amihud | exh_tail | Gaming L2 — volume acceleration good predictor. |
+| **ARBUSDT** | vol_z | log_r | liq_vac | rel_btc | vol_ti | amihud | exh_tail | L2 — momentum + relative BTC strength important. |
+| **OPUSDT** | vol_z | liq_vac | vol_ti | log_r | amihud | rel_btc | exh_tail | L2 — vacuum dominant on thin orderbook. |
+| **STRKUSDT** | vol_z | vol_ti | liq_vac | amihud | exh_tail | log_r | rel_btc | L2 (StarkWare) — volume trend critical, newer coin. |
+| **SUIUSDT** | vol_z | liq_vac | vol_ti | log_r | amihud | rel_btc | exh_tail | L1 new gen — vacuum important on momentum moves. |
+| **POLUSDT** | vol_z | liq_vac | vol_ti | amihud | log_r | rel_btc | exh_tail | Polygon (MATIC rename) — liquid, vacuum + depth. |
+| **TAOUSDT** | vol_z | liq_vac | log_r | rel_btc | amihud | vol_ti | exh_tail | AI/DePIN — BTC correlation high (institutional narrative). |
+| **AKTUSDT** | rel_btc | log_r | vol_z | vol_ti | exh_tail | liq_vac | amihud | AI/Cloud — **rel_btc is #1** (beta trade on AI narrative). |
+| **API3USDT** | vol_z | log_r | rel_btc | vol_ti | liq_vac | exh_tail | vol_chg | Oracle/DePIN — price momentum leads. |
+| **FETUSDT** | vol_z | liq_vac | amihud | vol_ti | log_r | exh_tail | rel_btc | AI agent — depth + vacuum key on thin book. |
+| **IOTXUSDT** | vol_z | log_r | rel_btc | vol_ti | exh_tail | volatility | vol_chg | IoT/DePIN — retail driven, rel_btc important. |
+| **WLDUSDT** | vol_z | liq_vac | vol_ti | amihud | exh_tail | log_r | vol_chg | Biometric/AI — depth dominant on newer coin. |
+| **ONDOUSDT** | vol_z | log_r | vol_ti | amihud | liq_vac | rel_btc | exh_tail | RWA — volume + momentum lead narrative moves. |
+| **POLYXUSDT** | vol_z | vol_ti | exh_tail | log_r | rel_btc | vol_chg | liq_vac | Compliance/RWA — tail reversals strong signal. |
+| **TIAUSDT** | vol_z | amihud | liq_vac | vol_ti | log_r | rel_btc | exh_tail | Modular L1 — thin market, illiquidity key. |
+| **ARUSDT** | log_r | vol_z | rel_btc | liq_vac | vol_ti | exh_tail | amihud | Storage — price momentum dominant, narrative-driven. |
+| **FILUSDT** | vol_z | liq_vac | amihud | vol_ti | log_r | rel_btc | exh_tail | Storage — similar to AR, vacuum on breakouts. |
+| **DYMUSDT** | vol_z | log_r | rel_btc | vol_ti | exh_tail | liq_vac | vol_chg | Modular — rel_btc strong (correlated L1 plays). |
+| **JUPUSDT** | vol_z | vol_ti | liq_vac | amihud | log_r | rel_btc | exh_tail | Solana DEX — volume trend important (trading volume proxy). |
+| **RUNEUSDT** | vol_z | vol_ti | liq_vac | exh_tail | amihud | log_r | vol_chg | Cross-chain DEX — tail reversals higher importance (liquidity provision). |
+| **TRBUSDT** | vol_z | liq_vac | amihud | vol_ti | log_r | rel_btc | exh_tail | Oracle — thin book, depth key. |
+| **TRUUSDT** | vol_z | rel_btc | vol_ti | log_r | exh_tail | vol_chg | liq_vac | RWA — BTC correlation strong (institutional narrative beta). |
+| **PYTHUSDT** | vol_z | log_r | rel_btc | vol_ti | liq_vac | amihud | exh_tail | Oracle/Solana — price momentum + BTC beta. |
+
+### Key Patterns Across Coins
+
+| Pattern | Coins | Insight |
+|---|---|---|
+| **vol_zscore always #1 or #2** | 36/40 coins | Abnormal volume is the universal regime signal. Institutional events visible before price. |
+| **No rel_btc for BTC/ETH/BNB** | 3 coins | They define the benchmark. Self-comparison adds noise not signal. |
+| **rel_btc = #1 for AKTUSDT** | 1 coin | AI narrative plays have very high beta to BTC. Trade is essentially a sector rotation trade. |
+| **amihud_illiquidity dominant for thin coins** | CRDB, TIA, FIL | Thin-book coins: small orders move price → illiquidity predicts regime more than volume absolute. |
+| **exhaustion_tail lowest ranked universally** | all coins | Reversal wicks have the weakest standalone signal. Only useful as a confirming feature. |
+
 
 ## 4. State Labeling & Regime Classification
 
@@ -426,23 +514,65 @@ except Exception:
 
 ---
 
-## 11. Retraining Schedule
+## 11. Retraining Schedule & Intervals
 
+### When Does Retraining Happen?
+
+The HMM brain retrains **lazily** — only when a coin is actively being scanned AND its model is stale. No scheduled batch job exists.
+
+```python
+# In _analyze_coin(), called via ThreadPoolExecutor every 5 min:
+brain = self._mtf_brains[symbol]
+if brain.needs_retrain():          # checks: time.time() - last_trained > retrain_interval
+    data = fetch_klines(symbol, tf, limit=1000)
+    features = compute_all_features(data)
+    brain.train(features)          # EM fitting, ~200-500ms per timeframe
+    brain._last_trained = time.time()
 ```
-Every cycle (5 min):
-  For each active coin in scan list:
-    brain = self._mtf_brains.get(symbol)
-    if brain.needs_retrain():   # last_trained > 24 hours ago
-        fetch 1000 bars of 15m, 1H, 4H OHLCV
-        compute features for each timeframe
-        brain.train(df_15m)  # retrain HMMBrain
-        brain.train(df_1h)
-        brain.train(df_4h)
-```
+
+### Retraining Interval Configuration
+
+| Timeframe | Interval | Bars Fetched | Time Window |
+|---|---|---|---|
+| **15m** | **24 hours** | 1000 bars | ~10.4 days of 15m data |
+| **1H** | **24 hours** | 1000 bars | ~41.7 days of 1H data |
+| **4H** | **24 hours** | 1000 bars | ~166.7 days of 4H data |
+
+All three timeframes retrain on the same 24-hour schedule.
+
+### Why 24 Hours?
+
+| Interval Considered | Verdict | Reason |
+|---|---|---|
+| Every 5 min (every cycle) | ❌ Rejected | Overfits intraday noise. Model churns states. High CPU cost. |
+| Every 1 hour | ❌ Rejected | Still too reactive to short-term price swings. |
+| **Every 24 hours** | ✅ Chosen | Adapts to regime changes (e.g., new bull/bear phase after a weekly close). Stable enough not to overfit. |
+| Every 7 days | ❌ Rejected | Miss medium-term regime changes within a week. |
+
+### Market Events That Trigger Awareness (Not Retrain)
+
+The model does NOT retrain on market events. Instead, it is designed to detect them:
+
+| Event | HMM Response |
+|---|---|
+| Sudden BTC crash | Margin confidence drops (model uncertain → conviction falls) |
+| Volume spike (whale trade) | `vol_zscore` spikes → regime re-classified in next prediction |
+| News-driven pump | `log_return` + `volume_change` change → model detects BULL in next 15m bar |
+
+**Design principle:** The 5-minute predict cycle (not the 24-hour retrain) is how the model adapts to intraday events. You get fresh regime classification every 5 minutes, even with a 24-hour-old model.
+
+### When Should You Force Retrain?
+
+> Manually delete `data/brain_cache/` on Railway to force all brains to retrain on next startup.
+
+Force retrain recommended when:
+1. Market structure changes significantly (e.g., BTC halving, macro rate decision)
+2. New features added to `segment_features.py`
+3. Feature engineering formula changed in `feature_engine.py`
+4. A coin's Sharpe has degraded significantly
 
 Retraining is coin-specific and happens lazily. A coin not scanned for >24h will retrain on its next appearance in the scan list.
 
----
 
 ## 12. Key Design Decisions
 
