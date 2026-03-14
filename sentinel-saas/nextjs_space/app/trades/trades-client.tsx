@@ -205,32 +205,47 @@ export function TradesClient({ trades: initialTrades }: TradesClientProps) {
     }
   }, []);
 
-  // Live price polling from CoinDCX every 1.5s for active trade symbols (BUG-11: unified with dashboard)
+  // Live price polling from Binance REST every 3s for active trade symbols
+  // Uses Binance /api/v3/ticker/price directly — reliable, no pair-name confusion
   useEffect(() => {
     async function fetchLivePrices() {
+      const activeTrades = (trades ?? []).filter(t => (t.status || '').toLowerCase() === 'active');
       const activeSymbols = [...new Set(
-        (trades ?? []).filter(t => (t.status || '').toLowerCase() === 'active')
-          .map(t => (t.symbol || t.coin + 'USDT').toUpperCase())
-          .filter(Boolean)
+        activeTrades.map(t => (t.symbol || (t.coin ?? '') + 'USDT').toUpperCase()).filter(Boolean)
       )];
       if (activeSymbols.length === 0) return;
+
+      // Build entry price lookup for sanity checks
+      const entryPriceBySymbol: Record<string, number> = {};
+      activeTrades.forEach(t => {
+        const sym = (t.symbol || (t.coin ?? '') + 'USDT').toUpperCase();
+        entryPriceBySymbol[sym] = t.entryPrice || 0;
+      });
+
       try {
-        // Use CoinDCX public prices (same source as dashboard)
-        const res = await fetch('/api/coindcx/prices', { cache: 'no-store' });
+        // Fetch all active symbols in one batch request (max 100 in Binance batch)
+        const symbolsParam = encodeURIComponent(JSON.stringify(activeSymbols));
+        const res = await fetch(
+          `https://api.binance.com/api/v3/ticker/price?symbols=${symbolsParam}`,
+          { cache: 'no-store', signal: AbortSignal.timeout(4000) }
+        );
         if (res.ok) {
-          const prices = await res.json();
+          const data: { symbol: string; price: string }[] = await res.json();
           const map: Record<string, number> = {};
-          Object.entries(prices).forEach(([pair, info]: [string, any]) => {
-            const sym = pair.replace(/^B-/, '').replace('_', '');
-            if (info?.ls) map[sym] = parseFloat(info.ls);
+          data.forEach(({ symbol, price }) => {
+            const p = parseFloat(price);
+            const entry = entryPriceBySymbol[symbol] || 0;
+            // Sanity check: price must be > 0 and within 5x of entry (catches wrong-pair maps)
+            if (p > 0 && (entry === 0 || (p > entry * 0.01 && p < entry * 10))) {
+              map[symbol] = p;
+            }
           });
-          // Only update if we got some prices
           if (Object.keys(map).length > 0) setLivePrices(map);
         }
-      } catch { /* silent */ }
+      } catch { /* silent — keep last known prices */ }
     }
     fetchLivePrices();
-    const timer = setInterval(fetchLivePrices, 1500);
+    const timer = setInterval(fetchLivePrices, 3000);
     return () => clearInterval(timer);
   }, [trades]);
 

@@ -146,26 +146,49 @@ export function DashboardClient({ user, stats, bots, recentTrades }: DashboardCl
     return () => { clearInterval(interval); clearInterval(walletInterval); };
   }, [fetchBotState]);
 
-  // Live price polling from CoinDCX every 3s (proxied — covers all futures pairs)
+  // Live price polling from Binance REST every 3s — fetches only active trade symbols
   useEffect(() => {
-    async function fetchCdxPrices() {
+    async function fetchLivePrices() {
       try {
-        const res = await fetch('/api/coindcx/prices', { cache: 'no-store' });
+        // Get distinct active trade symbols from live tradebook
+        const activeTrades = (botState?.tradebook?.trades || [])
+          .filter((t: any) => (t.status || '').toUpperCase() === 'ACTIVE');
+        const activeSymbols = [...new Set(
+          activeTrades.map((t: any) => (t.symbol || t.coin || '').toUpperCase()).filter(Boolean)
+        )];
+        if (activeSymbols.length === 0) return;
+
+        // Build entry price lookup for sanity checks
+        const entryPriceBySymbol: Record<string, number> = {};
+        activeTrades.forEach((t: any) => {
+          const sym = (t.symbol || t.coin || '').toUpperCase();
+          entryPriceBySymbol[sym] = t.entry_price || t.entryPrice || 0;
+        });
+
+        // Batch fetch from Binance (reliable, no pair-name issues)
+        const symbolsParam = encodeURIComponent(JSON.stringify(activeSymbols));
+        const res = await fetch(
+          `https://api.binance.com/api/v3/ticker/price?symbols=${symbolsParam}`,
+          { cache: 'no-store', signal: AbortSignal.timeout(4000) }
+        );
         if (!res.ok) return;
-        const prices = await res.json(); // { "B-BTC_USDT": { ls: 70678.1 }, ... }
+        const data: { symbol: string; price: string }[] = await res.json();
         const map: Record<string, number> = {};
-        Object.entries(prices).forEach(([pair, info]: [string, any]) => {
-          // "B-BTC_USDT" → "BTCUSDT"
-          const sym = pair.replace(/^B-/, '').replace('_', '');
-          if (info?.ls) map[sym] = parseFloat(info.ls);
+        data.forEach(({ symbol, price }) => {
+          const p = parseFloat(price);
+          const entry = entryPriceBySymbol[symbol] || 0;
+          // Sanity check: price > 0 and within 10x of entry (catches pair mismatches)
+          if (p > 0 && (entry === 0 || (p > entry * 0.01 && p < entry * 10))) {
+            map[symbol] = p;
+          }
         });
         if (Object.keys(map).length > 0) setLivePrices(map);
       } catch { /* silent */ }
     }
-    fetchCdxPrices();
-    const timer = setInterval(fetchCdxPrices, 3000);
+    fetchLivePrices();
+    const timer = setInterval(fetchLivePrices, 3000);
     return () => clearInterval(timer);
-  }, []);
+  }, [botState?.tradebook?.trades]);
 
   const handleBotToggle = async (botId: string, currentStatus: boolean) => {
     try {
