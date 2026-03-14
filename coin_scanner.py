@@ -287,11 +287,14 @@ def get_active_bot_segment_pool(active_bots):
         logger.warning("⚠️  Segment pool empty after filtering — using PRIMARY_SYMBOL as fallback")
         return [config.PRIMARY_SYMBOL]
 
-    # Always include PRIMARY_SYMBOL (BTC) at the front for macro signal
+    # Always include PRIMARY_SYMBOL (BTC) at the front IF L1 is an active segment
+    # (BTC is L1 — don't force it into Gaming/DeFi-only pools, it wastes a scan slot)
     pool = sorted(list(candidates))
     if config.PRIMARY_SYMBOL in pool:
         pool.remove(config.PRIMARY_SYMBOL)
-    pool.insert(0, config.PRIMARY_SYMBOL)
+    # Only prepend BTC if L1 is actively targeted (or we have a broad pool)
+    if "L1" in target_segments or len(target_segments) == 0:
+        pool.insert(0, config.PRIMARY_SYMBOL)
 
     return pool
 

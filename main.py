@@ -571,8 +571,9 @@ class RegimeMasterBot:
         raw_results.sort(key=lambda x: x.get("conviction", 0), reverse=True)
         # Note: If no bots exist in config.ENGINE_ACTIVE_BOTS, fall back to self._active_profiles
         eval_targets = _tick_active_bots if _tick_active_bots else [
-            {"bot_id": config.ENGINE_BOT_ID, "bot_name": p["label"], "user_id": config.ENGINE_USER_ID, "brain_type": "athena",
-             "segment_filter": _infer_segment_from_name(p.get("label", ""))} 
+            {"bot_id": config.ENGINE_BOT_ID, "bot_name": p["label"], "user_id": config.ENGINE_USER_ID,
+             "brain_type": "adaptive",  # fallback uses adaptive (no Athena LLM gate) so signals deploy immediately
+             "segment_filter": _infer_segment_from_name(p.get("label", ""))}
             for pid, p in self._active_profiles.items()
         ]
         
@@ -638,6 +639,9 @@ class RegimeMasterBot:
                 # Skip if already have active trade for this bot:symbol
                 if pos_key in tradebook_active_keys:
                     self._coin_states.setdefault(sym, {})["deploy_status"] = "FILTERED: active trade exists"
+                    _bcast("FILTERED_DUPLICATE", self._cycle_count, bot_name, bot_id, sym,
+                           raw.get("side", ""), get_segment_for_coin(sym), raw.get("confidence", 0),
+                           "active trade already open for this bot:symbol")
                     continue
 
                 # Evaluate raw analysis through this bot's specific profile lens
@@ -665,6 +669,9 @@ class RegimeMasterBot:
                     logger.warning("   ⛔ %s max positions reached (%d/%d) — skipping %s %s %d×",
                         bot_name, current_total, max_pos, trade["side"], sym, trade["leverage"])
                     self._coin_states.setdefault(sym, {})["deploy_status"] = f"FILTERED: overall max pos ({current_total}/{max_pos})"
+                    _bcast("FILTERED_MAX_POS", self._cycle_count, bot_name, bot_id, sym,
+                           trade["side"], get_segment_for_coin(sym),
+                           float(trade.get("confidence", 0)), f"positions={current_total}/{max_pos}")
                     continue
                 
                 # --- Segment Correlation Check ---
