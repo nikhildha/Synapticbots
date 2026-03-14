@@ -623,15 +623,17 @@ export function TradesClient({ trades: initialTrades }: TradesClientProps) {
           </motion.div>
 
           {/* ═══ Pending Limit Orders ═══ */}
-          {pendingOrders.length > 0 && (
-            <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.12 }} className="mb-6">
-              <Card>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '12px' }}>
-                  <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#F59E0B', boxShadow: '0 0 8px #F59E0B', animation: 'pulse 2s infinite' }} />
-                  <div style={{ fontSize: '13px', fontWeight: 700, color: '#F59E0B', letterSpacing: '0.5px' }}>Pending Limit Orders</div>
-                  <span style={{ fontSize: '10px', background: 'rgba(245,158,11,0.15)', color: '#F59E0B', padding: '2px 8px', borderRadius: '6px', fontWeight: 700 }}>{pendingOrders.length} awaiting fill</span>
-                  <span style={{ fontSize: '10px', color: '#6B7280', marginLeft: 'auto' }}>ATR pullback — waiting for price to reach limit</span>
-                </div>
+          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.12 }} className="mb-6">
+            <Card>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '12px' }}>
+                <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#F59E0B', boxShadow: '0 0 8px #F59E0B', animation: pendingOrders.length > 0 ? 'pulse 2s infinite' : undefined }} />
+                <div style={{ fontSize: '13px', fontWeight: 700, color: '#F59E0B', letterSpacing: '0.5px' }}>Pending Limit Orders</div>
+                <span style={{ fontSize: '10px', background: 'rgba(245,158,11,0.15)', color: '#F59E0B', padding: '2px 8px', borderRadius: '6px', fontWeight: 700 }}>
+                  {pendingOrders.length > 0 ? `${pendingOrders.length} awaiting fill` : 'none'}
+                </span>
+                <span style={{ fontSize: '10px', color: '#6B7280', marginLeft: 'auto' }}>ATR pullback — waiting for price to reach limit</span>
+              </div>
+              {pendingOrders.length > 0 ? (
                 <div style={{ overflowX: 'auto' }}>
                   <table style={{ width: '100%', minWidth: '900px', borderCollapse: 'collapse', fontSize: '13px' }}>
                     <thead>
@@ -689,9 +691,15 @@ export function TradesClient({ trades: initialTrades }: TradesClientProps) {
                     </tbody>
                   </table>
                 </div>
-              </Card>
-            </motion.div>
-          )}
+              ) : (
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '56px', borderRadius: '10px', border: '1px solid rgba(245,158,11,0.08)', background: 'rgba(245,158,11,0.02)', color: '#6B7280', fontSize: '13px', fontStyle: 'italic' }}>
+                  No pending limit orders — all signals deployed at market or no eligible trades this cycle
+                </div>
+              )}
+            </Card>
+          </motion.div>
+
+
 
           {/* ═══ Trade Journal Table ═══ */}
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }}>

@@ -268,13 +268,13 @@ export function RegimeCard({ regime, confidence, symbol, macroRegime, trend15m, 
                                 transition: 'stroke-dasharray 1.5s cubic-bezier(0.4,0,0.2,1)',
                             }}
                         />
-                        <text x={GAUGE_CX} y={GAUGE_CY - 4} textAnchor="middle"
-                            fontSize="18" fontWeight="800" fill={gaugeColor}
+                        <text x={GAUGE_CX} y={GAUGE_CY + 8} textAnchor="middle"
+                            fontSize="54" fontWeight="800" fill={gaugeColor}
                             fontFamily="monospace"
-                            style={{ filter: `drop-shadow(0 0 6px ${gaugeColor}88)` }}>
+                            style={{ filter: `drop-shadow(0 0 8px ${gaugeColor}88)` }}>
                             ~{pct}%
                         </text>
-                        <text x={GAUGE_CX} y={GAUGE_CY + 10} textAnchor="middle"
+                        <text x={GAUGE_CX} y={GAUGE_CY + 26} textAnchor="middle"
                             fontSize="8" fontWeight="700" fill="rgba(100,160,200,0.6)"
                             fontFamily="sans-serif" letterSpacing="2">
                             CONFID
@@ -604,6 +604,7 @@ export function SignalSummaryTable({ coinStates, multi }: SignalSummaryProps) {
         if (a.includes('ELIGIBLE_SELL')) return `Bearish @ ${pct.toFixed(0)}% — SHORT ready`;
         if (a.includes('ELIGIBLE')) return `${r} @ ${pct.toFixed(0)}% — trade ready`;
         if (a.includes('CRASH_SKIP') || a.includes('MACRO_CRASH')) return 'Crash regime — safety skip';
+        if (a.includes('WEEKEND') || a.includes('WEEK_SKIP')) return 'Weekend — skipped';
         if (a.includes('MTF_CONFLICT')) return 'Volatile (Multi-TF)';
         if (a.includes('15M_FILTER')) return '15m momentum opposes direction';
         if (a.includes('SENTIMENT_VETO') || a.includes('SENTIMENT_ALERT')) return 'Sentiment filter — vetoed';

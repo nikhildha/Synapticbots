@@ -32,8 +32,27 @@ export function SegmentHeatmap({ heatmapData, loading = false }: SegmentHeatmapP
   }
 
   if (!heatmapData || !heatmapData.segments || heatmapData.segments.length === 0) {
-    return null; /* Hide if no data */
+    return (
+      <div className="mb-8 p-6 rounded-2xl border border-white/5" style={{ background: 'rgba(17, 24, 39, 0.6)', backdropFilter: 'blur(12px)' }}>
+        <div className="flex items-center gap-3 mb-4">
+          <div className="p-2 rounded-lg bg-cyan-500/10">
+            <Activity className="w-5 h-5 text-cyan-400" />
+          </div>
+          <div>
+            <h2 className="text-[17px] font-bold text-white flex items-center gap-2">
+              Institutional Segment Heatmap
+              <span className="px-2 py-[2px] rounded text-[10px] font-bold bg-white/10 text-white/70 tracking-wider">LIVE</span>
+            </h2>
+            <p className="text-[12px] text-gray-400 mt-0.5">3-Pillar Composite Momentum (VW-RR, BTC Alpha, Breadth)</p>
+          </div>
+        </div>
+        <div className="flex items-center justify-center h-24 rounded-xl border border-white/5 bg-white/[0.02]">
+          <p className="text-[13px] text-gray-500 italic">Waiting for first engine cycle — heatmap will appear here</p>
+        </div>
+      </div>
+    );
   }
+
 
   // Sort by raw composite score (descending) to show hottest on left, coldest on right
   const sortedSegments = [...heatmapData.segments].sort((a, b) => b.composite_score - a.composite_score);
