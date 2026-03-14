@@ -44,6 +44,28 @@ const getBrain = (name = '', brainType = '') => {
   return BRAIN_META.adaptive;
 };
 
+// Segment icon derived from bot name (matches bots-client.tsx BOT_MODELS)
+const SEGMENT_ICONS: Record<string, { icon: string; color: string }> = {
+  'L1':     { icon: '🔷', color: '#A78BFA' },
+  'L2':     { icon: '🔗', color: '#22D3EE' },
+  'DeFi':   { icon: '🌊', color: '#34D399' },
+  'Gaming': { icon: '🎮', color: '#FBBF24' },
+  'AI':     { icon: '🤖', color: '#F472B6' },
+  'RWA':    { icon: '🏦', color: '#60A5FA' },
+  'ALL':    { icon: '⚡', color: '#22C55E' },
+};
+function getSegmentBadge(botName: string): { icon: string; color: string } | null {
+  const n = (botName || '').toLowerCase();
+  if (n.includes('all') || n.includes('adaptive') || n.includes('synaptic')) return SEGMENT_ICONS['ALL'];
+  if (n.includes('l1') || n.includes('layer 1') || n.includes('layer1')) return SEGMENT_ICONS['L1'];
+  if (n.includes('l2') || n.includes('layer 2') || n.includes('layer2')) return SEGMENT_ICONS['L2'];
+  if (n.includes('defi') || n.includes('de-fi')) return SEGMENT_ICONS['DeFi'];
+  if (n.includes('gaming') || n.includes('game') || n.includes('metaverse')) return SEGMENT_ICONS['Gaming'];
+  if (n.includes('ai') || n.includes('intelligence') || n.includes('neural')) return SEGMENT_ICONS['AI'];
+  if (n.includes('rwa') || n.includes('real world') || n.includes('asset')) return SEGMENT_ICONS['RWA'];
+  return null;
+}
+
 export function BotCard({ bot, onToggle, onDelete, liveTradeCount, trades = [], sessions = [] }: BotCardProps) {
   const [expanded, setExpanded] = useState(false);
   const [tab, setTab] = useState<'trades' | 'sessions'>('trades');
@@ -139,7 +161,7 @@ export function BotCard({ bot, onToggle, onDelete, liveTradeCount, trades = [], 
       >
         {/* Left: Bot identity */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 14, minWidth: 0, flex: '0 0 260px' }}>
-          {/* Avatar with rotating ring */}
+          {/* Avatar with segment icon badge */}
           <div style={{ position: 'relative', width: 54, height: 54, flexShrink: 0 }}>
 
             {/* Avatar circle */}
@@ -155,9 +177,27 @@ export function BotCard({ bot, onToggle, onDelete, liveTradeCount, trades = [], 
                 alt="brain"
                 style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }}
               />
-
             </div>
-          </div>
+
+            {/* Segment badge — bottom-right corner of avatar */}
+            {(() => {
+              const seg = getSegmentBadge(bot?.name || '');
+              if (!seg) return null;
+              return (
+                <div style={{
+                  position: 'absolute', bottom: -2, right: -2, zIndex: 2,
+                  width: 20, height: 20, borderRadius: '50%',
+                  background: `radial-gradient(circle, ${seg.color}33, rgba(8,14,26,0.95))`,
+                  border: `1.5px solid ${seg.color}60`,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  fontSize: 10, lineHeight: 1,
+                  boxShadow: `0 0 6px ${seg.color}55`,
+                }}>
+                  {seg.icon}
+                </div>
+              );
+            })()}
+          </div>{/* /avatar wrapper */}
           <div style={{ minWidth: 0 }}>
             <div style={{ fontSize: 'var(--text-md)', fontWeight: 700, color: 'var(--color-text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
               {bot?.name ?? 'Bot'}

@@ -89,10 +89,20 @@ export function RegimeCard({ regime, confidence, symbol, macroRegime, trend15m, 
     const ringCircumference = 2 * Math.PI * ringRadius;
     const ringOffset = ringCircumference - (pct / 100) * ringCircumference;
 
-    // Live BTC price + 1s background sparkline
+    // Live BTC price + 1s background sparkline (persists last 25 pts via sessionStorage)
     const [btcPrice, setBtcPrice] = useState<number | null>(null);
     const [btcChange, setBtcChange] = useState<number>(0);
-    const [btcPriceHistory, setBtcPriceHistory] = useState<number[]>([]);
+    const [btcPriceHistory, setBtcPriceHistory] = useState<number[]>(() => {
+        // Seed from sessionStorage on mount so sparkline doesn't restart on refresh
+        try {
+            const saved = sessionStorage.getItem('btcSparkHistory');
+            if (saved) {
+                const arr = JSON.parse(saved) as number[];
+                return Array.isArray(arr) ? arr.slice(-25) : [];
+            }
+        } catch { /* ignore */ }
+        return [];
+    });
 
     useEffect(() => {
         const fetchBtc = async () => {
@@ -106,7 +116,10 @@ export function RegimeCard({ regime, confidence, symbol, macroRegime, trend15m, 
                     setBtcChange(parseFloat(d.priceChangePercent));
                     setBtcPriceHistory(prev => {
                         const next = [...prev, price];
-                        return next.length > 300 ? next.slice(-300) : next; // 5-min window at 1s
+                        const capped = next.length > 300 ? next.slice(-300) : next;
+                        // Persist rolling window to sessionStorage
+                        try { sessionStorage.setItem('btcSparkHistory', JSON.stringify(capped.slice(-25))); } catch { /* ignore */ }
+                        return capped;
                     });
                 }
             } catch { /* silent */ }

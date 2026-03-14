@@ -19,7 +19,23 @@ export function VirtualLimitTracker({ trades }: VirtualLimitTrackerProps) {
   const openLimits = (trades || []).filter((t: any) => (t.status || '').toUpperCase() === 'OPEN');
 
   if (openLimits.length === 0) {
-    return null; // Don't render if no limit orders
+    return (
+      <div className="card-gradient rounded-xl overflow-hidden mb-6" style={{
+        border: '1px solid rgba(167, 139, 250, 0.1)',
+      }}>
+        <div style={{ padding: '14px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <h3 style={{ fontSize: '13px', fontWeight: 700, color: 'rgba(167,139,250,0.5)', textTransform: 'uppercase', letterSpacing: '1px', margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <span style={{ fontSize: '14px' }}>⏱️</span> Virtual Limit Orders
+          </h3>
+          <span style={{ background: 'rgba(107,114,128,0.08)', color: '#6B7280', padding: '2px 8px', borderRadius: '10px', fontSize: '10px', fontWeight: 700 }}>
+            0 PENDING
+          </span>
+        </div>
+        <div style={{ padding: '16px 20px', textAlign: 'center', color: 'rgba(107,114,128,0.5)', fontSize: '12px', borderTop: '1px solid rgba(255,255,255,0.03)' }}>
+          No pending limit orders — will appear here when a limit entry is placed
+        </div>
+      </div>
+    );
   }
 
   // TIF is 60 minutes as per Phase 4 description. We can use a constant or config.
