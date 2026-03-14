@@ -8,6 +8,8 @@ import json
 import os
 import time
 import logging
+import threading
+import urllib.request
 from datetime import datetime, timezone, timedelta
 
 IST = timezone(timedelta(hours=5, minutes=30))
@@ -21,7 +23,6 @@ from risk_manager import RiskManager
 from sideways_strategy import evaluate_mean_reversion
 from coin_scanner import get_top_coins_by_volume, get_active_bot_segment_pool, reload_coin_tiers
 from tools.weekly_reclassify import needs_reclassify, run_reclassify
-import threading
 import tradebook
 import telegram as tg
 import sentiment_engine as _sent_mod
@@ -817,13 +818,112 @@ class RegimeMasterBot:
         self._last_cycle_duration = cycle_duration
         self._save_multi_state(symbols, eligible_trades, deployed)
 
+        # ── 7. Persist cycle snapshot to DB (background thread, non-blocking) ─
+        threading.Thread(
+            target=self._post_cycle_snapshot,
+            args=(cycle_duration, eligible_trades, deployed),
+            daemon=True,
+            name=f"CycleSnap-{self._cycle_count}",
+        ).start()
+
         logger.info(
             "📊 Cycle #%d complete | Scanned: %d | Eligible: %d | Deployed: %d | Active: %d | Profiles: %d",
             self._cycle_count, len(symbols), len(eligible_trades), deployed,
             len(tradebook.get_active_trades()), len(self._active_profiles),
         )
 
+    def _post_cycle_snapshot(self, cycle_duration: float, eligible_trades: list, deployed: int):
+        """POST per-cycle signal archive to dashboard /api/cycle-snapshot for DB persistence."""
+        try:
+            dashboard_url = os.environ.get("DASHBOARD_URL", "").rstrip("/")
+            if not dashboard_url:
+                return  # no dashboard URL configured — silent skip
+
+            secret = os.environ.get("ENGINE_INTERNAL_SECRET", "synaptic-internal-2024")
+
+            # Collect per-coin scan results from _coin_states
+            coin_results = []
+            for sym, state in self._coin_states.items():
+                coin_results.append({
+                    "symbol":        sym,
+                    "regime":        state.get("regime"),
+                    "regime_full":   state.get("regime_full"),
+                    "action":        state.get("action"),
+                    "side":          state.get("side"),
+                    "confidence":    state.get("confidence"),
+                    "conviction":    state.get("conviction"),
+                    "tf_agreement":  state.get("tf_agreement"),
+                    "atr":           state.get("atr"),
+                    "price":         state.get("price") or state.get("current_price"),
+                    "deploy_status": state.get("deploy_status"),
+                    "was_deployed":  sym in [t.get("symbol") for t in eligible_trades],
+                    "athena_decision": state.get("athena_decision"),
+                })
+
+            # Collect segment heatmap data
+            heatmap = []
+            try:
+                heatmap_file = getattr(config, "HEATMAP_STATE_FILE", "data/segment_heatmap.json")
+                if os.path.exists(heatmap_file):
+                    with open(heatmap_file, "r") as f:
+                        hmap = json.load(f)
+                    segs = hmap.get("segments", [])
+                    selected = {s.get("segment") for s in segs[:2]}  # top-2 are selected
+                    for i, seg in enumerate(segs):
+                        heatmap.append({
+                            "segment":         seg.get("segment"),
+                            "composite_score": seg.get("composite_score"),
+                            "vw_rr":           seg.get("vw_rr"),
+                            "btc_alpha":       seg.get("btc_alpha"),
+                            "breadth_pct":     seg.get("breadth_pct"),
+                            "is_selected":     seg.get("segment") in selected,
+                            "rank":            i + 1,
+                        })
+            except Exception:
+                pass
+
+            # BTC state for market context
+            btc_state = self._coin_states.get("BTCUSDT", {})
+            active_bots = list(config.ENGINE_ACTIVE_BOTS)
+            bot_id = active_bots[0]["bot_id"] if active_bots else getattr(config, "ENGINE_BOT_ID", None)
+            mode = "live" if not getattr(config, "PAPER_TRADE", True) else "paper"
+
+            payload = {
+                "cycle_number":   self._cycle_count,
+                "mode":           mode,
+                "engine_bot_id":  bot_id,
+                "scanned_at":     datetime.now(IST).isoformat(),
+                "duration_ms":    int(cycle_duration * 1000),
+                "btc_regime":     btc_state.get("regime"),
+                "btc_confidence": btc_state.get("confidence"),
+                "btc_price":      btc_state.get("price") or btc_state.get("current_price"),
+                "macro_action":   btc_state.get("action"),
+                "coins_scanned":  len(self._coin_states),
+                "eligible_count": len(eligible_trades),
+                "deployed_count": deployed,
+                "filtered_count": len(self._coin_states) - len(eligible_trades),
+                "coin_results":   coin_results,
+                "heatmap":        heatmap,
+            }
+
+            data = json.dumps(payload).encode("utf-8")
+            req = urllib.request.Request(
+                f"{dashboard_url}/api/cycle-snapshot",
+                data=data,
+                method="POST",
+                headers={
+                    "Content-Type":    "application/json",
+                    "x-engine-secret": secret,
+                },
+            )
+            with urllib.request.urlopen(req, timeout=10) as resp:
+                logger.debug("📦 Cycle snapshot persisted — status %s", resp.status)
+
+        except Exception as exc:
+            logger.debug("Cycle snapshot POST failed (non-critical): %s", exc)
+
     # ─── Per-Coin Analysis ───────────────────────────────────────────────────
+
 
     def _analyze_coin(self, symbol, balance, btc_flash_crash=False):
         """
