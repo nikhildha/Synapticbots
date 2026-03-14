@@ -68,7 +68,7 @@ export function RegimeCard({ regime, confidence, symbol, macroRegime, trend15m, 
     const ringCircumference = 2 * Math.PI * ringRadius;
     const ringOffset = ringCircumference - (pct / 100) * ringCircumference;
 
-    // Live BTC price + 5-second sparkline history
+    // Live BTC price + 1-minute background sparkline
     const [btcPrice, setBtcPrice] = useState<number | null>(null);
     const [btcChange, setBtcChange] = useState<number>(0);
     const [btcPriceHistory, setBtcPriceHistory] = useState<number[]>([]);
@@ -84,13 +84,13 @@ export function RegimeCard({ regime, confidence, symbol, macroRegime, trend15m, 
                     setBtcChange(parseFloat(d.priceChangePercent));
                     setBtcPriceHistory(prev => {
                         const next = [...prev, price];
-                        return next.length > 60 ? next.slice(-60) : next; // keep last 60 pts
+                        return next.length > 120 ? next.slice(-120) : next; // 2h window at 1-min
                     });
                 }
             } catch { /* silent */ }
         };
         fetchBtc();
-        const timer = setInterval(fetchBtc, 5000); // 5-second sparkline
+        const timer = setInterval(fetchBtc, 60000); // 1-minute sparkline
         return () => clearInterval(timer);
     }, []);
 
@@ -164,6 +164,43 @@ export function RegimeCard({ regime, confidence, symbol, macroRegime, trend15m, 
                 position: 'absolute', top: 0, left: 0, right: 0, height: '1px',
                 background: `linear-gradient(90deg, transparent, ${info.color}60, transparent)`,
             }} />
+
+            {/* ── BTC background sparkline watermark ── */}
+            {btcPriceHistory.length >= 2 && (() => {
+                const pts = btcPriceHistory;
+                const minP = Math.min(...pts);
+                const maxP = Math.max(...pts);
+                const range = maxP - minP || 1;
+                const W = 400, H = 80;
+                const sparkPts = pts.map((p, i) => {
+                    const x = (i / (pts.length - 1)) * W;
+                    const y = H - ((p - minP) / range) * (H - 6) - 3;
+                    return `${x.toFixed(1)},${y.toFixed(1)}`;
+                }).join(' ');
+                const last = pts[pts.length - 1];
+                const first = pts[0];
+                const rising = last >= first;
+                const lc = rising ? '#00FF88' : '#FF3B5C';
+                return (
+                    <svg
+                        width="100%" viewBox={`0 0 ${W} ${H}`}
+                        preserveAspectRatio="none"
+                        style={{
+                            position: 'absolute', bottom: 0, left: 0, right: 0,
+                            opacity: 0.13, pointerEvents: 'none', display: 'block',
+                        }}
+                    >
+                        <defs>
+                            <linearGradient id="bgSparkGrad" x1="0" y1="0" x2="0" y2="1">
+                                <stop offset="0%" stopColor={lc} stopOpacity="0.5" />
+                                <stop offset="100%" stopColor={lc} stopOpacity="0" />
+                            </linearGradient>
+                        </defs>
+                        <polyline points={`0,${H} ${sparkPts} ${W},${H}`} fill="url(#bgSparkGrad)" stroke="none" />
+                        <polyline points={sparkPts} fill="none" stroke={lc} strokeWidth="1.5" strokeLinejoin="round" strokeLinecap="round" />
+                    </svg>
+                );
+            })()}
 
             {/* Header row */}
             <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '14px' }}>
@@ -274,8 +311,8 @@ export function RegimeCard({ regime, confidence, symbol, macroRegime, trend15m, 
                                 transition: 'stroke-dasharray 1.5s cubic-bezier(0.4,0,0.2,1)',
                             }}
                         />
-                        <text x={GAUGE_CX} y={GAUGE_CY + 6} textAnchor="middle"
-                            fontSize="26" fontWeight="800" fill={gaugeColor}
+                        <text x={GAUGE_CX} y={GAUGE_CY + 8} textAnchor="middle"
+                            fontSize="32" fontWeight="800" fill={gaugeColor}
                             fontFamily="monospace"
                             style={{ filter: `drop-shadow(0 0 8px ${gaugeColor}88)` }}>
                             ~{pct}%
@@ -289,68 +326,6 @@ export function RegimeCard({ regime, confidence, symbol, macroRegime, trend15m, 
                 </div>
 
             </div>
-
-            {/* ── BTC Live Price Sparkline ── */}
-            {btcPriceHistory.length >= 2 && (() => {
-                const pts = btcPriceHistory;
-                const minP = Math.min(...pts);
-                const maxP = Math.max(...pts);
-                const range = maxP - minP || 1;
-                const W = 320, H = 48;
-                const points = pts.map((p, i) => {
-                    const x = (i / (pts.length - 1)) * W;
-                    const y = H - ((p - minP) / range) * (H - 8) - 4;
-                    return `${x.toFixed(1)},${y.toFixed(1)}`;
-                }).join(' ');
-                const last = pts[pts.length - 1];
-                const first = pts[0];
-                const rising = last >= first;
-                const lineColor = rising ? '#00FF88' : '#FF3B5C';
-                const lastX = W;
-                const lastY = H - ((last - minP) / range) * (H - 8) - 4;
-                return (
-                    <div style={{ marginTop: '8px', padding: '8px 12px', background: 'rgba(0,0,0,0.3)', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.04)' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px' }}>
-                            <span style={{ fontSize: '9px', fontWeight: 700, color: '#4B6080', letterSpacing: '2px', textTransform: 'uppercase' }}>BTC / USDT · 5s</span>
-                            <span style={{ fontSize: '12px', fontWeight: 800, fontFamily: 'monospace', color: lineColor, textShadow: `0 0 8px ${lineColor}66` }}>
-                                ${last.toLocaleString('en-US', { maximumFractionDigits: 0 })}
-                                <span style={{ fontSize: '10px', marginLeft: '6px', color: btcChange >= 0 ? '#00FF88' : '#FF3B5C' }}>
-                                    {btcChange >= 0 ? '▲' : '▼'}{Math.abs(btcChange).toFixed(2)}%
-                                </span>
-                            </span>
-                        </div>
-                        <svg width="100%" viewBox={`0 0 ${W} ${H}`} style={{ display: 'block', overflow: 'visible' }}>
-                            <defs>
-                                <linearGradient id="sparkGrad" x1="0" y1="0" x2="0" y2="1">
-                                    <stop offset="0%" stopColor={lineColor} stopOpacity="0.25" />
-                                    <stop offset="100%" stopColor={lineColor} stopOpacity="0" />
-                                </linearGradient>
-                            </defs>
-                            {/* Fill area */}
-                            <polyline
-                                points={`0,${H} ${points} ${lastX},${H}`}
-                                fill="url(#sparkGrad)" stroke="none"
-                            />
-                            {/* Line */}
-                            <polyline
-                                points={points}
-                                fill="none"
-                                stroke={lineColor}
-                                strokeWidth="1.5"
-                                strokeLinejoin="round"
-                                strokeLinecap="round"
-                                style={{ filter: `drop-shadow(0 0 3px ${lineColor}88)` }}
-                            />
-                            {/* Live dot */}
-                            <circle cx={lastX} cy={lastY} r="3" fill={lineColor} style={{ filter: `drop-shadow(0 0 4px ${lineColor})` }} />
-                            <circle cx={lastX} cy={lastY} r="5" fill="none" stroke={lineColor} strokeWidth="1" strokeOpacity="0.4">
-                                <animate attributeName="r" values="4;8;4" dur="2s" repeatCount="indefinite" />
-                                <animate attributeName="stroke-opacity" values="0.4;0;0.4" dur="2s" repeatCount="indefinite" />
-                            </circle>
-                        </svg>
-                    </div>
-                );
-            })()}
 
         </div>
     );
