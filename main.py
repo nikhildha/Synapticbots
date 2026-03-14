@@ -1331,6 +1331,64 @@ class RegimeMasterBot:
                     self._coin_states[symbol]["action"] = "MTF_CONFLICT"
                     return None
 
+        # ── Tier 2B: 15m+4H agree, 1H lagging — gate on 1H EMA20 pullback ──────
+        # Cases 24 & 25: 15m=BULL + 4H=BULL + 1H=BEAR (or inverse SHORT version)
+        # 4H is the dominant macro trend. 1H hasn't flipped yet (lagging).
+        # We can trade WITH the 4H direction if price has pulled back to 1H EMA20.
+        _is_tier2b = False
+        if regime_1h is not None and regime_4h is not None:
+            macro_direction_bull = (regime_4h == config.REGIME_BULL and regime == config.REGIME_BULL)
+            macro_direction_bear = (regime_4h == config.REGIME_BEAR and regime == config.REGIME_BEAR)
+            one_h_lagging_bear   = (regime_1h == config.REGIME_BEAR and macro_direction_bull)
+            one_h_lagging_bull   = (regime_1h == config.REGIME_BULL and macro_direction_bear)
+
+            if one_h_lagging_bear or one_h_lagging_bull:
+                # 15m and 4H agree; 1H is lagging opposite → Tier 2B
+                _is_tier2b = True
+                ema20_1h_val = ta_multi.get("1h", {}).get("ema20") if "ta_multi" in dir() else None
+                # Fallback — compute directly if not yet in ta_multi
+                if ema20_1h_val is None:
+                    try:
+                        ema20_1h_val = float(compute_ema(df_1h_feat["close"], 20).iloc[-1])
+                    except Exception:
+                        ema20_1h_val = None
+                atr_1h_val = float(df_1h_feat["atr"].iloc[-1]) if "atr" in df_1h_feat.columns else current_atr
+
+                if ema20_1h_val and atr_1h_val > 0 and current_price > 0:
+                    atr_band_1h = atr_1h_val * 1.0   # 1× 1H ATR tolerance around 1H EMA20
+                    if one_h_lagging_bear:
+                        # LONG: pulled back to 1H EMA20 from above
+                        in_pullback_zone_1h = (
+                            current_price <= ema20_1h_val + atr_band_1h and
+                            current_price >= ema20_1h_val - atr_band_1h
+                        )
+                    else:
+                        # SHORT: bounced back to 1H EMA20 from below
+                        in_pullback_zone_1h = (
+                            current_price >= ema20_1h_val - atr_band_1h and
+                            current_price <= ema20_1h_val + atr_band_1h
+                        )
+                    if not in_pullback_zone_1h:
+                        self._coin_states[symbol]["action"] = "TIER2B_WAIT_PULLBACK"
+                        logger.debug(
+                            "📐 [%s] Tier2B (4H+15m agree, 1H lagging): price %.4f not in "
+                            "1H EMA20(%.4f) ± ATR(%.4f) — waiting",
+                            symbol, current_price, ema20_1h_val, atr_band_1h,
+                        )
+                        return None
+                    # Pullback confirmed — cap conviction at 60% (higher than Tier2A since 4H aligns)
+                    conviction = min(conviction, 60.0)
+                    logger.info(
+                        "📈 [%s] Tier2B TREND RESUME PULLBACK confirmed — "
+                        "price=%.4f 1H_EMA20=%.4f ATR_1H=%.4f — conviction capped %.1f",
+                        symbol, current_price, ema20_1h_val, atr_1h_val, conviction,
+                    )
+                    self._coin_states[symbol]["action"] = "TIER2B_RESUME_CONFIRMED"
+                else:
+                    # Can't compute — safe fallback: block
+                    self._coin_states[symbol]["action"] = "MTF_CONFLICT"
+                    return None
+
         # ── TREND (BULL / BEAR) — 8-factor conviction flow ──────────────────────
 
         # 1. Determine side first (needed for sentiment gate + conviction)

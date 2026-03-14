@@ -1,6 +1,6 @@
-# Regime-Master (HMMBOT) — Master Architecture & Documentation
+# Synaptic (Regime-Master) — Master Architecture & Documentation
 
-**Version:** Production (March 2026)
+**Version:** Production v3 — March 2026 (Tiered MTF Signal Pipeline)
 **GitHub:** https://github.com/nikhildha/Synapticbots
 **Deployment:** Railway (Docker, PostgreSQL)
 **Exchanges:** CoinDCX (live), Binance Futures (paper/testnet)
@@ -40,6 +40,18 @@
 10. [Testing](#10-testing)
 11. [Configuration Reference](#11-configuration-reference)
 12. [Glossary](#12-glossary)
+
+---
+
+## 📚 Deep-Dive Documentation
+
+For full technical detail, see the companion documents in this repo:
+
+| Document | What It Covers |
+|---|---|
+| [BRAIN_DEEP_DIVE.md](BRAIN_DEEP_DIVE.md) | HMM internals, feature engineering, margin confidence, full 27-combination MTF truth table, ATR pullback gate formulas, Athena design |
+| [MAIN_ENGINE.md](MAIN_ENGINE.md) | `main.py` engine loop, `_tick()` phases 1-7, `_analyze_coin()` step-by-step, position management, kill switches, all action codes |
+| [DEPLOY.md](DEPLOY.md) | Railway deployment, env vars, Docker config |
 
 ---
 
@@ -641,60 +653,59 @@ Flask REST server that bridges Python engine ↔ Next.js dashboard.
 
 ## 4. Brain Logic — Deep Dive
 
+> See **[BRAIN_DEEP_DIVE.md](BRAIN_DEEP_DIVE.md)** for the complete technical reference.
+
 ### Why Hidden Markov Model?
 
-Markets cycle through regimes (trending, ranging, volatile). Unlike indicators that react to price, an HMM learns the **hidden state** (regime) from observable features. Key advantages:
+Markets cycle through regimes (trending, ranging, volatile). Unlike indicators that react to price, an HMM learns the **hidden state** (regime) from observable features:
 
 1. **Probabilistic** — outputs confidence, not binary signal
 2. **Temporal** — considers sequences of observations, not just current bar
 3. **Unsupervised** — discovers regimes from data without labeling
 
-### Feature Selection Rationale
+### 3-State Model (Production)
 
-**Experiment: Greedy Feature Addition**
-Starting from 4 features (log_return, volatility, volume_change, rsi_norm):
-
-| Configuration | Sharpe | Notes |
-|--------------|--------|-------|
-| 4 features (baseline) | 0.258 | Too little context |
-| + funding_proxy | 0.481 | Futures sentiment adds edge |
-| + adx (6 features) | 0.667 | Trend strength resolves CHOP ambiguity |
-| + extra features | < 0.667 | Overfitting / curse of dimensionality |
-
-**Final: 6 features selected** (confirmed Mar 2026)
-
-### 3-State vs 4-State Comparison
-
-| Metric | 3-State | 4-State |
-|--------|---------|---------|
-| Sharpe Ratio | **1.22** | 0.72 |
-| Directional Accuracy | **35.5%** | 29.0% |
-| CRASH state accuracy | — | 10.9% |
-| Verdict | ✅ Production | ❌ Removed |
-
-### Regime Trading Rules
-
-| Regime | Trade Direction | Strategy |
-|--------|---------------|---------|
+| Regime | Trade | Strategy |
+|--------|-------|---------|
 | **BULL** | Long only | Trend following |
 | **BEAR** | Short only | Trend following |
 | **CHOP** | Sideways | Mean reversion (Bollinger Bands, RSI) |
 
-In CHOP, the `sideways_strategy.py` module takes over with:
-- Bollinger Band entries (price below lower band → long, above upper → short)
-- RSI extremes (< 35 = oversold → long; > 65 = overbought → short)
-- 30% smaller position size (`SIDEWAYS_POSITION_REDUCTION = 0.30`)
+4-state (CRASH) was tested and **removed**: Sharpe dropped from 1.22 → 0.72. CRASH classified as extreme BEAR.
 
-### Support/Resistance Experiment Results
+### Margin Confidence
 
-Experiment file: `tools/experiment_sr_4h_ic.py`
+Raw HMM posterior is always 99%+ (uncalibrated). Solution:
+```python
+confidence = sorted_probs[0] - sorted_probs[1]   # best - second_best
+```
+| Margin | Conviction Points |
+|--------|------------------|
+| ≥ 0.60 | 44 (max) |
+| ≥ 0.40 | 33 |
+| ≥ 0.25 | 22 |
+| ≥ 0.10 | 11 |
+| < 0.10 | 0 (model untrusted) |
 
-| Metric | Result | Interpretation |
-|--------|--------|---------------|
-| IC (Information Coefficient) | -0.010 | Near zero — weak predictive value |
-| t-statistic | -0.81 | Not statistically significant (need |t| > 2.0) |
-| Best lookback tested | 150×4h (25 days) | Sharpe 0.818 but t-stat weak |
-| **Decision** | Keep weight = 2 pts | Too minor to remove, not enough to increase |
+### Tiered MTF Signal Logic (v3 — March 2026)
+
+Every coin is evaluated across 15m, 1H, and 4H regimes. The combination of these three regimes determines the signal tier:
+
+| Tier | Condition | Action |
+|------|-----------|--------|
+| **1 — Trend Follow** | All TFs agree (or CHOP mixed in) | Full conviction trade |
+| **2A — Reversal** | 15m flipped vs 1H+4H | Gate: 15m EMA20 ± ATR pullback zone. Cap conviction at 55%. `signal_type=REVERSAL_PULLBACK` |
+| **2B — Trend Resume** | 15m+4H agree, 1H lagging | Gate: 1H EMA20 ± ATR pullback zone. Cap conviction at 60%. `signal_type=TREND_RESUME_PULLBACK` |
+| **3 — Noise Block** | 1H and 4H directly contradict | Hard block. `action=MTF_CONFLICT` |
+| **Skip** | 15m=CHOP or only 1 TF signals | No trade |
+
+**The core rule:** The 4H is the authority. Trading against the 4H is always blocked (Tier 3). Trading with the 4H but ahead of the 1H is allowed with pullback confirmation (Tier 2B).
+
+See `BRAIN_DEEP_DIVE.md §8-9` for the complete 27-combination truth table and pullback zone formulas.
+
+### Support/Resistance Weighting
+
+IC ~-0.01 (weak). Weight maintained at 2 pts — below threshold to increase, not zero enough to remove.
 
 ---
 
