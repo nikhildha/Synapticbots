@@ -259,6 +259,9 @@ def api_all():
         "heatmap": heatmap,
         # Athena LLM Reasoning Layer state (from live bot object, not disk)
         "athena": _engine_bot._athena.get_state() if _engine_bot and hasattr(_engine_bot, '_athena') and _engine_bot._athena else {"enabled": False},
+        # List of bot IDs currently registered with the engine (cleared on restart).
+        # Frontend uses this to detect de-registration and auto-re-push bots.
+        "registered_bot_ids": [b["bot_id"] for b in config.ENGINE_ACTIVE_BOTS],
     })
 
 
@@ -282,7 +285,6 @@ def api_gemini_health():
             "model": config.LLM_MODEL,
             "test_response": response.text.strip()[:50],
             "athena_enabled": config.LLM_REASONING_ENABLED,
-            "brain_type": config.ENGINE_BRAIN_TYPE,
         })
     except ImportError:
         return jsonify({"status": "error", "message": "google-generativeai not installed", "key_set": True})
@@ -814,7 +816,6 @@ def api_set_bot_id():
     data = request.get_json() or {}
     bot_id = data.get("bot_id", "")
     bot_name = data.get("bot_name", "")
-    brain_type = data.get("brain_type", "athena")
     segment_filter = data.get("segment_filter", "ALL")
     user_id = data.get("user_id", "")
 
@@ -823,10 +824,6 @@ def api_set_bot_id():
 
     old_id = config.ENGINE_BOT_ID
     config.ENGINE_BOT_ID = bot_id
-
-    # Set brain type (athena = HMM + Gemini AI, hmm = HMM only)
-    old_brain = config.ENGINE_BRAIN_TYPE
-    config.ENGINE_BRAIN_TYPE = brain_type if brain_type in ("athena", "hmm") else "athena"
 
     # Also update user_id if provided
     if user_id:
@@ -840,14 +837,12 @@ def api_set_bot_id():
         "bot_id": bot_id,
         "bot_name": bot_name,
         "user_id": user_id or config.ENGINE_USER_ID,
-        "brain_type": config.ENGINE_BRAIN_TYPE,
         "segment_filter": segment_filter,
     })
 
     logger.info(
-        "🔑 Bot added: %s (%s) → active_bots=%d (user: %s, brain: %s → %s)",
-        bot_id, bot_name, len(config.ENGINE_ACTIVE_BOTS), user_id or "<unchanged>",
-        old_brain, config.ENGINE_BRAIN_TYPE,
+        "🔑 Bot added: %s (%s) → active_bots=%d (user: %s) segment=%s",
+        bot_id, bot_name, len(config.ENGINE_ACTIVE_BOTS), user_id or "<unchanged>", segment_filter,
     )
 
     return jsonify({
@@ -856,7 +851,6 @@ def api_set_bot_id():
         "bot_name": bot_name,
         "previous_bot_id": old_id,
         "user_id": user_id or config.ENGINE_USER_ID,
-        "brain_type": config.ENGINE_BRAIN_TYPE,
         "active_bots": len(config.ENGINE_ACTIVE_BOTS),
     })
 

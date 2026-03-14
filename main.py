@@ -572,7 +572,6 @@ class RegimeMasterBot:
         # Note: If no bots exist in config.ENGINE_ACTIVE_BOTS, fall back to self._active_profiles
         eval_targets = _tick_active_bots if _tick_active_bots else [
             {"bot_id": config.ENGINE_BOT_ID, "bot_name": p["label"], "user_id": config.ENGINE_USER_ID,
-             "brain_type": "adaptive",  # fallback uses adaptive (no Athena LLM gate) so signals deploy immediately
              "segment_filter": _infer_segment_from_name(p.get("label", ""))}
             for pid, p in self._active_profiles.items()
         ]
