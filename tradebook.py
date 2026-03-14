@@ -230,7 +230,7 @@ def open_trade(symbol, side, leverage, quantity, entry_price, atr,
         "last_funding_check": now_iso,
         "profile_id":       profile_id,
         "bot_name":         bot_name,
-        "bot_id":           "",  # Removed — engine is broadcaster, no bot_id scoping
+        "bot_id":           bot_id or "",  # Stamp real bot_id for per-bot trade isolation
         "all_bot_ids":      all_bot_ids or [],  # Multi-bot: list of all active bot IDs at trade time
         # CoinDCX exchange tracking
         "exchange":         exchange,
