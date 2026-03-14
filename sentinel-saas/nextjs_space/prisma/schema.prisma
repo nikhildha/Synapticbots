@@ -1,241 +1,173 @@
-datasource db {
-    provider = "postgresql"
-    url      = env("DATABASE_URL")
-}
-
 generator client {
-    provider = "prisma-client-js"
-    binaryTargets = ["native", "linux-musl-arm64-openssl-3.0.x", "linux-musl-openssl-3.0.x", "debian-openssl-3.0.x"]
-    output = "../node_modules/.prisma/client"
+  provider      = "prisma-client-js"
+  output        = "../node_modules/.prisma/client"
+  binaryTargets = ["native", "linux-musl-arm64-openssl-3.0.x", "linux-musl-openssl-3.0.x", "debian-openssl-3.0.x"]
 }
 
-// ─── Users & Auth ────────────────────────────────────────────────────────────
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
 
 model User {
-  id                String             @id @default(cuid())
-  email             String             @unique
-  name              String?
-  password          String
-  emailVerified     DateTime?
-  image             String?
-  createdAt         DateTime           @default(now())
-  updatedAt         DateTime           @updatedAt
-  role              String             @default("user")
-  referralCode      String?
-  phone             String?
-  
-  subscription      Subscription?
-  bots              Bot[]
-  exchangeApiKeys   ExchangeApiKey[]
-  accounts          Account[]
-  sessions          Session[]
-  
+  id              String           @id @default(cuid())
+  email           String           @unique
+  name            String?
+  password        String
+  emailVerified   DateTime?
+  image           String?
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+  role            String           @default("user")
+  referralCode    String?
+  phone           String?
+  accounts        Account[]
+  bots            Bot[]
+  exchangeApiKeys ExchangeApiKey[]
+  sessions        Session[]
+  subscription    Subscription?
+
   @@index([email])
 }
 
 model Subscription {
   id                String    @id @default(cuid())
   userId            String    @unique
-  user              User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  
-  tier              String    @default("free") // free, pro, ultra
-  coinScans         Int       @default(0) // 0 for free trial, 15 for pro, 50 for ultra
-  status            String    @default("trial") // trial, active, expired, cancelled
-  
+  tier              String    @default("free")
+  coinScans         Int       @default(0)
+  status            String    @default("trial")
   trialEndsAt       DateTime?
   currentPeriodEnd  DateTime?
-  
   razorpayPaymentId String?
   razorpayOrderId   String?
-  
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @updatedAt
-  
+  user              User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
   @@index([userId])
 }
 
 model ExchangeApiKey {
-  id                String    @id @default(cuid())
-  userId            String
-  user              User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  
-  exchange          String    // binance, coindcx
-  apiKey            String    // encrypted at rest
-  apiSecret         String    // encrypted at rest
-  encryptionIv      String?   // AES IV for decryption
-  
-  isActive          Boolean   @default(true)
-  
-  createdAt         DateTime  @default(now())
-  updatedAt         DateTime  @updatedAt
-  
+  id           String   @id @default(cuid())
+  userId       String
+  exchange     String
+  apiKey       String
+  apiSecret    String
+  encryptionIv String?
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
   @@unique([userId, exchange])
   @@index([userId])
 }
 
-// ─── Bot & Engine ────────────────────────────────────────────────────────────
-
 model Bot {
-  id                String    @id @default(cuid())
-  userId            String
-  user              User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  name              String
-  exchange          String    // binance, coindcx
-  status            String    @default("stopped") // running, stopped, paused, error
-
-  isActive          Boolean   @default(false)
-
-  startedAt         DateTime?
-  stoppedAt         DateTime?
-
-  createdAt         DateTime  @default(now())
-  updatedAt         DateTime  @updatedAt
-
-  trades            Trade[]
-  sessions          BotSession[]
-  config            BotConfig?
-  state             BotState?
+  id        String       @id @default(cuid())
+  userId    String
+  name      String
+  exchange  String
+  status    String       @default("stopped")
+  isActive  Boolean      @default(false)
+  startedAt DateTime?
+  stoppedAt DateTime?
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+  user      User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  config    BotConfig?
+  sessions  BotSession[]
+  state     BotState?
+  trades    Trade[]
 
   @@index([userId])
   @@index([status])
 }
 
 model BotConfig {
-  id                String    @id @default(cuid())
-  botId             String    @unique
-  bot               Bot       @relation(fields: [botId], references: [id], onDelete: Cascade)
-  
-  // Trading params
-  mode              String    @default("paper")  // paper, live
-  capitalPerTrade   Float     @default(100)
-  maxOpenTrades     Int       @default(5)
-  
-  // Risk management
-  slMultiplier      Float     @default(0.8)      // ATR stop-loss multiplier
-  tpMultiplier      Float     @default(1.0)      // ATR take-profit multiplier
-  maxLossPct        Float     @default(-15)      // max loss per trade %
-  
-  // Multi-target settings
+  id                 String   @id @default(cuid())
+  botId              String   @unique
+  mode               String   @default("paper")
+  capitalPerTrade    Float    @default(100)
+  maxOpenTrades      Int      @default(5)
+  slMultiplier       Float    @default(0.8)
+  tpMultiplier       Float    @default(1.0)
+  maxLossPct         Float    @default(-15)
   multiTargetEnabled Boolean  @default(true)
-  t1Multiplier      Float    @default(0.5)       // T1 = 0.5× ATR from entry
-  t2Multiplier      Float    @default(1.0)       // T2 = 1.0× ATR
-  t3Multiplier      Float    @default(1.5)       // T3 = 1.5× ATR
-  t1BookPct         Float    @default(0.25)      // book 25% at T1
-  t2BookPct         Float    @default(0.50)      // book 50% at T2
-  
-  // Coin watchlist (JSON array of symbols)
-  coinList          Json      @default("[]")     // ["BTCUSDT","ETHUSDT",...]
-  
-  // Conviction / leverage tiers (JSON)
-  leverageTiers     Json?     // [{min:40,max:55,lev:5},{min:55,max:70,lev:10}...]
-  
-  // Brain selection (adaptive = HMM-only, athena = HMM + Gemini AI)
-  brainType         String    @default("adaptive") // adaptive, athena
-  
-  // Segment routing logic
-  segment           String    @default("ALL")    // "ALL" (Athena Router), "DeFi", "L1", etc.
-
-  createdAt         DateTime  @default(now())
-  updatedAt         DateTime  @updatedAt
+  t1Multiplier       Float    @default(0.5)
+  t2Multiplier       Float    @default(1.0)
+  t3Multiplier       Float    @default(1.5)
+  t1BookPct          Float    @default(0.25)
+  t2BookPct          Float    @default(0.50)
+  coinList           Json     @default("[]")
+  leverageTiers      Json?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+  brainType          String   @default("adaptive")
+  segment            String   @default("ALL")
+  bot                Bot      @relation(fields: [botId], references: [id], onDelete: Cascade)
 }
 
 model BotState {
-  id                String    @id @default(cuid())
-  botId             String    @unique
-  bot               Bot       @relation(fields: [botId], references: [id], onDelete: Cascade)
-  
-  engineStatus      String    @default("idle")   // idle, running, error
-  lastCycleAt       DateTime?
-  cycleCount        Int       @default(0)
-  cycleDurationMs   Int?                          // last cycle duration
-  
-  // Per-coin HMM states (JSON blob — regime, features, signals)
-  coinStates        Json?     // {BTCUSDT: {regime:1, features:{...}, signal:"BUY"}, ...}
-  
-  // Engine health
-  errorMessage      String?
-  errorAt           DateTime?
-  
-  updatedAt         DateTime  @updatedAt
+  id              String    @id @default(cuid())
+  botId           String    @unique
+  engineStatus    String    @default("idle")
+  lastCycleAt     DateTime?
+  cycleCount      Int       @default(0)
+  cycleDurationMs Int?
+  coinStates      Json?
+  errorMessage    String?
+  errorAt         DateTime?
+  updatedAt       DateTime  @updatedAt
+  bot             Bot       @relation(fields: [botId], references: [id], onDelete: Cascade)
 }
 
-// ─── Trades ──────────────────────────────────────────────────────────────────
-
 model Trade {
-  id                String    @id @default(cuid())
-  botId             String
-  bot               Bot       @relation(fields: [botId], references: [id], onDelete: Cascade)
-  
-  // Core trade info
-  coin              String    // e.g., DOGEUSDT, SUIUSDT
-  position          String    // long, short
-  regime            String    // bullish, bearish
-  confidence        Float     // 0-100
-  mode              String    @default("paper")  // paper, live
-  
-  leverage          Float     // e.g., 10, 15
-  capital           Float     // margin used
-  quantity          Float     @default(0)         // filled quantity
-  
-  // Prices
-  entryPrice        Float
-  currentPrice      Float?
-  exitPrice         Float?
-  
-  // Risk levels  
-  stopLoss          Float
-  takeProfit        Float
-  slType            String    @default("fixed") // fixed, trail_x1, trail_x2
-  
-  // ─── Multi-Target (T1/T2/T3) ──────────────────
-  t1Price           Float?
-  t2Price           Float?
-  t3Price           Float?
-  t1Hit             Boolean   @default(false)
-  t2Hit             Boolean   @default(false)
-  
-  // ─── Trailing Stop-Loss ────────────────────────
-  trailingSl        Float?
-  trailingTp        Float?
-  trailingActive    Boolean   @default(false)
-  trailSlCount      Int       @default(0)
-  
-  // ─── Capital Protection ────────────────────────
-  capitalProtectionActive Boolean @default(false)
-  
-  // ─── Original values (before partial closes) ──
-  originalQty       Float?
-  originalCapital   Float?
-  
-  // ─── PNL ───────────────────────────────────────
-  status            String    @default("active") // active, closed, cancelled
-  activePnl         Float     @default(0)
-  activePnlPercent  Float     @default(0)
-  totalPnl          Float     @default(0)
-  totalPnlPercent   Float     @default(0)
-  
-  // ─── Exit Info ─────────────────────────────────
-  exitReason        String?   // T1, T2, T3, FIXED_SL, SL_T1, SL_T2, TRAIL_SL_3, MAX_LOSS, etc.
-  exitPercent       Float?
-  
-  // ─── Exchange Order References ─────────────────
-  exchangeOrderId   String?
-  exchangePositionId String?
-
-  // ─── Session Reference ─────────────────────────
-  sessionId         String?
-  session           BotSession? @relation(fields: [sessionId], references: [id])
-
-  // ─── Timestamps ────────────────────────────────
-  entryTime         DateTime  @default(now())
-  exitTime          DateTime?
-
-  createdAt         DateTime  @default(now())
-  updatedAt         DateTime  @updatedAt
-
-  // ─── Partial bookings linked to this trade ─────
-  partialBookings   PartialBooking[]
+  id                      String           @id @default(cuid())
+  botId                   String
+  coin                    String
+  position                String
+  regime                  String
+  confidence              Float
+  mode                    String           @default("paper")
+  leverage                Float
+  capital                 Float
+  quantity                Float            @default(0)
+  entryPrice              Float
+  currentPrice            Float?
+  exitPrice               Float?
+  stopLoss                Float
+  takeProfit              Float
+  slType                  String           @default("fixed")
+  t1Price                 Float?
+  t2Price                 Float?
+  t3Price                 Float?
+  t1Hit                   Boolean          @default(false)
+  t2Hit                   Boolean          @default(false)
+  trailingSl              Float?
+  trailingTp              Float?
+  trailingActive          Boolean          @default(false)
+  trailSlCount            Int              @default(0)
+  capitalProtectionActive Boolean          @default(false)
+  originalQty             Float?
+  originalCapital         Float?
+  status                  String           @default("active")
+  activePnl               Float            @default(0)
+  activePnlPercent        Float            @default(0)
+  totalPnl                Float            @default(0)
+  totalPnlPercent         Float            @default(0)
+  exitReason              String?
+  exitPercent             Float?
+  exchangeOrderId         String?
+  exchangePositionId      String?
+  sessionId               String?
+  entryTime               DateTime         @default(now())
+  exitTime                DateTime?
+  createdAt               DateTime         @default(now())
+  updatedAt               DateTime         @updatedAt
+  partialBookings         PartialBooking[]
+  bot                     Bot              @relation(fields: [botId], references: [id], onDelete: Cascade)
+  session                 BotSession?      @relation(fields: [sessionId], references: [id])
 
   @@index([botId])
   @@index([status])
@@ -245,92 +177,66 @@ model Trade {
   @@index([entryTime])
 }
 
-// ─── Bot Session (start-to-stop run record) ──────────────────────────────────
-
 model BotSession {
-  id            String    @id @default(cuid())
-  botId         String
-  bot           Bot       @relation(fields: [botId], references: [id], onDelete: Cascade)
-
-  sessionIndex  Int       @default(1)   // 0=legacy backfill, 1=first real run, 2=second, etc.
-  startedAt     DateTime
-  endedAt       DateTime?
-  status        String    @default("active")  // active | closed
-  mode          String    @default("paper")   // paper | live
-
-  // Metrics — computed on session close
-  totalTrades   Int       @default(0)
-  closedTrades  Int       @default(0)
-  winTrades     Int       @default(0)
-  totalPnl      Float     @default(0)
-  roi           Float     @default(0)   // totalPnl / totalCapital × 100
-  winRate       Float     @default(0)   // winTrades / closedTrades × 100
-  maxDrawdown   Float     @default(0)   // worst single trade loss (proxy)
-  bestTrade     Float     @default(0)
-  worstTrade    Float     @default(0)
-  totalCapital  Float     @default(0)   // Σ(trade.capital) — ROI denominator
-
-  trades        Trade[]
-
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  id           String    @id @default(cuid())
+  botId        String
+  sessionIndex Int       @default(1)
+  startedAt    DateTime
+  endedAt      DateTime?
+  status       String    @default("active")
+  mode         String    @default("paper")
+  totalTrades  Int       @default(0)
+  closedTrades Int       @default(0)
+  winTrades    Int       @default(0)
+  totalPnl     Float     @default(0)
+  roi          Float     @default(0)
+  winRate      Float     @default(0)
+  maxDrawdown  Float     @default(0)
+  bestTrade    Float     @default(0)
+  worstTrade   Float     @default(0)
+  totalCapital Float     @default(0)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  bot          Bot       @relation(fields: [botId], references: [id], onDelete: Cascade)
+  trades       Trade[]
 
   @@index([botId])
   @@index([status])
 }
 
-// ─── Partial Booking Records (T1/T2 exits) ───────────────────────────────────
-
 model PartialBooking {
-  id              String    @id @default(cuid())
-  tradeId         String
-  trade           Trade     @relation(fields: [tradeId], references: [id], onDelete: Cascade)
-  
-  target          String    // T1, T2, T3
-  bookPercent     Float     // 0.25 for T1, 0.50 for T2
-  quantity        Float     // how much was closed
-  exitPrice       Float     // price at time of partial close
-  pnl             Float     // realized PNL for this partial
-  pnlPercent      Float     // realized PNL %
-  
-  createdAt       DateTime  @default(now())
-  
+  id          String   @id @default(cuid())
+  tradeId     String
+  target      String
+  bookPercent Float
+  quantity    Float
+  exitPrice   Float
+  pnl         Float
+  pnlPercent  Float
+  createdAt   DateTime @default(now())
+  trade       Trade    @relation(fields: [tradeId], references: [id], onDelete: Cascade)
+
   @@index([tradeId])
 }
 
-// ─── Cycle History & Signal Archive ─────────────────────────────────────────
-
 model CycleSnapshot {
-  id              String    @id @default(cuid())
-
-  // Engine identity
-  cycleNumber     Int                           // engine's own cycle counter
-  mode            String    @default("paper")   // paper | live
-  engineBotId     String?                       // which bot triggered this cycle
-
-  // Timing
-  scannedAt       DateTime                      // when the analysis ran (IST-aware UTC)
-  durationMs      Int?                          // how long the full scan took
-
-  // Market context
-  btcRegime       String?                       // dominant BTC HMM regime
-  btcConfidence   Float?                        // BTC regime confidence (0–100)
-  btcPrice        Float?                        // BTC price at scan time
-  macroAction     String?                       // LONG_ALTCOINS | NEUTRAL | VETO_*
-
-  // Aggregate stats
-  coinsScanned    Int       @default(0)
-  eligibleCount   Int       @default(0)
-  deployedCount   Int       @default(0)
-  filteredCount   Int       @default(0)
-
-  // Per-coin detail rows
-  coinResults     CoinScanResult[]
-
-  // Per-segment heatmap rows
-  heatmapEntries  SegmentHeatmapEntry[]
-
-  createdAt       DateTime  @default(now())
+  id             String                @id @default(cuid())
+  cycleNumber    Int
+  mode           String                @default("paper")
+  engineBotId    String?
+  scannedAt      DateTime
+  durationMs     Int?
+  btcRegime      String?
+  btcConfidence  Float?
+  btcPrice       Float?
+  macroAction    String?
+  coinsScanned   Int                   @default(0)
+  eligibleCount  Int                   @default(0)
+  deployedCount  Int                   @default(0)
+  filteredCount  Int                   @default(0)
+  createdAt      DateTime              @default(now())
+  coinResults    CoinScanResult[]
+  heatmapEntries SegmentHeatmapEntry[]
 
   @@index([scannedAt])
   @@index([cycleNumber])
@@ -338,26 +244,23 @@ model CycleSnapshot {
 }
 
 model CoinScanResult {
-  id              String    @id @default(cuid())
-
-  cycleId         String
-  cycle           CycleSnapshot @relation(fields: [cycleId], references: [id], onDelete: Cascade)
-
-  symbol          String                        // BTCUSDT, ETHUSDT, …
-  regime          String?                       // BULLISH | BEARISH | SIDEWAYS/CHOP | CRASH/PANIC
-  regimeFull      String?                       // full multi-TF string e.g. "1d=BEAR(0.92)|1h=BULL(1.00)|15m=BEAR(0.84)"
-  action          String?                       // ELIGIBLE_BUY | ELIGIBLE_SELL | MTF_CONFLICT | LOW_CONVICTION | …
-  side            String?                       // BUY | SELL
-  confidence      Float?                        // HMM confidence 0–100
-  conviction      Float?                        // composite conviction score
-  tfAgreement     Int?                          // 0–3 timeframes agree
-  atr             Float?                        // ATR at scan time
-  price           Float?                        // close price at scan time
-  deployStatus    String?                       // DEPLOYED | FILTERED: active trade exists | …
-  wasDeployed     Boolean   @default(false)
-  athenaDecision  String?                       // EXECUTE | WAIT | VETO
-
-  createdAt       DateTime  @default(now())
+  id             String        @id @default(cuid())
+  cycleId        String
+  symbol         String
+  regime         String?
+  regimeFull     String?
+  action         String?
+  side           String?
+  confidence     Float?
+  conviction     Float?
+  tfAgreement    Int?
+  atr            Float?
+  price          Float?
+  deployStatus   String?
+  wasDeployed    Boolean       @default(false)
+  athenaDecision String?
+  createdAt      DateTime      @default(now())
+  cycle          CycleSnapshot @relation(fields: [cycleId], references: [id], onDelete: Cascade)
 
   @@index([cycleId])
   @@index([symbol])
@@ -366,28 +269,22 @@ model CoinScanResult {
 }
 
 model SegmentHeatmapEntry {
-  id              String    @id @default(cuid())
-
-  cycleId         String
-  cycle           CycleSnapshot @relation(fields: [cycleId], references: [id], onDelete: Cascade)
-
-  segment         String                        // L1, L2, DeFi, Gaming, RWA, …
-  compositeScore  Float?                        // overall heatmap score
-  vwRr            Float?                        // volume-weighted risk-reward
-  btcAlpha        Float?                        // segment alpha vs BTC
-  breadthPct      Float?                        // % of coins in segment trending up
-  isSelected      Boolean   @default(false)     // was this segment picked this cycle?
-  rank            Int?                          // 1=hottest, 2=second, …
-
-  createdAt       DateTime  @default(now())
+  id             String        @id @default(cuid())
+  cycleId        String
+  segment        String
+  compositeScore Float?
+  vwRr           Float?
+  btcAlpha       Float?
+  breadthPct     Float?
+  isSelected     Boolean       @default(false)
+  rank           Int?
+  createdAt      DateTime      @default(now())
+  cycle          CycleSnapshot @relation(fields: [cycleId], references: [id], onDelete: Cascade)
 
   @@index([cycleId])
   @@index([segment])
   @@index([createdAt])
 }
-
-// ─── NextAuth Models ─────────────────────────────────────────────────────────
-
 
 model Account {
   id                String  @id @default(cuid())
@@ -402,8 +299,7 @@ model Account {
   scope             String?
   id_token          String?
   session_state     String?
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([provider, providerAccountId])
   @@index([userId])
@@ -415,7 +311,7 @@ model Session {
   userId       String
   expires      DateTime
   user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  
+
   @@index([userId])
 }
 
