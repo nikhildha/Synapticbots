@@ -131,12 +131,6 @@ class RegimeMasterBot:
         self._trade_count = 0
         self._cycle_count = 0
         self._last_cycle_duration = 0
-        # Active profiles from config
-        self._active_profiles = {pid: config.STRATEGY_PROFILES[pid]
-                                 for pid in config.ACTIVE_PROFILES
-                                 if pid in config.STRATEGY_PROFILES}
-        logger.info("🔧 Active strategy profiles: %s",
-                    ", ".join(f"{p['label']}" for p in self._active_profiles.values()))
         self._last_analysis_time = 0.0  # epoch — triggers immediate first run
 
         # Multi-coin state
@@ -566,300 +560,239 @@ class RegimeMasterBot:
                 logger.debug("Error analyzing %s: %s", symbol, e)
                 continue
 
-        # ── 5. Deploy across all active profiles/bots ─────────────────
-        # Sort raw results by conviction (highest first)
-        raw_results.sort(key=lambda x: x.get("conviction", 0), reverse=True)
-        # Note: If no bots exist in config.ENGINE_ACTIVE_BOTS, fall back to self._active_profiles
-        eval_targets = _tick_active_bots if _tick_active_bots else [
-            {"bot_id": config.ENGINE_BOT_ID, "bot_name": p["label"], "user_id": config.ENGINE_USER_ID,
-             "segment_filter": _infer_segment_from_name(p.get("label", ""))}
-            for pid, p in self._active_profiles.items()
-        ]
-        
-        logger.info("🔄 Deploying across %d active bots/profiles | tradebook_active_keys: %s",
-                    len(eval_targets), len(tradebook_active_keys))
+        # ── 5. Deploy: Top HMM coin per segment → Athena final call ────────────────
+        # raw_results already sorted by conviction (desc)
+        # For each registered segment bot:
+        #   1. Find the best HMM coin in that bot's segment from raw_results
+        #   2. Skip if bot already has that coin open (duplicate check)
+        #   3. Call Athena — FINAL DECISION (EXECUTE or VETO)
+        #   4. Execute if Athena approves
+        # No per-bot position cap — only the duplicate check prevents re-entering the same coin.
+
+        _tick_active_bots = list(config.ENGINE_ACTIVE_BOTS)
+        if not _tick_active_bots:
+            logger.warning("⚠️  No bots registered in ENGINE_ACTIVE_BOTS — skipping deploy step")
+
+        from segment_features import get_segment_for_coin
 
         deployed_trades = []
-        eligible_trades = []
         deployed = 0
 
-        for target in eval_targets:
-            bot_id = target.get("bot_id", config.ENGINE_BOT_ID)
-            bot_name = target.get("bot_name", "Athena Bot")
-            user_id = target.get("user_id", config.ENGINE_USER_ID)
-            # brain_type removed — all bots are the same brain (HMM), different only by segment
-            
-            # Match the Next.js profile string to the engine's internal configuration
-            profile_name = bot_name.lower()
-            if "conservative" in profile_name:
-                active_profile = config.BRAIN_PROFILES["conservative"]
-                profile_id = "conservative"
-            elif "aggressive" in profile_name:
-                active_profile = config.BRAIN_PROFILES["aggressive"]
-                profile_id = "aggressive"
-            else:
-                active_profile = config.BRAIN_PROFILES["balanced"]
-                profile_id = "balanced"
-                
-            bot_deployed = 0
-
-            # --- Per-Bot Segment Filter ---
-            # segment_filter from ENGINE_ACTIVE_BOTS (pushed by toggle/route.ts),
-            # with a name-based inference fallback (handles engine restart / missing push)
+        for target in _tick_active_bots:
+            bot_id   = target.get("bot_id", config.ENGINE_BOT_ID)
+            bot_name = target.get("bot_name", "Synaptic Bot")
+            user_id  = target.get("user_id", config.ENGINE_USER_ID)
             bot_segment_filter = target.get("segment_filter") or _infer_segment_from_name(bot_name)
+
+            # Build allowed-coin set for this bot's segment
             if bot_segment_filter == "ALL":
-                bot_allowed_coins = None  # No restriction — ALL coins eligible
+                bot_allowed_coins = None  # no restriction
             else:
                 bot_allowed_coins = set(config.CRYPTO_SEGMENTS.get(bot_segment_filter, []))
-                logger.debug("🗂 [%s] segment_filter=%s → %d coins", bot_name, bot_segment_filter, len(bot_allowed_coins))
 
-            # --- Correlation Control: Track Active Segments for this bot ---
-            # Build active_segments from bot_id-prefixed keys (per-bot isolation)
-            from segment_features import get_segment_for_coin
-            active_segments = {} # segment -> count (per THIS bot only)
-            for key in tradebook_active_keys:
-                # Keys are bot_id:symbol — only count this bot's positions
-                parts = key.split(":", 1)
-                if len(parts) == 2 and parts[0] == bot_id:
-                    seg_name = get_segment_for_coin(parts[1])
-                    active_segments[seg_name] = active_segments.get(seg_name, 0) + 1
+            # Filter raw_results to this bot's segment
+            if bot_allowed_coins is not None:
+                seg_results = [r for r in raw_results if r["symbol"] in bot_allowed_coins]
+            else:
+                seg_results = list(raw_results)
 
-            for raw in raw_results:
-                sym = raw["symbol"]
-                # Scope position checks to THIS specific bot instance
-                pos_key = f"{bot_id}:{sym}"
+            # Pick top N coins by HMM conviction
+            top_n = getattr(config, "TOP_COINS_PER_SEGMENT", 1)
+            top_coins = seg_results[:top_n]
 
-                # ── Per-Bot Segment Gate ──────────────────────────────────
-                # If this bot has a specific segment, skip coins outside it.
-                if bot_allowed_coins is not None and sym not in bot_allowed_coins:
-                    logger.debug("   ⛔ [%s] %s not in segment %s — SKIPPED", bot_name, sym, bot_segment_filter)
+            if not top_coins:
+                logger.debug("🔍 [%s] No HMM signals for segment %s this cycle", bot_name, bot_segment_filter)
+                continue
+
+            for top in top_coins:
+                sym      = top["symbol"]
+                pos_key  = f"{bot_id}:{sym}"
+                seg_name = get_segment_for_coin(sym)
+
+                # Conviction threshold — skip before Athena call if too low
+                conviction = top.get("conviction", 0)
+                min_conv   = getattr(config, "MIN_CONVICTION_FOR_DEPLOY", 0.60)
+                if conviction < min_conv:
+                    logger.debug("⛔ [%s] %s conviction %.0f%% < %.0f%% threshold — skip",
+                                 bot_name, sym, conviction * 100, min_conv * 100)
+                    self._coin_states.setdefault(sym, {})["deploy_status"] = (
+                        f"FILTERED: low conviction ({conviction:.0%} < {min_conv:.0%})"
+                    )
                     continue
 
-                # Skip if already have active trade for this bot:symbol
+                # Skip if already in this position (duplicate check)
                 if pos_key in tradebook_active_keys:
+                    logger.debug("🔄 [%s] %s already open — skip", bot_name, sym)
                     self._coin_states.setdefault(sym, {})["deploy_status"] = "FILTERED: active trade exists"
                     _bcast("FILTERED_DUPLICATE", self._cycle_count, bot_name, bot_id, sym,
-                           raw.get("side", ""), get_segment_for_coin(sym), raw.get("confidence", 0),
+                           top.get("side", ""), seg_name, conviction,
                            "active trade already open for this bot:symbol")
                     continue
-
-                # Evaluate raw analysis through this bot's specific profile lens
-                trade = self._evaluate_for_profile(raw, profile_id, active_profile, balance)
-                if not trade:
-                    logger.warning("   ⛔ [%s] %s: FILTERED by profile evaluation", bot_name, sym)
-                    # Ensure deploy_status is set — _evaluate_for_profile sets a specific FILTERED reason;
-                    # this fallback fires only if it returned None without setting one (shouldn't happen normally)
-                    current_ds = self._coin_states.get(sym, {}).get("deploy_status", "")
-                    if not current_ds.startswith("FILTERED"):
-                        self._coin_states.setdefault(sym, {})["deploy_status"] = "FILTERED: profile evaluation"
-                    continue
-
 
                 if self.risk.check_kill_switch():
                     return
 
-                logger.info("   ✅ [%s] %s: PASSED evaluation — preparing to deploy", bot_name, sym)
-
-                # Cap total concurrent positions for this specific bot
-                # Use tradebook_active_keys (bot_id:symbol from live tradebook) — NOT _active_positions
-                # which loads ALL historical positions at startup and caused 10/10 cap on every cycle.
-                current_total = sum(1 for k in tradebook_active_keys if k.startswith(f"{bot_id}:"))
-                # Per-segment bots: max 3 concurrent positions per bot (each segment has ~4 coins)
-                max_pos = active_profile.get("max_positions", getattr(config, "MAX_POS_PER_BOT", 3))
-                
-                if current_total >= max_pos:
-                    logger.warning("   ⛔ %s max positions reached (%d/%d) — skipping %s %s %d×",
-                        bot_name, current_total, max_pos, trade["side"], sym, trade["leverage"])
-                    self._coin_states.setdefault(sym, {})["deploy_status"] = f"FILTERED: overall max pos ({current_total}/{max_pos})"
-                    _bcast("FILTERED_MAX_POS", self._cycle_count, bot_name, bot_id, sym,
-                           trade["side"], get_segment_for_coin(sym),
-                           float(trade.get("confidence", 0)), f"positions={current_total}/{max_pos}")
-                    continue
-                
-                # --- Segment Correlation Check ---
-                # ALL bots (segment_filter=ALL) are exempt — they should never be
-                # blocked by segment correlation limits, they receive every signal.
-                seg_name = get_segment_for_coin(sym)
-                max_seg = getattr(config, "MAX_ACTIVE_PER_SEGMENT", 1)
-                if bot_segment_filter != "ALL" and active_segments.get(seg_name, 0) >= max_seg:
-                    logger.warning("   ⛔ [%s] %s: FILTERED segment %s max reached (%d/%d) — Correlation Control", 
-                        bot_name, sym, seg_name, active_segments.get(seg_name, 0), max_seg)
-                    self._coin_states.setdefault(sym, {})["deploy_status"] = f"FILTERED: segment limit ({seg_name})"
-                    continue
-
-                logger.info("   ✅ [%s] %s: PASSED evaluation — preparing to deploy", profile_id, sym)
-
-                # Track eligible trades before max position cap
-                eligible_trades.append(trade)
-
-                # ── Athena: Background Analysis (display only — never gates trades) ──
-                # Athena runs for ALL bots regardless of segment. Results are shown in
-                # the panel and broadcast log, but NEVER block a trade from deploying.
+                # ── Athena: FINAL CALL (gates deployment) ────────────────────────
+                current_price = self._coin_states.get(sym, {}).get("price", 0)
+                atr_val = top.get("atr", 0)
                 athena_decision = None
                 if self._athena and config.LLM_REASONING_ENABLED:
                     try:
                         llm_ctx = {
-                            "ticker": sym,
-                            "side": trade["side"],
-                            "leverage": trade["leverage"],
-                            "hmm_confidence": trade["confidence"],
-                            "hmm_regime": trade["regime_name"],
-                            "conviction": trade["conviction"],
-                            "current_price": self._coin_states.get(sym, {}).get("price", 0),
-                            "atr": trade["atr"],
-                            "atr_pct": (trade["atr"] / max(self._coin_states.get(sym, {}).get("price", 1), 0.0001)) * 100,
-                            "trend": self._coin_states.get(sym, {}).get("context", {}).get("trend_alignment", "UNKNOWN")
+                            "ticker":         sym,
+                            "side":           top["side"],
+                            "leverage":       top.get("leverage", 10),
+                            "hmm_confidence": top["confidence"],
+                            "hmm_regime":     top.get("regime_name", ""),
+                            "conviction":     conviction,
+                            "current_price":  current_price,
+                            "atr":            atr_val,
+                            "atr_pct":        (atr_val / max(current_price, 0.0001)) * 100,
+                            "trend":          self._coin_states.get(sym, {}).get("context", {}).get("trend_alignment", "UNKNOWN"),
                         }
                         athena_decision = self._athena.validate_signal(llm_ctx)
-                        # Store result for display — but do NOT skip/continue based on it
                         self._coin_states.setdefault(sym, {})["athena_state"] = {
-                            "action": athena_decision.action,
+                            "action":    athena_decision.action,
                             "confidence": athena_decision.adjusted_confidence,
                             "reasoning": athena_decision.reasoning,
                             "risk_flags": getattr(athena_decision, "risk_flags", []),
-                            "model": getattr(athena_decision, "model", "unknown_model"),
+                            "model":     getattr(athena_decision, "model", "unknown"),
                             "latency_ms": getattr(athena_decision, "latency_ms", 0),
                         }
-                        _bcast("ATHENA_INSIGHT", self._cycle_count, bot_name, bot_id, sym,
-                               trade["side"], seg_name, athena_decision.adjusted_confidence,
-                               f"action={athena_decision.action} model={getattr(athena_decision,'model','?')} reason={athena_decision.reasoning[:60]}")
-                        logger.info("🏛️ ATHENA INSIGHT [%s] %s → %s (conf=%.0f%%) [not gating]",
-                                    bot_name, sym, athena_decision.action, athena_decision.adjusted_confidence * 100)
+                        _bcast("ATHENA_DECISION", self._cycle_count, bot_name, bot_id, sym,
+                               top["side"], seg_name, athena_decision.adjusted_confidence,
+                               f"action={athena_decision.action} reason={athena_decision.reasoning[:80]}")
+                        logger.info("🏛️ ATHENA [%s] %s → %s (conf=%.0f%%)",
+                                    bot_name, sym, athena_decision.action,
+                                    athena_decision.adjusted_confidence * 100)
                     except Exception as e:
-                        logger.debug("Athena background analysis error for %s: %s", sym, e)
+                        logger.warning("⚠️ Athena call failed for %s: %s — failing open (deploy anyway)", sym, e)
+                        athena_decision = None  # fail open: treat as EXECUTE
 
-                
-                # ── BROADCAST AUDIT: signal dispatched to bot ──
+                # Athena VETO — coin blocked
+                if athena_decision and athena_decision.action not in ("EXECUTE", "LONG", "SHORT"):
+                    logger.info("🚫 ATHENA VETO [%s] %s — action=%s", bot_name, sym, athena_decision.action)
+                    self._coin_states.setdefault(sym, {})["deploy_status"] = f"FILTERED: Athena {athena_decision.action}"
+                    _bcast("ATHENA_VETO", self._cycle_count, bot_name, bot_id, sym,
+                           top["side"], seg_name, top.get("confidence", 0),
+                           f"Athena vetoed: {athena_decision.action} — {athena_decision.reasoning[:80]}")
+                    continue
+
+                # ── Build trade dict (replaces _evaluate_for_profile) ─────────────
+                # Inline sizing: capital / price = quantity; leverage from HMM ATR calc
+                capital     = getattr(config, "CAPITAL_PER_TRADE", 100.0)
+                lev         = top.get("leverage", 10)
+                qty         = top.get("quantity", (capital * lev) / max(current_price, 0.0001))
+                reason_str  = top.get("reason", f"{top.get('regime_name','')} {int(top['confidence']*100)}%")
+
+                # SIGNAL_DISPATCH broadcast
                 _bcast("SIGNAL_DISPATCH", self._cycle_count, bot_name, bot_id, sym,
-                       trade["side"], seg_name, trade["confidence"],
-                       f"regime={trade['regime_name']} lev={trade['leverage']}x qty={trade['quantity']:.4f}")
+                       top["side"], seg_name, top["confidence"],
+                       f"regime={top.get('regime_name','')} lev={lev}x qty={qty:.4f} athena=APPROVED")
 
-                # Mark as queued for deployment (UI shows this before execute_trade returns)
                 self._coin_states.setdefault(sym, {})["deploy_status"] = "DEPLOY_QUEUED"
 
-                # Execute the trade — catch ALL exceptions so one bad coin doesn't kill the entire deploy loop
                 logger.info(
-                    "🔥 DEPLOYING [%s]: %s %s @ %dx | Regime: %s (%.0f%%) | Qty: %.6f",
-                    bot_name, trade["side"], sym, trade["leverage"],
-                    trade["regime_name"], trade["confidence"] * 100, trade["quantity"],
+                    "🔥 DEPLOYING [%s]: %s %s @ %dx | HMM %.0f%% conv | Athena ✅",
+                    bot_name, top["side"], sym, lev, conviction * 100,
                 )
+
+                # Execute
                 try:
                     result = self.executor.execute_trade(
                         symbol=sym,
-                        side=trade["side"],
-                        leverage=trade["leverage"],
-                        quantity=trade["quantity"],
-                        atr=trade["atr"],
-                        ema_15m_20=trade.get("ema_15m_20"),
-                        regime=trade["regime"],
-                        confidence=trade["confidence"],
-                        reason=trade["reason"],
-                        swing_l=trade.get("swing_l"),
-                        swing_h=trade.get("swing_h"),
+                        side=top["side"],
+                        leverage=lev,
+                        quantity=qty,
+                        atr=atr_val,
+                        ema_15m_20=top.get("ema_15m_20"),
+                        regime=top.get("regime", 0),
+                        confidence=top["confidence"],
+                        reason=reason_str,
+                        swing_l=top.get("swing_l"),
+                        swing_h=top.get("swing_h"),
                     )
                 except Exception as exec_err:
-                    logger.error("🚨 EXECUTE_TRADE CRASHED [%s] %s: %s", bot_name, sym, exec_err, exc_info=True)
+                    logger.error("🚨 EXECUTE CRASH [%s] %s: %s", bot_name, sym, exec_err, exc_info=True)
                     _bcast("EXEC_CRASH", self._cycle_count, bot_name, bot_id, sym,
-                           trade["side"], seg_name, trade["confidence"],
-                           f"exception={type(exec_err).__name__}: {str(exec_err)[:120]}")
-                    self._coin_states.setdefault(sym, {})["deploy_status"] = f"FILTERED: execute_trade crash ({type(exec_err).__name__})"
+                           top["side"], seg_name, top["confidence"],
+                           f"{type(exec_err).__name__}: {str(exec_err)[:120]}")
+                    self._coin_states.setdefault(sym, {})["deploy_status"] = "FILTERED: execute crash"
                     continue
 
-                # Record in tradebook — use CoinDCX-confirmed values for live mode
-                # LIVE CONFIRMED: Do NOT record if execution failed (prevents phantom trades)
                 if result is None and not config.PAPER_TRADE:
-                    logger.warning(
-                        "⚠️ DEPLOYMENT_FAILED [%s]: %s %s — order rejected/failed, NOT recording",
-                        bot_name, trade["side"], sym,
-                    )
+                    logger.warning("⚠️ EXEC RETURNED NONE [%s] %s — order rejected", bot_name, sym)
                     _bcast("EXEC_NULL", self._cycle_count, bot_name, bot_id, sym,
-                           trade["side"], seg_name, trade["confidence"],
-                           f"execute_trade returned None (live mode) — order rejected by executor/exchange")
+                           top["side"], seg_name, top["confidence"],
+                           "execute_trade returned None (live mode) — order rejected")
                     self._coin_states.setdefault(sym, {})["deploy_status"] = "FILTERED: exec returned None"
                     continue
 
-                entry_price = result.get("entry_price", 0) if result else 0
-                fill_qty    = result.get("quantity", trade["quantity"]) if result else trade["quantity"]
-                fill_lev    = result.get("leverage", trade["leverage"]) if result else trade["leverage"]
-                fill_capital = result.get("capital", 100.0) if result else 100.0
-                fill_sl     = result.get("stop_loss", 0) if result else 0
-                fill_tp     = result.get("take_profit", 0) if result else 0
+                entry_price  = result.get("entry_price", 0) if result else 0
+                fill_qty     = result.get("quantity",   qty)    if result else qty
+                fill_lev     = result.get("leverage",   lev)    if result else lev
+                fill_capital = result.get("capital",    capital) if result else capital
+                fill_sl      = result.get("stop_loss",  0)      if result else 0
+                fill_tp      = result.get("take_profit", 0)     if result else 0
 
-                # LIVE CONFIRMED: Skip if zero entry price (exchange didn't confirm fill)
                 if entry_price <= 0 and not config.PAPER_TRADE:
-                    logger.warning(
-                        "⚠️ DEPLOYMENT_FAILED [%s]: %s %s — zero entry price, NOT recording",
-                        bot_name, trade["side"], sym,
-                    )
                     _bcast("EXEC_ZERO_PRICE", self._cycle_count, bot_name, bot_id, sym,
-                           trade["side"], seg_name, trade["confidence"],
-                           f"entry_price=0 — exchange fill not confirmed")
+                           top["side"], seg_name, top["confidence"], "entry_price=0")
                     continue
 
-                # STRICTLY RECORD ONLY TO THIS BOT_ID
                 tradebook.open_trade(
                     symbol=sym,
-                    side=trade["side"],
+                    side=top["side"],
                     leverage=fill_lev,
                     quantity=fill_qty,
                     entry_price=entry_price,
-                    atr=trade["atr"],
-                    regime=trade["regime_name"],
-                    confidence=trade["confidence"],
-                    reason=trade["reason"],
+                    atr=atr_val,
+                    regime=top.get("regime_name", ""),
+                    confidence=top["confidence"],
+                    reason=reason_str,
                     capital=fill_capital,
                     user_id=user_id,
-                    profile_id=profile_id,
+                    profile_id="segment",   # fixed — no more conservative/balanced/aggressive
                     bot_name=bot_name,
                     exchange=result.get("exchange") if result else None,
                     pair=result.get("pair") if result else None,
                     position_id=result.get("position_id") if result else None,
                     bot_id=bot_id,
-                    all_bot_ids=None, # DO NOT CLONE TRADES
+                    all_bot_ids=None,
                     rm_id=result.get("rm_id") if result else None,
                     override_sl=fill_sl if fill_sl > 0 else None,
                     override_tp=fill_tp if fill_tp > 0 else None,
                 )
-                # ── BROADCAST AUDIT: trade confirmed in tradebook ──
+
                 _bcast("TRADEBOOK_RECORDED", self._cycle_count, bot_name, bot_id, sym,
-                       trade["side"], seg_name, trade["confidence"],
-                       f"entry=${entry_price:.4f} lev={fill_lev}x sl=${fill_sl:.4f} tp=${fill_tp:.4f} paper={config.PAPER_TRADE}")
+                       top["side"], seg_name, top["confidence"],
+                       f"entry=${entry_price:.4f} lev={fill_lev}x sl=${fill_sl:.4f} tp=${fill_tp:.4f}")
 
                 self._active_positions[pos_key] = {
-                    "profile_id": profile_id,
-                    "bot_name": active_profile.get("label", "Athena Bot"),
-                    "regime": trade["regime_name"],
-                    "confidence": trade["confidence"],
-                    "side": trade["side"],
+                    "bot_name": bot_name,
+                    "regime":   top.get("regime_name", ""),
+                    "confidence": top["confidence"],
+                    "side":     top["side"],
                     "entry_time": datetime.now(IST).replace(tzinfo=None).isoformat(),
                     "leverage": fill_lev,
                     "entry_price": entry_price,
                     "quantity": fill_qty,
-                    "exchange": result.get("exchange", "binance") if result else "binance",
-                    "position_id": result.get("position_id") if result else None,
                 }
                 tradebook_active_keys.add(pos_key)
                 self._trade_count += 1
                 deployed += 1
-                bot_deployed += 1
-                active_segments[seg_name] = active_segments.get(seg_name, 0) + 1
 
-                # Collect trade info for batch alert
                 deployed_trades.append({
-                    "symbol": sym,
-                    "position": "LONG" if trade["side"] == "BUY" else "SHORT",
-                    "regime": trade["regime_name"],
-                    "confidence": trade["confidence"],
+                    "regime": top.get("regime_name", ""), # Use top.get for regime
+                    "confidence": top["confidence"],
                     "leverage": fill_lev,
                     "entry_price": entry_price,
                     "stop_loss": fill_sl,
                     "take_profit": fill_tp,
-                    "profile": active_profile.get("label", profile_id),
+                    "profile": "segment", # fixed
+                    "symbol": sym, # Add symbol for batch notification filtering
+                    "side": top["side"], # Add side for batch notification
                 })
-
-
-            if bot_deployed:
-                logger.info("   [%s] deployed %d trades", bot_name, bot_deployed)
 
         # ── Batch Telegram notification for all deployed trades ──
         if deployed_trades:
@@ -876,23 +809,23 @@ class RegimeMasterBot:
         # ── 6. Save state for dashboard ──────────────────────────
         cycle_duration = time.time() - cycle_start
         self._last_cycle_duration = cycle_duration
-        self._save_multi_state(symbols, eligible_trades, deployed)
+        self._save_multi_state(symbols, deployed_trades, deployed)
 
         # ── 7. Persist cycle snapshot to DB (background thread, non-blocking) ─
         threading.Thread(
             target=self._post_cycle_snapshot,
-            args=(cycle_duration, eligible_trades, deployed),
+            args=(cycle_duration, deployed_trades, deployed),
             daemon=True,
             name=f"CycleSnap-{self._cycle_count}",
         ).start()
 
         logger.info(
-            "📊 Cycle #%d complete | Scanned: %d | Eligible: %d | Deployed: %d | Active: %d | Profiles: %d",
-            self._cycle_count, len(symbols), len(eligible_trades), deployed,
-            len(tradebook.get_active_trades()), len(self._active_profiles),
+            "📊 Cycle #%d complete | Scanned: %d | Deployed: %d | Active: %d",
+            self._cycle_count, len(symbols), deployed,
+            len(tradebook.get_active_trades()),
         )
 
-    def _post_cycle_snapshot(self, cycle_duration: float, eligible_trades: list, deployed: int):
+    def _post_cycle_snapshot(self, cycle_duration: float, deployed_trades: list, deployed: int):
         """POST per-cycle signal archive to dashboard /api/cycle-snapshot for DB persistence."""
         try:
             dashboard_url = os.environ.get("DASHBOARD_URL", "").rstrip("/")
@@ -916,7 +849,7 @@ class RegimeMasterBot:
                     "atr":           state.get("atr"),
                     "price":         state.get("price") or state.get("current_price"),
                     "deploy_status": state.get("deploy_status"),
-                    "was_deployed":  sym in [t.get("symbol") for t in eligible_trades],
+                    "was_deployed":  sym in [t.get("symbol") for t in deployed_trades],
                     "athena_decision": state.get("athena_decision"),
                 })
 
@@ -959,9 +892,9 @@ class RegimeMasterBot:
                 "btc_price":      btc_state.get("price") or btc_state.get("current_price"),
                 "macro_action":   btc_state.get("action"),
                 "coins_scanned":  len(self._coin_states),
-                "eligible_count": len(eligible_trades),
+                "eligible_count": len(deployed_trades),
                 "deployed_count": deployed,
-                "filtered_count": len(self._coin_states) - len(eligible_trades),
+                "filtered_count": max(0, len(self._coin_states) - len(deployed_trades)),
                 "coin_results":   coin_results,
                 "heatmap":        heatmap,
             }
@@ -1110,9 +1043,8 @@ class RegimeMasterBot:
                         btc_regime_str = "BEAR"
                     btc_margin = btc_m
 
-            # Fallback active brain profile
-            brain_id = "balanced"
-            brain_cfg = config.BRAIN_PROFILES.get(brain_id, {})
+            # No fallback brain profile needed — BRAIN_PROFILES removed
+            brain_cfg = {}  # sizing comes from CAPITAL_PER_TRADE in deploy loop
 
             # Weekend skip
             if config.WEEKEND_SKIP_ENABLED:
@@ -2078,9 +2010,9 @@ class RegimeMasterBot:
             # Timing fields — written directly so dashboard always has them
             "last_analysis_time": now_utc.isoformat() + "Z",
             "next_analysis_time": (next_analysis.isoformat() + "Z") if next_analysis else None,
-            "active_profiles":  {pid: {"label": p["label"], "confidence_min": p["confidence_min"],
-                                       "max_positions": p["max_positions"]}
-                                 for pid, p in self._active_profiles.items()},
+            "active_bots":  [{"bot_id": b.get("bot_id"), "bot_name": b.get("bot_name"),
+                              "segment": b.get("segment_filter", "ALL")}
+                             for b in list(config.ENGINE_ACTIVE_BOTS)],
         }
         try:
             with open(config.MULTI_STATE_FILE, "w") as f:

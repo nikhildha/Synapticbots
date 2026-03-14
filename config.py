@@ -119,50 +119,9 @@ CONFIDENCE_HIGH = 0.99   # Above 99% → 35x  (optimized from 0.95)
 CONFIDENCE_MEDIUM = 0.96 # 96–99% → 25x  (optimized from 0.91)
 CONFIDENCE_LOW = 0.92    # 92–96% → 15x  (optimized from 0.85, below 92% = no deploy)
 
-# ─── Strategy Profiles (legacy — kept for backward compatibility) ───────────────
-STRATEGY_PROFILES = {
-    "standard": {
-        "label": "Synaptic Adaptive",
-        "confidence_min": 0.10,         # Multi-TF conviction replaces this
-        "confidence_tiers": {0.10: 10}, # Brain switcher sets leverage
-        "max_positions": 10,
-        "capital_per_trade": 100,
-        "atr_sl_mult": 1.5,
-        "atr_tp_mult": 3.0,
-        "trailing_sl": False,
-        "multi_target": False,
-        "mt_rr_ratio": 3,
-    },
-}
+# ─── Capital per trade (used by all bots — uniform sizing) ─────────────────────
+CAPITAL_PER_TRADE = 100        # $100 per trade, fixed
 
-# Active profiles — only 'standard' active to prevent multi-profile ghost trades
-ACTIVE_PROFILES = ["standard"]
-
-# ─── Static Bot Profiles ────────────────────────────────────────────────────────
-# Maps the UI bot string ("conservative", "aggressive") to its static configuration.
-BRAIN_PROFILES = {
-    "conservative": {
-        "label": "🟢 Conservative",
-        "leverage": 4,
-        "max_loss_pct": 20,
-        "max_positions": 10,
-        "capital_per_trade": 100,
-    },
-    "balanced": {
-        "label": "🟡 Balanced",
-        "leverage": 8,
-        "max_loss_pct": 20,
-        "max_positions": 10,
-        "capital_per_trade": 100,
-    },
-    "aggressive": {
-        "label": "🔴 Aggressive",
-        "leverage": 10,
-        "max_loss_pct": 25,
-        "max_positions": 10,
-        "capital_per_trade": 100,
-    },
-}
 # ─── Execution Engine (Alpha) ──────────────────────────────────────────────────
 EXECUTION_ATR_PULLBACK = True       # Wait for limit order at EMA20 if price > EMA20 + 0.5 ATR
 EXECUTION_TIF_MINUTES = 60          # Time-In-Force: Max lifespan of limit order before cancellation
@@ -251,9 +210,13 @@ RSI_OVERBOUGHT = 65
 SIDEWAYS_POSITION_REDUCTION = 0.30  # 30% smaller positions in chop
 
 # ─── Bot Loop ────────────────────────────────────────────────────────────────────
-LOOP_INTERVAL_SECONDS = 10        # 10-second heartbeat (faster trailing SL sync for live trading)
-ANALYSIS_INTERVAL_SECONDS = 600   # 10-minute full analysis cycle
+LOOP_INTERVAL_SECONDS = 10        # 10-second heartbeat (faster trailing SL sync)
+ANALYSIS_INTERVAL_SECONDS = 300   # 5-minute full analysis cycle
 ERROR_RETRY_SECONDS = 60          # Retry after error
+
+# Min HMM conviction to pass to Athena (below this, coin is skipped before Athena call)
+MIN_CONVICTION_FOR_DEPLOY = 0.60  # 60% — low conviction coins are filtered before Athena
+TOP_COINS_PER_SEGMENT = 1         # Athena evaluates the single highest-HMM coin per segment
 
 # ─── Multi-Coin Trading ──────────────────────────────────────────────────────────
 MAX_CONCURRENT_POSITIONS = 10   # Max symbols traded at once (reduced from 15)
