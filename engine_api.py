@@ -770,8 +770,7 @@ def api_set_config():
         try:
             cap = float(capital)
             if cap > 0:
-                for profile in config.STRATEGY_PROFILES.values():
-                    profile["capital_per_trade"] = cap
+                config.CAPITAL_PER_TRADE = cap
                 applied["capital_per_trade"] = cap
         except (TypeError, ValueError):
             pass
@@ -781,14 +780,8 @@ def api_set_config():
         try:
             mot = int(max_open)
             if mot > 0:
-                # Store as global config override
                 config.MAX_OPEN_TRADES = mot
-                # Also update all brain profiles
-                for brain_name, brain_profile in config.BRAIN_PROFILES.items():
-                    brain_profile["max_positions"] = mot
-                # Update strategy profiles too
-                for profile in config.STRATEGY_PROFILES.values():
-                    profile["max_positions"] = mot
+                config.MAX_CONCURRENT_POSITIONS = mot
                 applied["max_open_trades"] = mot
         except (TypeError, ValueError):
             pass

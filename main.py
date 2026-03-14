@@ -666,10 +666,10 @@ class RegimeMasterBot:
                 conviction = top.get("conviction", 0)
                 min_conv   = getattr(config, "MIN_CONVICTION_FOR_DEPLOY", 0.60)
                 if conviction < min_conv:
-                    logger.debug("⛔ [%s] %s conviction %.0f%% < %.0f%% threshold — skip",
-                                 bot_name, sym, conviction * 100, min_conv * 100)
+                    logger.debug("⛔ [%s] %s conviction %.0f < %.0f threshold — skip",
+                                 bot_name, sym, conviction, min_conv)
                     self._coin_states.setdefault(sym, {})["deploy_status"] = (
-                        f"FILTERED: low conviction ({conviction:.0%} < {min_conv:.0%})"
+                        f"FILTERED: low conviction ({conviction:.0f} < {min_conv:.0f})"
                     )
                     continue
 
@@ -678,7 +678,7 @@ class RegimeMasterBot:
                     logger.debug("🔄 [%s] %s already open — skip", bot_name, sym)
                     self._coin_states.setdefault(sym, {})["deploy_status"] = "FILTERED: active trade exists"
                     _bcast("FILTERED_DUPLICATE", self._cycle_count, bot_name, bot_id, sym,
-                           top.get("side", ""), seg_name, conviction,
+                           top.get("side", ""), seg_name, top.get("confidence", 0),
                            "active trade already open for this bot:symbol")
                     continue
 
@@ -1080,7 +1080,9 @@ class RegimeMasterBot:
             btc_margin = 0.0
             btc_daily_key = "BTCUSDT_1d"
             btc_brain = self._coin_brains.get(btc_daily_key)
-            if btc_brain and btc_brain.is_trained and "1d" in tf_data:
+            # Only use tf_data["1d"] for BTC itself — for other coins tf_data["1d"] is their OWN
+            # daily data, not BTC's, so feeding it to btc_brain produces wrong macro context.
+            if btc_brain and btc_brain.is_trained and "1d" in tf_data and symbol == "BTCUSDT":
                 btc_r, btc_m = btc_brain.predict(tf_data["1d"])
                 if btc_r == config.REGIME_BULL:
                     btc_regime_str = "BULL"
@@ -1100,6 +1102,8 @@ class RegimeMasterBot:
 
             # No fallback brain profile needed — BRAIN_PROFILES removed
             brain_cfg = {}  # sizing comes from CAPITAL_PER_TRADE in deploy loop
+            brain_id = "MultiTF-HMM"
+            _is_reversal_tier2 = False  # set here; legacy tier2 logic (line ~1318) is unreachable from multi-TF path
 
             # Weekend skip
             if config.WEEKEND_SKIP_ENABLED:
@@ -1188,7 +1192,7 @@ class RegimeMasterBot:
                 "tf_agreement": tf_agreement,
                 "athena": athena_action,
                 "signal_type": "REVERSAL_PULLBACK" if _is_reversal_tier2 else "TREND_FOLLOW",
-                "reason": f"{brain_cfg['label']} | {regime_summary} | conv={conviction:.1f} TF={tf_agreement}/3",
+                "reason": f"MultiTF-HMM | {regime_summary} | conv={conviction:.1f} TF={tf_agreement}/3",
             }
 
         # ── Legacy single-TF path (when MULTI_TF_ENABLED=False) ──

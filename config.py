@@ -215,7 +215,7 @@ ANALYSIS_INTERVAL_SECONDS = 300   # 5-minute full analysis cycle
 ERROR_RETRY_SECONDS = 60          # Retry after error
 
 # Min HMM conviction to pass to Athena (below this, coin is skipped before Athena call)
-MIN_CONVICTION_FOR_DEPLOY = 0.60  # 60% — low conviction coins are filtered before Athena
+MIN_CONVICTION_FOR_DEPLOY = 60    # 60 out of 100 — matches MultiTFHMMBrain conviction scale (0-100)
 TOP_COINS_PER_SEGMENT = 1         # Athena evaluates the single highest-HMM coin per segment
 
 # ─── Multi-Coin Trading ──────────────────────────────────────────────────────────
