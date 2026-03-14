@@ -1,5 +1,6 @@
 import { getServerSession } from 'next-auth';
 import { redirect } from 'next/navigation';
+import { isRedirectError } from 'next/dist/client/components/redirect';
 import { authOptions } from '@/lib/auth-options';
 import prisma from '@/lib/prisma';
 import { DashboardClient } from './dashboard-client';
@@ -126,6 +127,9 @@ export default async function DashboardPage() {
       />
     );
   } catch (error) {
+    // Re-throw Next.js redirect errors — redirect() internally throws NEXT_REDIRECT,
+    // which must not be caught here or no redirect happens (shows error page instead).
+    if (isRedirectError(error)) throw error;
     console.error('Dashboard error:', error);
     return (
       <div className="min-h-screen flex items-center justify-center">
