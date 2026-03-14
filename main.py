@@ -41,6 +41,28 @@ logging.basicConfig(
 )
 logger = logging.getLogger("RegimeMaster")
 
+# ─── Signal Broadcast Audit Logger ───────────────────────────────────────────
+# Separate rotating log file: every signal after Athena verdict, per bot receive
+import logging.handlers as _lh
+_broadcast_log_path = os.path.join(config.DATA_DIR, "signal_broadcast.log")
+_bcast_handler = _lh.TimedRotatingFileHandler(
+    _broadcast_log_path, when="midnight", backupCount=7, encoding="utf-8"
+)
+_bcast_handler.setFormatter(logging.Formatter("%(asctime)s %(message)s", datefmt="%Y-%m-%dT%H:%M:%S"))
+broadcast_logger = logging.getLogger("signal_broadcast")
+broadcast_logger.setLevel(logging.INFO)
+broadcast_logger.addHandler(_bcast_handler)
+broadcast_logger.propagate = False  # Don't duplicate to bot.log
+
+def _bcast(event: str, cycle: int, bot_name: str, bot_id: str, sym: str, side: str = "",
+           segment: str = "", conf: float = 0, detail: str = ""):
+    """Structured broadcast audit log. One line per signal event for full traceability."""
+    broadcast_logger.info(
+        "| cycle=%-4d | %-20s | bot=%-28s | id=%-24s | sym=%-10s | side=%-5s | seg=%-8s | conf=%4.0f%% | %s",
+        cycle, event.upper(), bot_name[:28], bot_id[:24], sym, side, segment, conf * 100, detail
+    )
+
+
 
 # ─── Bot name → segment mapping (fallback when segment_filter not in ENGINE_ACTIVE_BOTS) ──
 # Handles engine restart case where bots haven't been re-registered via toggle
@@ -689,6 +711,9 @@ class RegimeMasterBot:
                                 "confidence": athena_decision.adjusted_confidence,
                                 "reasoning": athena_decision.reasoning,
                             }
+                            _bcast("ATHENA_VETO", self._cycle_count, bot_name, bot_id, sym,
+                                   trade["side"], seg_name, athena_decision.adjusted_confidence,
+                                   f"reason={athena_decision.reasoning[:80]}")
                             continue
                             
                         # Compare HMM side (BUY/SELL) with Athena's direction (LONG/SHORT)
@@ -722,6 +747,9 @@ class RegimeMasterBot:
                                     "confidence": athena_decision.adjusted_confidence,
                                     "reasoning": athena_decision.reasoning,
                                 }
+                                _bcast("ATHENA_CONFLICT", self._cycle_count, bot_name, bot_id, sym,
+                                       trade["side"], seg_name, athena_decision.adjusted_confidence,
+                                       f"hmm={old_side} athena={athena_dir}")
                                 continue
 
                         if athena_decision.action == "REDUCE_SIZE":
@@ -745,8 +773,17 @@ class RegimeMasterBot:
                         "model": getattr(athena_decision, "model", "unknown_model"),
                         "latency_ms": getattr(athena_decision, "latency_ms", 0),
                     }
+                    # ── BROADCAST AUDIT: Athena EXECUTE verdict ──
+                    _bcast("ATHENA_EXECUTE", self._cycle_count, bot_name, bot_id, sym,
+                           trade["side"], seg_name, athena_decision.adjusted_confidence,
+                           f"action={athena_decision.action} model={getattr(athena_decision,'model','?')} reason={athena_decision.reasoning[:60]}")
                 elif "athena_state" in self._coin_states.setdefault(sym, {}):
                     del self._coin_states[sym]["athena_state"]
+                
+                # ── BROADCAST AUDIT: signal dispatched to bot ──
+                _bcast("SIGNAL_DISPATCH", self._cycle_count, bot_name, bot_id, sym,
+                       trade["side"], seg_name, trade["confidence"],
+                       f"regime={trade['regime_name']} lev={trade['leverage']}x qty={trade['quantity']:.4f}")
 
                 # Execute the trade
                 logger.info(
@@ -775,6 +812,9 @@ class RegimeMasterBot:
                         "⚠️ DEPLOYMENT_FAILED [%s]: %s %s — order rejected/failed, NOT recording",
                         bot_name, trade["side"], sym,
                     )
+                    _bcast("EXEC_FAILED", self._cycle_count, bot_name, bot_id, sym,
+                           trade["side"], seg_name, trade["confidence"],
+                           "order rejected by exchange / executor returned None")
                     continue
 
                 entry_price = result.get("entry_price", 0) if result else 0
@@ -790,6 +830,9 @@ class RegimeMasterBot:
                         "⚠️ DEPLOYMENT_FAILED [%s]: %s %s — zero entry price, NOT recording",
                         bot_name, trade["side"], sym,
                     )
+                    _bcast("EXEC_ZERO_PRICE", self._cycle_count, bot_name, bot_id, sym,
+                           trade["side"], seg_name, trade["confidence"],
+                           f"entry_price=0 — exchange fill not confirmed")
                     continue
 
                 # STRICTLY RECORD ONLY TO THIS BOT_ID
@@ -816,6 +859,10 @@ class RegimeMasterBot:
                     override_sl=fill_sl if fill_sl > 0 else None,
                     override_tp=fill_tp if fill_tp > 0 else None,
                 )
+                # ── BROADCAST AUDIT: trade confirmed in tradebook ──
+                _bcast("TRADEBOOK_RECORDED", self._cycle_count, bot_name, bot_id, sym,
+                       trade["side"], seg_name, trade["confidence"],
+                       f"entry=${entry_price:.4f} lev={fill_lev}x sl=${fill_sl:.4f} tp=${fill_tp:.4f} paper={config.PAPER_TRADE}")
 
                 self._active_positions[pos_key] = {
                     "profile_id": profile_id,
