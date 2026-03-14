@@ -586,12 +586,14 @@ class RegimeMasterBot:
                 logger.debug("🗂 [%s] segment_filter=%s → %d coins", bot_name, bot_segment_filter, len(bot_allowed_coins))
 
             # --- Correlation Control: Track Active Segments for this bot ---
+            # Build active_segments from bot_id-prefixed keys (per-bot isolation)
             from segment_features import get_segment_for_coin
-            active_segments = {} # segment -> count
+            active_segments = {} # segment -> count (per THIS bot only)
             for key in tradebook_active_keys:
-                if key.startswith(f"{bot_id}:"):
-                    _, act_sym = key.split(":", 1)
-                    seg_name = get_segment_for_coin(act_sym)
+                # Keys are bot_id:symbol — only count this bot's positions
+                parts = key.split(":", 1)
+                if len(parts) == 2 and parts[0] == bot_id:
+                    seg_name = get_segment_for_coin(parts[1])
                     active_segments[seg_name] = active_segments.get(seg_name, 0) + 1
 
             for raw in raw_results:
@@ -632,9 +634,11 @@ class RegimeMasterBot:
                     continue
                 
                 # --- Segment Correlation Check ---
+                # ALL bots (segment_filter=ALL) are exempt — they should never be
+                # blocked by segment correlation limits, they receive every signal.
                 seg_name = get_segment_for_coin(sym)
                 max_seg = getattr(config, "MAX_ACTIVE_PER_SEGMENT", 1)
-                if active_segments.get(seg_name, 0) >= max_seg:
+                if bot_segment_filter != "ALL" and active_segments.get(seg_name, 0) >= max_seg:
                     logger.warning("   ⛔ [%s] %s: FILTERED segment %s max reached (%d/%d) — Correlation Control", 
                         bot_name, sym, seg_name, active_segments.get(seg_name, 0), max_seg)
                     self._coin_states.setdefault(sym, {})["deploy_status"] = f"FILTERED: segment limit ({seg_name})"
