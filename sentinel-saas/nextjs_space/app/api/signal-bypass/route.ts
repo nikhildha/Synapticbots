@@ -27,8 +27,8 @@ function readBypassState() {
 // GET → return current bypass state
 export async function GET(req: NextRequest) {
   const session = await getServerSession(authOptions);
-  if (!session?.user || (session.user as any).role !== "admin") {
-    return NextResponse.json({ error: "Admin only" }, { status: 403 });
+  if (!session?.user) {
+    return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
   }
   return NextResponse.json(readBypassState());
 }
@@ -36,8 +36,8 @@ export async function GET(req: NextRequest) {
 // POST → update bypass state
 export async function POST(req: NextRequest) {
   const session = await getServerSession(authOptions);
-  if (!session?.user || (session.user as any).role !== "admin") {
-    return NextResponse.json({ error: "Admin only" }, { status: 403 });
+  if (!session?.user) {
+    return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
   }
   const body = await req.json();
   const current = readBypassState();
