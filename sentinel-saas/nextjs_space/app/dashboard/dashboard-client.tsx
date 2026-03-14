@@ -450,7 +450,19 @@ export function DashboardClient({ user, stats, bots, recentTrades }: DashboardCl
               gridTemplateColumns: '1.4fr 0.5fr 1.4fr',
               gap: '20px',
             }}>
-              <RegimeCard regime={regime} confidence={confidence} symbol={symbol} macroRegime={macroRegime} trend15m={trend15m} coinStates={multi?.coin_states} />
+              <RegimeCard
+                regime={regime}
+                confidence={confidence}
+                symbol={symbol}
+                macroRegime={macroRegime}
+                trend15m={trend15m}
+                coinStates={multi?.coin_states}
+                macro={{
+                  btc_action: multi?.coin_states?.BTCUSDT?.deploy_status || 'WAITING',
+                  btc_regime_name: multi?.coin_states?.BTCUSDT?.regime || regime,
+                  confidence: confidence,
+                }}
+              />
 
               {/* ═══ Synaptic Core Brain — Engine Status ═══ */}
               {(() => {
@@ -582,8 +594,7 @@ export function DashboardClient({ user, stats, bots, recentTrades }: DashboardCl
             className="mb-8"
           >
             <SegmentHeatmap
-              heatmap={botState?.heatmap || null}
-              coinStates={multi?.coin_states || {}}
+              heatmapData={botState?.heatmap || null}
             />
           </motion.div>
 
