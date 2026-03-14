@@ -649,6 +649,8 @@ class RegimeMasterBot:
                             "atr":            atr_val,
                             "atr_pct":        (atr_val / max(current_price, 0.0001)) * 100,
                             "trend":          self._coin_states.get(sym, {}).get("context", {}).get("trend_alignment", "UNKNOWN"),
+                            "signal_type":    top.get("signal_type", "TREND_FOLLOW"),
+                            "ema_15m_20":     top.get("ema_15m_20"),
                         }
                         athena_decision = self._athena.validate_signal(llm_ctx)
                         self._coin_states.setdefault(sym, {})["athena_state"] = {
@@ -1132,6 +1134,7 @@ class RegimeMasterBot:
                 "brain_cfg": brain_cfg,
                 "tf_agreement": tf_agreement,
                 "athena": athena_action,
+                "signal_type": "REVERSAL_PULLBACK" if _is_reversal_tier2 else "TREND_FOLLOW",
                 "reason": f"{brain_cfg['label']} | {regime_summary} | conv={conviction:.1f} TF={tf_agreement}/3",
             }
 
@@ -1254,15 +1257,79 @@ class RegimeMasterBot:
 
         # NOTE: With HMM_N_STATES=3, CRASH is merged into BEAR. No separate CRASH check needed.
 
-        # ── Multi-TF conflict filter (1h vs 4h must agree on direction) ──
+        # ── Multi-TF Tiered Signal Logic ─────────────────────────────────────────
+        # Tier 1 (full consensus): 1H and 4H agree → normal full-conviction flow
+        # Tier 2 (reversal setup): 15m flips vs 1H/4H → gate entry on ATR pullback
+        #                          to 15m EMA20 before allowing through at reduced size
+        # Tier 3 (true noise):     1H vs 4H conflict (not just 15m) → hard block
+        _is_reversal_tier2 = False
         if macro_regime_name:
-            # BULL on 1h but BEAR on 4h → skip (and vice versa)
-            if regime_name == "BULLISH" and macro_regime_name == "BEARISH":
+            # Hard block: 1H and 4H directly contradict each other (true noise)
+            # Note: macro_regime_name = 4H regime, regime_name = 15m regime (primary scan TF)
+            # 15m BULL + 4H BEAR = potential reversal, NOT noise → Tier 2
+            # We check 1H vs 4H conflict separately via tf_agreement being 1 (only one agrees)
+            one_h_predictions = (mtf_brain._predictions if mtf_brain else {})
+            regime_1h = one_h_predictions.get("1h", (None, 0))[0]
+            regime_4h = one_h_predictions.get("4h", (None, 0))[0]
+
+            tier1_conflict = (
+                regime_1h is not None and regime_4h is not None
+                and regime_1h != regime_4h
+                and regime_1h != config.REGIME_CHOP
+                and regime_4h != config.REGIME_CHOP
+            )
+            if tier1_conflict:
+                # 1H and 4H flatly disagree (e.g. 1H=BULL, 4H=BEAR) — Tier 3 noise block
                 self._coin_states[symbol]["action"] = "MTF_CONFLICT"
                 return None
-            if regime_name == "BEARISH" and macro_regime_name == "BULLISH":
-                self._coin_states[symbol]["action"] = "MTF_CONFLICT"
-                return None
+
+            # Tier 2: 15m flipped but higher TFs haven't confirmed yet
+            # 15m says BUY but 1H/4H still BEAR (or vice versa) → reversal setup
+            primary_regime = regime  # 15m HMM
+            higher_tf_regimes = [r for r in [regime_1h, regime_4h] if r is not None]
+            higher_tf_bear = all(r == config.REGIME_BEAR for r in higher_tf_regimes)
+            higher_tf_bull = all(r == config.REGIME_BULL for r in higher_tf_regimes)
+
+            if ((primary_regime == config.REGIME_BULL and higher_tf_bear) or
+                    (primary_regime == config.REGIME_BEAR and higher_tf_bull)):
+                # Tier 2: early reversal detected — apply ATR+EMA20 pullback gate
+                _is_reversal_tier2 = True
+                ema20_15m = _ema_15m_20  # already computed above
+                if ema20_15m and current_atr > 0 and current_price > 0:
+                    atr_band = current_atr * 1.0  # 1× ATR tolerance band around EMA20
+                    if primary_regime == config.REGIME_BULL:
+                        # For LONG reversal: price must have pulled back to EMA20 ± ATR
+                        in_pullback_zone = (
+                            current_price <= ema20_15m + atr_band and
+                            current_price >= ema20_15m - atr_band
+                        )
+                    else:
+                        # For SHORT reversal: price must have bounced back to EMA20 ± ATR
+                        in_pullback_zone = (
+                            current_price >= ema20_15m - atr_band and
+                            current_price <= ema20_15m + atr_band
+                        )
+                    if not in_pullback_zone:
+                        self._coin_states[symbol]["action"] = "REVERSAL_WAIT_PULLBACK"
+                        logger.debug(
+                            "📐 [%s] Tier2 reversal detected but price %.4f not yet in "
+                            "EMA20(%.4f) ± ATR(%.4f) zone — waiting for pullback",
+                            symbol, current_price, ema20_15m, atr_band,
+                        )
+                        return None
+                    # Pullback confirmed — reduce conviction cap for safety
+                    conviction = min(conviction, 55.0)
+                    logger.info(
+                        "🔄 [%s] Tier2 REVERSAL PULLBACK confirmed — "
+                        "price=%.4f EMA20=%.4f ATR=%.4f — proceeding at capped conviction %.1f",
+                        symbol, current_price, ema20_15m, current_atr, conviction,
+                    )
+                    # Flag for downstream (Athena context, SIGNAL_DISPATCH)
+                    self._coin_states[symbol]["action"] = "REVERSAL_PULLBACK_CONFIRMED"
+                else:
+                    # Can't compute zone — treat as MTF_CONFLICT (safe fallback)
+                    self._coin_states[symbol]["action"] = "MTF_CONFLICT"
+                    return None
 
         # ── TREND (BULL / BEAR) — 8-factor conviction flow ──────────────────────
 
