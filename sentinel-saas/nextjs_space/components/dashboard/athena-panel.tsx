@@ -131,7 +131,17 @@ export function AthenaPanel({ athena, perBot = {} }: Props) {
                 </div>
             </div>
 
-
+            {/* ── Legend: Border color = Athena verdict ── */}
+            <div style={{
+                padding: '5px 16px', borderBottom: '1px solid rgba(255,255,255,0.04)',
+                display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap',
+                background: 'rgba(0,0,0,0.2)',
+            }}>
+                <span style={{ fontSize: 9.5, color: '#4B5563', letterSpacing: '0.3px' }}>BORDER COLOR = ATHENA VERDICT</span>
+                <span style={{ fontSize: 9.5, color: '#00FF88', fontWeight: 700 }}>🟢 EXECUTE — approved &amp; deployed</span>
+                <span style={{ fontSize: 9.5, color: '#FF3B5C', fontWeight: 700 }}>🔴 VETO — blocked by Athena</span>
+                <span style={{ fontSize: 9.5, color: '#4B5563', marginLeft: 'auto' }}>↑↓ direction badge is independent</span>
+            </div>
 
             {/* ── Decision List ── */}
             <div style={{ maxHeight: 960, overflowY: 'auto', padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: 10 }}>

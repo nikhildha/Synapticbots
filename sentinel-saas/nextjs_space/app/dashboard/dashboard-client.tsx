@@ -577,7 +577,10 @@ export function DashboardClient({ user, stats, bots, recentTrades }: DashboardCl
             transition={{ delay: 0.2 }}
             className="mb-8"
           >
-            <SegmentHeatmap heatmapData={botState?.heatmap || null} loading={isRefreshing && !botState?.heatmap} />
+             {/* Stable height prevents layout shift while heatmap loads */}
+             <div style={{ minHeight: 320 }}>
+               <SegmentHeatmap heatmapData={botState?.heatmap || null} loading={isRefreshing && !botState?.heatmap} />
+             </div>
           </motion.div>
 
           <VirtualLimitTracker trades={allTrades} />
