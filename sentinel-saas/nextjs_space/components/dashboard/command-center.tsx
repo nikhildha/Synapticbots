@@ -629,9 +629,8 @@ export function SignalSummaryTable({ coinStates, multi, heatmap: heatmapProp }: 
     const [liveCoinStates, setLiveCoinStates] = useState<Record<string, any>>(coinStates || {});
     const [liveHeatmap, setLiveHeatmap] = useState<any>(heatmapProp || null);
 
-    // Auto-refresh: poll bot-state at engine interval or every 60s
+    // Main data refresh: poll at engine interval (10min)
     const refreshMs = Math.min(Math.max((liveMulti?.analysis_interval_seconds || 60) * 1000, 30000), 900000);
-
     useEffect(() => {
         const fetchLatest = async () => {
             try {
@@ -647,6 +646,22 @@ export function SignalSummaryTable({ coinStates, multi, heatmap: heatmapProp }: 
         const timer = setInterval(fetchLatest, refreshMs);
         return () => clearInterval(timer);
     }, [refreshMs]);
+
+    // Fast re-registration heartbeat: every 30s check if bots are still registered.
+    // Engine restart clears ENGINE_ACTIVE_BOTS — this re-pushes them quickly.
+    useEffect(() => {
+        const reRegister = async () => {
+            try {
+                await fetch('/api/bot-state', { cache: 'no-store' });
+                // bot-state/route.ts auto-re-registers any unregistered active bots
+                // on every call — so simply calling it is enough.
+            } catch { /* silent */ }
+        };
+        // Run immediately on mount, then every 30s
+        reRegister();
+        const hb = setInterval(reRegister, 30_000);
+        return () => clearInterval(hb);
+    }, []);
 
     useEffect(() => { if (coinStates) setLiveCoinStates(coinStates); }, [coinStates]);
     useEffect(() => { if (multi) setLiveMulti(multi); }, [multi]);
