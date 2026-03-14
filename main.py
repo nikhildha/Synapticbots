@@ -644,7 +644,13 @@ class RegimeMasterBot:
                 trade = self._evaluate_for_profile(raw, profile_id, active_profile, balance)
                 if not trade:
                     logger.warning("   ⛔ [%s] %s: FILTERED by profile evaluation", bot_name, sym)
+                    # Ensure deploy_status is set — _evaluate_for_profile sets a specific FILTERED reason;
+                    # this fallback fires only if it returned None without setting one (shouldn't happen normally)
+                    current_ds = self._coin_states.get(sym, {}).get("deploy_status", "")
+                    if not current_ds.startswith("FILTERED"):
+                        self._coin_states.setdefault(sym, {})["deploy_status"] = "FILTERED: profile evaluation"
                     continue
+
 
                 if self.risk.check_kill_switch():
                     return
