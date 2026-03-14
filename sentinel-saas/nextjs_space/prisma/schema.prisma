@@ -298,7 +298,96 @@ model PartialBooking {
   @@index([tradeId])
 }
 
+// ─── Cycle History & Signal Archive ─────────────────────────────────────────
+
+model CycleSnapshot {
+  id              String    @id @default(cuid())
+
+  // Engine identity
+  cycleNumber     Int                           // engine's own cycle counter
+  mode            String    @default("paper")   // paper | live
+  engineBotId     String?                       // which bot triggered this cycle
+
+  // Timing
+  scannedAt       DateTime                      // when the analysis ran (IST-aware UTC)
+  durationMs      Int?                          // how long the full scan took
+
+  // Market context
+  btcRegime       String?                       // dominant BTC HMM regime
+  btcConfidence   Float?                        // BTC regime confidence (0–100)
+  btcPrice        Float?                        // BTC price at scan time
+  macroAction     String?                       // LONG_ALTCOINS | NEUTRAL | VETO_*
+
+  // Aggregate stats
+  coinsScanned    Int       @default(0)
+  eligibleCount   Int       @default(0)
+  deployedCount   Int       @default(0)
+  filteredCount   Int       @default(0)
+
+  // Per-coin detail rows
+  coinResults     CoinScanResult[]
+
+  // Per-segment heatmap rows
+  heatmapEntries  SegmentHeatmapEntry[]
+
+  createdAt       DateTime  @default(now())
+
+  @@index([scannedAt])
+  @@index([cycleNumber])
+  @@index([mode])
+}
+
+model CoinScanResult {
+  id              String    @id @default(cuid())
+
+  cycleId         String
+  cycle           CycleSnapshot @relation(fields: [cycleId], references: [id], onDelete: Cascade)
+
+  symbol          String                        // BTCUSDT, ETHUSDT, …
+  regime          String?                       // BULLISH | BEARISH | SIDEWAYS/CHOP | CRASH/PANIC
+  regimeFull      String?                       // full multi-TF string e.g. "1d=BEAR(0.92)|1h=BULL(1.00)|15m=BEAR(0.84)"
+  action          String?                       // ELIGIBLE_BUY | ELIGIBLE_SELL | MTF_CONFLICT | LOW_CONVICTION | …
+  side            String?                       // BUY | SELL
+  confidence      Float?                        // HMM confidence 0–100
+  conviction      Float?                        // composite conviction score
+  tfAgreement     Int?                          // 0–3 timeframes agree
+  atr             Float?                        // ATR at scan time
+  price           Float?                        // close price at scan time
+  deployStatus    String?                       // DEPLOYED | FILTERED: active trade exists | …
+  wasDeployed     Boolean   @default(false)
+  athenaDecision  String?                       // EXECUTE | WAIT | VETO
+
+  createdAt       DateTime  @default(now())
+
+  @@index([cycleId])
+  @@index([symbol])
+  @@index([action])
+  @@index([createdAt])
+}
+
+model SegmentHeatmapEntry {
+  id              String    @id @default(cuid())
+
+  cycleId         String
+  cycle           CycleSnapshot @relation(fields: [cycleId], references: [id], onDelete: Cascade)
+
+  segment         String                        // L1, L2, DeFi, Gaming, RWA, …
+  compositeScore  Float?                        // overall heatmap score
+  vwRr            Float?                        // volume-weighted risk-reward
+  btcAlpha        Float?                        // segment alpha vs BTC
+  breadthPct      Float?                        // % of coins in segment trending up
+  isSelected      Boolean   @default(false)     // was this segment picked this cycle?
+  rank            Int?                          // 1=hottest, 2=second, …
+
+  createdAt       DateTime  @default(now())
+
+  @@index([cycleId])
+  @@index([segment])
+  @@index([createdAt])
+}
+
 // ─── NextAuth Models ─────────────────────────────────────────────────────────
+
 
 model Account {
   id                String  @id @default(cuid())
