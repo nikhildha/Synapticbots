@@ -795,14 +795,15 @@ export function SignalSummaryTable({ coinStates, multi, heatmap: heatmapProp }: 
                 const statsItems = [
                     { label: 'Engine', value: engineLabel, color: engineColor, isText: true },
                     { label: 'Next Cycle', value: nextCycleLabel, color: '#A78BFA', isText: true },
-                    { label: 'Coins Scanned', value: coins.length, color: '#06B6D4' },
+                    { label: 'Scanned', value: coins.length, color: '#06B6D4' },
                     { label: 'Eligible', value: eligible.length, color: '#22C55E' },
-                    { label: 'Filtered Out', value: skipped.length, color: '#EF4444' },
-                    { label: 'Last Cycle (IST)', value: formatIST(lastCycle), color: '#9CA3AF', isText: true },
+                    { label: 'Deployed', value: (liveMulti as any)?.deployed_count ?? '?', color: '#F59E0B' },
+                    { label: 'Filtered', value: skipped.length, color: '#EF4444' },
+                    { label: 'Last Cycle', value: formatIST(lastCycle), color: '#9CA3AF', isText: true },
                     { label: 'Interval', value: intervalSec ? `${Math.round(Number(intervalSec) / 60)}m` : '—', color: '#9CA3AF', isText: true },
                 ];
                 return (
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '8px', marginBottom: '12px' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(8, 1fr)', gap: '8px', marginBottom: '12px' }}>
                         {statsItems.map((s, i) => (
                             <div key={i} style={{ background: 'rgba(255,255,255,0.03)', border: `1px solid ${s.label === 'Engine' ? (isEngineOn ? 'rgba(34,197,94,0.2)' : 'rgba(239,68,68,0.2)') : 'rgba(255,255,255,0.06)'}`, borderRadius: '10px', padding: '10px 12px', textAlign: 'center' }}>
                                 <div style={{ fontSize: '9px', textTransform: 'uppercase', letterSpacing: '1px', color: '#6B7280', marginBottom: '4px' }}>{s.label}</div>

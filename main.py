@@ -798,25 +798,33 @@ class RegimeMasterBot:
                        trade["side"], seg_name, trade["confidence"],
                        f"regime={trade['regime_name']} lev={trade['leverage']}x qty={trade['quantity']:.4f}")
 
-                # Execute the trade
+                # Execute the trade — catch ALL exceptions so one bad coin doesn't kill the entire deploy loop
                 logger.info(
                     "🔥 DEPLOYING [%s]: %s %s @ %dx | Regime: %s (%.0f%%) | Qty: %.6f",
                     bot_name, trade["side"], sym, trade["leverage"],
                     trade["regime_name"], trade["confidence"] * 100, trade["quantity"],
                 )
-                result = self.executor.execute_trade(
-                    symbol=sym,
-                    side=trade["side"],
-                    leverage=trade["leverage"],
-                    quantity=trade["quantity"],
-                    atr=trade["atr"],
-                    ema_15m_20=trade.get("ema_15m_20"),
-                    regime=trade["regime"],
-                    confidence=trade["confidence"],
-                    reason=trade["reason"],
-                    swing_l=trade.get("swing_l"),
-                    swing_h=trade.get("swing_h"),
-                )
+                try:
+                    result = self.executor.execute_trade(
+                        symbol=sym,
+                        side=trade["side"],
+                        leverage=trade["leverage"],
+                        quantity=trade["quantity"],
+                        atr=trade["atr"],
+                        ema_15m_20=trade.get("ema_15m_20"),
+                        regime=trade["regime"],
+                        confidence=trade["confidence"],
+                        reason=trade["reason"],
+                        swing_l=trade.get("swing_l"),
+                        swing_h=trade.get("swing_h"),
+                    )
+                except Exception as exec_err:
+                    logger.error("🚨 EXECUTE_TRADE CRASHED [%s] %s: %s", bot_name, sym, exec_err, exc_info=True)
+                    _bcast("EXEC_CRASH", self._cycle_count, bot_name, bot_id, sym,
+                           trade["side"], seg_name, trade["confidence"],
+                           f"exception={type(exec_err).__name__}: {str(exec_err)[:120]}")
+                    self._coin_states.setdefault(sym, {})["deploy_status"] = f"FILTERED: execute_trade crash ({type(exec_err).__name__})"
+                    continue
 
                 # Record in tradebook — use CoinDCX-confirmed values for live mode
                 # LIVE CONFIRMED: Do NOT record if execution failed (prevents phantom trades)
