@@ -662,8 +662,11 @@ class RegimeMasterBot:
                 logger.info("   ✅ [%s] %s: PASSED evaluation — preparing to deploy", bot_name, sym)
 
                 # Cap total concurrent positions for this specific bot
-                current_total = sum(1 for k in self._active_positions if k.startswith(f"{bot_id}:"))
-                max_pos = active_profile.get("max_positions", config.MAX_CONCURRENT_POSITIONS)
+                # Use tradebook_active_keys (bot_id:symbol from live tradebook) — NOT _active_positions
+                # which loads ALL historical positions at startup and caused 10/10 cap on every cycle.
+                current_total = sum(1 for k in tradebook_active_keys if k.startswith(f"{bot_id}:"))
+                # Per-segment bots: max 3 concurrent positions per bot (each segment has ~4 coins)
+                max_pos = active_profile.get("max_positions", getattr(config, "MAX_POS_PER_BOT", 3))
                 
                 if current_total >= max_pos:
                     logger.warning("   ⛔ %s max positions reached (%d/%d) — skipping %s %s %d×",
