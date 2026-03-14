@@ -52,6 +52,38 @@ export async function GET() {
         // Fetch engine data for DASHBOARD UI (coin states, engine status, etc.)
         const engineData = await fetchEngineData(engineMode);
 
+        // ─── Auto-Re-Registration: re-push bots if engine restarted ─────────
+        // Engine restart clears ENGINE_ACTIVE_BOTS in memory. Any active DB bot
+        // not in registered_bot_ids needs to be re-pushed via /api/set-bot-id.
+        if (userId && userBots.length > 0 && engineData?.registered_bot_ids) {
+            const registeredIds: string[] = engineData.registered_bot_ids;
+            const activeBots = userBots.filter((b: any) => b.isActive);
+            for (const ub of activeBots) {
+                if (!registeredIds.includes(ub.id)) {
+                    const botMode = ((ub.config as any)?.mode || 'paper').toLowerCase();
+                    const reRegUrl = getEngineUrl(botMode.startsWith('live') ? 'live' : 'paper');
+                    if (!reRegUrl) continue;
+                    console.log(`[bot-state] Re-registering bot ${ub.id} (${ub.name}) — not in engine active list (engine may have restarted)`);
+                    try {
+                        await fetch(`${reRegUrl}/api/set-bot-id`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                bot_id: ub.id,
+                                bot_name: ub.name,
+                                user_id: userId,
+                                brain_type: (ub.config as any)?.brainType || 'adaptive',
+                                segment_filter: (ub.config as any)?.segment || 'ALL',
+                            }),
+                            signal: AbortSignal.timeout(5000),
+                        });
+                    } catch (e) {
+                        console.warn(`[bot-state] Re-registration failed for bot ${ub.id}:`, e);
+                    }
+                }
+            }
+        }
+
         const multi = engineData?.multi || { coin_states: {}, last_analysis_time: null, deployed_count: 0 };
         const engineTradebook = engineData?.tradebook || { trades: [], summary: {} };
         const engineState = engineData?.engine || { status: getEngineUrl(engineMode) ? 'unknown' : 'not_configured' };
@@ -155,7 +187,19 @@ export async function GET() {
         return NextResponse.json({
             state: {
                 regime: multi.macro_regime || coinStates?.BTCUSDT?.regime || 'WAITING',
-                confidence: coinStates?.BTCUSDT?.confidence || 0,
+                // FIX: use conviction (0-100) not raw HMM margin (0.0-1.0).
+                // HMM margin is near-zero for CHOP states → gauge showed ~0%.
+                // conviction is the proper 0-100 score used for leverage decisions.
+                confidence: (() => {
+                    const btc = coinStates?.BTCUSDT;
+                    const conviction = btc?.conviction;          // 0-100 scale
+                    const margin     = btc?.confidence;          // 0.0-1.0 raw HMM margin
+                    const btcConf    = multi?.btc_confidence;    // same as margin from btc_state
+                    if (conviction != null && conviction > 0) return conviction;
+                    if (margin != null && margin > 0.05) return margin;
+                    if (btcConf != null && btcConf > 0.05) return btcConf;
+                    return 0;
+                })(),
                 symbol: 'BTCUSDT',
                 btc_price: coinStates?.BTCUSDT?.price || null,
                 timestamp: lastAnalysis,
