@@ -12,6 +12,27 @@ const REGIME_MAP: Record<string, { emoji: string; color: string; bgGlow: string 
     'OFFLINE': { emoji: '⚫', color: '#4B5563', bgGlow: 'rgba(75,85,99,0.08)' },
 };
 
+// Mirrors CRYPTO_SEGMENTS in config.py — keep in sync when adding new coins
+const SEGMENT_MAP: Record<string, string> = {
+    // L1
+    BTC: 'L1', ETH: 'L1', SOL: 'L1', BNB: 'L1', AVAX: 'L1', SUI: 'L1',
+    // L2
+    MATIC: 'L2', ARB: 'L2', OP: 'L2', IMX: 'L2', RONIN: 'L2', RON: 'L2', STRK: 'L2', MANTA: 'L2',
+    // DeFi
+    LINK: 'DeFi', UNI: 'DeFi', AAVE: 'DeFi', DYDX: 'DeFi', CRV: 'DeFi', JUP: 'DeFi', PENDLE: 'DeFi', GMX: 'DeFi', ENS: 'DeFi',
+    // Gaming
+    AXS: 'Gaming', SAND: 'Gaming', MANA: 'Gaming', GALA: 'Gaming', ILV: 'Gaming', BEAM: 'Gaming', PIXEL: 'Gaming', IOTX: 'Gaming',
+    // AI
+    FET: 'AI', AGIX: 'AI', RENDER: 'AI', WLD: 'AI', TAO: 'AI', OCEAN: 'AI', NMR: 'AI', ALT: 'AI',
+    // RWA
+    POLYX: 'RWA', ONDO: 'RWA', CPOOL: 'RWA', CFG: 'RWA', RIO: 'RWA',
+};
+
+function getSegment(symbol: string): string {
+    const coin = symbol.replace('USDT', '').toUpperCase();
+    return SEGMENT_MAP[coin] || '';
+}
+
 function getRegimeInfo(regime: string) {
     const key = regime.toUpperCase();
     return REGIME_MAP[key] || (key.includes('WAIT') || key.includes('SCAN') ? REGIME_MAP['SCANNING'] : REGIME_MAP['SCANNING']);
@@ -166,16 +187,18 @@ export function RegimeCard({ regime, confidence, symbol, macroRegime, trend15m, 
                 background: `linear-gradient(90deg, transparent, ${info.color}60, transparent)`,
             }} />
 
-            {/* ── BTC background sparkline watermark ── */}
+            {/* ── BTC background sparkline watermark — brighter + vertically centered ── */}
             {btcPriceHistory.length >= 2 && (() => {
                 const pts = btcPriceHistory;
                 const minP = Math.min(...pts);
                 const maxP = Math.max(...pts);
                 const range = maxP - minP || 1;
-                const W = 400, H = 80;
+                const W = 400, H = 100;
+                // Center the line vertically: map to middle 60% of height
+                const PAD_TOP = H * 0.20, PAD_BOT = H * 0.20;
                 const sparkPts = pts.map((p, i) => {
                     const x = (i / (pts.length - 1)) * W;
-                    const y = H - ((p - minP) / range) * (H - 6) - 3;
+                    const y = PAD_TOP + (1 - (p - minP) / range) * (H - PAD_TOP - PAD_BOT);
                     return `${x.toFixed(1)},${y.toFixed(1)}`;
                 }).join(' ');
                 const last = pts[pts.length - 1];
@@ -187,18 +210,21 @@ export function RegimeCard({ regime, confidence, symbol, macroRegime, trend15m, 
                         width="100%" viewBox={`0 0 ${W} ${H}`}
                         preserveAspectRatio="none"
                         style={{
-                            position: 'absolute', bottom: 0, left: 0, right: 0,
-                            opacity: 0.13, pointerEvents: 'none', display: 'block',
+                            position: 'absolute', top: 0, bottom: 0, left: 0, right: 0,
+                            height: '100%', opacity: 0.32, pointerEvents: 'none', display: 'block',
+                            filter: `drop-shadow(0 0 4px ${lc}88)`,
                         }}
                     >
                         <defs>
                             <linearGradient id="bgSparkGrad" x1="0" y1="0" x2="0" y2="1">
-                                <stop offset="0%" stopColor={lc} stopOpacity="0.5" />
+                                <stop offset="0%" stopColor={lc} stopOpacity="0.4" />
                                 <stop offset="100%" stopColor={lc} stopOpacity="0" />
                             </linearGradient>
                         </defs>
+                        {/* Fill area below line */}
                         <polyline points={`0,${H} ${sparkPts} ${W},${H}`} fill="url(#bgSparkGrad)" stroke="none" />
-                        <polyline points={sparkPts} fill="none" stroke={lc} strokeWidth="1.5" strokeLinejoin="round" strokeLinecap="round" />
+                        {/* Bright glowing line */}
+                        <polyline points={sparkPts} fill="none" stroke={lc} strokeWidth="2" strokeLinejoin="round" strokeLinecap="round" />
                     </svg>
                 );
             })()}
@@ -757,7 +783,7 @@ export function SignalSummaryTable({ coinStates, multi }: SignalSummaryProps) {
                     <table style={{ width: '100%', minWidth: '900px', borderCollapse: 'collapse', fontSize: '14px' }}>
                         <thead>
                             <tr style={{ borderBottom: '2px solid rgba(255,255,255,0.08)' }}>
-                                {['#', 'Coin', 'Regime', 'Conf %', 'Deploy', 'Reason', 'Cycle #', 'Scan Time'].map(h => (
+                                {['#', 'Coin', 'Segment', 'Regime', 'Conf %', 'Deploy', 'Reason', 'Cycle #', 'Scan Time'].map(h => (
                                     <th key={h} style={{ padding: '10px 8px', textAlign: h === '#' || h === 'Coin' || h === 'Reason' ? 'left' : 'center', fontSize: '9px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '1px', color: '#4B5563', position: 'sticky' as const, top: 0, background: 'var(--color-surface, rgba(17,24,39,0.98))' }}>{h}</th>
                                 ))}
                             </tr>
@@ -787,6 +813,21 @@ export function SignalSummaryTable({ coinStates, multi }: SignalSummaryProps) {
                                         onMouseLeave={e => (e.currentTarget.style.background = isE ? 'rgba(0,255,136,0.03)' : 'transparent')}>
                                         <td style={{ padding: '8px 8px', color: 'rgba(0,229,255,0.3)', fontSize: 10, fontWeight: 600, fontFamily: 'var(--font-mono, monospace)' }}>{idx + 1}</td>
                                         <td style={{ padding: '8px 8px' }}><div style={{ fontWeight: 800, color: '#E8EDF5', fontSize: 14, fontFamily: 'var(--font-mono, monospace)', letterSpacing: '-0.3px' }}>{(c.symbol || '').replace('USDT', '')}</div></td>
+                                        <td style={{ padding: '8px 8px', textAlign: 'center' }}>
+                                            {(() => {
+                                                const seg = getSegment(c.symbol || '');
+                                                const segColors: Record<string, { bg: string; color: string }> = {
+                                                    L1: { bg: 'rgba(139,92,246,0.12)', color: '#A78BFA' },
+                                                    L2: { bg: 'rgba(6,182,212,0.12)', color: '#22D3EE' },
+                                                    DeFi: { bg: 'rgba(16,185,129,0.12)', color: '#34D399' },
+                                                    Gaming: { bg: 'rgba(245,158,11,0.12)', color: '#FBBF24' },
+                                                    AI: { bg: 'rgba(236,72,153,0.12)', color: '#F472B6' },
+                                                    RWA: { bg: 'rgba(59,130,246,0.12)', color: '#60A5FA' },
+                                                };
+                                                const sc = segColors[seg] || { bg: 'rgba(107,114,128,0.10)', color: '#9CA3AF' };
+                                                return <span style={{ background: sc.bg, color: sc.color, padding: '3px 9px', borderRadius: 8, fontSize: 10, fontWeight: 700 }}>{seg || '—'}</span>;
+                                            })()}
+                                        </td>
                                         <td style={{ padding: '8px 8px', textAlign: 'center' }}><span style={{ background: regBg, color: regColor(regime), padding: '3px 10px', borderRadius: 10, fontSize: 10, fontWeight: 700, textShadow: `0 0 6px ${regColor(regime)}66` }}>{regime}</span></td>
                                         <td style={{ padding: '8px 8px', textAlign: 'center', fontWeight: 800, fontSize: 14, fontFamily: 'var(--font-mono, monospace)', color: conf > 80 ? '#00FF88' : conf > 60 ? '#00E5FF' : conf > 40 ? '#FFB300' : '#4B5563', textShadow: conf > 80 ? '0 0 8px rgba(0,255,136,0.4)' : undefined }}>{conf.toFixed(1)}%</td>
                                         <td style={{ padding: '8px 8px', textAlign: 'center' }}><span style={{ background: dBg, color: dColor, padding: '3px 10px', borderRadius: 10, fontSize: 10, fontWeight: 700 }}>{dLabel}</span></td>
