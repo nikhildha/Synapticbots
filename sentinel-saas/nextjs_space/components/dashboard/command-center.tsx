@@ -651,7 +651,7 @@ export function SignalSummaryTable({ coinStates, multi }: SignalSummaryProps) {
     const coins = liveCoinStates ? Object.entries(liveCoinStates).map(([sym, c]: [string, any]) => ({ ...c, symbol: sym })) : [];
     const allSymbols = coins.map((c: any) => c.symbol || '').filter(Boolean).sort();
     const lastCycle = liveMulti?.last_analysis_time || null;
-    const intervalSec = liveMulti?.analysis_interval_seconds || 0;
+    const intervalSec = Number(liveMulti?.analysis_interval_seconds || 0);
 
     const formatIST = (iso: string | null) => {
         if (!iso) return '—';
@@ -781,7 +781,7 @@ export function SignalSummaryTable({ coinStates, multi }: SignalSummaryProps) {
                     { label: 'Eligible', value: eligible.length, color: '#22C55E' },
                     { label: 'Filtered Out', value: skipped.length, color: '#EF4444' },
                     { label: 'Last Cycle (IST)', value: formatIST(lastCycle), color: '#9CA3AF', isText: true },
-                    { label: 'Interval', value: intervalSec ? `${Math.round(intervalSec / 60)}m` : '—', color: '#9CA3AF', isText: true },
+                    { label: 'Interval', value: intervalSec ? `${Math.round(Number(intervalSec) / 60)}m` : '—', color: '#9CA3AF', isText: true },
                 ];
                 return (
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '8px', marginBottom: '12px' }}>

@@ -58,7 +58,7 @@ TIMEFRAME_MACRO = "4h"        # Macro regime (legacy — replaced by Multi-TF HM
 # ─── Multi-Timeframe HMM (backtest-proven: +$2,421 PnL, PF 1.49) ────────────
 MULTI_TF_ENABLED = True               # Use 3 separate HMM brains per coin
 MULTI_TF_TIMEFRAMES = ["1d", "1h", "15m"]   # Daily (macro), Hourly (swing), 15min (momentum)
-MULTI_TF_CANDLE_LIMIT = 1000          # Candles to fetch per TF (1000 Daily = 2.7 years)
+MULTI_TF_CANDLE_LIMIT = 300           # Candles per TF (300d daily / 300h hourly / 75h 15min)
 MULTI_TF_WEIGHTS = {"1d": 40, "1h": 35, "15m": 25}  # Conviction weights (sum=100)
 MULTI_TF_MIN_AGREEMENT = 2            # Minimum TFs agreeing on direction (2 of 3)
 MULTI_TF_MIN_MODELS = 2               # Minimum trained models required
