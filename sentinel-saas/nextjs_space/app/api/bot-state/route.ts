@@ -187,23 +187,39 @@ export async function GET() {
         return NextResponse.json({
             state: {
                 regime: multi.macro_regime || coinStates?.BTCUSDT?.regime || 'WAITING',
-                // FIX: use conviction (0-100) not raw HMM margin (0.0-1.0).
-                // HMM margin is near-zero for CHOP states → gauge showed ~0%.
-                // conviction is the proper 0-100 score used for leverage decisions.
+                // FIX: BTC is a macro-only coin — conviction is never set for it.
+                // The raw HMM margin (conf) is near-zero for CHOP/HIGH_VOLATILITY.
+                // Real signal: parse the per-TF margins from the regime string like
+                //   "1d=HIGH_VOL(0.92) | 1h=BEARISH(0.76) | 15m=BEARISH(0.84)"
+                // Average those bracket values → meaningful 0-100 display confidence.
                 confidence: (() => {
                     const btc = coinStates?.BTCUSDT;
-                    const conviction = btc?.conviction;          // 0-100 scale
-                    const margin     = btc?.confidence;          // 0.0-1.0 raw HMM margin
-                    const btcConf    = multi?.btc_confidence;    // same as margin from btc_state
+                    const regimeStr: string = btc?.regime || '';
+
+                    // Parse all (x.xx) margin values from the regime string
+                    const matches = regimeStr.match(/\(([\d.]+)\)/g);
+                    if (matches && matches.length > 0) {
+                        const values = matches
+                            .map((m: string) => parseFloat(m.replace(/[()]/g, '')))
+                            .filter((v: number) => !isNaN(v) && v > 0 && v <= 1);
+                        if (values.length > 0) {
+                            const avg = values.reduce((a: number, b: number) => a + b, 0) / values.length;
+                            return Math.round(avg * 100); // convert 0.84 → 84
+                        }
+                    }
+
+                    // Fallbacks: conviction (unlikely for BTC), then raw margin
+                    const conviction = btc?.conviction;
                     if (conviction != null && conviction > 0) return conviction;
-                    if (margin != null && margin > 0.05) return margin;
-                    if (btcConf != null && btcConf > 0.05) return btcConf;
+                    const margin = btc?.confidence;
+                    if (margin != null && margin > 0.05) return Math.round(margin * 100);
                     return 0;
                 })(),
                 symbol: 'BTCUSDT',
                 btc_price: coinStates?.BTCUSDT?.price || null,
                 timestamp: lastAnalysis,
             },
+
             multi: {
                 ...multi,
                 coins_scanned: Object.keys(coinStates).length,
