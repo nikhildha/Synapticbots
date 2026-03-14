@@ -67,12 +67,19 @@ export async function syncEngineTrades(
                 if (!isNaN(d.getTime())) exitTime = d;
             }
 
-            // ENGINE BROADCAST: The engine is a signal broadcaster — ALL user bots
-            // receive ALL engine trades. User-level isolation is maintained by
-            // getUserTrades(userId) at query time. Bot_id IS NOW used for scoping
-            // to separate Adaptive, Athena, and Scalper trades properly.
-            if (t.bot_id && t.bot_id !== botId) {
-                // This trade belongs to a different bot instance (e.g. Scalper vs Athena)
+            // STRICT BOT ISOLATION: Only sync trades that belong to THIS bot.
+            // Reject if:
+            //   1. Trade has a real bot_id that doesn't match → wrong bot
+            //   2. Trade has no bot_id (empty/"") AND this bot has a valid ID → unscoped trade
+            //      (legacy tradebook entries from before bot_id stamping was fixed)
+            const tradeBotId = (t.bot_id || '').trim();
+            if (tradeBotId && tradeBotId !== botId) {
+                // Trade explicitly belongs to a different bot
+                continue;
+            }
+            if (!tradeBotId && botId) {
+                // Trade has no bot_id stamp — don't assign it to any specific bot
+                // (prevents pre-fix tradebook entries from flooding all bots)
                 continue;
             }
 
