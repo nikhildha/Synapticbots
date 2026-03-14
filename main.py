@@ -42,6 +42,38 @@ logging.basicConfig(
 logger = logging.getLogger("RegimeMaster")
 
 
+# ─── Bot name → segment mapping (fallback when segment_filter not in ENGINE_ACTIVE_BOTS) ──
+# Handles engine restart case where bots haven't been re-registered via toggle
+def _infer_segment_from_name(bot_name: str) -> str:
+    """
+    Infer the segment_filter from the bot name.
+    E.g.: 'L1 Specialist' → 'L1', 'Gaming Specialist' → 'Gaming',
+          'Synaptic Adaptive — ALL' → 'ALL'
+    Returns 'ALL' if no known segment keyword is found (safe default for router bots).
+    """
+    name_lower = bot_name.lower()
+    # Explicit 'ALL' type bots
+    if "all" in name_lower or "adaptive" in name_lower or "router" in name_lower:
+        return "ALL"
+    # Map known segment keywords
+    segment_keywords = {
+        "l1": "L1",
+        "l2": "L2",
+        "defi": "DeFi",
+        "ai": "AI",
+        "meme": "Meme",
+        "rwa": "RWA",
+        "gaming": "Gaming",
+        "depin": "DePIN",
+        "modular": "Modular",
+        "oracle": "Oracles",
+    }
+    for keyword, segment in segment_keywords.items():
+        if keyword in name_lower:
+            return segment
+    return "ALL"  # Safe default
+
+
 class RegimeMasterBot:
     """
     Multi-coin orchestrator for Project Regime-Master.
@@ -511,7 +543,8 @@ class RegimeMasterBot:
         raw_results.sort(key=lambda x: x.get("conviction", 0), reverse=True)
         # Note: If no bots exist in config.ENGINE_ACTIVE_BOTS, fall back to self._active_profiles
         eval_targets = _tick_active_bots if _tick_active_bots else [
-            {"bot_id": config.ENGINE_BOT_ID, "bot_name": p["label"], "user_id": config.ENGINE_USER_ID, "brain_type": "athena"} 
+            {"bot_id": config.ENGINE_BOT_ID, "bot_name": p["label"], "user_id": config.ENGINE_USER_ID, "brain_type": "athena",
+             "segment_filter": _infer_segment_from_name(p.get("label", ""))} 
             for pid, p in self._active_profiles.items()
         ]
         
@@ -543,8 +576,9 @@ class RegimeMasterBot:
             bot_deployed = 0
 
             # --- Per-Bot Segment Filter ---
-            # Determine which segments this bot is responsible for
-            bot_segment_filter = target.get("segment_filter", "ALL")  # "ALL" or e.g. "L1", "DeFi"
+            # segment_filter from ENGINE_ACTIVE_BOTS (pushed by toggle/route.ts),
+            # with a name-based inference fallback (handles engine restart / missing push)
+            bot_segment_filter = target.get("segment_filter") or _infer_segment_from_name(bot_name)
             if bot_segment_filter == "ALL":
                 bot_allowed_coins = None  # No restriction — ALL coins eligible
             else:
