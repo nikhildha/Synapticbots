@@ -1199,96 +1199,13 @@ class RegimeMasterBot:
                 }
                 return None
 
-            # ── Athena LLM Reasoning Gate ──
-            # Only activate Athena for "athena" brain type — adaptive users use HMM-only signals.
-            # ENGINE_BRAIN_TYPE is set per-bot via /api/set-bot-id (brain_type param).
-            # Multi-bot: only use Athena if ALL active bots want it (otherwise it would
-            # silently veto signals for Adaptive-model users sharing the same engine).
+            # ── Athena pre-screening removed from scan phase ──
+            # Athena per-bot evaluation is handled in the deploy loop (lines 686-770).
+            # Running Athena here would veto signals FOR ALL BOTS (incl. adaptive ones)
+            # if any single athena-brained bot is active — silently blocking signals.
+            # The raw result is returned as-is; deploy loop applies Athena per-bot.
             athena_action = None
-            _active_bots = config.ENGINE_ACTIVE_BOTS
-            if _active_bots:
-                # FIX: Use `any` instead of `all`.
-                # If ANY bot asks for Athena, we must evaluate it.
-                # The later loop (lines 564-620) decides if a *specific* bot
-                # uses the result or ignores it based on its own brain_type.
-                _any_athena = any(b.get("brain_type") == "athena" for b in _active_bots)
-            else:
-                _any_athena = config.ENGINE_BRAIN_TYPE == "athena"
-            
-            _use_athena = self._athena and config.LLM_REASONING_ENABLED and _any_athena
-            if _use_athena:
-                try:
-                    llm_ctx = {
-                        "ticker": symbol,
-                        "side": side,
-                        "hmm_regime": regime_summary,
-                        "hmm_confidence": round(conf, 4),
-                        "conviction": round(conviction, 1),
-                        "brain_id": brain_id,
-                        "current_price": current_price,
-                        "atr": current_atr,
-                        "tf_agreement": tf_agreement,
-                        "btc_regime": btc_regime_str,
-                        "btc_margin": round(btc_margin, 3),
-                        "vol_percentile": round(vol_pct, 3),
-                        "sentiment": self._sentiment.get_coin_sentiment(symbol) if self._sentiment else None,
-                    }
-                    athena_decision = self._athena.validate_signal(llm_ctx)
-                    athena_action = athena_decision.action
 
-                    if athena_decision.action == "VETO":
-                        self._coin_states[symbol] = {
-                            "symbol": symbol, "regime": regime_summary,
-                            "confidence": round(conf, 4), "price": current_price,
-                            "action": f"ATHENA_VETO:{athena_decision.reasoning[:60]}",
-                            "brain": brain_id,
-                        }
-                        return None
-
-                    # ── Direction Conflict Detection ──
-                    # Compare HMM side (BUY/SELL) with Athena's direction (LONG/SHORT)
-                    athena_dir = getattr(athena_decision, "athena_direction", "").upper()
-                    hmm_side_map = {"BUY": "LONG", "SELL": "SHORT"}
-                    hmm_as_dir = hmm_side_map.get(side, "")
-
-                    if athena_dir in ("LONG", "SHORT") and athena_dir != hmm_as_dir:
-                        # Athena disagrees with HMM on direction
-                        if athena_decision.adjusted_confidence >= 0.8:
-                            # Strong Athena conviction (≥8/10) → OVERRIDE HMM direction
-                            old_side = side
-                            side = "BUY" if athena_dir == "LONG" else "SELL"
-                            logger.warning(
-                                "🏛️ Athena [%s] DIRECTION OVERRIDE: HMM=%s → Athena=%s "
-                                "(conf=%.0f%%) — %s",
-                                symbol, old_side, side,
-                                athena_decision.adjusted_confidence * 100,
-                                athena_decision.reasoning[:80],
-                            )
-                        else:
-                            # Weak disagreement → VETO (stay out when conflicting signals)
-                            logger.warning(
-                                "🏛️ Athena [%s] DIRECTION CONFLICT VETO: HMM=%s vs Athena=%s "
-                                "(conf=%.0f%% < 80%%) — staying out",
-                                symbol, side, athena_dir,
-                                athena_decision.adjusted_confidence * 100,
-                            )
-                            self._coin_states[symbol] = {
-                                "symbol": symbol, "regime": regime_summary,
-                                "confidence": round(conf, 4), "price": current_price,
-                                "action": f"ATHENA_CONFLICT:{side}vs{athena_dir}",
-                                "brain": brain_id,
-                            }
-                            return None
-
-                    if athena_decision.action == "REDUCE_SIZE":
-                        old_conv = conviction
-                        conviction *= athena_decision.adjusted_confidence
-                        logger.info(
-                            "🏛️ Athena [%s] REDUCE_SIZE: conviction %.1f → %.1f (×%.2f)",
-                            symbol, old_conv, conviction, athena_decision.adjusted_confidence,
-                        )
-                except Exception as e:
-                    logger.debug("Athena error for %s (fail-open): %s", symbol, e)
 
             # Update coin state for dashboard
             self._coin_states[symbol] = {
