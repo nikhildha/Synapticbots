@@ -68,7 +68,7 @@ export function RegimeCard({ regime, confidence, symbol, macroRegime, trend15m, 
     const ringCircumference = 2 * Math.PI * ringRadius;
     const ringOffset = ringCircumference - (pct / 100) * ringCircumference;
 
-    // Live BTC price + 1-minute background sparkline
+    // Live BTC price + 1s background sparkline
     const [btcPrice, setBtcPrice] = useState<number | null>(null);
     const [btcChange, setBtcChange] = useState<number>(0);
     const [btcPriceHistory, setBtcPriceHistory] = useState<number[]>([]);
@@ -76,7 +76,8 @@ export function RegimeCard({ regime, confidence, symbol, macroRegime, trend15m, 
     useEffect(() => {
         const fetchBtc = async () => {
             try {
-                const res = await fetch('https://api.binance.com/api/v3/ticker/24hr?symbol=BTCUSDT');
+                const res = await fetch('https://api.binance.com/api/v3/ticker/24hr?symbol=BTCUSDT',
+                    { signal: AbortSignal.timeout(900) });
                 if (res.ok) {
                     const d = await res.json();
                     const price = parseFloat(d.lastPrice);
@@ -84,13 +85,13 @@ export function RegimeCard({ regime, confidence, symbol, macroRegime, trend15m, 
                     setBtcChange(parseFloat(d.priceChangePercent));
                     setBtcPriceHistory(prev => {
                         const next = [...prev, price];
-                        return next.length > 120 ? next.slice(-120) : next; // 2h window at 1-min
+                        return next.length > 300 ? next.slice(-300) : next; // 5-min window at 1s
                     });
                 }
             } catch { /* silent */ }
         };
         fetchBtc();
-        const timer = setInterval(fetchBtc, 60000); // 1-minute sparkline
+        const timer = setInterval(fetchBtc, 1000); // 1-second sparkline
         return () => clearInterval(timer);
     }, []);
 
