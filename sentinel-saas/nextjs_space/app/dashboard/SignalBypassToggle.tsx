@@ -23,19 +23,49 @@ const DEFAULT_STATE: BypassState = {
   bypass_conviction: 65,
 };
 
+// All 40 coins the engine scans
+const ALL_COINS = [
+  "BTCUSDT", "ETHUSDT", "BNBUSDT", "SOLUSDT", "AVAXUSDT",
+  "ADAUSDT", "DOTUSDT", "LINKUSDT", "LTCUSDT", "NEARUSDT",
+  "UNIUSDT", "AAVEUSDT", "MKRUSDT", "COMPUSDT", "SNXUSDT",
+  "DOGEUSDT", "SHIBUSDT", "PEPEUSDT", "WIFUSDT", "BONKUSDT",
+  "APTUSDT", "SUIUSDT", "ARBUSDT", "OPUSDT", "INJUSDT",
+  "STXUSDT", "FILUSDT", "RENDERUSDT", "FETUSDT", "WLDUSDT",
+  "IMXUSDT", "MANAUSDT", "SANDUSDT", "AXSUSDT", "GALAUSDT",
+  "IOTXUSDT", "HBARUSDT", "XRPUSDT", "XLMUSDT", "ALGOUSDT",
+];
+
+const ALL_SEGMENTS = [
+  { value: "ALL", label: "ALL (any segment)" },
+  { value: "layer1", label: "Layer 1 (BTC, ETH, SOL…)" },
+  { value: "defi", label: "DeFi (AAVE, UNI, MKR…)" },
+  { value: "meme", label: "Meme (DOGE, SHIB, PEPE…)" },
+  { value: "layer2_alt", label: "Layer 2 / Alt-L1 (ARB, OP, APT…)" },
+  { value: "ai_depin", label: "AI / DePIN (FET, RENDER, WLD…)" },
+  { value: "gaming", label: "Gaming / Metaverse (MANA, SAND, AXS…)" },
+  { value: "rwa", label: "RWA / Infra (HBAR, IOTX, XRP…)" },
+];
+
 export function SignalBypassToggle() {
   const [state, setState] = useState<BypassState>(DEFAULT_STATE);
+  const [draft, setDraft] = useState<BypassState>(DEFAULT_STATE);
   const [loading, setLoading] = useState(false);
-  const [expanded, setExpanded] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [showPanel, setShowPanel] = useState(false);
+  const [dirty, setDirty] = useState(false);
 
   // Load current bypass state on mount
   useEffect(() => {
     fetch("/api/signal-bypass")
       .then((r) => r.json())
-      .then((d) => setState(d))
+      .then((d) => {
+        setState(d);
+        setDraft(d);
+      })
       .catch(() => {});
   }, []);
 
+  // Enable/disable toggle (immediately saves)
   const toggle = async () => {
     setLoading(true);
     const next = { ...state, bypass_enabled: !state.bypass_enabled };
@@ -48,122 +78,236 @@ export function SignalBypassToggle() {
       const body = await res.json();
       if (body.ok) {
         setState(next);
+        setDraft(next);
+        if (next.bypass_enabled) setShowPanel(true);
         toast[next.bypass_enabled ? "warning" : "success"](
           next.bypass_enabled
-            ? `⚗️ Signal Bypass ON — ${next.bypass_side} ${next.bypass_symbol}`
+            ? `⚗️ Bypass ON — ${next.bypass_side} ${next.bypass_symbol}`
             : "Signal Bypass OFF — normal operation resumed"
         );
       } else {
-        toast.error("Failed to update bypass: " + (body.error || "unknown"));
+        toast.error("Failed: " + (body.error || "unknown"));
       }
     } catch {
-      toast.error("Network error updating bypass");
+      toast.error("Network error");
     } finally {
       setLoading(false);
     }
   };
 
-  const updateField = async (patch: Partial<BypassState>) => {
-    const next = { ...state, ...patch };
-    setState(next);
+  // Update draft locally (not saved yet)
+  const updateDraft = (patch: Partial<BypassState>) => {
+    setDraft((prev) => ({ ...prev, ...patch }));
+    setDirty(true);
+  };
+
+  // Explicit save
+  const save = async () => {
+    setSaving(true);
     try {
-      await fetch("/api/signal-bypass", {
+      const res = await fetch("/api/signal-bypass", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(next),
+        body: JSON.stringify(draft),
       });
-    } catch {}
+      const body = await res.json();
+      if (body.ok) {
+        setState(draft);
+        setDirty(false);
+        toast.success(`✅ Bypass config saved — ${draft.bypass_side} ${draft.bypass_symbol} [${draft.bypass_segment}]`);
+      } else {
+        toast.error("Save failed: " + (body.error || "unknown"));
+      }
+    } catch {
+      toast.error("Network error saving config");
+    } finally {
+      setSaving(false);
+    }
   };
 
   const isOn = state.bypass_enabled;
 
   return (
-    <div className="relative">
-      {/* Main toggle button */}
-      <button
-        onClick={toggle}
-        disabled={loading}
-        title="Signal Bypass — Admin Experiment Mode"
-        className={`
-          flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium
-          border transition-all duration-200
-          ${isOn
-            ? "bg-amber-500/20 border-amber-400/60 text-amber-300 shadow-[0_0_12px_rgba(245,158,11,0.3)]"
-            : "bg-white/5 border-white/10 text-gray-400 hover:border-white/20 hover:text-gray-300"
-          }
-        `}
-        onMouseEnter={() => setExpanded(true)}
-        onMouseLeave={() => setExpanded(false)}
-      >
-        <span className={`text-base transition-transform ${loading ? "animate-spin" : ""}`}>⚗️</span>
-        <span>{isOn ? "Bypass ON" : "Bypass"}</span>
-        {/* LED indicator */}
-        <span className={`w-2 h-2 rounded-full ${isOn ? "bg-amber-400 animate-pulse" : "bg-gray-600"}`} />
-      </button>
-
-      {/* Expanded config panel */}
-      {isOn && (
-        <div
-          className="absolute right-0 top-full mt-2 z-50 w-72 rounded-xl border border-amber-400/30 bg-[rgba(17,24,39,0.97)] backdrop-blur-xl shadow-2xl p-4"
-          onMouseEnter={() => setExpanded(true)}
-          onMouseLeave={() => setExpanded(false)}
+    <div className="relative" style={{ position: "relative" }}>
+      {/* ── Main toggle button + gear icon ── */}
+      <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+        <button
+          onClick={toggle}
+          disabled={loading}
+          title="Toggle signal bypass ON/OFF"
+          style={{
+            display: "flex", alignItems: "center", gap: 6,
+            padding: "6px 12px", borderRadius: 8, fontSize: 12, fontWeight: 600,
+            border: `1px solid ${isOn ? "rgba(245,158,11,0.6)" : "rgba(255,255,255,0.1)"}`,
+            background: isOn ? "rgba(245,158,11,0.15)" : "rgba(255,255,255,0.04)",
+            color: isOn ? "#FCD34D" : "#9CA3AF",
+            cursor: loading ? "wait" : "pointer",
+            transition: "all 0.2s",
+            boxShadow: isOn ? "0 0 14px rgba(245,158,11,0.25)" : "none",
+          }}
         >
-          <div className="flex items-center gap-2 mb-3">
-            <span className="text-base">⚗️</span>
-            <span className="text-xs font-bold text-amber-300 uppercase tracking-widest">Bypass Config</span>
-          </div>
-          <div className="space-y-2.5 text-xs">
-            <div>
-              <label className="text-gray-400 block mb-1">Symbol</label>
-              <input
-                type="text"
-                value={state.bypass_symbol}
-                onChange={(e) => updateField({ bypass_symbol: e.target.value.toUpperCase() })}
-                className="w-full bg-white/5 border border-white/10 rounded-lg px-2 py-1.5 text-white focus:outline-none focus:border-amber-400/50"
-                placeholder="BTCUSDT"
-              />
+          <span style={{ fontSize: 14 }}>{loading ? "⏳" : "⚗️"}</span>
+          <span>{isOn ? "Bypass ON" : "Bypass"}</span>
+          <span style={{
+            width: 7, height: 7, borderRadius: "50%",
+            background: isOn ? "#F59E0B" : "#374151",
+            boxShadow: isOn ? "0 0 6px #F59E0B" : "none",
+            animation: isOn ? "pulse 1s infinite" : "none",
+          }} />
+        </button>
+
+        {/* Config gear — always visible when bypass is on or panel is open */}
+        {(isOn || showPanel) && (
+          <button
+            onClick={() => setShowPanel((v) => !v)}
+            title="Configure bypass"
+            style={{
+              padding: "6px 8px", borderRadius: 8, fontSize: 13,
+              border: "1px solid rgba(255,255,255,0.1)",
+              background: showPanel ? "rgba(245,158,11,0.15)" : "rgba(255,255,255,0.04)",
+              color: showPanel ? "#FCD34D" : "#6B7280",
+              cursor: "pointer",
+            }}
+          >
+            ⚙️
+          </button>
+        )}
+      </div>
+
+      {/* ── Config panel ── */}
+      {showPanel && (
+        <div
+          style={{
+            position: "absolute", right: 0, top: "calc(100% + 8px)", zIndex: 9999,
+            width: 300, borderRadius: 12,
+            border: "1px solid rgba(245,158,11,0.3)",
+            background: "rgba(10,13,24,0.98)",
+            backdropFilter: "blur(20px)",
+            boxShadow: "0 20px 60px rgba(0,0,0,0.6), 0 0 30px rgba(245,158,11,0.08)",
+            padding: 16,
+          }}
+        >
+          {/* Header */}
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <span style={{ fontSize: 16 }}>⚗️</span>
+              <span style={{ fontSize: 11, fontWeight: 700, color: "#FCD34D", letterSpacing: "0.1em", textTransform: "uppercase" }}>
+                Bypass Config
+              </span>
             </div>
+            <button onClick={() => setShowPanel(false)} style={{ color: "#6B7280", background: "none", border: "none", cursor: "pointer", fontSize: 16, lineHeight: 1 }}>✕</button>
+          </div>
+
+          <div style={{ display: "flex", flexDirection: "column", gap: 12, fontSize: 12 }}>
+            {/* Symbol dropdown */}
             <div>
-              <label className="text-gray-400 block mb-1">Side</label>
-              <div className="flex gap-2">
-                {["BUY", "SELL"].map((s) => (
+              <label style={{ color: "#9CA3AF", display: "block", marginBottom: 4, fontWeight: 600 }}>Symbol</label>
+              <select
+                value={draft.bypass_symbol}
+                onChange={(e) => updateDraft({ bypass_symbol: e.target.value })}
+                style={{
+                  width: "100%", padding: "6px 10px", borderRadius: 8, fontSize: 12,
+                  background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.12)",
+                  color: "#fff", cursor: "pointer",
+                  outline: "none",
+                }}
+              >
+                <option value="ALL" style={{ background: "#111827", color: "#FCD34D" }}>
+                  ★ ALL COINS (broadcast)
+                </option>
+                {ALL_COINS.map((c) => (
+                  <option key={c} value={c} style={{ background: "#111827", color: "#fff" }}>
+                    {c.replace("USDT", "")} ({c})
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* Side toggle */}
+            <div>
+              <label style={{ color: "#9CA3AF", display: "block", marginBottom: 4, fontWeight: 600 }}>Side</label>
+              <div style={{ display: "flex", gap: 6 }}>
+                {(["BUY", "SELL"] as const).map((s) => (
                   <button
                     key={s}
-                    onClick={() => updateField({ bypass_side: s as "BUY" | "SELL" })}
-                    className={`flex-1 py-1.5 rounded-lg border text-xs font-medium transition-colors ${
-                      state.bypass_side === s
-                        ? s === "BUY"
-                          ? "bg-emerald-500/20 border-emerald-400/60 text-emerald-300"
-                          : "bg-red-500/20 border-red-400/60 text-red-300"
-                        : "bg-white/5 border-white/10 text-gray-400"
-                    }`}
+                    onClick={() => updateDraft({ bypass_side: s })}
+                    style={{
+                      flex: 1, padding: "6px 0", borderRadius: 8, fontSize: 12, fontWeight: 700,
+                      cursor: "pointer", transition: "all 0.15s",
+                      border: `1px solid ${draft.bypass_side === s
+                        ? s === "BUY" ? "rgba(34,197,94,0.6)" : "rgba(239,68,68,0.6)"
+                        : "rgba(255,255,255,0.1)"}`,
+                      background: draft.bypass_side === s
+                        ? s === "BUY" ? "rgba(34,197,94,0.15)" : "rgba(239,68,68,0.15)"
+                        : "rgba(255,255,255,0.04)",
+                      color: draft.bypass_side === s
+                        ? s === "BUY" ? "#4ADE80" : "#F87171"
+                        : "#6B7280",
+                    }}
                   >
                     {s === "BUY" ? "▲ LONG" : "▼ SHORT"}
                   </button>
                 ))}
               </div>
             </div>
+
+            {/* Segment dropdown */}
             <div>
-              <label className="text-gray-400 block mb-1">Segment</label>
-              <input
-                type="text"
-                value={state.bypass_segment}
-                onChange={(e) => updateField({ bypass_segment: e.target.value.toLowerCase() })}
-                className="w-full bg-white/5 border border-white/10 rounded-lg px-2 py-1.5 text-white focus:outline-none focus:border-amber-400/50"
-                placeholder="layer1"
-              />
+              <label style={{ color: "#9CA3AF", display: "block", marginBottom: 4, fontWeight: 600 }}>Segment</label>
+              <select
+                value={draft.bypass_segment}
+                onChange={(e) => updateDraft({ bypass_segment: e.target.value })}
+                style={{
+                  width: "100%", padding: "6px 10px", borderRadius: 8, fontSize: 12,
+                  background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.12)",
+                  color: "#fff", cursor: "pointer",
+                  outline: "none",
+                }}
+              >
+                {ALL_SEGMENTS.map((seg) => (
+                  <option key={seg.value} value={seg.value} style={{ background: "#111827", color: "#fff" }}>
+                    {seg.label}
+                  </option>
+                ))}
+              </select>
             </div>
+
+            {/* Conviction slider */}
             <div>
-              <label className="text-gray-400 block mb-1">Conviction: <span className="text-white font-semibold">{state.bypass_conviction}</span></label>
+              <label style={{ color: "#9CA3AF", display: "block", marginBottom: 4, fontWeight: 600 }}>
+                Conviction: <span style={{ color: "#fff", fontWeight: 700 }}>{draft.bypass_conviction}</span>
+                <span style={{ color: "#6B7280", marginLeft: 4 }}>(leverage gate)</span>
+              </label>
               <input
                 type="range" min={40} max={100} step={5}
-                value={state.bypass_conviction}
-                onChange={(e) => updateField({ bypass_conviction: parseInt(e.target.value) })}
-                className="w-full accent-amber-400"
+                value={draft.bypass_conviction}
+                onChange={(e) => updateDraft({ bypass_conviction: parseInt(e.target.value) })}
+                style={{ width: "100%", accentColor: "#F59E0B" }}
               />
+              <div style={{ display: "flex", justifyContent: "space-between", color: "#6B7280", fontSize: 10, marginTop: 2 }}>
+                <span>40 (low)</span><span>70 (med)</span><span>100 (max)</span>
+              </div>
             </div>
+
+            {/* Save button */}
+            <button
+              onClick={save}
+              disabled={saving || !dirty}
+              style={{
+                width: "100%", padding: "8px 0", borderRadius: 8, fontSize: 12, fontWeight: 700,
+                cursor: dirty && !saving ? "pointer" : "default",
+                border: `1px solid ${dirty ? "rgba(245,158,11,0.5)" : "rgba(255,255,255,0.08)"}`,
+                background: dirty ? "rgba(245,158,11,0.18)" : "rgba(255,255,255,0.04)",
+                color: dirty ? "#FCD34D" : "#4B5563",
+                transition: "all 0.2s",
+              }}
+            >
+              {saving ? "⏳ Saving…" : dirty ? "💾 Save Config" : "✓ Saved"}
+            </button>
           </div>
-          <div className="mt-3 pt-3 border-t border-white/10 text-[10px] text-amber-400/60 text-center">
+
+          {/* Footer warning */}
+          <div style={{ marginTop: 12, paddingTop: 10, borderTop: "1px solid rgba(255,255,255,0.08)", fontSize: 10, color: "rgba(245,158,11,0.5)", textAlign: "center" }}>
             ⚠️ EXPERIMENT MODE — disable before production
           </div>
         </div>
