@@ -225,6 +225,19 @@ export function RegimeCard({ regime, confidence, symbol, macroRegime, trend15m, 
                         <polyline points={`0,${H} ${sparkPts} ${W},${H}`} fill="url(#bgSparkGrad)" stroke="none" />
                         {/* Bright glowing line */}
                         <polyline points={sparkPts} fill="none" stroke={lc} strokeWidth="2" strokeLinejoin="round" strokeLinecap="round" />
+                        {/* Live dot at latest data point */}
+                        {(() => {
+                            const lastX = W;
+                            const lastY = PAD_TOP + (1 - (last - minP) / range) * (H - PAD_TOP - PAD_BOT);
+                            return (
+                                <>
+                                    {/* Outer glow ring */}
+                                    <circle cx={lastX} cy={lastY} r="5" fill="none" stroke={lc} strokeWidth="1" opacity="0.4" />
+                                    {/* Solid dot */}
+                                    <circle cx={lastX} cy={lastY} r="3" fill={lc} />
+                                </>
+                            );
+                        })()}
                     </svg>
                 );
             })()}
