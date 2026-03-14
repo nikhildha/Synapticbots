@@ -498,20 +498,26 @@ class RegimeMasterBot:
         # SOLE SOURCE OF TRUTH: tradebook active count
         tradebook_active = tradebook.get_active_trades()
         tradebook_active_count = len(tradebook_active)
-        # Build set of profile:symbol keys for active trades
+        # Build set of bot_id:symbol keys for active trades (per-bot scope)
+        # IMPORTANT: use bot_id from the trade, not profile_id — so the per-bot
+        # duplicate check at pos_key = f"{bot_id}:{sym}" actually works.
         tradebook_active_keys = set()
-        deployed_symbols = set()
         for t in tradebook_active:
+            tid = t.get("bot_id", "").strip()
             pid = t.get("profile_id", "standard")
-            tradebook_active_keys.add(f"{pid}:{t['symbol']}")
-            deployed_symbols.add(t["symbol"])
+            sym_t = t['symbol']
+            if tid:
+                tradebook_active_keys.add(f"{tid}:{sym_t}")
+            # Also add profile_id variant as fallback (legacy trades without bot_id)
+            tradebook_active_keys.add(f"{pid}:{sym_t}")
         raw_results = []
 
-        # Filter out already-deployed coins (no need to re-scan)
-        scan_symbols = [s for s in symbols if s not in deployed_symbols]
-        logger.info("📡 Scanning %d coins (%d deployed, skipped): %s",
-                    len(scan_symbols), len(deployed_symbols),
-                    ", ".join(s.replace("USDT", "") for s in scan_symbols[:8]))
+        # Scan ALL symbols — do NOT skip based on other bots' deployed coins.
+        # Each bot has its own position check (pos_key = bot_id:symbol).
+        # If Synaptic Adaptive deployed ETH, L1 Specialist should still scan + deploy it.
+        scan_symbols = symbols
+        logger.info("📡 Scanning %d coins | active tradebook keys: %d",
+                    len(scan_symbols), len(tradebook_active_keys))
 
         # ── 4b. Macro Veto Overlay (BTC Flash Crash Detection) ──
         btc_flash_crash = False
