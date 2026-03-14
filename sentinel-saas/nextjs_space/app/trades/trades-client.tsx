@@ -179,6 +179,7 @@ export function TradesClient({ trades: initialTrades }: TradesClientProps) {
   const [isExitingAll, setIsExitingAll] = useState(false);
   const [confirmExitAll, setConfirmExitAll] = useState(false);
   const clearPauseRef = useRef(false); // blocks auto-refresh after clearing
+  const [pendingOrders, setPendingOrders] = useState<any[]>([]); // engine-side OPEN limit orders
 
   useEffect(() => { setMounted(true); }, []);
 
@@ -194,6 +195,7 @@ export function TradesClient({ trades: initialTrades }: TradesClientProps) {
         const raw = data?.tradebook?.trades || [];
         // Always update — even if empty — so stale trades get cleared
         setTrades(raw.map(mapTrade));
+        setPendingOrders(data?.tradebook?.pending_orders || []);
         setLastRefresh(new Date().toLocaleTimeString());
       }
     } catch {
@@ -619,6 +621,77 @@ export function TradesClient({ trades: initialTrades }: TradesClientProps) {
               </div>
             </Card>
           </motion.div>
+
+          {/* ═══ Pending Limit Orders ═══ */}
+          {pendingOrders.length > 0 && (
+            <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.12 }} className="mb-6">
+              <Card>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '12px' }}>
+                  <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#F59E0B', boxShadow: '0 0 8px #F59E0B', animation: 'pulse 2s infinite' }} />
+                  <div style={{ fontSize: '13px', fontWeight: 700, color: '#F59E0B', letterSpacing: '0.5px' }}>Pending Limit Orders</div>
+                  <span style={{ fontSize: '10px', background: 'rgba(245,158,11,0.15)', color: '#F59E0B', padding: '2px 8px', borderRadius: '6px', fontWeight: 700 }}>{pendingOrders.length} awaiting fill</span>
+                  <span style={{ fontSize: '10px', color: '#6B7280', marginLeft: 'auto' }}>ATR pullback — waiting for price to reach limit</span>
+                </div>
+                <div style={{ overflowX: 'auto' }}>
+                  <table style={{ width: '100%', minWidth: '900px', borderCollapse: 'collapse', fontSize: '13px' }}>
+                    <thead>
+                      <tr style={{ borderBottom: '1px solid rgba(245,158,11,0.15)' }}>
+                        {['Coin', 'Side', 'Order Type', 'Limit Price', 'Current Price', 'Take Profit', 'Stop Loss', 'Capital', 'Lev', 'Placed At'].map(h => (
+                          <th key={h} style={{ padding: '8px 10px', textAlign: 'center', fontSize: '9px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '1px', color: '#6B7280' }}>{h}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {pendingOrders.map((o: any, i: number) => {
+                        const sym = (o.symbol || '').replace('USDT', '');
+                        const isLong = (o.side || o.position || '').toLowerCase().includes('long') || (o.side || '').toLowerCase() === 'buy';
+                        const orderType = (o.order_type || 'LIMIT').toUpperCase();
+                        const isVirtual = orderType.includes('VIRTUAL');
+                        const livePrice = livePrices[(o.symbol || '').toUpperCase()] || null;
+                        const limitPrice = o.limit_price || o.entry_price || o.price || 0;
+                        const priceDiff = livePrice && limitPrice ? ((livePrice - limitPrice) / limitPrice * 100) : null;
+                        return (
+                          <tr key={i} style={{ borderBottom: '1px solid rgba(255,255,255,0.04)', background: 'rgba(245,158,11,0.02)' }}>
+                            <td style={{ padding: '8px 10px', textAlign: 'center', fontWeight: 800, color: '#E8EDF5', fontFamily: 'monospace' }}>{sym}</td>
+                            <td style={{ padding: '8px 10px', textAlign: 'center' }}>
+                              <span style={{ padding: '2px 8px', borderRadius: '6px', fontSize: '10px', fontWeight: 700, color: isLong ? '#22C55E' : '#EF4444', background: isLong ? 'rgba(34,197,94,0.15)' : 'rgba(239,68,68,0.15)' }}>
+                                {isLong ? 'LONG' : 'SHORT'}
+                              </span>
+                            </td>
+                            <td style={{ padding: '8px 10px', textAlign: 'center' }}>
+                              <span style={{ padding: '2px 8px', borderRadius: '6px', fontSize: '10px', fontWeight: 700, color: isVirtual ? '#A78BFA' : '#F59E0B', background: isVirtual ? 'rgba(167,139,250,0.15)' : 'rgba(245,158,11,0.15)' }}>
+                                {isVirtual ? 'VIRTUAL' : 'LIMIT'}
+                              </span>
+                            </td>
+                            <td style={{ padding: '8px 10px', textAlign: 'center', fontFamily: 'monospace', color: '#F59E0B', fontWeight: 700 }}>{limitPrice > 0 ? fmtPrice(limitPrice) : '—'}</td>
+                            <td style={{ padding: '8px 10px', textAlign: 'center', fontFamily: 'monospace' }}>
+                              {livePrice ? (
+                                <span style={{ color: '#00E5FF' }}>
+                                  {fmtPrice(livePrice)}
+                                  {priceDiff !== null && (
+                                    <span style={{ fontSize: '10px', marginLeft: '4px', color: Math.abs(priceDiff) < 1 ? '#22C55E' : '#9CA3AF' }}>
+                                      ({priceDiff >= 0 ? '+' : ''}{priceDiff.toFixed(2)}%)
+                                    </span>
+                                  )}
+                                </span>
+                              ) : <span style={{ color: '#6B7280' }}>—</span>}
+                            </td>
+                            <td style={{ padding: '8px 10px', textAlign: 'center', fontFamily: 'monospace', color: '#22C55E', fontSize: '12px' }}>{o.take_profit > 0 ? fmtPrice(o.take_profit) : '—'}</td>
+                            <td style={{ padding: '8px 10px', textAlign: 'center', fontFamily: 'monospace', color: '#EF4444', fontSize: '12px' }}>{o.stop_loss > 0 ? fmtPrice(o.stop_loss) : '—'}</td>
+                            <td style={{ padding: '8px 10px', textAlign: 'center', color: '#D1D5DB' }}>${o.capital || 100}</td>
+                            <td style={{ padding: '8px 10px', textAlign: 'center', color: '#D1D5DB' }}>{o.leverage || 1}×</td>
+                            <td style={{ padding: '8px 10px', textAlign: 'center', fontFamily: 'monospace', fontSize: '11px', color: '#6B7280' }}>
+                              {o.entry_time || o.timestamp ? new Date(o.entry_time || o.timestamp || '').toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true, timeZone: 'Asia/Kolkata' }) + ' IST' : '—'}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </Card>
+            </motion.div>
+          )}
 
           {/* ═══ Trade Journal Table ═══ */}
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }}>

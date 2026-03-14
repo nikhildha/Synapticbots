@@ -186,6 +186,11 @@ export async function GET() {
 
             tradebook: {
                 trades,
+                // Pending engine orders (LIMIT / VIRTUAL_LIMIT awaiting fill — not yet in DB)
+                pending_orders: engineTradesRaw.filter((t: any) =>
+                    (t.status || '').toUpperCase() === 'OPEN' &&
+                    (t.order_type || '').toUpperCase().includes('LIMIT')
+                ),
                 // F2 FIX: compute per-user summary from user's trades, not engine-wide
                 summary: {
                     total_trades: trades.length,

@@ -252,15 +252,15 @@ export function RegimeCard({ regime, confidence, symbol, macroRegime, trend15m, 
                         <circle cx={GAUGE_CX} cy={GAUGE_CY} r={INNER_R + 2} fill="none" stroke="rgba(0,0,0,0.8)" strokeWidth="8" />
                         <circle cx={GAUGE_CX} cy={GAUGE_CY} r={INNER_R} fill="rgba(2,6,14,0.95)" />
                         <circle cx={GAUGE_CX} cy={GAUGE_CY} r={ARC_R}
-                            fill="none" stroke="rgba(0,229,255,0.05)" strokeWidth="7.5" strokeLinecap="round"
+                            fill="none" stroke="rgba(0,229,255,0.08)" strokeWidth="15" strokeLinecap="round"
                             strokeDasharray={`${ARC_SPAN} ${arcCirc - ARC_SPAN}`}
-                            strokeDashoffset={arcCirc * (1 - startDeg / 360)}
+                            strokeDashoffset={0}
                             style={{ transform: `rotate(${startDeg}deg)`, transformOrigin: `${GAUGE_CX}px ${GAUGE_CY}px` }}
                         />
                         <circle cx={GAUGE_CX} cy={GAUGE_CY} r={ARC_R}
-                            fill="none" stroke={gaugeColor} strokeWidth="7.5" strokeLinecap="round"
+                            fill="none" stroke={gaugeColor} strokeWidth="15" strokeLinecap="round"
                             strokeDasharray={`${(pct / 100) * ARC_SPAN} ${arcCirc - (pct / 100) * ARC_SPAN}`}
-                            strokeDashoffset={arcCirc * (1 - startDeg / 360)}
+                            strokeDashoffset={0}
                             filter="url(#arcGlow)"
                             style={{
                                 transform: `rotate(${startDeg}deg)`,
