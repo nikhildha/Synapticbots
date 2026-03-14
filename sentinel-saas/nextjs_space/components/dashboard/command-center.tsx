@@ -612,7 +612,8 @@ export function SignalSummaryTable({ coinStates, multi }: SignalSummaryProps) {
         if (a.includes('LOW_CONVICTION')) return 'Conviction too low';
         if (a.includes('VOL_TOO_HIGH')) return 'ATR too high — risky';
         if (a.includes('VOL_TOO_LOW')) return 'ATR too low — no opportunity';
-        return 'Analyzing market conditions...';
+        // Fallback: show the raw action code so users can see the actual engine reason
+        return a ? a.replace(/_/g, ' ').toLowerCase().replace(/\b\w/g, (c: string) => c.toUpperCase()) : 'Analyzing market conditions...';
     };
 
     const toggleCoin = (sym: string) => setSelectedCoins(prev => prev.includes(sym) ? prev.filter(s => s !== sym) : [...prev, sym]);
