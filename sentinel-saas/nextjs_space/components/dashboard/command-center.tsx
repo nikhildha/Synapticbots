@@ -612,6 +612,7 @@ export function ActivePositionsCard({ deployedCount, activePositions, trades }: 
 interface SignalSummaryProps {
     coinStates: Record<string, any>;
     multi?: any;
+    heatmap?: any;
 }
 
 function formatPrice(price: number): string {
@@ -621,11 +622,12 @@ function formatPrice(price: number): string {
     return '$' + price.toFixed(6);
 }
 
-export function SignalSummaryTable({ coinStates, multi }: SignalSummaryProps) {
+export function SignalSummaryTable({ coinStates, multi, heatmap: heatmapProp }: SignalSummaryProps) {
     const [selectedCoins, setSelectedCoins] = useState<string[]>([]);
     const [filterOpen, setFilterOpen] = useState(false);
     const [liveMulti, setLiveMulti] = useState<any>(multi);
     const [liveCoinStates, setLiveCoinStates] = useState<Record<string, any>>(coinStates || {});
+    const [liveHeatmap, setLiveHeatmap] = useState<any>(heatmapProp || null);
 
     // Auto-refresh: poll bot-state at engine interval or every 60s
     const refreshMs = Math.min(Math.max((liveMulti?.analysis_interval_seconds || 60) * 1000, 30000), 900000);
@@ -638,6 +640,7 @@ export function SignalSummaryTable({ coinStates, multi }: SignalSummaryProps) {
                     const d = await res.json();
                     if (d?.multi?.coin_states) setLiveCoinStates(d.multi.coin_states);
                     if (d?.multi) setLiveMulti(d.multi);
+                    if (d?.heatmap) setLiveHeatmap(d.heatmap);
                 }
             } catch { /* silent */ }
         };
@@ -795,7 +798,59 @@ export function SignalSummaryTable({ coinStates, multi }: SignalSummaryProps) {
                 );
             })()}
 
+            {/* ── Segment Heatmap ─────────────────────────────────── */}
+            {liveHeatmap?.segments?.length > 0 && (() => {
+                const segs: any[] = liveHeatmap.segments;
+                const btc24h: number = liveHeatmap.btc_24h ?? 0;
+                const maxAbs = Math.max(...segs.map((s: any) => Math.abs(s.composite_score)), 0.01);
+                return (
+                    <div style={{ marginBottom: '14px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
+                            <span style={{ fontSize: '11px', fontWeight: 700, color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: '1px' }}>🔥 Segment Heatmap</span>
+                            <span style={{ fontSize: '10px', color: btc24h >= 0 ? '#22C55E' : '#EF4444', fontFamily: 'monospace', background: 'rgba(255,255,255,0.05)', padding: '2px 7px', borderRadius: '6px' }}>
+                                BTC 24h: {btc24h >= 0 ? '+' : ''}{btc24h.toFixed(2)}%
+                            </span>
+                            <span style={{ fontSize: '10px', color: '#4B5563', marginLeft: 'auto' }}>Score = VW-RR × Breadth</span>
+                        </div>
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '6px' }}>
+                            {segs.map((seg: any, i: number) => {
+                                const pos = seg.composite_score >= 0;
+                                const barW = Math.round((Math.abs(seg.composite_score) / maxAbs) * 100);
+                                const rankColors = ['#FFD700', '#C0C0C0', '#CD7F32'];
+                                return (
+                                    <div key={seg.segment} style={{
+                                        background: pos ? 'rgba(34,197,94,0.06)' : 'rgba(239,68,68,0.06)',
+                                        border: `1px solid ${pos ? 'rgba(34,197,94,0.2)' : 'rgba(239,68,68,0.2)'}`,
+                                        borderRadius: '10px', padding: '8px 10px', position: 'relative', overflow: 'hidden',
+                                    }}>
+                                        {/* rank badge */}
+                                        {i < 3 && <span style={{ position: 'absolute', top: 4, right: 6, fontSize: '10px', color: rankColors[i] }}>#{i + 1}</span>}
+                                        {/* segment name */}
+                                        <div style={{ fontSize: '11px', fontWeight: 700, color: '#E5E7EB', marginBottom: '4px' }}>{seg.segment}</div>
+                                        {/* composite score */}
+                                        <div style={{ fontSize: '15px', fontWeight: 800, color: pos ? '#22C55E' : '#EF4444', lineHeight: 1, marginBottom: '4px' }}>
+                                            {pos ? '+' : ''}{seg.composite_score.toFixed(2)}
+                                        </div>
+                                        {/* bar */}
+                                        <div style={{ height: '3px', background: 'rgba(255,255,255,0.05)', borderRadius: '2px', marginBottom: '5px' }}>
+                                            <div style={{ height: '100%', width: `${barW}%`, background: pos ? '#22C55E' : '#EF4444', borderRadius: '2px', transition: 'width 0.4s ease' }} />
+                                        </div>
+                                        {/* sub-metrics */}
+                                        <div style={{ display: 'flex', gap: '6px', fontSize: '9px', color: '#6B7280' }}>
+                                            <span title="VW-RR">VW {seg.vw_rr >= 0 ? '+' : ''}{seg.vw_rr}%</span>
+                                            <span title="Alpha vs BTC">α {seg.btc_alpha >= 0 ? '+' : ''}{seg.btc_alpha}%</span>
+                                            <span title="Breadth">🫧{seg.breadth_pct}%</span>
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    </div>
+                );
+            })()}
+
             {/* Coin Filter Dropdown */}
+
             <div style={{ marginBottom: '12px', position: 'relative' }}>
                 <div onClick={() => setFilterOpen(!filterOpen)} style={{ padding: '8px 14px', borderRadius: '10px', cursor: 'pointer', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', color: selectedCoins.length > 0 ? '#06B6D4' : '#6B7280' }}>
                     <span>🔍</span>

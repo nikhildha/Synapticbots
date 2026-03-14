@@ -689,7 +689,7 @@ export function DashboardClient({ user, stats, bots, recentTrades }: DashboardCl
             transition={{ delay: 0.35 }}
             className="mt-8"
           >
-            <SignalSummaryTable coinStates={multi?.coin_states || {}} multi={multi} />
+            <SignalSummaryTable coinStates={multi?.coin_states || {}} multi={multi} heatmap={botState?.heatmap || null} />
           </motion.div>
 
           {/* ═══ Row 6: Athena Intelligence Panel ═══ */}

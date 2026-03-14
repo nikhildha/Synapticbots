@@ -181,6 +181,7 @@ export async function GET() {
                 timestamp: lastAnalysis,
             },
             scanner: { coins: Object.keys(coinStates) },
+            heatmap: engineData?.heatmap || null,
             athena: engineData?.athena || { enabled: true, recent_decisions: [], model: 'gemini-2.5-flash' },
             perBot,
 
