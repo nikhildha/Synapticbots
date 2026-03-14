@@ -716,7 +716,15 @@ class RegimeMasterBot:
                 current_price = self._coin_states.get(sym, {}).get("price", 0)
                 atr_val = top.get("atr", 0)
                 athena_decision = None
-                if self._athena and config.LLM_REASONING_ENABLED:
+                _is_bypass_signal = top.get("signal_type") == "BYPASS_TEST"
+                if _is_bypass_signal:
+                    # BYPASS MODE: skip Athena entirely — this is a pipeline test
+                    logger.warning(
+                        "⚗️  BYPASS: Athena skipped for %s — signal_type=BYPASS_TEST (pipeline test mode)",
+                        sym,
+                    )
+                    athena_decision = None  # None = auto-approve (fail-open path)
+                elif self._athena and config.LLM_REASONING_ENABLED:
                     try:
                         llm_ctx = {
                             "ticker":         sym,
