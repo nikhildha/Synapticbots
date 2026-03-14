@@ -570,6 +570,15 @@ export function DashboardClient({ user, stats, bots, recentTrades }: DashboardCl
           </motion.div>
 
 
+          {/* ═══ Row 3: Institutional Segment Heatmap ═══ */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.2 }}
+            className="mb-8"
+          >
+            <SegmentHeatmap heatmapData={botState?.heatmap || null} loading={isRefreshing && !botState?.heatmap} />
+          </motion.div>
 
           {/* ═══ Row 4: Bots Section ═══ */}
 
@@ -674,16 +683,6 @@ export function DashboardClient({ user, stats, bots, recentTrades }: DashboardCl
             className="mt-8"
           >
             <SignalSummaryTable coinStates={multi?.coin_states || {}} multi={multi} heatmap={botState?.heatmap || null} />
-          </motion.div>
-
-          {/* ═══ Row 6: Institutional Segment Heatmap ═══ */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.4 }}
-            className="mt-6 mb-8"
-          >
-            <SegmentHeatmap heatmapData={botState?.heatmap || null} loading={isRefreshing && !botState?.heatmap} />
           </motion.div>
 
         </div>
