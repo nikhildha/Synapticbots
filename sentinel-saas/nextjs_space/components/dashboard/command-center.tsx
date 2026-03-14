@@ -208,7 +208,7 @@ export function RegimeCard({ regime, confidence, symbol, macroRegime, trend15m, 
                 const range = maxP - minP || 1;
                 const W = 400, H = 100;
                 // Center the line vertically: map to middle 60% of height
-                const PAD_TOP = H * 0.20, PAD_BOT = H * 0.20;
+                const PAD_TOP = H * 0.35, PAD_BOT = H * 0.15;
                 const sparkPts = pts.map((p, i) => {
                     const x = (i / (pts.length - 1)) * W;
                     const y = PAD_TOP + (1 - (p - minP) / range) * (H - PAD_TOP - PAD_BOT);

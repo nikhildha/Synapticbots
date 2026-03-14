@@ -570,7 +570,8 @@ export function DashboardClient({ user, stats, bots, recentTrades }: DashboardCl
           </motion.div>
 
 
-          {/* ═══ Row 3: Institutional Segment Heatmap ═══ */}
+          {/* ═══ Row 3: Institutional Segment Heatmap — only shown when data available ═══ */}
+          {botState?.heatmap && Object.keys(botState.heatmap).length > 0 && (
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -582,8 +583,9 @@ export function DashboardClient({ user, stats, bots, recentTrades }: DashboardCl
                <SegmentHeatmap heatmapData={botState?.heatmap || null} loading={isRefreshing && !botState?.heatmap} />
              </div>
           </motion.div>
+          )}
 
-          <VirtualLimitTracker trades={allTrades} />
+
 
           {/* ═══ Row 4: Bots Section ═══ */}
 
@@ -646,6 +648,9 @@ export function DashboardClient({ user, stats, bots, recentTrades }: DashboardCl
               </div>
             )}
           </motion.div>
+
+          {/* Virtual Limit Orders — after Bot Scan Summary */}
+          <VirtualLimitTracker trades={allTrades} />
 
           {/* ═══ Row 4: Athena Intelligence & Engine Terminal ═══ */}
           {(botState?.athena?.enabled || bots?.some((b: any) => (b.name || '').toLowerCase().includes('athena'))) && (
