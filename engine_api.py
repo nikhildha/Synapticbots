@@ -165,6 +165,26 @@ def _restore_mode_on_startup():
 
 _restore_mode_on_startup()
 
+# ── Startup: auto-clear stale paused engine_state so a manual-pause from a
+# previous Railway deployment NEVER silently keeps the engine off after redeploy.
+def _clear_stale_pause():
+    try:
+        state_path = os.path.join(config.DATA_DIR, "engine_state.json")
+        if os.path.exists(state_path):
+            with open(state_path, "r") as f:
+                st = json.load(f)
+            if st.get("status") == "paused":
+                logger.warning("🔄 Stale paused engine_state.json detected on startup — auto-resuming")
+                st["status"] = "running"
+                st["paused_by"] = None
+                st["resumed_at"] = datetime.now(timezone.utc).isoformat()
+                with open(state_path, "w") as fw:
+                    json.dump(st, fw, indent=2)
+    except Exception as e:
+        logger.warning("Startup: could not clear stale pause: %s", e)
+
+_clear_stale_pause()
+
 # ── Startup diagnostics: verify mode ─────────────────────────────────
 logger.info(
     "🔧 ENGINE MODE DIAGNOSTIC: PAPER_TRADE env=%s | config.PAPER_TRADE=%s | EXCHANGE_LIVE=%s",
@@ -987,6 +1007,31 @@ def start_engine():
     _engine_thread = threading.Thread(target=_run_engine, daemon=False, name="EngineThread")
     _engine_thread.start()
     _engine_start_time = time.time()
+
+
+@app.route("/api/resume", methods=["POST"])
+def api_resume():
+    """Clear any paused/halted engine_state so the engine resumes analysis."""
+    auth_err = _check_auth()
+    if auth_err:
+        return auth_err
+    try:
+        state_path = os.path.join(config.DATA_DIR, "engine_state.json")
+        resume_state = {
+            "status": "running",
+            "resumed_at": datetime.now(timezone.utc).isoformat(),
+            "paused_by": None,
+            "halt_until": None,
+        }
+        with open(state_path, "w") as f:
+            json.dump(resume_state, f, indent=2)
+        # Also reset pause flag on live bot object
+        if _engine_bot:
+            _engine_bot._pause_logged = False
+        logger.info("▶️  Engine RESUMED via /api/resume")
+        return jsonify({"status": "resumed", "message": "Engine state cleared — analysis will resume on next heartbeat"})
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
 
 
 @app.route("/api/restart", methods=["POST"])
