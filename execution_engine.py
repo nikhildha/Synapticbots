@@ -476,6 +476,8 @@ class ExecutionEngine:
             confirmed = self._read_cdx_confirmed_position(pair, price, quantity, leverage, sl, tp, cdx)
 
             fill_price  = confirmed.get("avg_price", price)
+            if not fill_price or fill_price <= 0:
+                fill_price = price
             fill_qty    = confirmed.get("active_pos", quantity)
             fill_lev    = confirmed.get("leverage", leverage)
             fill_margin = confirmed.get("locked_margin", 0) or (fill_qty * fill_price / fill_lev)

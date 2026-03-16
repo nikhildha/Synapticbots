@@ -755,6 +755,7 @@ class RegimeMasterBot:
                 if entry_price <= 0 and not config.PAPER_TRADE:
                     _bcast("EXEC_ZERO_PRICE", self._cycle_count, bot_name, bot_id, sym,
                            top["side"], seg_name, top["confidence"], "entry_price=0")
+                    self._coin_states.setdefault(sym, {})["deploy_status"] = "FILTERED: zero entry price"
                     continue
 
                 # Each bot in the outer loop owns its own trade record.
