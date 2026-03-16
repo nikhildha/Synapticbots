@@ -37,7 +37,7 @@ SECONDARY_SYMBOLS = ["ETHUSDT"]
 
 # ─── Excluded Coins ─────────────────────────────────────────────────────────────
 # Coins placed here are completely ignored by the engine, scanner, and scanners.
-EXCLUDED_COINS = ["AKTUSDT", "FETUSDT"]
+EXCLUDED_COINS = ["AKTUSDT", "FETUSDT", "WIFUSDT"]
 
 # ─── Crypto Segments (for Segment-Level Analysis) ───────────────────────────────
 CRYPTO_SEGMENTS = {
