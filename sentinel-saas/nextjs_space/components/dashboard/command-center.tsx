@@ -34,6 +34,8 @@ const SEGMENT_MAP: Record<string, string> = {
     PYTH: 'Oracles', TRB: 'Oracles', API3: 'Oracles',
     // Modular
     TIA: 'Modular', DYM: 'Modular',
+    // Meme
+    DOGE: 'Meme', SHIB: 'Meme', PEPE: 'Meme', WIF: 'Meme', BONK: 'Meme',
 };
 
 
