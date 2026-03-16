@@ -757,23 +757,12 @@ class RegimeMasterBot:
                            top["side"], seg_name, top["confidence"], "entry_price=0")
                     continue
 
-                # ── Multi-Bot Allocation Logic ──
-                # Find all active bots that should receive this trade based on segment filters
-                matching_bot_ids = []
-                # Fallback to ENGINE_BOT_ID if no active bots list exists
-                active_bots = getattr(config, "ENGINE_ACTIVE_BOTS", [])
-                
-                if active_bots:
-                    for bot in active_bots:
-                        b_filter = bot.get("segment_filter", "ALL")
-                        if b_filter == "ALL" or b_filter == seg_name:
-                            matching_bot_ids.append(bot.get("bot_id"))
-                
-                if not matching_bot_ids:
-                    matching_bot_ids = [config.ENGINE_BOT_ID]
-                
-                primary_bot_id = matching_bot_ids[0]
-
+                # Each bot in the outer loop owns its own trade record.
+                # Using the current bot_id (not matching_bot_ids[0]) is critical:
+                # if we used the first bot in ENGINE_ACTIVE_BOTS it would always be
+                # the admin bot, causing non-admin trades to be stamped with the wrong
+                # owner and the per-bot duplicate key (bot_id:symbol) to never match
+                # the stored trade, so non-admin bots would open new trades every cycle.
                 tradebook.open_trade(
                     symbol=sym,
                     side=top["side"],
@@ -791,8 +780,8 @@ class RegimeMasterBot:
                     exchange=result.get("exchange") if result else None,
                     pair=result.get("pair") if result else None,
                     position_id=result.get("position_id") if result else None,
-                    bot_id=primary_bot_id,
-                    all_bot_ids=matching_bot_ids,
+                    bot_id=bot_id,
+                    all_bot_ids=[bot_id],
                     rm_id=result.get("rm_id") if result else None,
                     override_sl=fill_sl if fill_sl > 0 else None,
                     override_tp=fill_tp if fill_tp > 0 else None,
