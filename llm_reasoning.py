@@ -195,7 +195,6 @@ class AthenaEngine:
         payload = {
             "contents": [{"parts": [{"text": prompt}]}],
             "systemInstruction": {"parts": [{"text": ATHENA_SYSTEM_PROMPT}]},
-            "tools": [{"googleSearch": {}}],
             "generationConfig": {
                 "temperature": 0.3,
                 "maxOutputTokens": 4096,
