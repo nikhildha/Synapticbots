@@ -1392,7 +1392,7 @@ class RegimeMasterBot:
                 self._coin_states[symbol]["action"] = "MTF_CONFLICT"
                 return None
 
-            # Tier 2: 15m flipped but higher TFs haven't confirmed yet
+            # [DISABLED] Tier 2: 15m flipped but higher TFs haven't confirmed yet
             # 15m says BUY but 1H/4H still BEAR (or vice versa) → reversal setup
             primary_regime = regime  # 15m HMM
             higher_tf_regimes = [r for r in [regime_1h, regime_4h] if r is not None]
@@ -1401,49 +1401,22 @@ class RegimeMasterBot:
 
             if ((primary_regime == config.REGIME_BULL and higher_tf_bear) or
                     (primary_regime == config.REGIME_BEAR and higher_tf_bull)):
-                # Tier 2: early reversal detected — apply ATR+EMA20 pullback gate
+                # Tier 2: early reversal detected
                 _is_reversal_tier2 = True
-                ema20_15m = _ema_15m_20  # already computed above
-                if ema20_15m and current_atr > 0 and current_price > 0:
-                    atr_band = current_atr * 1.0  # 1× ATR tolerance band around EMA20
-                    if primary_regime == config.REGIME_BULL:
-                        # For LONG reversal: price must have pulled back to EMA20 ± ATR
-                        in_pullback_zone = (
-                            current_price <= ema20_15m + atr_band and
-                            current_price >= ema20_15m - atr_band
-                        )
-                    else:
-                        # For SHORT reversal: price must have bounced back to EMA20 ± ATR
-                        in_pullback_zone = (
-                            current_price >= ema20_15m - atr_band and
-                            current_price <= ema20_15m + atr_band
-                        )
-                    if not in_pullback_zone:
-                        self._coin_states[symbol]["action"] = "REVERSAL_WAIT_PULLBACK"
-                        logger.debug(
-                            "📐 [%s] Tier2 reversal detected but price %.4f not yet in "
-                            "EMA20(%.4f) ± ATR(%.4f) zone — waiting for pullback",
-                            symbol, current_price, ema20_15m, atr_band,
-                        )
-                        return None
-                    # Pullback confirmed — reduce conviction cap for safety
-                    conviction = min(conviction, 55.0)
-                    logger.info(
-                        "🔄 [%s] Tier2 REVERSAL PULLBACK confirmed — "
-                        "price=%.4f EMA20=%.4f ATR=%.4f — proceeding at capped conviction %.1f",
-                        symbol, current_price, ema20_15m, current_atr, conviction,
-                    )
-                    # Flag for downstream (Athena context, SIGNAL_DISPATCH)
-                    self._coin_states[symbol]["action"] = "REVERSAL_PULLBACK_CONFIRMED"
-                else:
-                    # Can't compute zone — treat as MTF_CONFLICT (safe fallback)
-                    self._coin_states[symbol]["action"] = "MTF_CONFLICT"
-                    return None
+                
+                # USER OVERRIDE: Tier 2 EMA20 pullback logic disabled.
+                # Proceeding with trade without waiting for pullback.
+                conviction = min(conviction, 55.0)
+                logger.info(
+                    "🔄 [%s] Tier2 REVERSAL detected — "
+                    "price=%.4f — proceeding at capped conviction %.1f (EMA Pullback logic DISABLED)",
+                    symbol, current_price, conviction,
+                )
+                self._coin_states[symbol]["action"] = "REVERSAL_TIER2_ACCEPTED_NO_PULLBACK"
+
 
         # ── Tier 2B: 15m+4H agree, 1H lagging — gate on 1H EMA20 pullback ──────
         # Cases 24 & 25: 15m=BULL + 4H=BULL + 1H=BEAR (or inverse SHORT version)
-        # 4H is the dominant macro trend. 1H hasn't flipped yet (lagging).
-        # We can trade WITH the 4H direction if price has pulled back to 1H EMA20.
         _is_tier2b = False
         if regime_1h is not None and regime_4h is not None:
             macro_direction_bull = (regime_4h == config.REGIME_BULL and regime == config.REGIME_BULL)
@@ -1454,40 +1427,16 @@ class RegimeMasterBot:
             if one_h_lagging_bear or one_h_lagging_bull:
                 # 15m and 4H agree; 1H is lagging opposite → Tier 2B
                 _is_tier2b = True
-                ema20_1h_val = ta_multi.get("1h", {}).get("ema20") if "ta_multi" in dir() else None
-                # Fallback — compute directly if not yet in ta_multi
-                if ema20_1h_val is None:
-                    try:
-                        ema20_1h_val = float(compute_ema(df_1h_feat["close"], 20).iloc[-1])
-                    except Exception:
-                        ema20_1h_val = None
-                atr_1h_val = float(df_1h_feat["atr"].iloc[-1]) if "atr" in df_1h_feat.columns else current_atr
-
-                if ema20_1h_val and atr_1h_val > 0 and current_price > 0:
-                    atr_band_1h = atr_1h_val * 1.0   # 1× 1H ATR tolerance around 1H EMA20
-                    if one_h_lagging_bear:
-                        # LONG: pulled back to 1H EMA20 from above
-                        in_pullback_zone_1h = (
-                            current_price <= ema20_1h_val + atr_band_1h and
-                            current_price >= ema20_1h_val - atr_band_1h
-                        )
-                    else:
-                        # SHORT: bounced back to 1H EMA20 from below
-                        in_pullback_zone_1h = (
-                            current_price >= ema20_1h_val - atr_band_1h and
-                            current_price <= ema20_1h_val + atr_band_1h
-                        )
-                    if not in_pullback_zone_1h:
-                        self._coin_states[symbol]["action"] = "TIER2B_WAIT_PULLBACK"
-                        logger.debug(
-                            "📐 [%s] Tier2B (4H+15m agree, 1H lagging): price %.4f not in "
-                            "1H EMA20(%.4f) ± ATR(%.4f) — waiting",
-                            symbol, current_price, ema20_1h_val, atr_band_1h,
-                        )
-                        return None
-                    # Pullback confirmed — cap conviction at 60% (higher than Tier2A since 4H aligns)
-                    conviction = min(conviction, 60.0)
-                    logger.info(
+                
+                # USER OVERRIDE: Tier 2B 1H EMA20 pullback logic disabled.
+                # Proceeding with trade without waiting for pullback.
+                conviction = min(conviction, 60.0)
+                logger.info(
+                    "📈 [%s] Tier2B TREND RESUME detected — "
+                    "price=%.4f — conviction capped %.1f (EMA Pullback logic DISABLED)",
+                    symbol, current_price, conviction,
+                )
+                self._coin_states[symbol]["action"] = "TIER2B_RESUME_ACCEPTED_NO_PULLBACK"
                         "📈 [%s] Tier2B TREND RESUME PULLBACK confirmed — "
                         "price=%.4f 1H_EMA20=%.4f ATR_1H=%.4f — conviction capped %.1f",
                         symbol, current_price, ema20_1h_val, atr_1h_val, conviction,
