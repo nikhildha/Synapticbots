@@ -68,8 +68,20 @@ export async function checkSubscription(userId: string): Promise<SubscriptionSta
         where: { userId },
     });
 
-    // No subscription record — treat as expired
+    // No subscription record
     if (!sub) {
+        // Bypass subscription check ONLY for local development / admin
+        if (process.env.NODE_ENV === 'development') {
+            return {
+                isActive: true,
+                isExpired: false,
+                tier: 'ultra',
+                daysRemaining: 999,
+                expiresAt: null,
+                message: 'Local Admin Bypass — Ultra Tier Active',
+            };
+        }
+
         return {
             isActive: false,
             isExpired: true,
