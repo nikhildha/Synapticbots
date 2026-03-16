@@ -460,7 +460,7 @@ export function DashboardClient({ user, stats, bots, recentTrades }: DashboardCl
                 macro={{
                   btc_action: multi?.coin_states?.BTCUSDT?.deploy_status || 'WAITING',
                   btc_regime_name: multi?.coin_states?.BTCUSDT?.regime || regime,
-                  confidence: confidence,
+                  confidence: multi?.coin_states?.BTCUSDT?.confidence || 0,
                 }}
               />
 
