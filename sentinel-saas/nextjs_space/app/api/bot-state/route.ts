@@ -64,6 +64,12 @@ export async function GET() {
             hasMixedModes ? fetchEngineData(engineMode === 'live' ? 'paper' : 'live') : Promise.resolve(null),
         ]);
 
+        // Track which engine modes responded (null = engine unreachable, not just empty)
+        const engineDataByMode: Record<string, any> = {
+            [engineMode]: engineData,
+            ...(altEngineData ? { [engineMode === 'live' ? 'paper' : 'live']: altEngineData } : {}),
+        };
+
         // Build per-engine registered_bot_ids maps for correct re-registration checks
         const registeredByMode: Record<string, Set<string>> = {
             live: new Set(
@@ -84,8 +90,11 @@ export async function GET() {
                 const modeKey = botMode.startsWith('live') ? 'live' : 'paper';
                 const reRegUrl = getEngineUrl(modeKey as EngineMode);
                 if (!reRegUrl) continue;
-                // Only re-register if we have data from this engine AND bot is missing from it
-                if (registeredByMode[modeKey].size === 0) continue; // engine data unavailable — skip
+                // Skip only if the engine is UNREACHABLE (null response) — NOT if it
+                // responded with an empty registered_bot_ids (that's exactly the post-
+                // restart state where re-registration is needed).
+                if (engineDataByMode[modeKey] === undefined) continue; // engine not fetched for this mode
+                if (engineDataByMode[modeKey] === null) continue;      // engine unreachable
                 if (!registeredByMode[modeKey].has(ub.id)) {
                     console.log(`[bot-state] Re-registering bot ${ub.id} (${ub.name}) — not in ${modeKey} engine active list (engine may have restarted)`);
                     try {
