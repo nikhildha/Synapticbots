@@ -295,7 +295,7 @@ export function RegimeCard({ regime, confidence, symbol, macroRegime, trend15m, 
                                     </>
                                 )}
                                 <span style={{ color: '#9CA3AF', fontWeight: 700 }}>
-                                    {macro.btc_regime_name} ({Math.round(macro.confidence > 1 ? macro.confidence : macro.confidence * 100)}%)
+                                    {displayRegime} ({Math.round(macro.confidence > 1 ? macro.confidence : macro.confidence * 100)}%)
                                 </span>
                             </span>
                         </div>
