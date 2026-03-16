@@ -302,7 +302,7 @@ SENTIMENT_LOG_FILE       = os.path.join(DATA_DIR, "sentiment_log.csv")
 # Acts as a "risk committee" — can EXECUTE, REDUCE_SIZE, or VETO trades.
 LLM_REASONING_ENABLED       = True
 LLM_API_KEY                 = os.getenv("GEMINI_API_KEY", "")
-LLM_MODEL                   = "gemini-2.0-flash"          # Latest available flash model
+LLM_MODEL                   = "gemini-2.5-flash"          # Latest available flash model
 LLM_CACHE_MINUTES           = 10                          # Cache per-coin LLM decisions
 LLM_TIMEOUT_SECONDS         = 30                          # Includes Google Search grounding time
 LLM_VETO_THRESHOLD          = 0.30                        # Below this → LLM vetoes the trade
