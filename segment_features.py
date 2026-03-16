@@ -44,6 +44,7 @@ COIN_FEATURES = {
     ],
     "BTCUSDT": [
         "vol_zscore",
+        "log_return",
         "volume_trend_intensity",
         "liquidity_vacuum",
         "amihud_illiquidity",
