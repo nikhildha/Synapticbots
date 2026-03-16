@@ -611,6 +611,13 @@ class RegimeMasterBot:
                 logger.debug("🔍 [%s] No HMM signals for segment %s this cycle", bot_name, bot_segment_filter)
                 continue
 
+            # Explicitly mark non-top eligible coins so the UI doesn't get stuck showing "READY"
+            for ignored in seg_results[top_n:]:
+                sym = ignored["symbol"]
+                _st = self._coin_states.get(sym, {}).get("deploy_status", "")
+                if not _st:
+                    self._coin_states.setdefault(sym, {})["deploy_status"] = "FILTERED: Not top coin in segment"
+
             for top in top_coins:
                 sym      = top["symbol"]
                 pos_key  = f"{bot_id}:{sym}"
