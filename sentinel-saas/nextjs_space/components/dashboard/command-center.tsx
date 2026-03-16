@@ -288,8 +288,12 @@ export function RegimeCard({ regime, confidence, symbol, macroRegime, trend15m, 
                                             macro.btc_action.includes('VETO') || macro.btc_action === 'NEUTRAL' ? '#F59E0B' : '#EF4444'}`
                             }} />
                             <span style={{ fontSize: '10px', fontWeight: 800, color: '#E8EDF5', letterSpacing: '0.5px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                <span>MACRO: {macro.btc_action.replace('_', ' ')}</span>
-                                <span style={{ color: '#6B7280' }}>|</span>
+                                {macro.btc_action !== 'WAITING' && (
+                                    <>
+                                        <span>MACRO: {macro.btc_action.replace('_', ' ')}</span>
+                                        <span style={{ color: '#6B7280' }}>|</span>
+                                    </>
+                                )}
                                 <span style={{ color: '#9CA3AF', fontWeight: 700 }}>
                                     {macro.btc_regime_name} ({Math.round(macro.confidence > 1 ? macro.confidence : macro.confidence * 100)}%)
                                 </span>

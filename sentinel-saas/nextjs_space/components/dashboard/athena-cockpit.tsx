@@ -138,9 +138,9 @@ export function AthenaCockpit({ bots, athena, trades, coinStates, multi }: Athen
                     <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                         <span style={{
                             padding: '4px 12px', borderRadius: '20px', fontSize: '11px', fontWeight: 700,
-                            background: 'rgba(255,179,0,0.1)', color: AMBER,
-                            border: `1px solid rgba(255,179,0,0.3)`,
-                        }}>✳ STANDBY</span>
+                            background: 'rgba(0,255,136,0.1)', color: EMERALD,
+                            border: `1px solid rgba(0,255,136,0.3)`,
+                        }}>✳ ACTIVE</span>
                         <span style={{
                             padding: '4px 10px', borderRadius: '8px', fontSize: '10px', fontWeight: 600,
                             background: 'rgba(255,255,255,0.04)', color: '#6B7280',

@@ -110,13 +110,13 @@ export function AthenaPanel({ athena, perBot = {} }: Props) {
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                     <span style={{
                         fontSize: 10, padding: '3px 10px', borderRadius: 20,
-                        background: enabled ? (isRunning ? 'rgba(0,255,136,0.10)' : 'rgba(255,179,0,0.10)') : 'rgba(255,59,92,0.10)',
-                        color: enabled ? (isRunning ? '#00FF88' : '#FFB300') : '#FF3B5C',
+                        background: enabled ? 'rgba(0,255,136,0.10)' : 'rgba(255,59,92,0.10)',
+                        color: enabled ? '#00FF88' : '#FF3B5C',
                         fontWeight: 700,
-                        border: `1px solid ${enabled ? (isRunning ? 'rgba(0,255,136,0.20)' : 'rgba(255,179,0,0.20)') : 'rgba(255,59,92,0.20)'}`,
+                        border: `1px solid ${enabled ? 'rgba(0,255,136,0.20)' : 'rgba(255,59,92,0.20)'}`,
                         letterSpacing: '0.5px',
                     }}>
-                        ○ {enabled ? (isRunning ? 'ACTIVE' : 'STANDBY') : 'OFFLINE'}
+                        ○ {enabled ? 'ACTIVE' : 'OFFLINE'}
                     </span>
                     <span style={{
                         fontSize: 10, color: 'var(--color-text-muted)', fontFamily: 'var(--font-mono)',
