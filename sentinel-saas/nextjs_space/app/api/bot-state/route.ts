@@ -50,20 +50,44 @@ export async function GET() {
         }
 
         // Fetch engine data for DASHBOARD UI (coin states, engine status, etc.)
-        const engineData = await fetchEngineData(engineMode);
+        // Always fetch both engines when URLs are configured so we have per-engine
+        // registered_bot_ids for correct re-registration and full pending order lists.
+        const hasMixedModes = userBots.some((b: any) =>
+            b.isActive && (b.config?.mode || '').toLowerCase().includes('live')
+        ) && userBots.some((b: any) =>
+            b.isActive && !(b.config?.mode || '').toLowerCase().includes('live')
+        );
+
+        const [engineData, altEngineData] = await Promise.all([
+            fetchEngineData(engineMode),
+            // Fetch the opposite engine when user has bots on both engines
+            hasMixedModes ? fetchEngineData(engineMode === 'live' ? 'paper' : 'live') : Promise.resolve(null),
+        ]);
+
+        // Build per-engine registered_bot_ids maps for correct re-registration checks
+        const registeredByMode: Record<string, Set<string>> = {
+            live: new Set(
+                (engineMode === 'live' ? engineData : altEngineData)?.registered_bot_ids || []
+            ),
+            paper: new Set(
+                (engineMode === 'paper' ? engineData : altEngineData)?.registered_bot_ids || []
+            ),
+        };
 
         // ─── Auto-Re-Registration: re-push bots if engine restarted ─────────
         // Engine restart clears ENGINE_ACTIVE_BOTS in memory. Any active DB bot
         // not in registered_bot_ids needs to be re-pushed via /api/set-bot-id.
-        if (userId && userBots.length > 0 && engineData?.registered_bot_ids) {
-            const registeredIds: string[] = engineData.registered_bot_ids;
+        if (userId && userBots.length > 0) {
             const activeBots = userBots.filter((b: any) => b.isActive);
             for (const ub of activeBots) {
-                if (!registeredIds.includes(ub.id)) {
-                    const botMode = ((ub.config as any)?.mode || 'paper').toLowerCase();
-                    const reRegUrl = getEngineUrl(botMode.startsWith('live') ? 'live' : 'paper');
-                    if (!reRegUrl) continue;
-                    console.log(`[bot-state] Re-registering bot ${ub.id} (${ub.name}) — not in engine active list (engine may have restarted)`);
+                const botMode = ((ub.config as any)?.mode || 'paper').toLowerCase();
+                const modeKey = botMode.startsWith('live') ? 'live' : 'paper';
+                const reRegUrl = getEngineUrl(modeKey as EngineMode);
+                if (!reRegUrl) continue;
+                // Only re-register if we have data from this engine AND bot is missing from it
+                if (registeredByMode[modeKey].size === 0) continue; // engine data unavailable — skip
+                if (!registeredByMode[modeKey].has(ub.id)) {
+                    console.log(`[bot-state] Re-registering bot ${ub.id} (${ub.name}) — not in ${modeKey} engine active list (engine may have restarted)`);
                     try {
                         await fetch(`${reRegUrl}/api/set-bot-id`, {
                             method: 'POST',
@@ -90,7 +114,15 @@ export async function GET() {
 
         // Build the engine state part of the response (shared — not per-user)
         const coinStates = multi.coin_states || {};
-        const engineTradesRaw = engineTradebook.trades || [];
+        // Merge trades from both engines so pending_orders enrichment covers all modes
+        const altTrades: any[] = altEngineData?.tradebook?.trades || [];
+        const engineTradesRaw = [...(engineTradebook.trades || []), ...altTrades];
+
+        // Pre-build engine trade cache from already-fetched data (avoids duplicate HTTP calls below)
+        const prefetchedEngineCache: Record<string, any[]> = {
+            [engineMode]: engineTradebook.trades || [],
+            ...(altEngineData ? { [engineMode === 'live' ? 'paper' : 'live']: altTrades } : {}),
+        };
 
         // ─── Per-User Trade Isolation ────────────────────────────────
         let trades: any[] = [];
@@ -98,12 +130,12 @@ export async function GET() {
         if (session && userId) {
             // ISOLATION FIX: sync each bot from its OWN engine (not one engine for all)
             // This prevents paper bots from getting live trades and vice versa.
-            const engineTradeCache: Record<string, any[]> = {};
+            const engineTradeCache: Record<string, any[]> = { ...prefetchedEngineCache };
             for (const ub of userBots) {
                 if (!ub.startedAt) continue;
                 const botMode: EngineMode = ((ub.config as any)?.mode || 'paper').toLowerCase().includes('live') ? 'live' : 'paper';
                 try {
-                    // Cache engine trades per mode to avoid duplicate fetches
+                    // Use pre-fetched engine data if available; only fetch if not already cached
                     if (!engineTradeCache[botMode]) {
                         const data = await fetchEngineData(botMode);
                         engineTradeCache[botMode] = data?.tradebook?.trades || [];
@@ -265,10 +297,11 @@ export async function GET() {
             engine: engineState,
             _debug: {
                 engineMode,
+                hasMixedModes,
                 liveUrl: getEngineUrl('live') ? '✓ set' : '✗ empty',
                 paperUrl: getEngineUrl('paper') ? '✓ set' : '✗ empty',
                 engineDataOk: !!engineData,
-                altEngineDataOk: false,
+                altEngineDataOk: !!altEngineData,
                 totalBots: userBots.length,
                 activeBots: userBots.filter((b: any) => b.isActive).length,
             },
