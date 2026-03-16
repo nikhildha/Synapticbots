@@ -656,19 +656,10 @@ def update_unrealized(prices=None, funding_rates=None):
 
         funding_cost = trade.get("funding_cost", 0)
 
-        # For LIVE trades: qty from CoinDCX IS the leveraged quantity,
-        # so raw_pnl is already the full P&L — do NOT multiply by leverage.
-        # Also skip commission estimation — CoinDCX handles actual fees.
-        # PnL FIX: qty is ALWAYS leveraged (both paper and live)
-        # so raw_pnl already represents the full dollar P&L.
-        is_live = trade.get("mode", "").upper().startswith("LIVE")
-        if is_live:
-            est_commission = 0
-        else:
-            entry_notional = entry * qty
-            exit_notional = current * qty
-            est_commission = (entry_notional + exit_notional) * config.TAKER_FEE
-        net_pnl = round(raw_pnl - est_commission - funding_cost, 4)
+        # To prevent trades from starting in an immediate deep paper loss,
+        # we do NOT subtract estimated exit commissions from the unrealized PnL.
+        # It is only subtracted during a real exit (realized PnL).
+        net_pnl = round(raw_pnl - funding_cost, 4)
         pnl_pct = round(net_pnl / capital * 100, 2) if capital else 0
 
         # Track max favorable / adverse excursion
