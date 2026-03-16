@@ -1437,15 +1437,6 @@ class RegimeMasterBot:
                     symbol, current_price, conviction,
                 )
                 self._coin_states[symbol]["action"] = "TIER2B_RESUME_ACCEPTED_NO_PULLBACK"
-                        "📈 [%s] Tier2B TREND RESUME PULLBACK confirmed — "
-                        "price=%.4f 1H_EMA20=%.4f ATR_1H=%.4f — conviction capped %.1f",
-                        symbol, current_price, ema20_1h_val, atr_1h_val, conviction,
-                    )
-                    self._coin_states[symbol]["action"] = "TIER2B_RESUME_CONFIRMED"
-                else:
-                    # Can't compute — safe fallback: block
-                    self._coin_states[symbol]["action"] = "MTF_CONFLICT"
-                    return None
 
         # ── TREND (BULL / BEAR) — 8-factor conviction flow ──────────────────────
 
