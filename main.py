@@ -560,58 +560,7 @@ class RegimeMasterBot:
                 logger.debug("Error analyzing %s: %s", symbol, e)
                 continue
 
-        # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-        # ── SIGNAL BYPASS (EXPERIMENT — REMOVE THIS ENTIRE BLOCK WHEN DONE) ────
-        # Purpose: Inject a synthetic HMM signal to verify the bot deploy pipeline
-        # end-to-end without needing a real HMM signal. Toggle via dashboard.
-        # Controlled by: data/bypass_state.json  {"bypass_enabled": true/false}
-        # To remove: delete from here to the matching END comment below.
-        try:
-            import os as _os
-            _bypass_path = _os.path.join(getattr(config, "DATA_DIR", "data"), "bypass_state.json")
-            _bypass_enabled = False
-            if _os.path.exists(_bypass_path):
-                with open(_bypass_path, "r") as _f:
-                    _bstate = json.load(_f)
-                    _bypass_enabled = bool(_bstate.get("bypass_enabled", False))
 
-            if _bypass_enabled:
-                _bypass_symbol   = _bstate.get("bypass_symbol", "BTCUSDT")
-                _bypass_side     = _bstate.get("bypass_side", "BUY")
-                _bypass_segment  = _bstate.get("bypass_segment", "layer1")
-                _bypass_conv     = float(_bstate.get("bypass_conviction", 65.0))
-                _dummy_brain_cfg = {
-                    "label":          "⚗️ BYPASS",
-                    "conviction_min": 0,
-                    "segment":        _bypass_segment,
-                }
-                _bypass_result = {
-                    "symbol":       _bypass_symbol,
-                    "side":         _bypass_side,
-                    "atr":          0.01,
-                    "ema_15m_20":   None,
-                    "regime":       0 if _bypass_side == "BUY" else 1,
-                    "regime_name":  "BULLISH" if _bypass_side == "BUY" else "BEARISH",
-                    "confidence":   0.75,
-                    "conviction":   _bypass_conv,
-                    "brain_id":     "bypass",
-                    "brain_cfg":    _dummy_brain_cfg,
-                    "tf_agreement": 3,
-                    "athena":       None,
-                    "signal_type":  "BYPASS_TEST",
-                    "reason":       f"⚗️ SIGNAL_BYPASS | {_bypass_segment} | conv={_bypass_conv}",
-                }
-                # Prepend so bypass wins segment-selection against real results
-                raw_results.insert(0, _bypass_result)
-                logger.warning(
-                    "⚗️  SIGNAL_BYPASS ACTIVE — injecting synthetic signal: "
-                    "%s %s segment=%s conviction=%.0f",
-                    _bypass_side, _bypass_symbol, _bypass_segment, _bypass_conv,
-                )
-        except Exception as _bypass_err:
-            logger.debug("Bypass block error (non-fatal): %s", _bypass_err)
-        # ── END SIGNAL BYPASS ────────────────────────────────────────────────────
-        # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
         # ── 5. Deploy: Top HMM coin per segment → Athena final call ────────────────
         # raw_results already sorted by conviction (desc)
@@ -623,32 +572,7 @@ class RegimeMasterBot:
         # No per-bot position cap — only the duplicate check prevents re-entering the same coin.
 
         _tick_active_bots = list(config.ENGINE_ACTIVE_BOTS)
-        if not _tick_active_bots:
-            # ── BYPASS FALLBACK: if bypass is active but no bots registered
-            # (happens after Railway restart), synthesize a temporary bot entry
-            # from the bypass_state.json so the deploy loop can run at least once.
-            try:
-                import os as _os2
-                _bpath = _os2.path.join(getattr(config, "DATA_DIR", "data"), "bypass_state.json")
-                if _os2.path.exists(_bpath):
-                    with open(_bpath) as _bf:
-                        _bs = json.load(_bf)
-                    if _bs.get("bypass_enabled"):
-                        _phantom_bot = {
-                            "bot_id":         getattr(config, "ENGINE_BOT_ID", "bypass-phantom"),
-                            "bot_name":       "Bypass Phantom Bot",
-                            "user_id":        getattr(config, "ENGINE_USER_ID", "admin"),
-                            "segment_filter": _bs.get("bypass_segment", "ALL"),
-                        }
-                        _tick_active_bots = [_phantom_bot]
-                        logger.warning(
-                            "⚗️  BYPASS FALLBACK: ENGINE_ACTIVE_BOTS empty — "
-                            "using phantom bot for deploy (segment=%s). "
-                            "Toggle your real bot OFF→ON on the dashboard to permanently re-register it.",
-                            _bs.get("bypass_segment", "ALL"),
-                        )
-            except Exception as _pherr:
-                logger.debug("Bypass phantom bot creation failed: %s", _pherr)
+
 
         if not _tick_active_bots:
             logger.warning("⚠️  No bots registered in ENGINE_ACTIVE_BOTS — skipping deploy step")
@@ -716,15 +640,7 @@ class RegimeMasterBot:
                 current_price = self._coin_states.get(sym, {}).get("price", 0)
                 atr_val = top.get("atr", 0)
                 athena_decision = None
-                _is_bypass_signal = top.get("signal_type") == "BYPASS_TEST"
-                if _is_bypass_signal:
-                    # BYPASS MODE: skip Athena entirely — this is a pipeline test
-                    logger.warning(
-                        "⚗️  BYPASS: Athena skipped for %s — signal_type=BYPASS_TEST (pipeline test mode)",
-                        sym,
-                    )
-                    athena_decision = None  # None = auto-approve (fail-open path)
-                elif self._athena and config.LLM_REASONING_ENABLED:
+                if self._athena and config.LLM_REASONING_ENABLED:
                     try:
                         llm_ctx = {
                             "ticker":         sym,

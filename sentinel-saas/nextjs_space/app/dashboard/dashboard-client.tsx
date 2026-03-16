@@ -9,12 +9,9 @@ import { RegimeCard, PnlCard, ActivePositionsCard, SignalSummaryTable } from '@/
 import { AthenaPanel } from '@/components/dashboard/athena-panel';
 import { TerminalFeed } from '@/components/dashboard/terminal-feed';
 import { SegmentHeatmap } from '@/components/dashboard/segment-heatmap';
-import { VirtualLimitTracker } from '@/components/dashboard/virtual-limit-tracker';
 import { Bot, TrendingUp, Activity, DollarSign, Zap } from 'lucide-react';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
-// ── SIGNAL BYPASS (EXPERIMENT — remove this import when done) ──
-import { SignalBypassToggle } from './SignalBypassToggle';
 
 
 interface DashboardClientProps {
@@ -609,9 +606,6 @@ export function DashboardClient({ user, stats, bots, recentTrades }: DashboardCl
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-xl font-bold text-cyan-400">Synaptic Bots</h2>
               <div className="flex items-center gap-3">
-                {/* ── SIGNAL BYPASS TOGGLE (EXPERIMENT — REMOVE THIS BLOCK WHEN DONE) ── */}
-                <SignalBypassToggle />
-                {/* ── END SIGNAL BYPASS TOGGLE ── */}
                 <Link
                   href="/bots"
                   className="px-4 py-2 bg-[var(--color-primary)] text-white rounded-lg hover:bg-[var(--color-primary-dark)] transition-colors"
@@ -708,87 +702,6 @@ export function DashboardClient({ user, stats, bots, recentTrades }: DashboardCl
         </div>
       </main>
 
-      {/* ═══ Admin: Data Feed Health ═══ */}
-      {(user as any)?.role === 'admin' && (
-        <div className="max-w-7xl mx-auto px-4 pb-12">
-          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.4 }}>
-            <div style={{
-              background: 'rgba(17, 24, 39, 0.85)', backdropFilter: 'blur(16px)',
-              border: '1px solid rgba(245,158,11,0.2)', borderRadius: '16px', overflow: 'hidden',
-            }}>
-              <div style={{
-                padding: '16px 24px',
-                background: 'linear-gradient(135deg, rgba(245,158,11,0.08) 0%, rgba(239,68,68,0.04) 100%)',
-                borderBottom: '1px solid rgba(255,255,255,0.06)',
-              }}>
-                <h2 style={{ fontSize: '18px', fontWeight: 700, color: '#F59E0B', margin: 0 }}>🛡️ Data Feed Health</h2>
-                <p style={{ fontSize: '12px', color: '#6B7280', marginTop: '2px' }}>Admin-only monitoring of external data sources</p>
-              </div>
-              <div style={{ padding: '20px 24px', display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '16px' }}>
-                {[
-                  {
-                    name: 'Engine Cycle',
-                    status: botState?.multi?.cycle ? 'ok' : 'waiting',
-                    detail: botState?.multi?.cycle ? `Cycle #${botState.multi.cycle}` : 'No cycles yet',
-                    sub: botState?.multi?.timestamp ? `Last: ${new Date(botState.multi.timestamp).toLocaleTimeString()}` : 'Waiting…',
-                  },
-                  {
-                    name: 'Binance API',
-                    status: feedHealth?.liveMarket || 'checking',
-                    detail: feedHealth?.liveMarket === 'ok' ? 'Connected' : 'Error',
-                    sub: 'Funding rates & prices',
-                  },
-                  {
-                    name: 'Fear & Greed',
-                    status: feedHealth?.fearGreed || 'checking',
-                    detail: feedHealth?.fearGreed === 'ok' ? 'Connected' : 'Error',
-                    sub: 'alternative.me API',
-                  },
-                  {
-                    name: 'Coin Scanner',
-                    status: (botState?.multi?.coins_scanned || 0) > 0 ? 'ok' : 'waiting',
-                    detail: `${botState?.multi?.coins_scanned || 0} coins`,
-                    sub: `${botState?.multi?.eligible_count || 0} eligible`,
-                  },
-                  {
-                    name: 'Tradebook',
-                    status: (botState?.tradebook?.trades?.length || 0) > 0 ? 'ok' : 'waiting',
-                    detail: `${botState?.tradebook?.trades?.length || 0} trades`,
-                    sub: 'tradebook.json',
-                  },
-                ].map(feed => {
-                  const color = feed.status === 'ok' ? '#22C55E' : feed.status === 'error' ? '#EF4444' : '#F59E0B';
-                  return (
-                    <div key={feed.name} style={{
-                      background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)',
-                      borderRadius: '12px', padding: '16px', textAlign: 'center',
-                    }}>
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', marginBottom: '8px' }}>
-                        <div style={{
-                          width: '8px', height: '8px', borderRadius: '50%', background: color,
-                          boxShadow: `0 0 8px ${color}44`,
-                        }} />
-                        <span style={{ fontSize: '11px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.8px', color: '#9CA3AF' }}>{feed.name}</span>
-                      </div>
-                      <div style={{ fontSize: '16px', fontWeight: 700, color }}>{feed.detail}</div>
-                      <div style={{ fontSize: '10px', color: '#6B7280', marginTop: '4px' }}>{feed.sub}</div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          </motion.div>
-        </div>
-      )}
-
-
-
-      {/* ═══ Virtual Limit Orders (bottom of page) ═══ */}
-      <div className="max-w-7xl mx-auto px-4 pb-12">
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.5 }}>
-          <VirtualLimitTracker trades={allTrades} />
-        </motion.div>
-      </div>
     </div>
   );
 }
