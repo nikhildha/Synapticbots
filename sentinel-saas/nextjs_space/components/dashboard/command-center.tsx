@@ -265,45 +265,9 @@ export function RegimeCard({ regime, confidence, symbol, macroRegime, trend15m, 
             })()}
 
             {/* Header row */}
-            <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '14px' }}>
-                <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '6px' }}>
-                    <div style={{
-                        fontSize: '11px', fontWeight: 700, textTransform: 'uppercase' as const,
-                        letterSpacing: '2.5px', color: '#4B6080',
-                    }}>Market Regime</div>
-                    {macro && (
-                        <div style={{
-                            display: 'flex', alignItems: 'center', gap: '6px',
-                            background: macro.btc_action === 'LONG_ALTCOINS' ? 'rgba(34,197,94,0.1)' : 
-                                        macro.btc_action.includes('VETO') || macro.btc_action === 'NEUTRAL' ? 'rgba(245,158,11,0.1)' : 'rgba(239,68,68,0.1)',
-                            border: `1px solid ${macro.btc_action === 'LONG_ALTCOINS' ? 'rgba(34,197,94,0.2)' : 
-                                        macro.btc_action.includes('VETO') || macro.btc_action === 'NEUTRAL' ? 'rgba(245,158,11,0.2)' : 'rgba(239,68,68,0.2)'}`,
-                            padding: '4px 8px', borderRadius: '6px', width: 'fit-content'
-                        }}>
-                            <div style={{
-                                width: '8px', height: '8px', borderRadius: '50%',
-                                background: macro.btc_action === 'LONG_ALTCOINS' ? '#22C55E' : 
-                                            macro.btc_action.includes('VETO') || macro.btc_action === 'NEUTRAL' ? '#F59E0B' : '#EF4444',
-                                boxShadow: `0 0 6px ${macro.btc_action === 'LONG_ALTCOINS' ? '#22C55E' : 
-                                            macro.btc_action.includes('VETO') || macro.btc_action === 'NEUTRAL' ? '#F59E0B' : '#EF4444'}`
-                            }} />
-                            <span style={{ fontSize: '10px', fontWeight: 800, color: '#E8EDF5', letterSpacing: '0.5px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                {macro.btc_action !== 'WAITING' && (
-                                    <>
-                                        <span>MACRO: {macro.btc_action.replace('_', ' ')}</span>
-                                        <span style={{ color: '#6B7280' }}>|</span>
-                                    </>
-                                )}
-                                <span style={{ color: '#9CA3AF', fontWeight: 700 }}>
-                                    {displayRegime} ({Math.round(macro.confidence > 1 ? macro.confidence : macro.confidence * 100)}%)
-                                </span>
-                            </span>
-                        </div>
-                    )}
-                </div>
-
-                {/* ── Top Right Text: Regime, Price, Delta ── */}
-                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '2px' }}>
+            <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '14px' }}>
+                {/* ── Top Center Text: Regime, Price, Delta ── */}
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px' }}>
                     <div style={{
                         fontSize: '10px', fontWeight: 800, letterSpacing: '1px',
                         color: info.color, textTransform: 'uppercase' as const,
