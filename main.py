@@ -664,6 +664,8 @@ class RegimeMasterBot:
                             "trend":          self._coin_states.get(sym, {}).get("context", {}).get("trend_alignment", "UNKNOWN"),
                             "signal_type":    top.get("signal_type", "TREND_FOLLOW"),
                             "ema_15m_20":     top.get("ema_15m_20"),
+                            "tf_agreement":   top.get("tf_agreement", 0),
+                            "btc_regime":     self._coin_states.get("BTCUSDT", {}).get("regime", "UNKNOWN"),
                         }
                         athena_decision = self._athena.validate_signal(llm_ctx)
                         self._coin_states.setdefault(sym, {})["athena_state"] = {
