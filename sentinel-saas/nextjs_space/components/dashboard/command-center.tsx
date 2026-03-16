@@ -310,7 +310,7 @@ export function RegimeCard({ regime, confidence, symbol, macroRegime, trend15m, 
                         textShadow: `0 0 8px ${info.color}88`,
                         textAlign: 'center',
                     }}>
-                        Regime: {displayRegime}
+                        BTC REGIME: {displayRegime}
                     </div>
                     {btcPrice && (
                         <div style={{ display: 'flex', alignItems: 'baseline', gap: '6px' }}>
