@@ -68,19 +68,21 @@ export async function syncEngineTrades(
             }
 
             // STRICT BOT ISOLATION: Only sync trades that belong to THIS bot.
-            // Reject if:
-            //   1. Trade has a real bot_id that doesn't match → wrong bot
-            //   2. Trade has no bot_id (empty/"") AND this bot has a valid ID → unscoped trade
-            //      (legacy tradebook entries from before bot_id stamping was fixed)
+            // Check all_bot_ids first (multi-bot engine feature), then fallback to primary bot_id.
+            const allBotIds = Array.isArray(t.all_bot_ids) && t.all_bot_ids.length > 0 ? t.all_bot_ids : [];
             const tradeBotId = (t.bot_id || '').trim();
-            if (tradeBotId && tradeBotId !== botId) {
-                // Trade explicitly belongs to a different bot
-                continue;
-            }
-            if (!tradeBotId && botId) {
-                // Trade has no bot_id stamp — don't assign it to any specific bot
-                // (prevents pre-fix tradebook entries from flooding all bots)
-                continue;
+
+            if (allBotIds.length > 0) {
+                if (!allBotIds.includes(botId)) {
+                    continue;
+                }
+            } else {
+                if (tradeBotId && tradeBotId !== botId) {
+                    continue;
+                }
+                if (!tradeBotId && botId) {
+                    continue;
+                }
             }
 
             const resolvedBotId = botId;
