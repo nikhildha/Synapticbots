@@ -379,8 +379,8 @@ class RegimeMasterBot:
         # Snapshot ALL active bot IDs once per tick (multi-bot support)
         # Each trade will be recorded for the first active bot, and synced
         # to all bots via the SaaS bot-state trade sync layer.
-        _tick_active_bots = list(config.ENGINE_ACTIVE_BOTS)  # snapshot
-        _tick_bot_id = _tick_active_bots[0]["bot_id"] if _tick_active_bots else config.ENGINE_BOT_ID
+        _tick_active_bots = list(getattr(config, "ENGINE_ACTIVE_BOTS", []))  # snapshot
+        _tick_bot_id = config.ENGINE_BOT_ID
 
         # ── 0. Weekly coin tier re-classification (background) ───
         self._maybe_reclassify_tiers()
@@ -830,6 +830,23 @@ class RegimeMasterBot:
                            top["side"], seg_name, top["confidence"], "entry_price=0")
                     continue
 
+                # ── Multi-Bot Allocation Logic ──
+                # Find all active bots that should receive this trade based on segment filters
+                matching_bot_ids = []
+                # Fallback to ENGINE_BOT_ID if no active bots list exists
+                active_bots = getattr(config, "ENGINE_ACTIVE_BOTS", [])
+                
+                if active_bots:
+                    for bot in active_bots:
+                        b_filter = bot.get("segment_filter", "ALL")
+                        if b_filter == "ALL" or b_filter == seg_name:
+                            matching_bot_ids.append(bot.get("bot_id"))
+                
+                if not matching_bot_ids:
+                    matching_bot_ids = [config.ENGINE_BOT_ID]
+                
+                primary_bot_id = matching_bot_ids[0]
+
                 tradebook.open_trade(
                     symbol=sym,
                     side=top["side"],
@@ -847,8 +864,8 @@ class RegimeMasterBot:
                     exchange=result.get("exchange") if result else None,
                     pair=result.get("pair") if result else None,
                     position_id=result.get("position_id") if result else None,
-                    bot_id=bot_id,
-                    all_bot_ids=None,
+                    bot_id=primary_bot_id,
+                    all_bot_ids=matching_bot_ids,
                     rm_id=result.get("rm_id") if result else None,
                     override_sl=fill_sl if fill_sl > 0 else None,
                     override_tp=fill_tp if fill_tp > 0 else None,

@@ -98,8 +98,18 @@ class HMMBrain:
         Map raw HMM states → canonical regime labels by sorting on mean log-return.
         Highest return → BULL, then CHOP (near zero), then BEAR, then CRASH (most negative).
         """
-        means = self.model.means_[:, 0]   # log-return means per raw state
-        vols  = self.model.means_[:, 1]    # volatility means per raw state
+        try:
+            ret_idx = self.features.index("log_return")
+        except ValueError:
+            ret_idx = 0
+            
+        try:
+            vol_idx = self.features.index("volatility")
+        except ValueError:
+            vol_idx = 1
+            
+        means = self.model.means_[:, ret_idx]   # log-return means per raw state
+        vols  = self.model.means_[:, vol_idx]    # volatility means per raw state
 
         # Sort states: highest mean first → lowest
         sorted_indices = np.argsort(means)[::-1]
