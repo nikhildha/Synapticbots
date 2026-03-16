@@ -160,49 +160,6 @@ def compute_atr(df, length=14):
     return atr
 
 
-def compute_adx(df, length=14):
-    """
-    Compute Average Directional Index (ADX), normalized to [0, 1].
-
-    Parameters
-    ----------
-    df : pd.DataFrame with 'high', 'low', 'close'
-    length : int — smoothing period (default 14)
-
-    Returns
-    -------
-    pd.Series in range [0, 1] (raw ADX / 100)
-    """
-    high = df["high"]
-    low = df["low"]
-    prev_high = high.shift(1)
-    prev_low = low.shift(1)
-    prev_close = df["close"].shift(1)
-
-    dm_plus_raw = high - prev_high
-    dm_minus_raw = prev_low - low
-
-    dm_plus = dm_plus_raw.where((dm_plus_raw > dm_minus_raw) & (dm_plus_raw > 0), 0.0)
-    dm_minus = dm_minus_raw.where((dm_minus_raw > dm_plus_raw) & (dm_minus_raw > 0), 0.0)
-
-    tr = pd.concat([
-        high - low,
-        (high - prev_close).abs(),
-        (low - prev_close).abs(),
-    ], axis=1).max(axis=1)
-
-    atr_s = tr.ewm(alpha=1 / length, min_periods=length, adjust=False).mean()
-    sm_plus = dm_plus.ewm(alpha=1 / length, min_periods=length, adjust=False).mean()
-    sm_minus = dm_minus.ewm(alpha=1 / length, min_periods=length, adjust=False).mean()
-
-    di_plus = 100 * sm_plus / atr_s.replace(0, np.nan)
-    di_minus = 100 * sm_minus / atr_s.replace(0, np.nan)
-    di_sum = (di_plus + di_minus).replace(0, np.nan)
-
-    dx = 100 * (di_plus - di_minus).abs() / di_sum
-    adx = dx.ewm(alpha=1 / length, min_periods=length, adjust=False).mean()
-    return adx / 100  # normalize to [0, 1]
-
 
 def compute_indicators(df):
     """

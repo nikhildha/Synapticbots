@@ -130,13 +130,7 @@ CONFIDENCE_LOW = 0.92    # 92–96% → 15x  (optimized from 0.85, below 92% = n
 # ─── Capital per trade (used by all bots — uniform sizing) ─────────────────────
 CAPITAL_PER_TRADE = 100        # $100 per trade, fixed
 
-# ─── Execution Engine (Alpha) ──────────────────────────────────────────────────
-EXECUTION_ATR_PULLBACK = True       # Wait for limit order at EMA20 if price > EMA20 + 0.5 ATR
-EXECUTION_TIF_MINUTES = 60          # Time-In-Force: Max lifespan of limit order before cancellation
-EXECUTION_ESCAPE_ATR = 2.0          # Escape Hatch: Cancel if price moves this many ATRs away
 EXECUTION_DYNAMIC_LEVERAGE = True   # Select leverage (10x-25x) based on current ATR%
-EXECUTION_MIN_LEVERAGE = 10         # Used when ATR volatility is high (>= 1.5%)
-EXECUTION_MAX_LEVERAGE = 25         # Used when ATR volatility is low (<= 0.5%)
 
 # ─── Risk Management ────────────────────────────────────────────────────────────
 RISK_PER_TRADE = 0.04
@@ -183,12 +177,8 @@ TRAILING_SL_STEPS = [
     (45.0, 40.0),   # At +45% leveraged P&L → Lock +40% profit
     (50.0, 45.0),   # At +50% leveraged P&L → Lock +45% profit
 ]
-# Legacy ATR trailing (kept for reference, superseded by stepped lock)
+# Legacy ATR trailing (kept for test compat — superseded by TRAILING_SL_STEPS)
 TRAILING_SL_ACTIVATION_ATR = 1.0
-TRAILING_SL_DISTANCE_ATR = 1.0
-TRAILING_TP_ENABLED = False
-TRAILING_TP_ACTIVATION_PCT = 0.75
-TRAILING_TP_EXTENSION_ATR = 1.5
 TRAILING_TP_MAX_EXTENSIONS = 3
 
 # ─── Multi-Target Partial Profit Booking (0304_v1) ─────────────────────────────
@@ -199,10 +189,6 @@ MT_T2_FRAC = 0.666               # T2 at 66.6% of T3 distance
 MT_T1_BOOK_PCT = 0.25            # Book 25% of original qty at T1
 MT_T2_BOOK_PCT = 0.50            # Book 50% of remaining qty at T2
 
-# ─── Capital Protection (legacy — replaced by Stepped Lock above) ─────────────
-CAPITAL_PROTECT_ENABLED = False
-CAPITAL_PROTECT_TRIGGER_PCT = 10.0
-CAPITAL_PROTECT_LOCK_PCT = 4.0
 
 # ─── Volatility Filter ─────────────────────────────────────────────────────────
 VOL_FILTER_ENABLED = True

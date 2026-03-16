@@ -20,7 +20,6 @@ from data_pipeline import fetch_klines, get_multi_timeframe_data, _get_binance_c
 from feature_engine import compute_all_features, compute_hmm_features, compute_trend, compute_support_resistance, compute_sr_position, compute_ema
 from execution_engine import ExecutionEngine
 from risk_manager import RiskManager
-from sideways_strategy import evaluate_mean_reversion
 from coin_scanner import get_top_coins_by_volume, get_active_bot_segment_pool, reload_coin_tiers
 from tools.weekly_reclassify import needs_reclassify, run_reclassify
 import tradebook
