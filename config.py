@@ -35,6 +35,10 @@ MAKER_FEE = 0.0002            # 0.02% maker per leg
 PRIMARY_SYMBOL = "BTCUSDT"
 SECONDARY_SYMBOLS = ["ETHUSDT"]
 
+# ─── Excluded Coins ─────────────────────────────────────────────────────────────
+# Coins placed here are completely ignored by the engine, scanner, and scanners.
+EXCLUDED_COINS = ["AKTUSDT"]
+
 # ─── Crypto Segments (for Segment-Level Analysis) ───────────────────────────────
 CRYPTO_SEGMENTS = {
     "L1": ["BTCUSDT", "ETHUSDT", "SOLUSDT", "BNBUSDT", "AVAXUSDT", "SUIUSDT"],
@@ -48,6 +52,10 @@ CRYPTO_SEGMENTS = {
     "Modular": ["TIAUSDT", "DYMUSDT"],
     "Oracles": ["PYTHUSDT", "TRBUSDT", "API3USDT"]
 }
+
+# Apply exclusion filter immediately
+for _seg in list(CRYPTO_SEGMENTS.keys()):
+    CRYPTO_SEGMENTS[_seg] = [c for c in CRYPTO_SEGMENTS[_seg] if c not in EXCLUDED_COINS]
 
 # ─── Timeframes ─────────────────────────────────────────────────────────────────
 TIMEFRAME_EXECUTION = "15m"   # Entry / exit timing (optimized from 5m)
