@@ -915,7 +915,8 @@ export function SignalSummaryTable({ coinStates, multi, heatmap: heatmapProp }: 
                                 const regBg = regime.includes('BULL') ? 'rgba(34,197,94,0.12)' : regime.includes('BEAR') ? 'rgba(239,68,68,0.12)' : regime.includes('CHOP') || regime.includes('SIDE') ? 'rgba(245,158,11,0.12)' : 'rgba(107,114,128,0.10)';
                                 // Check if this coin has an active trade (deployed)
                                 const activePositions = liveMulti?.active_positions || liveMulti?.positions || {};
-                                const isDeployed = Object.keys(activePositions).some(k => k === c.symbol || k.endsWith(':' + c.symbol));
+                                const symBase = (c.symbol || '').replace('USDT', '');
+                                const isDeployed = Object.keys(activePositions).some(k => k === symBase || k === c.symbol || k.endsWith(':' + c.symbol) || k.endsWith(':' + symBase));
                                 const deployStatus = c.deploy_status || '';
                                 let dLabel = 'PENDING', dColor = '#6B7280', dBg = 'rgba(107,114,128,0.08)';
                                 if (isDeployed || deployStatus === 'ACTIVE') { dLabel = 'DEPLOYED'; dColor = '#06B6D4'; dBg = 'rgba(6,182,212,0.12)'; }
