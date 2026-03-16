@@ -552,6 +552,9 @@ class RegimeMasterBot:
             logger.debug("Failed to fetch BTC macro context: %s", e)
 
         for symbol in scan_symbols:
+            if symbol in config.EXCLUDED_COINS:
+                logger.info("🚫 Skipping %s (Exclusion List)", symbol)
+                continue
             try:
                 result = self._analyze_coin(symbol, balance, btc_flash_crash=btc_flash_crash)
                 if result:
