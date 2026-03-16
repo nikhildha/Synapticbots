@@ -303,11 +303,12 @@ export function RegimeCard({ regime, confidence, symbol, macroRegime, trend15m, 
                 </div>
 
                 {/* ── Top Right Text: Regime, Price, Delta ── */}
-                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '2px' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px' }}>
                     <div style={{
                         fontSize: '10px', fontWeight: 800, letterSpacing: '1px',
                         color: info.color, textTransform: 'uppercase' as const,
                         textShadow: `0 0 8px ${info.color}88`,
+                        textAlign: 'center',
                     }}>
                         Regime: {displayRegime}
                     </div>
