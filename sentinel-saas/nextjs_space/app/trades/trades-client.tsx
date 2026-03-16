@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { Header } from '@/components/header';
-import { BtcCandlestickChart } from '@/components/btc-candlestick-chart';
+import { ActiveTradesChart } from '@/components/active-trades-chart';
 import { Download, TrendingUp, TrendingDown, Clock, Search, X, BarChart3, RefreshCw, Trash2 } from 'lucide-react';
 import { motion } from 'framer-motion';
 
@@ -545,9 +545,9 @@ export function TradesClient({ trades: initialTrades }: TradesClientProps) {
             </div>
           </motion.div>
 
-          {/* ═══ BTC/USDT Candlestick Chart ═══ */}
+          {/* ═══ Trades Chart ═══ */}
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.08 }} className="mb-6">
-            <BtcCandlestickChart />
+            <ActiveTradesChart activeTrades={trades.filter(t => (t.status || '').toLowerCase() === 'active')} />
           </motion.div>
 
           {/* ═══ Filter Bar ═══ */}
