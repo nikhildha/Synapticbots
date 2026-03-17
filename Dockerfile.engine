@@ -21,8 +21,5 @@ RUN mkdir -p /app/data
 ENV PORT=3001
 EXPOSE 3001
 
-# Start the engine API explicitly via bash to stop Railway Nixpacks from overriding it
-COPY start_engine.sh .
-RUN chmod +x start_engine.sh
-
-ENTRYPOINT ["./start_engine.sh"]
+# Start the engine API (which starts the bot in a background thread)
+CMD ["python", "engine_api.py"]
