@@ -139,7 +139,7 @@ class RegimeMasterBot:
         self._multi_tf_brains = {}   # symbol → MultiTFHMMBrain (3 TFs per coin)
         self._coin_states = {}       # symbol → latest state dict (for dashboard)
         self._live_prices = {}       # symbol → {ls, fr, ...} (fetched each cycle)
-        self._BRAIN_CACHE_MAX = 20   # LRU eviction cap (15 coins × 3 TFs = 45 max; cap at 20 prevents OOM)
+        self._BRAIN_CACHE_MAX = 5    # LRU eviction cap (down from 20) — strict limit protects Railway 300MB RAM tier from OOM kills
 
         # ─── Coin pool configuration ─────────────────────────────────────────
         # Pool size matches config.TOP_COINS_LIMIT to scan all coins per cycle
@@ -557,7 +557,11 @@ class RegimeMasterBot:
                     raw_results.append(result)
             except Exception as e:
                 logger.debug("Error analyzing %s: %s", symbol, e)
-                continue
+                
+            # Aggressive GC: Clear memory physically bounded by MTF array instantiations immediately
+            # so the baseline RAM never scales to n_coins during a single heartbeat cycle.
+            self._evict_brain_cache()
+            gc.collect()
 
 
 
