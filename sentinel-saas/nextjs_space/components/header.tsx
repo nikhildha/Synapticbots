@@ -65,7 +65,7 @@ export function Header() {
                     Cockpit
                   </Link>
                   <Link href="/bots" className="text-[17px] font-medium text-[var(--color-text-secondary)] hover:text-[var(--color-primary)] transition-colors">
-                    Bots
+                    Deploy
                   </Link>
                   <Link href="/trades" className="text-[17px] font-medium text-[var(--color-text-secondary)] hover:text-[var(--color-primary)] transition-colors">
                     Trade Book
@@ -157,7 +157,7 @@ export function Header() {
                     Cockpit
                   </Link>
                   <Link href="/bots" className="block text-[var(--color-text-secondary)] hover:text-[var(--color-primary)] transition-colors">
-                    Bots
+                    Deploy
                   </Link>
                   <Link href="/trades" className="block text-[var(--color-text-secondary)] hover:text-[var(--color-primary)] transition-colors">
                     Trade Book

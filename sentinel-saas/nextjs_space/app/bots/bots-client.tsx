@@ -251,7 +251,7 @@ export function BotsClient({ bots: initialBots }: BotsClientProps) {
       <main style={{ paddingTop: 88, paddingBottom: 48, paddingLeft: 16, paddingRight: 16 }}>
         <div style={{ maxWidth: 1200, margin: '0 auto' }}>
 
-          {/* ════ COCKPIT HEADER ════ */}
+          {/* ════ BOTS HEADER ════ */}
           <motion.div initial={{ opacity: 0, y: -12 }} animate={{ opacity: 1, y: 0 }}
             style={{ marginBottom: 28 }}
           >
@@ -288,7 +288,7 @@ export function BotsClient({ bots: initialBots }: BotsClientProps) {
             <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 16 }}>
               <div>
                 <h1 style={{ fontSize: 'var(--text-3xl)', fontWeight: 800, margin: 0, letterSpacing: '-0.03em' }}>
-                  <span className="text-gradient">Cockpit</span>
+                  <span className="text-gradient">Bots</span>
                 </h1>
                 <p style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-secondary)', margin: '4px 0 0' }}>
                   Deploy, monitor &amp; manage your automated trading bots

@@ -8,7 +8,7 @@ import type { Metadata } from 'next';
 export const dynamic = 'force-dynamic';
 
 export const metadata: Metadata = {
-  title: 'Cockpit — Synaptic',
+  title: 'Bots — Synaptic',
   description: 'Deploy and manage your automated HMM trading bots',
 };
 
@@ -53,11 +53,11 @@ export default async function BotsPage() {
       />
     );
   } catch (error) {
-    console.error('Cockpit data error:', error);
+    console.error('Bots data error:', error);
     return (
       <div className="min-h-screen flex items-center justify-center bg-[var(--color-bg)]">
         <div className="text-center space-y-4">
-          <h2 className="text-2xl font-bold text-[var(--color-danger)]">Error Loading Cockpit</h2>
+          <h2 className="text-2xl font-bold text-[var(--color-danger)]">Error Loading Bots</h2>
           <p className="text-[var(--color-text-secondary)]">Please try refreshing the page</p>
           <a
             href="/api/auth/signout?callbackUrl=/login"
