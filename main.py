@@ -527,7 +527,9 @@ class RegimeMasterBot:
         # Scan ALL symbols — do NOT skip based on other bots' deployed coins.
         # Each bot has its own position check (pos_key = bot_id:symbol).
         # If Synaptic Adaptive deployed ETH, L1 Specialist should still scan + deploy it.
-        scan_symbols = symbols
+        # BTCUSDT is the macro regime reference for every coin's conviction score.
+        # It must be analyzed on EVERY cycle regardless of which batch rotation is active.
+        scan_symbols = symbols if "BTCUSDT" in symbols else ["BTCUSDT"] + list(symbols)
         logger.info("📡 Scanning %d coins | active tradebook keys: %d",
                     len(scan_symbols), len(tradebook_active_keys))
 
@@ -556,7 +558,10 @@ class RegimeMasterBot:
                 if result:
                     raw_results.append(result)
             except Exception as e:
-                logger.debug("Error analyzing %s: %s", symbol, e)
+                if symbol == "BTCUSDT":
+                    logger.error("🚨 BTC analysis failed: %s", e, exc_info=True)
+                else:
+                    logger.debug("Error analyzing %s: %s", symbol, e)
                 
             # Aggressive GC: Clear memory physically bounded by MTF array instantiations immediately
             # so the baseline RAM never scales to n_coins during a single heartbeat cycle.
@@ -951,6 +956,9 @@ class RegimeMasterBot:
         # Fetch 1h data
         df_1h = fetch_klines(symbol, config.TIMEFRAME_CONFIRMATION, limit=config.HMM_LOOKBACK)
         if df_1h is None or len(df_1h) < 60:
+            if symbol == "BTCUSDT":
+                logger.error("🚨 BTC 1h data fetch failed or too short — regime STALE")
+                self._coin_states.setdefault("BTCUSDT", {})["last_fetch_error"] = datetime.utcnow().isoformat()
             return None
 
         # Get or create brain for this coin (1h)
@@ -968,6 +976,8 @@ class RegimeMasterBot:
             brain.train(df_1h_hmm)
 
         if not brain.is_trained:
+            if symbol == "BTCUSDT":
+                logger.error("🚨 BTC brain not trained — regime STALE")
             return None
 
         # Predict regime (1h)
