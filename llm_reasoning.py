@@ -167,12 +167,15 @@ class AthenaEngine:
         cached = self._check_cache(symbol)
         if cached:
             logger.info("🏛️ Athena [%s] → %s (cached)", symbol, cached.action)
+            self._log_decision(symbol, signal_context, cached)
             return cached
 
         # 2. Rate limit check
         if self._cycle_call_count >= config.LLM_MAX_CALLS_PER_CYCLE:
             logger.debug("🏛️ Athena [%s] → EXECUTE (rate limited)", symbol)
-            return self._default_execute(symbol, reason="Rate limit reached")
+            decision = self._default_execute(symbol, reason="Rate limit reached")
+            self._log_decision(symbol, signal_context, decision)
+            return decision
 
         # 3. Init check
         if not self._ensure_initialized():
