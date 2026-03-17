@@ -4,156 +4,11 @@
   <meta charset="utf-8" />
   <meta name="generator" content="pandoc" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
-  <title>Regime-Master Architecture</title>
+  <title>Synaptic — Master Architecture</title>
   <style>
     /* Default styles provided by pandoc.
     ** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
     */
-    html {
-      color: #1a1a1a;
-      background-color: #fdfdfd;
-    }
-    body {
-      margin: 0 auto;
-      max-width: 36em;
-      padding-left: 50px;
-      padding-right: 50px;
-      padding-top: 50px;
-      padding-bottom: 50px;
-      hyphens: auto;
-      overflow-wrap: break-word;
-      text-rendering: optimizeLegibility;
-      font-kerning: normal;
-    }
-    @media (max-width: 600px) {
-      body {
-        font-size: 0.9em;
-        padding: 12px;
-      }
-      h1 {
-        font-size: 1.8em;
-      }
-    }
-    @media print {
-      html {
-        background-color: white;
-      }
-      body {
-        background-color: transparent;
-        color: black;
-        font-size: 12pt;
-      }
-      p, h2, h3 {
-        orphans: 3;
-        widows: 3;
-      }
-      h2, h3, h4 {
-        page-break-after: avoid;
-      }
-    }
-    p {
-      margin: 1em 0;
-    }
-    a {
-      color: #1a1a1a;
-    }
-    a:visited {
-      color: #1a1a1a;
-    }
-    img {
-      max-width: 100%;
-    }
-    svg {
-      height: auto;
-      max-width: 100%;
-    }
-    h1, h2, h3, h4, h5, h6 {
-      margin-top: 1.4em;
-    }
-    h5, h6 {
-      font-size: 1em;
-      font-style: italic;
-    }
-    h6 {
-      font-weight: normal;
-    }
-    ol, ul {
-      padding-left: 1.7em;
-      margin-top: 1em;
-    }
-    li > ol, li > ul {
-      margin-top: 0;
-    }
-    blockquote {
-      margin: 1em 0 1em 1.7em;
-      padding-left: 1em;
-      border-left: 2px solid #e6e6e6;
-      color: #606060;
-    }
-    code {
-      font-family: Menlo, Monaco, Consolas, 'Lucida Console', monospace;
-      font-size: 85%;
-      margin: 0;
-      hyphens: manual;
-    }
-    pre {
-      margin: 1em 0;
-      overflow: auto;
-    }
-    pre code {
-      padding: 0;
-      overflow: visible;
-      overflow-wrap: normal;
-    }
-    .sourceCode {
-     background-color: transparent;
-     overflow: visible;
-    }
-    hr {
-      border: none;
-      border-top: 1px solid #1a1a1a;
-      height: 1px;
-      margin: 1em 0;
-    }
-    table {
-      margin: 1em 0;
-      border-collapse: collapse;
-      width: 100%;
-      overflow-x: auto;
-      display: block;
-      font-variant-numeric: lining-nums tabular-nums;
-    }
-    table caption {
-      margin-bottom: 0.75em;
-    }
-    tbody {
-      margin-top: 0.5em;
-      border-top: 1px solid #1a1a1a;
-      border-bottom: 1px solid #1a1a1a;
-    }
-    th {
-      border-top: 1px solid #1a1a1a;
-      padding: 0.25em 0.5em 0.25em 0.5em;
-    }
-    td {
-      padding: 0.125em 0.5em 0.25em 0.5em;
-    }
-    header {
-      margin-bottom: 4em;
-      text-align: center;
-    }
-    #TOC li {
-      list-style: none;
-    }
-    #TOC ul {
-      padding-left: 1.3em;
-    }
-    #TOC > ul {
-      padding-left: 0;
-    }
-    #TOC a:not(:hover) {
-      text-decoration: none;
-    }
     code{white-space: pre-wrap;}
     span.smallcaps{font-variant: small-caps;}
     div.columns{display: flex; gap: min(4vw, 1.5em);}
@@ -235,19 +90,35 @@
     code span.vs { color: #4070a0; } /* VerbatimString */
     code span.wa { color: #60a0b0; font-weight: bold; font-style: italic; } /* Warning */
   </style>
+  <link rel="stylesheet" href="" />
 </head>
 <body>
+<style>
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 960px; margin: 40px auto; padding: 0 24px; color: #1a1a2e; background: #f8f9fa; }
+    h1 { color: #0f3460; border-bottom: 3px solid #e94560; padding-bottom: 12px; }
+    h2 { color: #0f3460; border-bottom: 1px solid #dee2e6; padding-bottom: 8px; margin-top: 40px; }
+    h3 { color: #16213e; margin-top: 28px; }
+    h4 { color: #533483; }
+    pre { background: #1a1a2e; color: #e8e8e8; padding: 16px; border-radius: 8px; overflow-x: auto; font-size: 13px; line-height: 1.5; }
+    code { background: #e9ecef; padding: 2px 6px; border-radius: 4px; font-size: 13px; color: #c7254e; }
+    pre code { background: none; color: #e8e8e8; padding: 0; }
+    table { border-collapse: collapse; width: 100%; margin: 16px 0; }
+    th { background: #0f3460; color: white; padding: 10px 14px; text-align: left; }
+    td { padding: 9px 14px; border-bottom: 1px solid #dee2e6; }
+    tr:nth-child(even) { background: #f1f3f5; }
+    blockquote { border-left: 4px solid #e94560; margin: 0; padding: 12px 20px; background: #fff3cd; border-radius: 0 4px 4px 0; }
+    a { color: #0f3460; }
+    hr { border: none; border-top: 1px solid #dee2e6; margin: 32px 0; }
+  </style>
 <header id="title-block-header">
-<h1 class="title">Regime-Master Architecture</h1>
+<h1 class="title">Synaptic — Master Architecture</h1>
 </header>
-<h1
-id="regime-master-hmmbot-master-architecture-documentation">Regime-Master
-(HMMBOT) — Master Architecture &amp; Documentation</h1>
-<p><strong>Version:</strong> Production (March 2026)
-<strong>GitHub:</strong> https://github.com/nikhildha/Synapticbots
-<strong>Deployment:</strong> Railway (Docker, PostgreSQL)
-<strong>Exchanges:</strong> CoinDCX (live), Binance Futures
-(paper/testnet)</p>
+<h1 id="synaptic-master-architecture-developer-reference">Synaptic —
+Master Architecture &amp; Developer Reference</h1>
+<p><strong>Version:</strong> Production v4 — March 2026 (Multi-TF HMM +
+Athena LLM) <strong>Deployment:</strong> Railway (Docker, PostgreSQL)
+<strong>Exchanges:</strong> CoinDCX (live), Binance (paper/testnet data
+source)</p>
 <hr />
 <h2 id="table-of-contents">Table of Contents</h2>
 <ol type="1">
@@ -256,454 +127,1172 @@ id="regime-master-hmmbot-master-architecture-documentation">Regime-Master
 Architecture</a></li>
 <li><a href="#3-python-trading-engine">Python Trading Engine</a>
 <ul>
-<li>3.1 <a href="#31-main-bot-loop">Main Bot Loop (main.py)</a></li>
-<li>3.2 <a href="#32-data-pipeline">Data Pipeline
+<li>3.1 <a href="#31-main-bot-loop-mainpy">Main Bot Loop
+(main.py)</a></li>
+<li>3.2 <a href="#32-data-pipeline-data_pipelinepy">Data Pipeline
 (data_pipeline.py)</a></li>
-<li>3.3 <a href="#33-feature-engine">Feature Engine
+<li>3.3 <a href="#33-feature-engine-feature_enginepy">Feature Engine
 (feature_engine.py)</a></li>
-<li>3.4 <a href="#34-hmm-brain">HMM Brain (hmm_brain.py)</a></li>
-<li>3.5 <a href="#35-coin-scanner">Coin Scanner
+<li>3.4 <a href="#34-hmm-brain-hmm_brainpy">HMM Brain
+(hmm_brain.py)</a></li>
+<li>3.5 <a href="#35-segment-features-segment_featurespy">Segment
+Features (segment_features.py)</a></li>
+<li>3.6 <a href="#36-coin-scanner-coin_scannerpy">Coin Scanner
 (coin_scanner.py)</a></li>
-<li>3.6 <a href="#36-risk-manager">Risk Manager
+<li>3.7 <a href="#37-risk-manager-risk_managerpy">Risk Manager
 (risk_manager.py)</a></li>
-<li>3.7 <a href="#37-execution-engine">Execution Engine
-(execution_engine.py)</a></li>
-<li>3.8 <a href="#38-order-flow-engine">Order Flow Engine
-(orderflow_engine.py)</a></li>
-<li>3.9 <a href="#39-sentiment-engine">Sentiment Engine</a></li>
-<li>3.10 <a href="#310-tradebook">Tradebook (tradebook.py)</a></li>
-<li>3.11 <a href="#311-engine-api">Engine API (engine_api.py)</a></li>
+<li>3.8 <a href="#38-execution-engine-execution_enginepy">Execution
+Engine (execution_engine.py)</a></li>
+<li>3.9 <a href="#39-tradebook-tradebookpy">Tradebook
+(tradebook.py)</a></li>
+<li>3.10 <a href="#310-athena-llm-layer-llm_reasoningpy">Athena LLM
+Layer (llm_reasoning.py)</a></li>
+<li>3.11 <a href="#311-engine-api-engine_apipy">Engine API
+(engine_api.py)</a></li>
 </ul></li>
-<li><a href="#4-brain-logic--deep-dive">Brain Logic — Deep Dive</a></li>
-<li><a href="#5-risk-management-system">Risk Management System</a></li>
-<li><a href="#6-saas-dashboard">SaaS Dashboard (sentinel-saas)</a>
+<li><a href="#4-signal-pipeline--end-to-end-flow">Signal Pipeline —
+End-to-End Flow</a></li>
+<li><a href="#5-exit-mechanics">Exit Mechanics</a></li>
+<li><a href="#6-risk-management">Risk Management</a></li>
+<li><a href="#7-crypto-segments">Crypto Segments</a></li>
+<li><a href="#8-saas-dashboard-nextjs">SaaS Dashboard (NextJS)</a>
 <ul>
-<li>6.1 <a href="#61-technology-stack">Technology Stack</a></li>
-<li>6.2 <a href="#62-application-pages">Application Pages</a></li>
-<li>6.3 <a href="#63-api-routes">API Routes</a></li>
-<li>6.4 <a href="#64-database-schema">Database Schema</a></li>
-<li>6.5 <a href="#65-authentication--authorization">Authentication &amp;
-Authorization</a></li>
-<li>6.6 <a href="#66-subscription-system">Subscription System</a></li>
-<li>6.7 <a href="#67-exchange-api-key-management">Exchange API Key
-Management</a></li>
-<li>6.8 <a href="#68-bot-session-lifecycle">Bot Session
-Lifecycle</a></li>
+<li>8.1 <a href="#81-technology-stack">Technology Stack</a></li>
+<li>8.2 <a href="#82-application-pages">Application Pages</a></li>
+<li>8.3 <a href="#83-api-routes--complete-list">API Routes — Complete
+List</a></li>
+<li>8.4 <a href="#84-bot-lifecycle">Bot Lifecycle</a></li>
+<li>8.5 <a href="#85-auto-re-registration">Auto Re-Registration</a></li>
+<li>8.6 <a href="#86-trade-sync-flow">Trade Sync Flow</a></li>
+<li>8.7 <a href="#87-btc-confidence-display">BTC Confidence
+Display</a></li>
 </ul></li>
-<li><a href="#7-data-flow--integration">Data Flow &amp;
-Integration</a></li>
-<li><a href="#8-backtesting--experimentation">Backtesting &amp;
-Experimentation</a></li>
-<li><a href="#9-deployment--infrastructure">Deployment &amp;
+<li><a href="#9-data-routing--end-to-end">Data Routing —
+End-to-End</a></li>
+<li><a href="#10-deployment--infrastructure">Deployment &amp;
 Infrastructure</a></li>
-<li><a href="#10-testing">Testing</a></li>
 <li><a href="#11-configuration-reference">Configuration
 Reference</a></li>
-<li><a href="#12-glossary">Glossary</a></li>
 </ol>
 <hr />
 <h2 id="system-overview">1. System Overview</h2>
-<p><strong>Regime-Master</strong> is a production-grade algorithmic
-cryptocurrency trading system built on a 3-state Gaussian Hidden Markov
-Model (HMM) for market regime detection, combined with multi-factor
-conviction scoring, dynamic leverage management, and a full SaaS
-dashboard for multi-user deployment.</p>
-<h3 id="what-it-does">What It Does</h3>
-<ul>
-<li>Scans up to 25 crypto coins every 5 minutes using HMM regime
-classification</li>
-<li>Scores each opportunity across 8 conviction factors (0–100
-scale)</li>
-<li>Dynamically assigns leverage (0x to 35x) based on conviction
-score</li>
-<li>Opens long or short futures positions with multi-target partial
-profit booking (T1/T2/T3)</li>
-<li>Trails stop-losses using ATR-based dynamic rules</li>
-<li>Shuts down automatically if portfolio drawdown exceeds 10% in 24
-hours</li>
-<li>Sends real-time Telegram alerts for all trade events</li>
-<li>Exposes full status and control via a Next.js SaaS dashboard with
-per-user bots</li>
-</ul>
-<h3 id="key-design-principles">Key Design Principles</h3>
-<table>
-<colgroup>
-<col style="width: 42%" />
-<col style="width: 57%" />
-</colgroup>
-<thead>
-<tr>
-<th>Principle</th>
-<th>Implementation</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><strong>Regime-aware trading</strong></td>
-<td>Only trades in BULL/BEAR; avoids CHOP for trend strategies</td>
-</tr>
-<tr>
-<td><strong>Evidence-gated leverage</strong></td>
-<td>Leverage unlocked only when conviction score ≥ 40</td>
-</tr>
-<tr>
-<td><strong>Anti-liquidation</strong></td>
-<td>Isolated margin, ATR stops, kill switch at 10% drawdown</td>
-</tr>
-<tr>
-<td><strong>Multi-target exit</strong></td>
-<td>25% booked at T1, 50% at T2, remainder runs to T3</td>
-</tr>
-<tr>
-<td><strong>Per-user isolation</strong></td>
-<td>Each SaaS user has their own bot, trades, API keys, and session
-history</td>
-</tr>
-<tr>
-<td><strong>Encryption at rest</strong></td>
-<td>Exchange API keys encrypted with AES-256-GCM before DB storage</td>
-</tr>
-</tbody>
-</table>
+<p>Synaptic (Project Regime-Master) is an automated cryptocurrency
+futures trading system. It uses Hidden Markov Models (HMM) on multiple
+timeframes to classify market regimes (Bull/Bear/Chop), then routes
+signals through an LLM reasoning layer (Athena) before executing
+trades.</p>
+<p>The system is multi-tenant: multiple users can run isolated bots
+simultaneously on a shared engine. Each bot is scoped to a market
+segment (L1, L2, AI, etc.) and executes trades with its own
+<code>bot_id</code> stamp for full trade isolation.</p>
+<p><strong>Who it’s for:</strong> Internal use — the engine operator
+deploys bots for end-users via the SaaS dashboard.</p>
+<p><strong>What it does:</strong> - Every 15 minutes: scans a
+segment-based coin pool, runs 3-TF HMM analysis per coin, computes
+conviction scores, calls Athena for final LLM validation, and deploys
+limit or market orders - Every 10 seconds (heartbeat): updates
+unrealized P&amp;L, manages trailing SL steps, checks exit conditions,
+handles limit order expiry/fill - Persists all state to JSON files
+(engine) and PostgreSQL (SaaS dashboard)</p>
 <hr />
 <h2 id="high-level-architecture">2. High-Level Architecture</h2>
-<pre><code>┌─────────────────────────────────────────────────────────────────────┐
-│                        RAILWAY CONTAINER                            │
-│                                                                     │
-│  ┌─────────────────────────┐    ┌──────────────────────────────┐   │
-│  │   Python Trading Engine  │    │   Next.js SaaS Dashboard     │   │
-│  │                          │    │   (Port 3000)                │   │
-│  │  main.py (bot loop)      │◄───┤   React + TypeScript         │   │
-│  │  hmm_brain.py            │    │   Prisma ORM → PostgreSQL    │   │
-│  │  feature_engine.py       │    │   NextAuth (JWT sessions)    │   │
-│  │  risk_manager.py         │    │   AES-256-GCM key storage    │   │
-│  │  execution_engine.py     │    └───────────────┬──────────────┘   │
-│  │  sentiment_engine.py     │                    │                  │
-│  │  orderflow_engine.py     │    ┌───────────────▼──────────────┐   │
-│  │  coin_scanner.py         │    │   Flask Engine API           │   │
-│  │  tradebook.py            │◄───┤   (Port 5000)                │   │
-│  │                          │    │   /api/bot-state             │   │
-│  └────────────┬─────────────┘    │   /api/trades                │   │
-│               │                  │   /api/close-trade           │   │
-│               │                  │   /api/health                │   │
-│  ┌────────────▼─────────────┐    └──────────────────────────────┘   │
-│  │   /app/data/ (shared)    │                                       │
-│  │   bot_state.json         │    ┌──────────────────────────────┐   │
-│  │   tradebook.json         │    │   PostgreSQL Database         │   │
-│  │   sentiment_log.csv      │    │   (Railway Postgres)          │   │
-│  │   coin_tiers.csv         │    │   Users, Bots, Trades,        │   │
-│  │   commands.json          │    │   Sessions, API Keys          │   │
-│  └──────────────────────────┘    └──────────────────────────────┘   │
-└─────────────────────────────────────────────────────────────────────┘
-          │                                    │
-          ▼                                    ▼
-  ┌───────────────┐                   ┌────────────────┐
-  │  CoinDCX API  │                   │   Binance API  │
-  │  (Live Trade) │                   │  (Paper/Test)  │
-  └───────────────┘                   └────────────────┘</code></pre>
-<h3 id="component-responsibilities">Component Responsibilities</h3>
-<table>
-<colgroup>
-<col style="width: 25%" />
-<col style="width: 23%" />
-<col style="width: 13%" />
-<col style="width: 37%" />
-</colgroup>
-<thead>
-<tr>
-<th>Component</th>
-<th>Language</th>
-<th>Port</th>
-<th>Responsibility</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><strong>main.py</strong></td>
-<td>Python</td>
-<td>—</td>
-<td>Bot orchestration loop, cycle management</td>
-</tr>
-<tr>
-<td><strong>engine_api.py</strong></td>
-<td>Python/Flask</td>
-<td>5000</td>
-<td>REST API for dashboard ↔︎ engine communication</td>
-</tr>
-<tr>
-<td><strong>Next.js App</strong></td>
-<td>TypeScript</td>
-<td>3000</td>
-<td>SaaS dashboard, user management, API layer</td>
-</tr>
-<tr>
-<td><strong>PostgreSQL</strong></td>
-<td>SQL</td>
-<td>5432</td>
-<td>Persistent storage (users, bots, trades, sessions)</td>
-</tr>
-<tr>
-<td><strong>CoinDCX</strong></td>
-<td>External</td>
-<td>—</td>
-<td>Live futures trading (Indian exchange)</td>
-</tr>
-<tr>
-<td><strong>Binance Futures</strong></td>
-<td>External</td>
-<td>—</td>
-<td>Paper/testnet trading</td>
-</tr>
-</tbody>
-</table>
+<pre><code>┌─────────────────────────────────────────────────────────────────┐
+│                        Railway Platform                          │
+│                                                                   │
+│  ┌──────────────────────────┐    ┌──────────────────────────┐   │
+│  │   Python Trading Engine  │    │   NextJS SaaS Dashboard  │   │
+│  │   (Flask + main loop)    │    │   (Next.js 14 App Router)│   │
+│  │                          │    │                          │   │
+│  │  engine_api.py (Flask)   │◄───│  /api/bot-state GET      │   │
+│  │  └─ main.py (bot loop)   │    │  /api/bots/toggle POST   │   │
+│  │     ├─ hmm_brain.py      │    │  /api/trades/* POST      │   │
+│  │     ├─ feature_engine.py │    │                          │   │
+│  │     ├─ coin_scanner.py   │    │  Prisma ORM → PostgreSQL │   │
+│  │     ├─ risk_manager.py   │    │  NextAuth sessions        │   │
+│  │     ├─ llm_reasoning.py  │    │  Subscription gating     │   │
+│  │     ├─ tradebook.py      │    └──────────────────────────┘   │
+│  │     └─ execution_engine  │                                    │
+│  │                          │    ┌──────────────────────────┐   │
+│  │  Data: data/*.json       │    │   PostgreSQL Database    │   │
+│  └──────────────────────────┘    │   User / Bot / Trade     │   │
+│                                   │   BotSession / CycleSnap │   │
+│  ┌──────────────────────────┐    └──────────────────────────┘   │
+│  │  External APIs           │                                    │
+│  │  CoinDCX (live orders)   │                                    │
+│  │  Binance (OHLCV data)    │                                    │
+│  │  Gemini API (Athena LLM) │                                    │
+│  └──────────────────────────┘                                    │
+└─────────────────────────────────────────────────────────────────┘</code></pre>
+<p><strong>Two-layer architecture:</strong> - <strong>Python
+Engine</strong> — stateful trading loop, market analysis, order
+execution, tradebook. Exposes a Flask REST API. State persisted in
+<code>data/*.json</code>. - <strong>NextJS SaaS</strong> — user-facing
+dashboard, bot management, trade display, subscription. Reads engine
+state via HTTP. Writes user/bot/trade records to PostgreSQL.</p>
+<p>The two layers communicate via HTTP only. The engine has no direct DB
+access; the SaaS dashboard has no direct market data access.</p>
 <hr />
 <h2 id="python-trading-engine">3. Python Trading Engine</h2>
-<h3 id="main-bot-loop">3.1 Main Bot Loop</h3>
-<p><strong>File:</strong> <code>main.py</code> (56.5 KB)</p>
-<p>The <code>RegimeMasterBot</code> class contains the entire bot
-lifecycle.</p>
-<h4 id="timing-architecture">Timing Architecture</h4>
-<pre><code>Every 30 seconds (LOOP_INTERVAL_SECONDS):
-  └── Heartbeat loop
-        ├── Read commands.json (START / STOP / PAUSE / CLOSE_ALL)
-        ├── Update engine_state.json (health, uptime, CPU)
-        └── Every 300 seconds (ANALYSIS_INTERVAL_SECONDS = 5 min):
-              └── Full analysis cycle
-                    ├── Coin scanner: refresh top coins (every 4 cycles = 20 min)
-                    ├── For each coin:
-                    │     ├── Fetch OHLCV (15m, 1h, 4h)
-                    │     ├── Compute features
-                    │     ├── HMM predict → (regime, confidence)
-                    │     ├── Compute conviction score (8 factors)
-                    │     ├── If score ≥ 40 and no open position: open trade
-                    │     └── If open position: check SL/TP/T1/T2/trailing
-                    └── Sync tradebook → write engine_state.json</code></pre>
-<h4 id="key-methods">Key Methods</h4>
+<h3 id="main-bot-loop-main.py">3.1 Main Bot Loop (main.py)</h3>
+<p><strong>Entry point:</strong> <code>engine_api.py</code> starts
+<code>RegimeMasterBot</code> in a background thread via
+<code>_run_engine()</code>.</p>
+<p><strong>Two timing loops:</strong></p>
 <table>
 <colgroup>
-<col style="width: 47%" />
-<col style="width: 52%" />
+<col style="width: 24%" />
+<col style="width: 40%" />
+<col style="width: 36%" />
 </colgroup>
 <thead>
 <tr>
-<th>Method</th>
+<th>Loop</th>
+<th>Interval</th>
 <th>Purpose</th>
 </tr>
 </thead>
 <tbody>
 <tr>
-<td><code>run()</code></td>
-<td>Entry point — starts the bot loop</td>
+<td>Heartbeat (<code>_heartbeat</code>)</td>
+<td>10 seconds (<code>LOOP_INTERVAL_SECONDS</code>)</td>
+<td>Trailing SL sync, limit order management, P&amp;L updates,
+pause/halt checks</td>
 </tr>
 <tr>
-<td><code>_heartbeat()</code></td>
-<td>30-second cycle — read commands, update state</td>
-</tr>
-<tr>
-<td><code>_analysis_cycle()</code></td>
-<td>5-minute cycle — full HMM scan across all coins</td>
-</tr>
-<tr>
-<td><code>_analyze_coin(symbol)</code></td>
-<td>Per-coin regime detection + conviction scoring</td>
-</tr>
-<tr>
-<td><code>_manage_position(symbol)</code></td>
-<td>Monitor open position: SL/TP/T1/T2 checks</td>
-</tr>
-<tr>
-<td><code>_process_commands()</code></td>
-<td>Handle dashboard commands (start, stop, pause, close-all)</td>
-</tr>
-<tr>
-<td><code>_update_engine_state()</code></td>
-<td>Write engine health to data/engine_state.json</td>
+<td>Analysis Cycle (<code>_tick</code>)</td>
+<td>15 minutes (<code>ANALYSIS_INTERVAL_SECONDS</code>)</td>
+<td>Full coin scan, HMM analysis, conviction scoring, Athena call, trade
+deployment</td>
 </tr>
 </tbody>
 </table>
-<h4 id="bot-states">Bot States</h4>
-<pre><code>IDLE → RUNNING → PAUSED → RUNNING → STOPPED
-              ↓
-           KILLED (kill switch triggered)</code></pre>
+<p><strong><code>_tick()</code> — Full Analysis Cycle
+steps:</strong></p>
+<ol type="1">
+<li>Check weekly tier re-classification (background thread if due)</li>
+<li>Reset Athena rate limiter for the new cycle</li>
+<li>Refresh segment heatmap JSON (cheap ticker call)</li>
+<li>Rebuild coin pool from
+<code>get_active_bot_segment_pool(ENGINE_ACTIVE_BOTS)</code> every
+<code>SCAN_INTERVAL_CYCLES</code> cycles</li>
+<li>Rotate through pool in batches; skip already-deployed coins</li>
+<li>Fetch live CoinDCX prices (funding rates, etc.)</li>
+<li>Fetch balance; retry up to 3x in live mode if $0</li>
+<li>Check kill switch (10% drawdown in 24h)</li>
+<li>Run <code>_check_exits()</code> — syncs
+<code>_active_positions</code> dict from tradebook (regime-change exits
+disabled)</li>
+<li>BTC flash-crash macro veto (blocks all BUY signals if BTC drops
+&gt;1.5% in 15m)</li>
+<li><code>_analyze_coin()</code> for each symbol → builds
+<code>raw_results</code> list</li>
+<li>Deploy loop — iterates per registered bot in
+<code>ENGINE_ACTIVE_BOTS</code>:
+<ul>
+<li>Filter raw_results to bot’s segment</li>
+<li>Pick top <code>TOP_COINS_PER_SEGMENT</code> (=1) coin by
+conviction</li>
+<li>Skip if conviction &lt; <code>MIN_CONVICTION_FOR_DEPLOY</code>
+(60)</li>
+<li>Skip if <code>bot_id:symbol</code> already in active tradebook keys
+(duplicate guard)</li>
+<li>Call Athena — VETO or EXECUTE</li>
+<li>Execute trade, stamp with <code>bot_id</code></li>
+<li>Record in tradebook via <code>tradebook.open_trade()</code></li>
+</ul></li>
+<li>Save multi-state JSON for dashboard</li>
+<li>POST cycle snapshot to dashboard <code>/api/cycle-snapshot</code>
+(background thread)</li>
+</ol>
+<p><strong><code>_heartbeat()</code> tasks:</strong> - Read
+<code>engine_state.json</code> — skip if paused/halted - Process
+commands file (KILL/CLOSE_ALL) - <code>_sync_positions()</code> — remove
+closed trades from <code>_active_positions</code> -
+<code>_manage_limit_orders()</code> — TIF expiry, escape hatch, paper
+fills, virtual limit triggers -
+<code>tradebook.update_unrealized()</code> — P&amp;L updates, trailing
+SL stepping, SL/TP exit checks (paper) - Live mode: sync CoinDCX
+positions, sync live TP/SL</p>
+<p><strong>Key in-memory state:</strong></p>
+<pre><code>_multi_tf_brains: dict[symbol → MultiTFHMMBrain]   # 3-TF brains per coin
+_coin_brains:     dict[tf_key → HMMBrain]           # per-coin-per-TF brain cache
+_coin_states:     dict[symbol → dict]               # dashboard state per coin
+_active_positions: dict[bot_id:symbol → dict]       # active position tracker
+_live_prices:     dict[cdx_pair → dict]             # live funding/price data</code></pre>
+<p><strong>Segment inference fallback:</strong>
+<code>_infer_segment_from_name(bot_name)</code> maps bot name keywords →
+segment when <code>segment_filter</code> is not in registration
+payload.</p>
+<p><strong>Signal broadcast audit log:</strong> Every signal event
+(FILTERED, ATHENA_DECISION, SIGNAL_DISPATCH, TRADEBOOK_RECORDED) is
+written to <code>data/signal_broadcast.log</code> via
+<code>_bcast()</code>. Rotates daily, 7-day retention.</p>
 <hr />
-<h3 id="data-pipeline">3.2 Data Pipeline</h3>
-<p><strong>File:</strong> <code>data_pipeline.py</code> (8.2 KB)</p>
-<p>Responsible for all market data ingestion.</p>
-<h4 id="data-sources">Data Sources</h4>
-<table>
-<thead>
-<tr>
-<th>Source</th>
-<th>Purpose</th>
-<th>Fallback</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><strong>Binance Futures</strong></td>
-<td>OHLCV for all timeframes (primary)</td>
-<td>CoinDCX</td>
-</tr>
-<tr>
-<td><strong>CoinDCX</strong></td>
-<td>Live spot/futures prices</td>
-<td>Binance</td>
-</tr>
-<tr>
-<td><strong>Binance Spot</strong></td>
-<td>Funding rate proxy (perpetual funding)</td>
-<td>—</td>
-</tr>
-</tbody>
-</table>
-<h4 id="timeframes-used">Timeframes Used</h4>
-<table>
-<thead>
-<tr>
-<th>Timeframe</th>
-<th>Purpose</th>
-<th>Candles</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><code>15m</code></td>
-<td>Entry/exit timing, HMM training data</td>
-<td>250 candles</td>
-</tr>
-<tr>
-<td><code>1h</code></td>
-<td>Trend confirmation</td>
-<td>100 candles</td>
-</tr>
-<tr>
-<td><code>4h</code></td>
-<td>Macro regime, S/R lookback</td>
-<td>150 candles</td>
-</tr>
-<tr>
-<td><code>1d</code></td>
-<td>Long-term trend context</td>
-<td>60 candles</td>
-</tr>
-</tbody>
-</table>
-<h4 id="key-function">Key Function</h4>
-<div class="sourceCode" id="cb4"><pre
-class="sourceCode python"><code class="sourceCode python"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> fetch_ohlcv(symbol, interval, limit<span class="op">=</span><span class="dv">250</span>) <span class="op">-&gt;</span> pd.DataFrame:</span>
-<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a>    <span class="co"># Returns: open, high, low, close, volume columns</span></span>
-<span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a>    <span class="co"># Tries Binance first, falls back to CoinDCX</span></span>
-<span id="cb4-4"><a href="#cb4-4" aria-hidden="true" tabindex="-1"></a>    <span class="co"># Normalizes column names and datetime index</span></span></code></pre></div>
-<hr />
-<h3 id="feature-engine">3.3 Feature Engine</h3>
-<p><strong>File:</strong> <code>feature_engine.py</code> (11.6 KB)</p>
-<p>Computes all technical indicators and the 6 HMM input features.</p>
-<h4 id="hmm-feature-set-6-features">HMM Feature Set (6 Features)</h4>
-<p>These 6 features are the inputs to the Gaussian HMM. Selected via
-greedy ablation — adding <code>funding_proxy</code> and <code>adx</code>
-boosted Sharpe from 0.258 → 0.667.</p>
+<h3 id="data-pipeline-data_pipeline.py">3.2 Data Pipeline
+(data_pipeline.py)</h3>
+<p>Unified OHLCV data layer. Always tries CoinDCX first, falls back to
+Binance.</p>
 <table>
 <colgroup>
-<col style="width: 27%" />
-<col style="width: 27%" />
-<col style="width: 45%" />
+<col style="width: 43%" />
+<col style="width: 56%" />
+</colgroup>
+<thead>
+<tr>
+<th>Function</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>fetch_klines(symbol, interval, limit)</code></td>
+<td>Primary kline fetcher. CoinDCX → Binance fallback</td>
+</tr>
+<tr>
+<td><code>fetch_futures_klines(symbol, interval, limit)</code></td>
+<td>Futures klines. Paper→Binance Futures, Live→CoinDCX</td>
+</tr>
+<tr>
+<td><code>get_multi_timeframe_data(symbol)</code></td>
+<td>Fetches 15m, 1h, 4h simultaneously</td>
+</tr>
+<tr>
+<td><code>get_current_price(symbol)</code></td>
+<td>Live price. Always CoinDCX, Binance fallback</td>
+</tr>
+<tr>
+<td><code>_get_binance_client()</code></td>
+<td>Lazy singleton Binance client</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Supported intervals:</strong> 1m, 3m, 5m, 15m, 30m, 1h, 4h,
+1d, 1w</p>
+<p>The <code>_parse_klines_df()</code> function normalizes raw kline
+arrays to a clean OHLCV DataFrame with <code>timestamp</code>
+(datetime), <code>open</code>, <code>high</code>, <code>low</code>,
+<code>close</code>, <code>volume</code> columns.</p>
+<hr />
+<h3 id="feature-engine-feature_engine.py">3.3 Feature Engine
+(feature_engine.py)</h3>
+<p><strong>Two-pass computation:</strong></p>
+<p><strong>Pass 1 — HMM Features</strong>
+(<code>compute_hmm_features(df, btc_df=None)</code>):</p>
+<table>
+<colgroup>
+<col style="width: 40%" />
+<col style="width: 59%" />
 </colgroup>
 <thead>
 <tr>
 <th>Feature</th>
-<th>Formula</th>
-<th>Why It Matters</th>
+<th>Description</th>
 </tr>
 </thead>
 <tbody>
 <tr>
 <td><code>log_return</code></td>
-<td><code>ln(close_t / close_{t-1})</code></td>
-<td>Raw price momentum signal</td>
+<td>Log(close/close.shift(1))</td>
 </tr>
 <tr>
 <td><code>volatility</code></td>
-<td>Rolling 20-period std of log_return</td>
-<td>Regime separator (low in BULL, high in BEAR)</td>
+<td>(high - low) / close</td>
 </tr>
 <tr>
 <td><code>volume_change</code></td>
-<td><code>(vol_t - vol_{t-1}) / vol_{t-1}</code></td>
-<td>Volume expansion confirms breakouts</td>
+<td>Log(volume/volume.shift), clipped ±3</td>
 </tr>
 <tr>
-<td><code>rsi_norm</code></td>
-<td><code>(RSI_14 - 50) / 50</code></td>
-<td>Normalized [-1, +1] momentum indicator</td>
+<td><code>vol_zscore</code></td>
+<td>Z-score of volume vs 24-period SMA, clipped ±5</td>
 </tr>
 <tr>
-<td><code>funding_proxy</code></td>
-<td><code>close / EMA(close, 20) - 1</code></td>
-<td>Proxy for futures funding sentiment</td>
+<td><code>rel_strength_btc</code></td>
+<td>Asset return - BTC return (requires btc_df); jittered to prevent
+singular covariance</td>
 </tr>
 <tr>
-<td><code>adx</code></td>
-<td>Average Directional Index (14)</td>
-<td>Trend strength (separates trend from chop)</td>
+<td><code>liquidity_vacuum</code></td>
+<td>Abs log-return / (ATR14/price), clipped 0-5</td>
+</tr>
+<tr>
+<td><code>exhaustion_tail</code></td>
+<td>Wick skew × vol_zscore (captures rejection candles)</td>
+</tr>
+<tr>
+<td><code>amihud_illiquidity</code></td>
+<td>Abs log-return / dollar volume × 1e8, clipped 0-10</td>
+</tr>
+<tr>
+<td><code>volume_trend_intensity</code></td>
+<td>EMA5/EMA20 of volume (momentum of volume)</td>
+</tr>
+<tr>
+<td><code>swing_l</code></td>
+<td>10-candle rolling min of low (for RM3_Swing SL)</td>
+</tr>
+<tr>
+<td><code>swing_h</code></td>
+<td>10-candle rolling max of high (for RM3_Swing SL)</td>
 </tr>
 </tbody>
 </table>
+<p><strong>Pass 2 — Technical Indicators</strong>
+(<code>compute_indicators(df)</code>): Adds <code>rsi</code>,
+<code>bb_upper</code>, <code>bb_middle</code>, <code>bb_lower</code>,
+<code>atr</code>.</p>
+<p><strong>Convenience:</strong> <code>compute_all_features(df)</code>
+runs both passes.</p>
+<p><strong>Other exported functions:</strong> -
+<code>compute_ema(series, length)</code> — EWM with adjust=False -
+<code>compute_trend(df)</code> → ‘UP’/‘DOWN’/‘FLAT’ via EMA 20/50
+crossover - <code>compute_atr(df, length=14)</code> — EWM ATR -
+<code>compute_support_resistance(df)</code> → dict with
+support/resistance/pivot/bb_pos - <code>compute_sr_position(df)</code> →
+(sr_position, vwap_position) for conviction scoring -
+<code>compute_vwap(df, window=20)</code> — rolling VWAP</p>
+<hr />
+<h3 id="hmm-brain-hmm_brain.py">3.4 HMM Brain (hmm_brain.py)</h3>
+<h4 id="hmmbrain-single-coin-single-timeframe"><code>HMMBrain</code> —
+Single coin, single timeframe</h4>
+<p><strong>Model:</strong> <code>GaussianHMM</code> from hmmlearn.
+<code>n_components=3</code> (HMM_N_STATES),
+<code>covariance_type="full"</code>, 100 iterations.</p>
+<p><strong>Training (<code>train(df)</code>):</strong> 1. Extracts
+coin’s specific feature list from <code>segment_features.py</code> 2.
+Z-score normalizes features (stores mean/std for prediction scaling) 3.
+Fits GaussianHMM 4. Calls <code>_build_state_map()</code> to assign
+canonical regime labels</p>
+<p><strong><code>_build_state_map()</code>:</strong> - Finds
+<code>log_return</code> index in <code>self.features</code> dynamically
+(NOT hardcoded 0) - Finds <code>volatility</code> index in
+<code>self.features</code> dynamically (NOT hardcoded 1) - Sorts raw HMM
+states by mean log-return (descending) - Maps: highest return → BULL
+(0), middle → CHOP (2), lowest → BEAR (1) - For 4-state models: uses
+volatility to distinguish CHOP from BEAR among middle states</p>
+<p><strong>Prediction (<code>predict(df)</code>):</strong> - Returns
+<code>(canonical_state: int, confidence: float)</code> - Confidence =
+<strong>margin</strong> = best_prob - 2nd_best_prob (range 0.0–1.0) -
+Raw max-posterior was always 99%+ regardless of accuracy; margin
+measures decisiveness</p>
+<p><strong>Retrain trigger:</strong> <code>needs_retrain()</code>
+returns True if model is untrained or age &gt;
+<code>HMM_RETRAIN_HOURS</code> (24h)</p>
 <h4
-id="additional-technical-indicators-for-conviction-scoring">Additional
-Technical Indicators (for Conviction Scoring)</h4>
+id="multitfhmmbrain-multi-timeframe-aggregator"><code>MultiTFHMMBrain</code>
+— Multi-timeframe aggregator</h4>
+<p>Manages 3 separate <code>HMMBrain</code> instances per coin (1d, 1h,
+15m).</p>
+<p><strong>Conviction computation
+(<code>get_conviction()</code>):</strong></p>
+<pre><code>Timeframe weights: 1d=40%, 1h=35%, 15m=25%
+
+For each TF with a non-CHOP prediction:
+  Direction vote: BULL→BUY, BEAR→SELL, CHOP→no vote
+
+Consensus = majority of non-CHOP votes
+  If tied: return 0, None, 0
+
+Weighted score per TF (if agrees with consensus):
+  margin &gt;= 0.30 → full weight (100%)
+  margin &gt;= 0.20 → 85% weight
+  margin &gt;= 0.10 → 65% weight
+  margin &gt;= 0.05 → 40% weight
+  below 0.05    → 20% weight
+
+Disagreement = 0 (no penalty, no contribution)
+CHOP = 0
+
+conviction = sum(w × tier_multiplier), clipped 0–100</code></pre>
+<p>Minimum agreement required: 2 of 3 TFs
+(<code>MULTI_TF_MIN_AGREEMENT</code>).</p>
+<p><strong>Regime summary format</strong> (used in dashboard):
+<code>"1d=BULLISH(0.45) | 1h=BULLISH(0.32) | 15m=SIDEWAYS/CHOP(0.08)"</code></p>
+<hr />
+<h3 id="segment-features-segment_features.py">3.5 Segment Features
+(segment_features.py)</h3>
+<p>Per-coin feature lists determined via 15m Permutation Likelihood
+backtesting across 8 segments and 4 timeframes.</p>
+<p><strong>Global default:</strong> <code>ALL_HMM_FEATURES</code> — 9
+features used for unknown/unmapped coins.</p>
+<p><strong><code>COIN_FEATURES</code> dict:</strong> 41 coins with
+individually optimized feature subsets. Examples:</p>
+<table>
+<colgroup>
+<col style="width: 37%" />
+<col style="width: 62%" />
+</colgroup>
+<thead>
+<tr>
+<th>Coin</th>
+<th>Features</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>BTCUSDT</td>
+<td>vol_zscore, log_return, volume_trend_intensity, liquidity_vacuum,
+amihud_illiquidity, exhaustion_tail, volatility, volume_change</td>
+</tr>
+<tr>
+<td>SOLUSDT</td>
+<td>vol_zscore, liquidity_vacuum, amihud_illiquidity,
+volume_trend_intensity, exhaustion_tail, log_return,
+rel_strength_btc</td>
+</tr>
+<tr>
+<td>TAOUSDT</td>
+<td>vol_zscore, liquidity_vacuum, log_return, rel_strength_btc,
+amihud_illiquidity, volume_trend_intensity, exhaustion_tail</td>
+</tr>
+</tbody>
+</table>
+<p>Note: BTCUSDT includes <code>log_return</code> explicitly because
+<code>_build_state_map()</code> searches for it by name — this is
+required for correct state ordering.</p>
+<p><strong>API:</strong> - <code>get_features_for_coin(coin)</code> →
+returns coin-specific list or ALL_HMM_FEATURES fallback -
+<code>get_segment_for_coin(coin)</code> → returns segment name from
+<code>config.CRYPTO_SEGMENTS</code>, defaults to “L1”</p>
+<hr />
+<h3 id="coin-scanner-coin_scanner.py">3.6 Coin Scanner
+(coin_scanner.py)</h3>
+<h4 id="scan-pool-building">Scan Pool Building</h4>
+<p><code>get_active_bot_segment_pool(active_bots)</code> — called each
+cycle in <code>_tick()</code>:</p>
+<ol type="1">
+<li>Inspect <code>segment_filter</code> for each active bot</li>
+<li>If any bot has <code>segment_filter="ALL"</code> or no bots
+registered → trigger dynamic segment selection</li>
+<li>Dynamic mode: call
+<code>get_hottest_segments(SEGMENT_SCAN_LIMIT=3)</code> → writes
+<code>data/segment_heatmap.json</code></li>
+<li>Compile coins from all target segments</li>
+<li>Apply static exclusions (<code>COIN_EXCLUDE</code> +
+<code>EXCLUDED_COINS</code>) and dynamic exclusions
+(<code>coin_exclusions.json</code>)</li>
+<li><strong>Always insert PRIMARY_SYMBOL (BTCUSDT) at index 0</strong> —
+required for BTC macro context and dashboard display</li>
+</ol>
+<h4
+id="institutional-segment-heatmap-get_hottest_segments">Institutional
+Segment Heatmap (<code>get_hottest_segments</code>)</h4>
+<p>3-Pillar scoring for each segment:</p>
+<table>
+<colgroup>
+<col style="width: 32%" />
+<col style="width: 36%" />
+<col style="width: 32%" />
+</colgroup>
+<thead>
+<tr>
+<th>Pillar</th>
+<th>Formula</th>
+<th>Weight</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>VW-RR (Volume-Weighted Relative Return)</td>
+<td>Σ(coin_change × volume_weight)</td>
+<td>Part of composite</td>
+</tr>
+<tr>
+<td>Benchmark Alpha</td>
+<td>VW-RR - BTC 24h return</td>
+<td>Part of composite</td>
+</tr>
+<tr>
+<td>Participation Breadth</td>
+<td>% coins moving in segment direction</td>
+<td>Multiplier</td>
+</tr>
+</tbody>
+</table>
+<p><code>composite_score = VW-RR × (breadth_pct / 100)</code></p>
+<p>Segments ranked by absolute composite score. Top
+<code>SEGMENT_SCAN_LIMIT</code> (3) returned.</p>
+<h4 id="coin-tier-system">Coin Tier System</h4>
+<p>Coins classified into Tier A/B/C via weekly calibration experiment
+(<code>tools/weekly_reclassify.py</code>): - Tier A: stable forward
+Sharpe ≥ 1.0 — promoted to front of scan queue - Tier C: excluded from
+shortlist</p>
+<p><code>reload_coin_tiers()</code> called after background
+reclassification completes.</p>
+<h4 id="dynamic-exclusions">Dynamic Exclusions</h4>
+<p><code>auto_exclude_coin(symbol)</code> adds coins with insufficient
+data (&lt;60 candles) to <code>data/coin_exclusions.json</code>.
+Persisted across restarts.</p>
+<hr />
+<h3 id="risk-manager-risk_manager.py">3.7 Risk Manager
+(risk_manager.py)</h3>
+<h4 id="risk-manager-routing">Risk Manager Routing</h4>
 <table>
 <thead>
 <tr>
-<th>Indicator</th>
+<th>Segment</th>
+<th>Risk Manager</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>L1</td>
+<td>RM2_ATR</td>
+</tr>
+<tr>
+<td>L2, AI, DePIN, Gaming, RWA, DeFi, Meme</td>
+<td>RM3_Swing</td>
+</tr>
+</tbody>
+</table>
+<p><code>config.get_optimal_rm(symbol)</code> returns the RM ID for a
+given symbol.</p>
+<h4 id="stop-loss-take-profit-computation-calculate_optimal_stops">Stop
+Loss / Take Profit Computation
+(<code>calculate_optimal_stops</code>)</h4>
+<p><strong>RM2_ATR:</strong> - multiplier <code>m = 2.5</code> (3.5 for
+Meme/AI segments) - <code>SL = entry - direction × (m × ATR)</code> -
+<code>TP = entry + direction × (m × 2.0 × ATR)</code> → 1:2 R:R</p>
+<p><strong>RM3_Swing:</strong> - <code>SL = swing_l</code> (for BUY) or
+<code>swing_h</code> (for SELL) — 10-candle rolling local extremum -
+Falls back to <code>entry - direction × (3.0 × ATR)</code> if swing
+level is invalid -
+<code>TP = entry + direction × (risk_dist × 2.5)</code> → 2.5R R:R on
+actual swing risk</p>
+<h4 id="leverage-selection">Leverage Selection</h4>
+<p>Two paths: 1. <strong>Dynamic ATR-based</strong>
+(<code>EXECUTION_DYNAMIC_LEVERAGE=True</code>, primary): linear scale
+from ATR% - ATR% ≤ 0.5% → 25x - ATR% ≥ 1.5% → 10x - Linear between [10x,
+25x] 2. <strong>Conviction-based</strong> (legacy fallback): conviction
+score → leverage tier</p>
+<h4 id="conviction-score-5-active-factors-0100">Conviction Score (5
+active factors, 0–100)</h4>
+<table>
+<thead>
+<tr>
+<th>Factor</th>
+<th>Weight</th>
+<th>Source</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>HMM Confidence (margin tier)</td>
+<td>71</td>
+<td><code>_score_hmm()</code></td>
+</tr>
+<tr>
+<td>BTC Macro Regime alignment</td>
+<td>7</td>
+<td><code>_score_btc_macro()</code></td>
+</tr>
+<tr>
+<td>Funding Rate carry signal</td>
+<td>11</td>
+<td><code>_score_funding()</code></td>
+</tr>
+<tr>
+<td>Open Interest Change</td>
+<td>11</td>
+<td><code>_score_oi()</code></td>
+</tr>
+<tr>
+<td>Order Flow</td>
+<td>0 (disabled)</td>
+<td>—</td>
+</tr>
+<tr>
+<td>SR + VWAP</td>
+<td>0 (removed)</td>
+<td>—</td>
+</tr>
+<tr>
+<td>Sentiment</td>
+<td>0 (removed)</td>
+<td>—</td>
+</tr>
+<tr>
+<td>Volatility quality</td>
+<td>0 (removed)</td>
+<td>—</td>
+</tr>
+</tbody>
+</table>
+<p>Minimum conviction to proceed to Athena: 60
+(<code>MIN_CONVICTION_FOR_DEPLOY</code>)</p>
+<h4 id="kill-switch">Kill Switch</h4>
+<p><code>check_kill_switch()</code> triggers if portfolio drawdown ≥ 10%
+in 24h. Writes KILL command to <code>data/commands.json</code>, closes
+all positions.</p>
+<h4
+id="margin-first-position-sizing-calculate_margin_first_position">Margin-First
+Position Sizing (<code>calculate_margin_first_position</code>)</h4>
+<pre><code>For each leverage tier [35, 25, 15, 10, 5] (descending):
+  If tier &gt; conviction_leverage: skip
+  sl_mult = get_atr_multipliers(lev)[0]
+  loss_at_sl = (atr × sl_mult / price) × lev × 100  [% of margin]
+  If loss_at_sl &lt;= max_loss_pct: use this leverage
+
+If final_leverage &lt; MIN_LEVERAGE_FLOOR (5): skip trade
+quantity = (margin × final_leverage) / price</code></pre>
+<hr />
+<h3 id="execution-engine-execution_engine.py">3.8 Execution Engine
+(execution_engine.py)</h3>
+<p>Handles paper vs live order routing. Paper trades go to Binance
+testnet; live trades go to CoinDCX.</p>
+<p><strong>Limit order mechanics:</strong> - If
+<code>EXECUTION_ATR_PULLBACK=True</code> and <code>ema_15m_20</code> is
+available: places limit order at 20-EMA - Otherwise: market order -
+Virtual Ghost Limits (<code>EXECUTION_VIRTUAL_LIMITS=True</code>): limit
+orders held locally in tradebook as <code>status=OPEN</code>, not sent
+to exchange until triggered — prevents margin deadlock</p>
+<p><strong>SL/TP placement:</strong> - Calls
+<code>RiskManager.calculate_optimal_stops()</code> using coin’s segment
+RM - Returns <code>(stop_loss, take_profit, rm_id)</code> passed to
+<code>tradebook.open_trade()</code> as
+<code>override_sl/override_tp</code></p>
+<hr />
+<h3 id="tradebook-tradebook.py">3.9 Tradebook (tradebook.py)</h3>
+<p>Persistent trade journal in <code>data/tradebook.json</code>.
+Thread-safe via <code>_book_lock</code>.</p>
+<h4 id="trade-status-lifecycle">Trade Status Lifecycle</h4>
+<pre><code>OPEN    (limit order placed, awaiting fill)
+  ↓ fill detected (paper: price crosses, live: virtual trigger)
+ACTIVE  (position live, P&amp;L tracked)
+  ↓ exit condition met
+CLOSED  (final P&amp;L recorded)
+
+Also:
+CANCELLED  (limit order cancelled — TIF_EXPIRED or ESCAPE_HATCH)</code></pre>
+<h4 id="key-functions">Key Functions</h4>
+<table>
+<colgroup>
+<col style="width: 52%" />
+<col style="width: 47%" />
+</colgroup>
+<thead>
+<tr>
+<th>Function</th>
 <th>Purpose</th>
 </tr>
 </thead>
 <tbody>
 <tr>
-<td>ATR (14)</td>
-<td>Stop-loss/take-profit placement</td>
+<td><code>open_trade(...)</code></td>
+<td>Record new entry; deduplicates by
+<code>symbol+profile_id</code></td>
 </tr>
 <tr>
-<td>VWAP</td>
-<td>Intraday fair value reference</td>
+<td><code>close_trade(trade_id, symbol, exit_price, reason)</code></td>
+<td>Record exit, compute P&amp;L, fees</td>
 </tr>
 <tr>
-<td>EMA (20, 50, 200)</td>
-<td>Trend direction across timeframes</td>
+<td><code>cancel_trade(trade_id, reason)</code></td>
+<td>Cancel OPEN limit; no P&amp;L recorded</td>
 </tr>
 <tr>
-<td>Bollinger Bands (20, 2σ)</td>
-<td>Sideways/CHOP strategy entry</td>
+<td><code>activate_limit_order(trade_id, fill_price, fill_qty)</code></td>
+<td>OPEN → ACTIVE transition</td>
 </tr>
 <tr>
-<td>Support/Resistance Zones</td>
-<td>Price levels using pivot point method</td>
+<td><code>update_unrealized(prices, funding_rates)</code></td>
+<td>Batch P&amp;L update + exit checks</td>
 </tr>
 <tr>
-<td>RSI divergence</td>
-<td>Momentum vs price mismatch</td>
+<td><code>update_trade(trade_id, updates)</code></td>
+<td>Patch any trade fields</td>
+</tr>
+<tr>
+<td><code>get_active_trades()</code></td>
+<td>Returns list of ACTIVE + OPEN trades</td>
 </tr>
 </tbody>
 </table>
-<h4 id="key-functions">Key Functions</h4>
-<div class="sourceCode" id="cb5"><pre
-class="sourceCode python"><code class="sourceCode python"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> compute_hmm_features(df) <span class="op">-&gt;</span> pd.DataFrame:</span>
-<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a>    <span class="co"># Returns df with HMM_FEATURES columns added</span></span>
-<span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb5-4"><a href="#cb5-4" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> compute_atr(df, period<span class="op">=</span><span class="dv">14</span>) <span class="op">-&gt;</span> pd.Series:</span>
-<span id="cb5-5"><a href="#cb5-5" aria-hidden="true" tabindex="-1"></a>    <span class="co"># True Range rolling mean</span></span>
-<span id="cb5-6"><a href="#cb5-6" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb5-7"><a href="#cb5-7" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> compute_vwap(df) <span class="op">-&gt;</span> pd.Series:</span>
-<span id="cb5-8"><a href="#cb5-8" aria-hidden="true" tabindex="-1"></a>    <span class="co"># (price × volume).cumsum() / volume.cumsum()</span></span>
-<span id="cb5-9"><a href="#cb5-9" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb5-10"><a href="#cb5-10" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> compute_sr_position(df_4h, lookback<span class="op">=</span><span class="dv">50</span>) <span class="op">-&gt;</span> <span class="bu">float</span>:</span>
-<span id="cb5-11"><a href="#cb5-11" aria-hidden="true" tabindex="-1"></a>    <span class="co"># Returns position relative to S/R: -1 (at support) to +1 (at resistance)</span></span></code></pre></div>
+<h4 id="pl-computation">P&amp;L Computation</h4>
+<pre><code>raw_pnl = (exit_price - entry_price) × quantity    [LONG]
+raw_pnl = (entry_price - exit_price) × quantity    [SHORT]
+
+Note: quantity is already leveraged (= capital × leverage / price)
+DO NOT multiply by leverage again.
+
+commission = (entry_notional + exit_notional) × TAKER_FEE (0.05%)
+net_pnl = raw_pnl - commission - funding_cost
+pnl_pct = net_pnl / capital × 100</code></pre>
+<h4 id="funding-rate-accumulation">Funding Rate Accumulation</h4>
+<p>Every heartbeat, <code>update_unrealized()</code> checks how many
+8-hour intervals have elapsed since <code>last_funding_check</code>.
+Uses live CoinDCX funding rate if available, else
+<code>DEFAULT_FUNDING_RATE</code> (0.01%). Accumulates in
+<code>trade["funding_cost"]</code>.</p>
+<h4 id="trailing-sl-stepped-profit-lock-trailing_sl_steps">Trailing SL —
+Stepped Profit Lock (<code>TRAILING_SL_STEPS</code>)</h4>
+<p>Every heartbeat, for each ACTIVE trade:</p>
+<pre><code>For each step (trigger_pnl_pct, lock_pnl_pct) in TRAILING_SL_STEPS:
+  If pnl_pct &gt;= trigger_pnl AND step_idx &gt; stepped_lock_level:
+    lock_price_move = (lock_pnl / 100) / leverage
+    new_sl = entry × (1 + lock_price_move)   [LONG]
+    new_sl = entry × (1 - lock_price_move)   [SHORT]
+    If new_sl improves on trailing_sl: update it
+    stepped_lock_level = step_idx</code></pre>
+<p>Steps defined in <code>TRAILING_SL_STEPS</code>: - At +5% P&amp;L →
+SL to breakeven - At +10% → lock +5% - At +15% → lock +10% - … continues
+to +50% → lock +45%</p>
+<p>For live trades: calls <code>ExecutionEngine.modify_sl_live()</code>
+to update exchange SL order.</p>
 <hr />
-<h3 id="hmm-brain">3.4 HMM Brain</h3>
-<p><strong>File:</strong> <code>hmm_brain.py</code> (8.5 KB)</p>
-<p>The core intelligence module. Wraps <code>hmmlearn.GaussianHMM</code>
-with regime labeling and margin confidence.</p>
-<h4 id="model-parameters">Model Parameters</h4>
+<h3 id="athena-llm-layer-llm_reasoning.py">3.10 Athena LLM Layer
+(llm_reasoning.py)</h3>
+<p>File: <code>llm_reasoning.py</code> — class
+<code>AthenaEngine</code></p>
+<p><strong>Model:</strong> <code>gemini-2.5-flash</code> via Google
+Generative AI REST API
+(<code>https://generativelanguage.googleapis.com/v1beta/models/...</code>)</p>
+<p><strong>Design:</strong> Fail-open. If API is unavailable, returns
+<code>AthenaDecision(action="EXECUTE", adjusted_confidence=1.0)</code> —
+trades are never blocked due to infrastructure failure.</p>
+<h4 id="signal-context-sent-to-athena">Signal Context Sent to
+Athena</h4>
+<div class="sourceCode" id="cb8"><pre
+class="sourceCode python"><code class="sourceCode python"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a>{</span>
+<span id="cb8-2"><a href="#cb8-2" aria-hidden="true" tabindex="-1"></a>  <span class="st">&quot;ticker&quot;</span>:         symbol,           <span class="co"># e.g. &quot;SOLUSDT&quot;</span></span>
+<span id="cb8-3"><a href="#cb8-3" aria-hidden="true" tabindex="-1"></a>  <span class="st">&quot;side&quot;</span>:           <span class="st">&quot;BUY&quot;</span><span class="op">/</span><span class="st">&quot;SELL&quot;</span>,</span>
+<span id="cb8-4"><a href="#cb8-4" aria-hidden="true" tabindex="-1"></a>  <span class="st">&quot;leverage&quot;</span>:       <span class="bu">int</span>,</span>
+<span id="cb8-5"><a href="#cb8-5" aria-hidden="true" tabindex="-1"></a>  <span class="st">&quot;hmm_confidence&quot;</span>: <span class="bu">float</span>,           <span class="co"># HMM margin (0.0–1.0)</span></span>
+<span id="cb8-6"><a href="#cb8-6" aria-hidden="true" tabindex="-1"></a>  <span class="st">&quot;hmm_regime&quot;</span>:     <span class="bu">str</span>,             <span class="co"># e.g. &quot;BULLISH&quot;</span></span>
+<span id="cb8-7"><a href="#cb8-7" aria-hidden="true" tabindex="-1"></a>  <span class="st">&quot;conviction&quot;</span>:     <span class="bu">float</span>,           <span class="co"># 0–100 multi-factor score</span></span>
+<span id="cb8-8"><a href="#cb8-8" aria-hidden="true" tabindex="-1"></a>  <span class="st">&quot;current_price&quot;</span>:  <span class="bu">float</span>,</span>
+<span id="cb8-9"><a href="#cb8-9" aria-hidden="true" tabindex="-1"></a>  <span class="st">&quot;atr&quot;</span>:            <span class="bu">float</span>,</span>
+<span id="cb8-10"><a href="#cb8-10" aria-hidden="true" tabindex="-1"></a>  <span class="st">&quot;atr_pct&quot;</span>:        <span class="bu">float</span>,           <span class="co"># ATR as % of price</span></span>
+<span id="cb8-11"><a href="#cb8-11" aria-hidden="true" tabindex="-1"></a>  <span class="st">&quot;trend&quot;</span>:          <span class="bu">str</span>,             <span class="co"># EMA20/50 trend direction</span></span>
+<span id="cb8-12"><a href="#cb8-12" aria-hidden="true" tabindex="-1"></a>  <span class="st">&quot;signal_type&quot;</span>:    <span class="bu">str</span>,             <span class="co"># &quot;TREND_FOLLOW&quot; or &quot;REVERSAL_PULLBACK&quot;</span></span>
+<span id="cb8-13"><a href="#cb8-13" aria-hidden="true" tabindex="-1"></a>  <span class="st">&quot;ema_15m_20&quot;</span>:     <span class="bu">float</span>,</span>
+<span id="cb8-14"><a href="#cb8-14" aria-hidden="true" tabindex="-1"></a>  <span class="st">&quot;tf_agreement&quot;</span>:   <span class="bu">int</span>,             <span class="co"># 0–3 TFs agreeing</span></span>
+<span id="cb8-15"><a href="#cb8-15" aria-hidden="true" tabindex="-1"></a>  <span class="st">&quot;btc_regime&quot;</span>:     <span class="bu">str</span>,             <span class="co"># from BTCUSDT coin state</span></span>
+<span id="cb8-16"><a href="#cb8-16" aria-hidden="true" tabindex="-1"></a>}</span></code></pre></div>
+<h4 id="athena-prompt">Athena Prompt</h4>
+<p>Athena acts as Lead Investment Officer. Tasks per coin: 1. Technical
+price action (candles, momentum) 2. Support &amp; Resistance levels 3.
+FVG and Order Blocks 4. Current news (Gemini web grounding) 5. BTC macro
+regime alignment 6. Final conviction: LONG / SHORT / SKIP 7. Leverage
+and position size recommendation</p>
+<p>HMM signal carries 40% weight; Athena’s own analysis carries 60%.</p>
+<h4 id="decision-mapping">Decision Mapping</h4>
+<table>
+<thead>
+<tr>
+<th>Athena Output</th>
+<th>Engine Action</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>LONG or SHORT</td>
+<td>EXECUTE</td>
+</tr>
+<tr>
+<td>SKIP</td>
+<td>VETO</td>
+</tr>
+<tr>
+<td>adjusted_confidence &lt; 0.30 (LLM_VETO_THRESHOLD)</td>
+<td>VETO (forced)</td>
+</tr>
+</tbody>
+</table>
+<h4 id="rate-limiting-caching">Rate Limiting &amp; Caching</h4>
+<ul>
+<li>Max 5 API calls per cycle
+(<code>LLM_MAX_CALLS_PER_CYCLE</code>)</li>
+<li>Cache per coin for 10 minutes (<code>LLM_CACHE_MINUTES</code>)</li>
+<li><code>reset_cycle()</code> called at start of each
+<code>_tick()</code></li>
+</ul>
+<h4 id="decision-logging">Decision Logging</h4>
+<p>All non-cached decisions logged to
+<code>data/athena_decisions.json</code> (last 200 entries) and in-memory
+buffer (last 50).</p>
+<h4 id="athenadecision-dataclass"><code>AthenaDecision</code>
+dataclass</h4>
+<div class="sourceCode" id="cb9"><pre
+class="sourceCode python"><code class="sourceCode python"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a><span class="at">@dataclass</span></span>
+<span id="cb9-2"><a href="#cb9-2" aria-hidden="true" tabindex="-1"></a><span class="kw">class</span> AthenaDecision:</span>
+<span id="cb9-3"><a href="#cb9-3" aria-hidden="true" tabindex="-1"></a>    action: <span class="bu">str</span>              <span class="co"># EXECUTE, VETO, REDUCE_SIZE</span></span>
+<span id="cb9-4"><a href="#cb9-4" aria-hidden="true" tabindex="-1"></a>    adjusted_confidence: <span class="bu">float</span></span>
+<span id="cb9-5"><a href="#cb9-5" aria-hidden="true" tabindex="-1"></a>    reasoning: <span class="bu">str</span></span>
+<span id="cb9-6"><a href="#cb9-6" aria-hidden="true" tabindex="-1"></a>    risk_flags: <span class="bu">list</span></span>
+<span id="cb9-7"><a href="#cb9-7" aria-hidden="true" tabindex="-1"></a>    athena_direction: <span class="bu">str</span>    <span class="co"># LONG, SHORT, SKIP (original)</span></span>
+<span id="cb9-8"><a href="#cb9-8" aria-hidden="true" tabindex="-1"></a>    model: <span class="bu">str</span></span>
+<span id="cb9-9"><a href="#cb9-9" aria-hidden="true" tabindex="-1"></a>    latency_ms: <span class="bu">int</span></span>
+<span id="cb9-10"><a href="#cb9-10" aria-hidden="true" tabindex="-1"></a>    cached: <span class="bu">bool</span></span></code></pre></div>
+<hr />
+<h3 id="engine-api-engine_api.py">3.11 Engine API (engine_api.py)</h3>
+<p>Flask app wrapping the trading bot. Auth: Bearer token via
+<code>ENGINE_API_SECRET</code> env var. All routes require auth except
+<code>/api/health</code>.</p>
+<p>Engine runs in background thread via <code>_run_engine()</code> with
+auto-restart: up to 5 retries with exponential backoff (10s base), then
+5-minute recovery cooldown before infinite retry.</p>
+<h4 id="engine-api-endpoints-26-total">Engine API Endpoints (26
+total)</h4>
+<table>
+<colgroup>
+<col style="width: 29%" />
+<col style="width: 37%" />
+<col style="width: 33%" />
+</colgroup>
+<thead>
+<tr>
+<th>Method</th>
+<th>Endpoint</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>GET</td>
+<td><code>/api/all</code></td>
+<td>Primary dashboard endpoint: multi_bot_state, tradebook,
+engine_state, segment_heatmap, athena state, registered_bot_ids</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/api/health</code></td>
+<td>Engine status, uptime, cycle info, memory, crash history (no
+auth)</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/api/gemini-health</code></td>
+<td>Validate Gemini API key connectivity</td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/api/close-trade</code></td>
+<td>Close single trade (live: CoinDCX first, then tradebook)</td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/api/close-all</code></td>
+<td>Queue CLOSE_ALL command</td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/api/exit-all-live</code></td>
+<td>Immediately close all CoinDCX positions + tradebook (called on bot
+stop)</td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/api/reset-trades</code></td>
+<td>Clear all tradebook entries (paper mode only)</td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/api/sync-exchange</code></td>
+<td>Reconcile tradebook with CoinDCX positions</td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/api/set-mode</code></td>
+<td>Switch paper/live mode at runtime</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/api/validate-exchange</code></td>
+<td>Test exchange API key; returns balance</td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/api/set-config</code></td>
+<td>Apply per-bot risk config (max_loss_pct, capital_per_trade,
+max_open_trades)</td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/api/set-bot-id</code></td>
+<td>Register bot with engine (adds to ENGINE_ACTIVE_BOTS)</td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/api/remove-bot-id</code></td>
+<td>Deregister bot from ENGINE_ACTIVE_BOTS</td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/api/restart</code></td>
+<td>Force-restart engine thread</td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/api/resume</code></td>
+<td>Clear paused/halted state</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/api/broadcast-log</code></td>
+<td>Last N lines of signal_broadcast.log as structured JSON</td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/api/pause</code></td>
+<td>Pause engine (optional halt_until timestamp)</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/api/scanner</code></td>
+<td>Latest coin scanner results</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/api/athena</code></td>
+<td>Athena state + recent decisions</td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/api/force-cycle</code></td>
+<td>Trigger immediate analysis cycle</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/api/multi-state</code></td>
+<td>Raw multi_bot_state.json</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/api/trade-history</code></td>
+<td>All tradebook entries</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/api/segment-heatmap</code></td>
+<td>Latest segment heatmap</td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/api/kill-switch</code></td>
+<td>Trigger kill switch immediately</td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/api/reset-kill-switch</code></td>
+<td>Reset kill switch</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/api/coin-state</code></td>
+<td>State for a specific coin</td>
+</tr>
+</tbody>
+</table>
+<p><strong><code>/api/all</code> response structure:</strong></p>
+<div class="sourceCode" id="cb10"><pre
+class="sourceCode json"><code class="sourceCode json"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a><span class="fu">{</span></span>
+<span id="cb10-2"><a href="#cb10-2" aria-hidden="true" tabindex="-1"></a>  <span class="dt">&quot;multi&quot;</span><span class="fu">:</span> <span class="fu">{</span> <span class="dt">&quot;coin_states&quot;</span><span class="fu">:</span> <span class="fu">{</span><span class="er">...</span><span class="fu">},</span> <span class="dt">&quot;last_analysis_time&quot;</span><span class="fu">:</span> <span class="st">&quot;...&quot;</span><span class="fu">,</span> <span class="dt">&quot;deployed_count&quot;</span><span class="fu">:</span> <span class="er">N</span> <span class="fu">},</span></span>
+<span id="cb10-3"><a href="#cb10-3" aria-hidden="true" tabindex="-1"></a>  <span class="dt">&quot;tradebook&quot;</span><span class="fu">:</span> <span class="fu">{</span> <span class="dt">&quot;trades&quot;</span><span class="fu">:</span> <span class="ot">[</span><span class="er">...</span><span class="ot">]</span><span class="fu">,</span> <span class="dt">&quot;summary&quot;</span><span class="fu">:</span> <span class="fu">{</span><span class="er">...</span><span class="fu">}</span> <span class="fu">},</span></span>
+<span id="cb10-4"><a href="#cb10-4" aria-hidden="true" tabindex="-1"></a>  <span class="dt">&quot;engine&quot;</span><span class="fu">:</span> <span class="fu">{</span> <span class="dt">&quot;status&quot;</span><span class="fu">:</span> <span class="st">&quot;running&quot;</span><span class="fu">,</span> <span class="er">...</span> <span class="fu">},</span></span>
+<span id="cb10-5"><a href="#cb10-5" aria-hidden="true" tabindex="-1"></a>  <span class="dt">&quot;heatmap&quot;</span><span class="fu">:</span> <span class="fu">{</span> <span class="dt">&quot;segments&quot;</span><span class="fu">:</span> <span class="ot">[</span><span class="er">...</span><span class="ot">]</span> <span class="fu">},</span></span>
+<span id="cb10-6"><a href="#cb10-6" aria-hidden="true" tabindex="-1"></a>  <span class="dt">&quot;athena&quot;</span><span class="fu">:</span> <span class="fu">{</span> <span class="dt">&quot;enabled&quot;</span><span class="fu">:</span> <span class="kw">true</span><span class="fu">,</span> <span class="dt">&quot;model&quot;</span><span class="fu">:</span> <span class="st">&quot;gemini-2.5-flash&quot;</span><span class="fu">,</span> <span class="dt">&quot;recent_decisions&quot;</span><span class="fu">:</span> <span class="ot">[</span><span class="er">...</span><span class="ot">]</span> <span class="fu">},</span></span>
+<span id="cb10-7"><a href="#cb10-7" aria-hidden="true" tabindex="-1"></a>  <span class="dt">&quot;registered_bot_ids&quot;</span><span class="fu">:</span> <span class="ot">[</span><span class="st">&quot;botId1&quot;</span><span class="ot">,</span> <span class="st">&quot;botId2&quot;</span><span class="ot">]</span></span>
+<span id="cb10-8"><a href="#cb10-8" aria-hidden="true" tabindex="-1"></a><span class="fu">}</span></span></code></pre></div>
+<hr />
+<h2 id="signal-pipeline-end-to-end-flow">4. Signal Pipeline — End-to-End
+Flow</h2>
+<pre><code>Every 15 minutes:
+
+1. SCAN POOL
+   get_active_bot_segment_pool(ENGINE_ACTIVE_BOTS)
+   → BTC always first, then segment coins (exclusions applied)
+
+2. FOR EACH COIN IN BATCH:
+   a. fetch_klines(symbol, &quot;1h&quot;, 250)            [1h data for legacy brain]
+   b. For each TF in [&quot;1d&quot;, &quot;1h&quot;, &quot;15m&quot;]:
+      - fetch_klines(symbol, tf, 300)
+      - compute_all_features(df_tf)
+      - HMMBrain.train(df_tf)  [if needs_retrain()]
+      - MultiTFHMMBrain.set_brain(tf, brain)
+      - tf_data[tf] = df_tf_feat
+
+   c. MultiTFHMMBrain.predict(tf_data)
+   d. conviction, side, tf_agreement = mtf_brain.get_conviction()
+      → If side=None (no consensus): return None
+
+   e. Macro Veto: if side=BUY and BTC dropped &gt;1.5% in 15m: skip
+
+   f. Volatility filter: ATR% must be in [0.3%, 6%]
+
+   g. Conviction threshold: if conviction &lt; 60: skip
+
+   h. Fetch 15m data for ema_15m_20 (limit order target)
+
+   i. Return raw_result dict: {symbol, side, conviction, confidence, atr, ema_15m_20, ...}
+
+3. SORT raw_results by conviction DESC
+
+4. FOR EACH BOT in ENGINE_ACTIVE_BOTS:
+   a. Filter raw_results to bot&#39;s segment
+   b. Pick top 1 coin (TOP_COINS_PER_SEGMENT=1)
+   c. Check duplicate: if bot_id:symbol in active tradebook → skip
+   d. ATHENA CALL:
+      - Build llm_ctx with ticker, side, hmm_confidence, conviction, btc_regime, etc.
+      - AthenaEngine.validate_signal(llm_ctx)
+      - If action=VETO: skip
+      - If API fails: auto-EXECUTE (fail-open)
+   e. EXECUTE:
+      - ExecutionEngine.execute_trade(symbol, side, leverage, quantity, atr, ema_15m_20, ...)
+      - → CoinDCX limit/market order (live) or Binance testnet (paper)
+   f. RECORD:
+      - tradebook.open_trade(..., bot_id=bot_id, all_bot_ids=[bot_id], ...)
+      - _active_positions[f&quot;{bot_id}:{symbol}&quot;] = {...}</code></pre>
+<hr />
+<h2 id="exit-mechanics">5. Exit Mechanics</h2>
+<p>All exits except MAX_LOSS are handled in
+<code>tradebook.update_unrealized()</code> (called every 10s heartbeat).
+For live trades, CoinDCX handles SL/TP at the exchange level; tradebook
+mirrors state via <code>_sync_coindcx_positions()</code>.</p>
+<table>
+<colgroup>
+<col style="width: 41%" />
+<col style="width: 35%" />
+<col style="width: 22%" />
+</colgroup>
+<thead>
+<tr>
+<th>Exit Trigger</th>
+<th>Threshold</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>MAX_LOSS</strong></td>
+<td><code>pnl_pct &lt;= -35%</code> (configurable via
+<code>set-config</code>)</td>
+<td>Hard stop. Fires BEFORE fixed SL for deep SELL trades where EMA20 SL
+is above market (SELL enters above EMA20, SL = EMA20 above entry → hit
+requires -45%+ move, MAX_LOSS catches at -35% first). This is by design,
+not a bug.</td>
+</tr>
+<tr>
+<td><strong>Fixed SL / TP</strong></td>
+<td><code>current_price &lt;= trailing_sl</code> (LONG) or
+<code>&gt;= trailing_sl</code> (SHORT)</td>
+<td>Uses trailing_sl value (which starts at fixed SL and improves as
+TRAILING_SL_STEPS activate)</td>
+</tr>
+<tr>
+<td><strong>Trailing SL Steps</strong></td>
+<td>+5% P&amp;L → breakeven; +10% → lock +5%; etc.</td>
+<td>10-step ladder up to +50% trigger → +45% lock. Modifies
+<code>trailing_sl</code> in-place</td>
+</tr>
+<tr>
+<td><strong>Escape Hatch</strong></td>
+<td>Price moves &gt; <code>2.0 × ATR</code> from OPEN limit order entry
+price</td>
+<td>Cancels OPEN limit order: <code>status=CANCELLED</code>, P&amp;L=0.
+Prevents stale limit orders from filling far from intended price</td>
+</tr>
+<tr>
+<td><strong>TIF Expiry</strong></td>
+<td>OPEN limit order age &gt; 60 minutes
+(<code>EXECUTION_TIF_MINUTES</code>)</td>
+<td>Cancels OPEN limit order: <code>status=CANCELLED</code>,
+P&amp;L=0</td>
+</tr>
+<tr>
+<td><strong>Regime-change exits</strong></td>
+<td>DISABLED</td>
+<td><code>_check_exits()</code> only syncs
+<code>_active_positions</code> dict; no regime-based forced closes.
+Backtest showed regime exits hurt returns</td>
+</tr>
+<tr>
+<td><strong>Kill Switch</strong></td>
+<td>Portfolio drawdown ≥ 10% in 24h</td>
+<td>Closes all positions, halts new deployments</td>
+</tr>
+<tr>
+<td><strong>KILL_SWITCH command</strong></td>
+<td>Manual trigger from dashboard</td>
+<td>Same as kill switch</td>
+</tr>
+</tbody>
+</table>
+<p><strong>73% early exit root cause (documented):</strong> SELL trades
+entered when EMA20 is above market price. RM2_ATR places SL at EMA20
+above entry. For SL to be hit, price would need to rally 45%+ from
+entry. MAX_LOSS at -35% fires first. This is correct behavior — MAX_LOSS
+acts as a wider safety net for trades where the structural SL is
+effectively out of reach.</p>
+<hr />
+<h2 id="risk-management">6. Risk Management</h2>
+<h4 id="leverage-tiers">Leverage Tiers</h4>
+<table>
+<thead>
+<tr>
+<th>Conviction Score</th>
+<th>Leverage</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>&lt; 60</td>
+<td>0 (no trade)</td>
+</tr>
+<tr>
+<td>60–69</td>
+<td>15x</td>
+</tr>
+<tr>
+<td>70–94</td>
+<td>25x</td>
+</tr>
+<tr>
+<td>≥ 95</td>
+<td>35x</td>
+</tr>
+</tbody>
+</table>
+<p>Dynamic ATR leverage overrides conviction tiers when
+<code>EXECUTION_DYNAMIC_LEVERAGE=True</code> (default):</p>
+<table>
+<thead>
+<tr>
+<th>ATR%</th>
+<th>Leverage</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>≤ 0.5%</td>
+<td>25x</td>
+</tr>
+<tr>
+<td>≥ 1.5%</td>
+<td>10x</td>
+</tr>
+<tr>
+<td>Between</td>
+<td>Linear interpolation</td>
+</tr>
+</tbody>
+</table>
+<h4 id="capital-allocation">Capital Allocation</h4>
+<ul>
+<li><code>CAPITAL_PER_TRADE = $100</code> per trade (fixed)</li>
+<li><code>PAPER_MAX_CAPITAL = $2,500</code> total portfolio (25 slots ×
+$100)</li>
+<li>Live mode: caps margin at <code>min($100, balance × 5%)</code> via
+<code>CAPITAL_PER_COIN_PCT</code></li>
+</ul>
+<h4 id="atr-multipliers-by-leverage">ATR Multipliers by Leverage</h4>
+<div class="sourceCode" id="cb12"><pre
+class="sourceCode python"><code class="sourceCode python"><span id="cb12-1"><a href="#cb12-1" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> get_atr_multipliers(leverage):</span>
+<span id="cb12-2"><a href="#cb12-2" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> leverage <span class="op">&gt;=</span> <span class="dv">50</span>: <span class="cf">return</span> (<span class="fl">0.5</span>, <span class="fl">1.0</span>)</span>
+<span id="cb12-3"><a href="#cb12-3" aria-hidden="true" tabindex="-1"></a>    <span class="cf">elif</span> leverage <span class="op">&gt;=</span> <span class="dv">10</span>: <span class="cf">return</span> (<span class="fl">1.0</span>, <span class="fl">2.0</span>)   <span class="co"># 1:2 R:R — backtest-proven</span></span>
+<span id="cb12-4"><a href="#cb12-4" aria-hidden="true" tabindex="-1"></a>    <span class="cf">elif</span> leverage <span class="op">&gt;=</span> <span class="dv">5</span>:  <span class="cf">return</span> (<span class="fl">1.2</span>, <span class="fl">2.4</span>)</span>
+<span id="cb12-5"><a href="#cb12-5" aria-hidden="true" tabindex="-1"></a>    <span class="cf">else</span>:                <span class="cf">return</span> (<span class="fl">1.5</span>, <span class="fl">3.0</span>)</span></code></pre></div>
+<h4 id="key-risk-parameters">Key Risk Parameters</h4>
 <table>
 <colgroup>
 <col style="width: 42%" />
@@ -714,958 +1303,1106 @@ with regime labeling and margin confidence.</p>
 <tr>
 <th>Parameter</th>
 <th>Value</th>
-<th>Reason</th>
+<th>Effect</th>
 </tr>
 </thead>
 <tbody>
 <tr>
-<td><code>n_states</code></td>
-<td>3</td>
-<td>BULL / CHOP / BEAR (4-state tried: Sharpe 0.72 vs 1.22 for
-3-state)</td>
+<td><code>MAX_LOSS_PER_TRADE_PCT</code></td>
+<td>-35%</td>
+<td>Hard stop on leveraged P&amp;L%</td>
 </tr>
 <tr>
-<td><code>covariance_type</code></td>
-<td><code>full</code></td>
-<td>Captures cross-feature correlations</td>
+<td><code>MIN_LEVERAGE_FLOOR</code></td>
+<td>5x</td>
+<td>Skip trade if risk-capped leverage drops below 5x</td>
 </tr>
 <tr>
-<td><code>n_iter</code></td>
-<td>100</td>
-<td>EM convergence iterations</td>
+<td><code>KILL_SWITCH_DRAWDOWN</code></td>
+<td>10%</td>
+<td>Portfolio drawdown threshold for kill switch</td>
 </tr>
 <tr>
-<td><code>lookback</code></td>
-<td>250 candles</td>
-<td>~2.6 days of 15m data</td>
+<td><code>RISK_PER_TRADE</code></td>
+<td>4%</td>
+<td>Risk % used in <code>calculate_position_size()</code></td>
 </tr>
 <tr>
-<td><code>retrain_every</code></td>
-<td>24 hours</td>
-<td>Adapts to new market conditions</td>
+<td><code>MIN_CONVICTION_FOR_DEPLOY</code></td>
+<td>60</td>
+<td>Minimum conviction before Athena call</td>
+</tr>
+<tr>
+<td><code>VOL_MIN_ATR_PCT</code></td>
+<td>0.3%</td>
+<td>Minimum volatility to trade</td>
+</tr>
+<tr>
+<td><code>VOL_MAX_ATR_PCT</code></td>
+<td>6.0%</td>
+<td>Maximum volatility to trade</td>
+</tr>
+<tr>
+<td><code>MACRO_VETO_BTC_DROP_PCT</code></td>
+<td>1.5%</td>
+<td>BTC flash crash threshold to block BUY signals</td>
 </tr>
 </tbody>
 </table>
-<h4 id="why-crash-state-was-removed">Why CRASH State Was Removed</h4>
-<p>When 4-state HMM was tested, the CRASH state achieved only
-<strong>10.9% directional accuracy</strong> — worse than random (25% for
-4 states). The 3-state model (Sharpe 1.22) significantly outperforms
-4-state (Sharpe 0.72). CRASH events are now classified as extreme
-BEAR.</p>
-<h4 id="state-labeling-algorithm">State Labeling Algorithm</h4>
-<p>After training, raw HMM states have no semantic meaning (they’re just
-0, 1, 2). The <code>_build_state_map()</code> method re-labels them by
-sorting on mean log-return:</p>
-<div class="sourceCode" id="cb6"><pre
-class="sourceCode python"><code class="sourceCode python"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a>sorted_indices <span class="op">=</span> np.argsort(means)[::<span class="op">-</span><span class="dv">1</span>]</span>
-<span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a><span class="co"># sorted_indices[0] = highest mean log-return → BULL</span></span>
-<span id="cb6-3"><a href="#cb6-3" aria-hidden="true" tabindex="-1"></a><span class="co"># sorted_indices[1] = middle return          → CHOP</span></span>
-<span id="cb6-4"><a href="#cb6-4" aria-hidden="true" tabindex="-1"></a><span class="co"># sorted_indices[2] = lowest mean log-return → BEAR</span></span></code></pre></div>
-<h4 id="confidence-margin-vs-raw-posterior">Confidence: Margin vs Raw
-Posterior</h4>
-<p><strong>Problem with raw posterior:</strong>
-<code>model.predict_proba()</code> returned values of 99%+ for nearly
-every prediction regardless of actual accuracy. This made it completely
-uncalibrated and useless as a confidence signal.</p>
-<p><strong>Solution — Margin confidence:</strong></p>
-<div class="sourceCode" id="cb7"><pre
-class="sourceCode python"><code class="sourceCode python"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a>sorted_p <span class="op">=</span> np.sort(probs)[::<span class="op">-</span><span class="dv">1</span>]</span>
-<span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a>confidence <span class="op">=</span> sorted_p[<span class="dv">0</span>] <span class="op">-</span> sorted_p[<span class="dv">1</span>]  <span class="co"># best - 2nd_best</span></span></code></pre></div>
-<table>
-<thead>
-<tr>
-<th>Margin</th>
-<th>Interpretation</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>0.0 – 0.10</td>
-<td>Very uncertain (below LOW threshold → no trade)</td>
-</tr>
-<tr>
-<td>0.10 – 0.25</td>
-<td>Low confidence</td>
-</tr>
-<tr>
-<td>0.25 – 0.40</td>
-<td>Medium confidence</td>
-</tr>
-<tr>
-<td>0.40 – 0.60</td>
-<td>Medium-high confidence</td>
-</tr>
-<tr>
-<td>0.60 – 1.00</td>
-<td>High confidence</td>
-</tr>
-</tbody>
-</table>
-<h4 id="margin-confidence-tiers">Margin Confidence Tiers</h4>
-<div class="sourceCode" id="cb8"><pre
-class="sourceCode python"><code class="sourceCode python"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a>HMM_CONF_TIER thresholds:</span>
-<span id="cb8-2"><a href="#cb8-2" aria-hidden="true" tabindex="-1"></a>  HIGH      <span class="op">=</span> <span class="fl">0.60</span>   → full HMM score (<span class="dv">44</span> pts)</span>
-<span id="cb8-3"><a href="#cb8-3" aria-hidden="true" tabindex="-1"></a>  MED_HIGH  <span class="op">=</span> <span class="fl">0.40</span>   → <span class="op">~</span><span class="dv">33</span> pts</span>
-<span id="cb8-4"><a href="#cb8-4" aria-hidden="true" tabindex="-1"></a>  MED       <span class="op">=</span> <span class="fl">0.25</span>   → <span class="op">~</span><span class="dv">22</span> pts</span>
-<span id="cb8-5"><a href="#cb8-5" aria-hidden="true" tabindex="-1"></a>  LOW       <span class="op">=</span> <span class="fl">0.10</span>   → <span class="op">~</span><span class="dv">11</span> pts</span>
-<span id="cb8-6"><a href="#cb8-6" aria-hidden="true" tabindex="-1"></a>  <span class="op">&lt;</span> <span class="fl">0.10</span>            → <span class="dv">0</span> pts (HMM untrusted)</span></code></pre></div>
-<h4 id="retraining-schedule">Retraining Schedule</h4>
-<p>The model retrains every 24 hours
-(<code>HMM_RETRAIN_HOURS = 24</code>) on the latest 250 candles of 15m
-OHLCV. <code>needs_retrain()</code> checks
-<code>datetime.utcnow() - last_trained &gt; 24h</code>.</p>
 <hr />
-<h3 id="coin-scanner">3.5 Coin Scanner</h3>
-<p><strong>File:</strong> <code>coin_scanner.py</code> (10.3 KB)</p>
-<p>Dynamically selects which coins to trade each cycle.</p>
-<h4 id="coin-tier-classification">Coin Tier Classification</h4>
-<p>Tiers determined by backtesting Sharpe ratio on forward-test windows
-(from <code>tools/experiment_3state_calibration.py</code>). Stored in
-<code>data/coin_tiers.csv</code>.</p>
+<h2 id="crypto-segments">7. Crypto Segments</h2>
 <table>
 <colgroup>
-<col style="width: 27%" />
-<col style="width: 40%" />
 <col style="width: 31%" />
+<col style="width: 24%" />
+<col style="width: 44%" />
 </colgroup>
 <thead>
 <tr>
-<th>Tier</th>
-<th>Criteria</th>
+<th>Segment</th>
 <th>Coins</th>
+<th>Risk Manager</th>
 </tr>
 </thead>
 <tbody>
 <tr>
-<td><strong>A (Trade)</strong></td>
-<td>Forward-test Sharpe ≥ 1.0</td>
-<td>ENA, SEI, ZEC, PHA, CHZ, PEPE, ADA, XRP, TIA, ETHFI, DOGE, AAVE,
-WLD, AR, ETC, BCH, FET, KAVA</td>
+<td>L1</td>
+<td>BTCUSDT, ETHUSDT, SOLUSDT, BNBUSDT, AVAXUSDT, SUIUSDT</td>
+<td>RM2_ATR</td>
 </tr>
 <tr>
-<td><strong>B (Monitor)</strong></td>
-<td>Sharpe 0.5–1.0</td>
-<td>BTC, ETH, SOL (and others)</td>
+<td>L2</td>
+<td>ARBUSDT, OPUSDT, POLUSDT, MNTUSDT, STRKUSDT, IMXUSDT, RONINUSDT</td>
+<td>RM3_Swing</td>
 </tr>
 <tr>
-<td><strong>C (Avoid)</strong></td>
-<td>Sharpe &lt; 0.5 or volatile</td>
-<td>CAKE, FXS, DOT, XLM, AVAX, SHIB, TAO, WIF, AUDIO, GALA, OP, INJ,
-SUI, NEAR, BNB, BONK, LTC</td>
+<td>DeFi</td>
+<td>UNIUSDT, AAVEUSDT, CRVUSDT, JUPUSDT, RUNEUSDT, PENDLEUSDT,
+LINKUSDT</td>
+<td>RM3_Swing</td>
+</tr>
+<tr>
+<td>AI</td>
+<td>TAOUSDT, INJUSDT, WLDUSDT</td>
+<td>RM3_Swing</td>
+</tr>
+<tr>
+<td>Meme</td>
+<td>DOGEUSDT, SHIBUSDT, PEPEUSDT, BONKUSDT</td>
+<td>RM3_Swing</td>
+</tr>
+<tr>
+<td>RWA</td>
+<td>ONDOUSDT, POLYXUSDT, TRUUSDT</td>
+<td>RM3_Swing</td>
+</tr>
+<tr>
+<td>Gaming</td>
+<td>AXSUSDT, SANDUSDT, PIXELUSDT, IOTXUSDT</td>
+<td>RM3_Swing</td>
+</tr>
+<tr>
+<td>DePIN</td>
+<td>ARUSDT, HNTUSDT</td>
+<td>RM3_Swing</td>
+</tr>
+<tr>
+<td>Modular</td>
+<td>TIAUSDT, DYMUSDT</td>
+<td>RM3_Swing</td>
+</tr>
+<tr>
+<td>Oracles</td>
+<td>PYTHUSDT, TRBUSDT, API3USDT</td>
+<td>RM3_Swing</td>
 </tr>
 </tbody>
 </table>
-<h4 id="scan-process">Scan Process</h4>
-<pre><code>1. Fetch top 50 coins by 24h USDT volume from Binance
-2. Filter out Tier C coins
-3. Sort: Tier A coins first, then Tier B by volume
-4. Return top N = TOP_COINS_LIMIT (25) for analysis
-5. Re-scan every SCAN_INTERVAL_CYCLES = 4 (every 20 minutes)</code></pre>
+<p><strong>Excluded globally:</strong>
+<code>AKTUSDT, FETUSDT, WIFUSDT, FILUSDT</code> — removed from all
+segment lists at import time.</p>
+<p><strong>Static exchange exclusions</strong> (scanner level):
+<code>EURUSDT, WBTCUSDT, USDCUSDT, TUSDUSDT, BUSDUSDT, USTUSDT, DAIUSDT, FDUSDUSDT, CVCUSDT, USD1USDT</code></p>
+<p><strong>Segment rotation:</strong>
+<code>SCANNER_SEGMENT_ROTATION=True</code>. Updates master shortlist
+every 1 hour; determines active segments from 15-minute time block
+within the hour. <code>MAX_ACTIVE_PER_SEGMENT=1</code> limits
+correlation.</p>
 <hr />
-<h3 id="risk-manager">3.6 Risk Manager</h3>
-<p><strong>File:</strong> <code>risk_manager.py</code> (18.2 KB)</p>
-<p>Enforces all risk rules. The “Anti-Liquidation” module.</p>
-<h4 id="conviction-score-formula">Conviction Score Formula</h4>
-<p>The conviction score (0–100) gates every trade and determines
-leverage:</p>
-<pre><code>Score = HMM(44) + BTC_macro(7) + Funding(11) + SR_VWAP(2)
-      + OI(11) + Vol(0) + Sentiment(15) + OrderFlow(10)
-      = 100 pts maximum</code></pre>
-<table>
-<colgroup>
-<col style="width: 22%" />
-<col style="width: 30%" />
-<col style="width: 47%" />
-</colgroup>
-<thead>
-<tr>
-<th>Factor</th>
-<th>Max Points</th>
-<th>What It Measures</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><strong>HMM Regime</strong></td>
-<td>44</td>
-<td>Regime type + margin confidence tier</td>
-</tr>
-<tr>
-<td><strong>Sentiment</strong></td>
-<td>15</td>
-<td>VADER/FinBERT + CryptoPanic + Fear &amp; Greed score</td>
-</tr>
-<tr>
-<td><strong>Funding Rate</strong></td>
-<td>11</td>
-<td>Funding rate direction + magnitude (futures sentiment)</td>
-</tr>
-<tr>
-<td><strong>Open Interest</strong></td>
-<td>11</td>
-<td>OI trend — rising OI confirms new money in direction</td>
-</tr>
-<tr>
-<td><strong>Order Flow</strong></td>
-<td>10</td>
-<td>Taker buy/sell imbalance + L2 depth ratio</td>
-</tr>
-<tr>
-<td><strong>BTC Macro</strong></td>
-<td>7</td>
-<td>BTC correlation (coin moves with BTC regime)</td>
-</tr>
-<tr>
-<td><strong>S/R + VWAP</strong></td>
-<td>2</td>
-<td>Entry near support (long) or resistance (short)</td>
-</tr>
-<tr>
-<td><strong>Volatility</strong></td>
-<td>0</td>
-<td>Filter only — blocks trade if ATR% out of range</td>
-</tr>
-</tbody>
-</table>
-<h4 id="hmm-conviction-points-breakdown">HMM Conviction Points
-Breakdown</h4>
-<table>
-<thead>
-<tr>
-<th>Regime</th>
-<th>Margin Tier</th>
-<th>Points</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>BULL / BEAR</td>
-<td>HIGH (≥0.60)</td>
-<td>44</td>
-</tr>
-<tr>
-<td>BULL / BEAR</td>
-<td>MED_HIGH (≥0.40)</td>
-<td>33</td>
-</tr>
-<tr>
-<td>BULL / BEAR</td>
-<td>MED (≥0.25)</td>
-<td>22</td>
-</tr>
-<tr>
-<td>BULL / BEAR</td>
-<td>LOW (≥0.10)</td>
-<td>11</td>
-</tr>
-<tr>
-<td>CHOP</td>
-<td>Any</td>
-<td>0 (no trend trade)</td>
-</tr>
-<tr>
-<td>Any</td>
-<td>&lt; 0.10</td>
-<td>0 (model untrusted)</td>
-</tr>
-</tbody>
-</table>
-<h4 id="leverage-bands">Leverage Bands</h4>
-<pre><code>Conviction Score → Leverage
-&lt; 40             → 0x   (no trade)
-40 – 54          → 10x
-55 – 69          → 15x
-70 – 84          → 25x
-85 – 100         → 35x</code></pre>
-<h4 id="position-sizing-formula">Position Sizing Formula</h4>
-<pre><code>risk_amount = balance × RISK_PER_TRADE (4%)
-stop_distance = ATR × sl_multiplier(leverage)
-quantity = risk_amount / stop_distance
-max_qty = (balance × leverage) / entry_price
-final_qty = min(quantity, max_qty)</code></pre>
-<h4 id="atr-multipliers-by-leverage">ATR Multipliers by Leverage</h4>
-<p>Higher leverage → tighter stops to maintain consistent portfolio
-risk:</p>
-<table>
-<thead>
-<tr>
-<th>Leverage</th>
-<th>SL Multiplier</th>
-<th>TP Multiplier</th>
-<th>Risk:Reward</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>1–4x</td>
-<td>1.5</td>
-<td>3.0</td>
-<td>1:2</td>
-</tr>
-<tr>
-<td>5–9x</td>
-<td>1.2</td>
-<td>2.4</td>
-<td>1:2</td>
-</tr>
-<tr>
-<td>10–24x</td>
-<td>1.0</td>
-<td>2.0</td>
-<td>1:2</td>
-</tr>
-<tr>
-<td>25–49x</td>
-<td>0.7</td>
-<td>1.4</td>
-<td>1:2</td>
-</tr>
-<tr>
-<td>≥ 50x</td>
-<td>0.5</td>
-<td>1.0</td>
-<td>1:2</td>
-</tr>
-</tbody>
-</table>
-<h4 id="kill-switch">Kill Switch</h4>
-<div class="sourceCode" id="cb13"><pre
-class="sourceCode python"><code class="sourceCode python"><span id="cb13-1"><a href="#cb13-1" aria-hidden="true" tabindex="-1"></a>KILL_SWITCH_DRAWDOWN <span class="op">=</span> <span class="fl">0.10</span>  <span class="co"># 10% portfolio loss in 24h → bot stops</span></span>
-<span id="cb13-2"><a href="#cb13-2" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb13-3"><a href="#cb13-3" aria-hidden="true" tabindex="-1"></a><span class="cf">if</span> drawdown_24h <span class="op">&gt;=</span> <span class="fl">0.10</span>:</span>
-<span id="cb13-4"><a href="#cb13-4" aria-hidden="true" tabindex="-1"></a>    <span class="va">self</span>._killed <span class="op">=</span> <span class="va">True</span></span>
-<span id="cb13-5"><a href="#cb13-5" aria-hidden="true" tabindex="-1"></a>    close_all_positions()</span>
-<span id="cb13-6"><a href="#cb13-6" aria-hidden="true" tabindex="-1"></a>    send_telegram_alert(<span class="st">&quot;KILL SWITCH TRIGGERED&quot;</span>)</span></code></pre></div>
-<h4 id="volatility-filter">Volatility Filter</h4>
-<div class="sourceCode" id="cb14"><pre
-class="sourceCode python"><code class="sourceCode python"><span id="cb14-1"><a href="#cb14-1" aria-hidden="true" tabindex="-1"></a>VOL_MIN_ATR_PCT <span class="op">=</span> <span class="fl">0.003</span>  <span class="co"># 0.3% minimum ATR (too quiet = no trade)</span></span>
-<span id="cb14-2"><a href="#cb14-2" aria-hidden="true" tabindex="-1"></a>VOL_MAX_ATR_PCT <span class="op">=</span> <span class="fl">0.06</span>   <span class="co"># 6.0% maximum ATR (too chaotic = no trade)</span></span></code></pre></div>
-<hr />
-<h3 id="execution-engine">3.7 Execution Engine</h3>
-<p><strong>File:</strong> <code>execution_engine.py</code> (21.7 KB)</p>
-<p>Handles all order placement — paper (simulation) and live (real
-exchange).</p>
-<h4 id="trading-modes">Trading Modes</h4>
-<table>
-<thead>
-<tr>
-<th>Mode</th>
-<th>Exchange</th>
-<th>Real Money</th>
-<th>Purpose</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>Paper</td>
-<td>Binance Testnet</td>
-<td>No</td>
-<td>Safe testing, SaaS user copy-trades</td>
-</tr>
-<tr>
-<td>Live</td>
-<td>CoinDCX</td>
-<td>Yes</td>
-<td>Real margin futures (admin/advanced users)</td>
-</tr>
-</tbody>
-</table>
-<h4 id="multi-target-profit-booking-t1t2t3">Multi-Target Profit Booking
-(T1/T2/T3)</h4>
-<p>The primary exit strategy. Configured in <code>config.py</code>:</p>
-<pre><code>MT_RR_RATIO = 5         (SL : T3 = 1:5)
-MT_T1_FRAC  = 0.333     T1 at 33.3% of T3 distance
-MT_T2_FRAC  = 0.666     T2 at 66.6% of T3 distance
-MT_T1_BOOK_PCT = 0.25   Book 25% of qty at T1
-MT_T2_BOOK_PCT = 0.50   Book 50% of remaining qty at T2</code></pre>
-<p><strong>Example (LONG @ $100, ATR = $2, SL mult = 1.0 at 10x
-leverage):</strong></p>
-<pre><code>Entry  = $100.00
-SL     = $98.00  (entry - 1×ATR)
-T1     = $103.33  (entry + 1.667×ATR)  → book 25%
-T2     = $106.67  (entry + 3.333×ATR)  → book 50% of remaining
-T3     = $110.00  (entry + 5.0×ATR)    → close remainder</code></pre>
-<p><strong>PnL per stage at 10x leverage on $100 capital:</strong> - T1
-hit: +$8.33 profit on 25% of position - T2 hit: +$16.67 profit on 37.5%
-of position - T3 hit: +$25.00 profit on 37.5% of position - Max T3 PnL
-(all targets hit): +$16.67 per $100 capital</p>
-<h4 id="trailing-stop-loss">Trailing Stop-Loss</h4>
-<div class="sourceCode" id="cb17"><pre
-class="sourceCode python"><code class="sourceCode python"><span id="cb17-1"><a href="#cb17-1" aria-hidden="true" tabindex="-1"></a>TRAILING_SL_ENABLED <span class="op">=</span> <span class="va">True</span></span>
-<span id="cb17-2"><a href="#cb17-2" aria-hidden="true" tabindex="-1"></a>TRAILING_SL_ACTIVATION_ATR <span class="op">=</span> <span class="fl">1.0</span>  <span class="co"># Activates when price moves 1×ATR in favor</span></span>
-<span id="cb17-3"><a href="#cb17-3" aria-hidden="true" tabindex="-1"></a>TRAILING_SL_DISTANCE_ATR <span class="op">=</span> <span class="fl">1.0</span>    <span class="co"># SL stays 1×ATR behind price peak</span></span>
-<span id="cb17-4"><a href="#cb17-4" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb17-5"><a href="#cb17-5" aria-hidden="true" tabindex="-1"></a><span class="co"># Logic:</span></span>
-<span id="cb17-6"><a href="#cb17-6" aria-hidden="true" tabindex="-1"></a><span class="cf">if</span> price_move_favor <span class="op">&gt;=</span> <span class="fl">1.0</span> × ATR:</span>
-<span id="cb17-7"><a href="#cb17-7" aria-hidden="true" tabindex="-1"></a>    trail_active <span class="op">=</span> <span class="va">True</span></span>
-<span id="cb17-8"><a href="#cb17-8" aria-hidden="true" tabindex="-1"></a>    new_sl <span class="op">=</span> peak_price <span class="op">-</span> <span class="fl">1.0</span> × ATR  <span class="co"># trails peak, never goes backward</span></span></code></pre></div>
-<h4 id="order-flow">Order Flow</h4>
-<pre><code>open_position()
-  ├── Validate conviction score ≥ 40
-  ├── Calculate position size (2% risk rule)
-  ├── Set SL, T1, T2, T3 levels
-  ├── Place market order (paper: simulate, live: CoinDCX REST API)
-  └── Log to tradebook.json
-
-close_position(reason)
-  ├── Place market close order
-  ├── Record exit price, PnL, exit reason
-  ├── Append PartialBooking records for T1/T2
-  └── Mark trade as &quot;closed&quot; in tradebook</code></pre>
-<hr />
-<h3 id="order-flow-engine">3.8 Order Flow Engine</h3>
-<p><strong>File:</strong> <code>orderflow_engine.py</code> (37.9 KB)</p>
-<p>Analyzes microstructure signals from the order book.</p>
-<h4 id="signals-computed">Signals Computed</h4>
-<table>
-<colgroup>
-<col style="width: 24%" />
-<col style="width: 24%" />
-<col style="width: 51%" />
-</colgroup>
-<thead>
-<tr>
-<th>Signal</th>
-<th>Method</th>
-<th>Conviction Impact</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><strong>L2 Depth Imbalance</strong></td>
-<td>(bid_vol - ask_vol) / (bid_vol + ask_vol)</td>
-<td>Directional pressure</td>
-</tr>
-<tr>
-<td><strong>Taker Buy/Sell Flow</strong></td>
-<td>Aggressor-side trade flow from recent trades</td>
-<td>Short-term momentum</td>
-</tr>
-<tr>
-<td><strong>Cumulative Delta</strong></td>
-<td>Running sum of (buy_vol - sell_vol)</td>
-<td>Sustained buying/selling pressure</td>
-</tr>
-<tr>
-<td><strong>Weighted Price Levels</strong></td>
-<td>Volume-weighted bid/ask clusters</td>
-<td>Key price magnets</td>
-</tr>
-</tbody>
-</table>
-<p>These feed into the <strong>Order Flow factor (10 pts)</strong> of
-the conviction score.</p>
-<hr />
-<h3 id="sentiment-engine">3.9 Sentiment Engine</h3>
-<p><strong>Files:</strong> <code>sentiment_engine.py</code> (21.1 KB),
-<code>sentiment_sources.py</code> (18.5 KB)</p>
-<h4 id="data-sources-1">Data Sources</h4>
-<table>
-<colgroup>
-<col style="width: 29%" />
-<col style="width: 29%" />
-<col style="width: 40%" />
-</colgroup>
-<thead>
-<tr>
-<th>Source</th>
-<th>Weight</th>
-<th>API/Method</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><strong>CryptoPanic</strong></td>
-<td>Primary news</td>
-<td>REST API (free key, rate limited)</td>
-</tr>
-<tr>
-<td><strong>RSS Feeds</strong></td>
-<td>5 outlets (CoinDesk, CoinTelegraph, Decrypt, The Block,
-Blockworks)</td>
-<td><code>feedparser</code> library</td>
-</tr>
-<tr>
-<td><strong>Reddit</strong></td>
-<td>r/CryptoCurrency, coin-specific subs</td>
-<td>PRAW (OAuth) or public JSON</td>
-</tr>
-<tr>
-<td><strong>Fear &amp; Greed Index</strong></td>
-<td>Macro sentiment</td>
-<td>alternative.me API</td>
-</tr>
-</tbody>
-</table>
-<h4 id="nlp-pipeline">NLP Pipeline</h4>
-<pre><code>Raw text → VADER (always, fast) → score [-1, +1]
-         → FinBERT (optional, lazy-load, ~400MB PyTorch model)
-              → probability for [positive, negative, neutral]
-         → Weighted average → final_score
-
-Buzz = article count in last 4 hours (SENTIMENT_WINDOW_HOURS)
-Momentum = change in score from previous period</code></pre>
-<h4 id="output-sentimentsignal">Output: SentimentSignal</h4>
-<div class="sourceCode" id="cb20"><pre
-class="sourceCode python"><code class="sourceCode python"><span id="cb20-1"><a href="#cb20-1" aria-hidden="true" tabindex="-1"></a><span class="at">@dataclass</span></span>
-<span id="cb20-2"><a href="#cb20-2" aria-hidden="true" tabindex="-1"></a><span class="kw">class</span> SentimentSignal:</span>
-<span id="cb20-3"><a href="#cb20-3" aria-hidden="true" tabindex="-1"></a>    score: <span class="bu">float</span>        <span class="co"># -1.0 (very bearish) to +1.0 (very bullish)</span></span>
-<span id="cb20-4"><a href="#cb20-4" aria-hidden="true" tabindex="-1"></a>    confidence: <span class="bu">float</span>   <span class="co"># 0.0 to 1.0 (based on article count)</span></span>
-<span id="cb20-5"><a href="#cb20-5" aria-hidden="true" tabindex="-1"></a>    buzz: <span class="bu">int</span>           <span class="co"># number of relevant articles</span></span>
-<span id="cb20-6"><a href="#cb20-6" aria-hidden="true" tabindex="-1"></a>    momentum: <span class="bu">float</span>     <span class="co"># score change vs last period</span></span>
-<span id="cb20-7"><a href="#cb20-7" aria-hidden="true" tabindex="-1"></a>    alert: <span class="bu">bool</span>         <span class="co"># True = hack/exploit detected → hard veto (conviction = 0)</span></span></code></pre></div>
-<h4 id="integration-in-conviction-score">Integration in Conviction
-Score</h4>
-<div class="sourceCode" id="cb21"><pre
-class="sourceCode python"><code class="sourceCode python"><span id="cb21-1"><a href="#cb21-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Sentiment contributes up to 15 pts</span></span>
-<span id="cb21-2"><a href="#cb21-2" aria-hidden="true" tabindex="-1"></a><span class="cf">if</span> alert:</span>
-<span id="cb21-3"><a href="#cb21-3" aria-hidden="true" tabindex="-1"></a>    conviction_score <span class="op">=</span> <span class="dv">0</span>  <span class="co"># Hard veto — overrides everything</span></span>
-<span id="cb21-4"><a href="#cb21-4" aria-hidden="true" tabindex="-1"></a><span class="cf">else</span>:</span>
-<span id="cb21-5"><a href="#cb21-5" aria-hidden="true" tabindex="-1"></a>    sentiment_pts <span class="op">=</span> normalize(score) × <span class="dv">15</span></span></code></pre></div>
-<hr />
-<h3 id="tradebook">3.10 Tradebook</h3>
-<p><strong>File:</strong> <code>tradebook.py</code> (39.3 KB)</p>
-<p>Persistent trade ledger backed by
-<code>data/tradebook.json</code>.</p>
-<h4 id="trade-lifecycle">Trade Lifecycle</h4>
-<pre><code>OPEN → [T1_HIT] → [T2_HIT] → CLOSED
-     → SL_HIT   → CLOSED
-     → MANUAL    → CLOSED
-     → KILL_SW   → CLOSED</code></pre>
-<h4 id="data-stored-per-trade">Data Stored Per Trade</h4>
-<div class="sourceCode" id="cb23"><pre
-class="sourceCode python"><code class="sourceCode python"><span id="cb23-1"><a href="#cb23-1" aria-hidden="true" tabindex="-1"></a>{</span>
-<span id="cb23-2"><a href="#cb23-2" aria-hidden="true" tabindex="-1"></a>    <span class="st">&quot;trade_id&quot;</span>: <span class="st">&quot;T-0042-DOGEUSDT&quot;</span>,</span>
-<span id="cb23-3"><a href="#cb23-3" aria-hidden="true" tabindex="-1"></a>    <span class="st">&quot;symbol&quot;</span>: <span class="st">&quot;DOGEUSDT&quot;</span>,</span>
-<span id="cb23-4"><a href="#cb23-4" aria-hidden="true" tabindex="-1"></a>    <span class="st">&quot;side&quot;</span>: <span class="st">&quot;long&quot;</span>,</span>
-<span id="cb23-5"><a href="#cb23-5" aria-hidden="true" tabindex="-1"></a>    <span class="st">&quot;regime&quot;</span>: <span class="st">&quot;BULLISH&quot;</span>,</span>
-<span id="cb23-6"><a href="#cb23-6" aria-hidden="true" tabindex="-1"></a>    <span class="st">&quot;confidence&quot;</span>: <span class="fl">0.73</span>,</span>
-<span id="cb23-7"><a href="#cb23-7" aria-hidden="true" tabindex="-1"></a>    <span class="st">&quot;conviction_score&quot;</span>: <span class="dv">82</span>,</span>
-<span id="cb23-8"><a href="#cb23-8" aria-hidden="true" tabindex="-1"></a>    <span class="st">&quot;leverage&quot;</span>: <span class="dv">25</span>,</span>
-<span id="cb23-9"><a href="#cb23-9" aria-hidden="true" tabindex="-1"></a>    <span class="st">&quot;capital&quot;</span>: <span class="fl">100.0</span>,</span>
-<span id="cb23-10"><a href="#cb23-10" aria-hidden="true" tabindex="-1"></a>    <span class="st">&quot;entry_price&quot;</span>: <span class="fl">0.1234</span>,</span>
-<span id="cb23-11"><a href="#cb23-11" aria-hidden="true" tabindex="-1"></a>    <span class="st">&quot;current_price&quot;</span>: <span class="fl">0.1267</span>,</span>
-<span id="cb23-12"><a href="#cb23-12" aria-hidden="true" tabindex="-1"></a>    <span class="st">&quot;sl&quot;</span>: <span class="fl">0.1215</span>,</span>
-<span id="cb23-13"><a href="#cb23-13" aria-hidden="true" tabindex="-1"></a>    <span class="st">&quot;t1&quot;</span>: <span class="fl">0.1256</span>, <span class="st">&quot;t2&quot;</span>: <span class="fl">0.1278</span>, <span class="st">&quot;t3&quot;</span>: <span class="fl">0.1300</span>,</span>
-<span id="cb23-14"><a href="#cb23-14" aria-hidden="true" tabindex="-1"></a>    <span class="st">&quot;t1_hit&quot;</span>: <span class="va">True</span>, <span class="st">&quot;t2_hit&quot;</span>: <span class="va">False</span>,</span>
-<span id="cb23-15"><a href="#cb23-15" aria-hidden="true" tabindex="-1"></a>    <span class="st">&quot;trailing_sl&quot;</span>: <span class="fl">0.1245</span>, <span class="st">&quot;trailing_active&quot;</span>: <span class="va">True</span>,</span>
-<span id="cb23-16"><a href="#cb23-16" aria-hidden="true" tabindex="-1"></a>    <span class="st">&quot;pnl&quot;</span>: <span class="fl">5.34</span>,</span>
-<span id="cb23-17"><a href="#cb23-17" aria-hidden="true" tabindex="-1"></a>    <span class="st">&quot;status&quot;</span>: <span class="st">&quot;active&quot;</span>,</span>
-<span id="cb23-18"><a href="#cb23-18" aria-hidden="true" tabindex="-1"></a>    <span class="st">&quot;entry_time&quot;</span>: <span class="st">&quot;2026-03-07T10:00:00Z&quot;</span></span>
-<span id="cb23-19"><a href="#cb23-19" aria-hidden="true" tabindex="-1"></a>}</span></code></pre></div>
-<hr />
-<h3 id="engine-api">3.11 Engine API</h3>
-<p><strong>File:</strong> <code>engine_api.py</code> (8.8 KB)</p>
-<p>Flask REST server that bridges Python engine ↔︎ Next.js dashboard.</p>
-<h4 id="endpoints">Endpoints</h4>
-<table>
-<colgroup>
-<col style="width: 30%" />
-<col style="width: 34%" />
-<col style="width: 34%" />
-</colgroup>
-<thead>
-<tr>
-<th>Method</th>
-<th>Endpoint</th>
-<th>Returns</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>GET</td>
-<td><code>/api/health</code></td>
-<td>Engine status, uptime, cycle count</td>
-</tr>
-<tr>
-<td>GET</td>
-<td><code>/api/bot-state</code></td>
-<td>All coin regimes, active positions, engine state</td>
-</tr>
-<tr>
-<td>GET</td>
-<td><code>/api/trades</code></td>
-<td>All trades from tradebook.json</td>
-</tr>
-<tr>
-<td>POST</td>
-<td><code>/api/close-trade</code></td>
-<td>Close a specific trade by trade_id or symbol</td>
-</tr>
-<tr>
-<td>POST</td>
-<td><code>/api/close-all</code></td>
-<td>Close all open positions (KILL_ALL command)</td>
-</tr>
-</tbody>
-</table>
-<hr />
-<h2 id="brain-logic-deep-dive">4. Brain Logic — Deep Dive</h2>
-<h3 id="why-hidden-markov-model">Why Hidden Markov Model?</h3>
-<p>Markets cycle through regimes (trending, ranging, volatile). Unlike
-indicators that react to price, an HMM learns the <strong>hidden
-state</strong> (regime) from observable features. Key advantages:</p>
-<ol type="1">
-<li><strong>Probabilistic</strong> — outputs confidence, not binary
-signal</li>
-<li><strong>Temporal</strong> — considers sequences of observations, not
-just current bar</li>
-<li><strong>Unsupervised</strong> — discovers regimes from data without
-labeling</li>
-</ol>
-<h3 id="feature-selection-rationale">Feature Selection Rationale</h3>
-<p><strong>Experiment: Greedy Feature Addition</strong> Starting from 4
-features (log_return, volatility, volume_change, rsi_norm):</p>
-<table>
-<thead>
-<tr>
-<th>Configuration</th>
-<th>Sharpe</th>
-<th>Notes</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>4 features (baseline)</td>
-<td>0.258</td>
-<td>Too little context</td>
-</tr>
-<tr>
-<td>+ funding_proxy</td>
-<td>0.481</td>
-<td>Futures sentiment adds edge</td>
-</tr>
-<tr>
-<td>+ adx (6 features)</td>
-<td>0.667</td>
-<td>Trend strength resolves CHOP ambiguity</td>
-</tr>
-<tr>
-<td>+ extra features</td>
-<td>&lt; 0.667</td>
-<td>Overfitting / curse of dimensionality</td>
-</tr>
-</tbody>
-</table>
-<p><strong>Final: 6 features selected</strong> (confirmed Mar 2026)</p>
-<h3 id="state-vs-4-state-comparison">3-State vs 4-State Comparison</h3>
-<table>
-<thead>
-<tr>
-<th>Metric</th>
-<th>3-State</th>
-<th>4-State</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>Sharpe Ratio</td>
-<td><strong>1.22</strong></td>
-<td>0.72</td>
-</tr>
-<tr>
-<td>Directional Accuracy</td>
-<td><strong>35.5%</strong></td>
-<td>29.0%</td>
-</tr>
-<tr>
-<td>CRASH state accuracy</td>
-<td>—</td>
-<td>10.9%</td>
-</tr>
-<tr>
-<td>Verdict</td>
-<td>✅ Production</td>
-<td>❌ Removed</td>
-</tr>
-</tbody>
-</table>
-<h3 id="regime-trading-rules">Regime Trading Rules</h3>
-<table>
-<thead>
-<tr>
-<th>Regime</th>
-<th>Trade Direction</th>
-<th>Strategy</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><strong>BULL</strong></td>
-<td>Long only</td>
-<td>Trend following</td>
-</tr>
-<tr>
-<td><strong>BEAR</strong></td>
-<td>Short only</td>
-<td>Trend following</td>
-</tr>
-<tr>
-<td><strong>CHOP</strong></td>
-<td>Sideways</td>
-<td>Mean reversion (Bollinger Bands, RSI)</td>
-</tr>
-</tbody>
-</table>
-<p>In CHOP, the <code>sideways_strategy.py</code> module takes over
-with: - Bollinger Band entries (price below lower band → long, above
-upper → short) - RSI extremes (&lt; 35 = oversold → long; &gt; 65 =
-overbought → short) - 30% smaller position size
-(<code>SIDEWAYS_POSITION_REDUCTION = 0.30</code>)</p>
-<h3 id="supportresistance-experiment-results">Support/Resistance
-Experiment Results</h3>
-<p>Experiment file: <code>tools/experiment_sr_4h_ic.py</code></p>
-<table>
-<colgroup>
-<col style="width: 25%" />
-<col style="width: 25%" />
-<col style="width: 48%" />
-</colgroup>
-<thead>
-<tr>
-<th>Metric</th>
-<th>Result</th>
-<th>Interpretation</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>IC (Information Coefficient)</td>
-<td>-0.010</td>
-<td>Near zero — weak predictive value</td>
-</tr>
-<tr>
-<td>t-statistic</td>
-<td>-0.81</td>
-<td>Not statistically significant (need</td>
-</tr>
-<tr>
-<td>Best lookback tested</td>
-<td>150×4h (25 days)</td>
-<td>Sharpe 0.818 but t-stat weak</td>
-</tr>
-<tr>
-<td><strong>Decision</strong></td>
-<td>Keep weight = 2 pts</td>
-<td>Too minor to remove, not enough to increase</td>
-</tr>
-</tbody>
-</table>
-<hr />
-<h2 id="risk-management-system">5. Risk Management System</h2>
-<h3 id="five-layer-risk-hierarchy">Five-Layer Risk Hierarchy</h3>
-<pre><code>Layer 1: Conviction Gating    → Score &lt; 40 = NO TRADE
-Layer 2: Leverage Bands       → Score → 0x / 10x / 15x / 25x / 35x
-Layer 3: Position Sizing      → 4% risk per trade (ATR-based)
-Layer 4: Trade-Level Stops    → SL + T1/T2/T3 + trailing SL
-Layer 5: Portfolio Kill Switch→ 10% drawdown in 24h → stop all</code></pre>
-<h3 id="trade-execution-decision-tree">Trade Execution Decision
-Tree</h3>
-<pre><code>Coin available?
-│
-├─ No → Skip
-└─ Yes
-     │
-     ├─ Already have open position?
-     │    └─ Yes → Monitor SL/TP, skip new entry
-     │
-     └─ No open position
-          │
-          ├─ Fetch OHLCV → Compute features → HMM predict
-          │
-          ├─ Regime == CHOP? → Use sideways_strategy
-          │
-          ├─ Compute conviction score (8 factors)
-          │
-          ├─ Score &lt; 40? → SKIP (no trade)
-          │
-          ├─ Volatility filter pass? → ATR% in [0.3%, 6%]
-          │
-          ├─ Kill switch active? → BLOCK all trades
-          │
-          └─ OPEN TRADE
-               ├─ Calculate leverage band (10x / 15x / 25x / 35x)
-               ├─ Size position (4% risk rule)
-               ├─ Set SL (ATR × sl_mult)
-               ├─ Set T1, T2, T3 targets
-               └─ Place order (paper or live)</code></pre>
-<h3 id="exit-logic">Exit Logic</h3>
-<pre><code>Every 30-second heartbeat:
-  For each open position:
-    ├─ price ≤ SL?           → CLOSE (stop_loss)
-    ├─ price ≥ T1 (not hit)? → Book 25%, set SL to breakeven
-    ├─ price ≥ T2 (not hit)? → Book 50% of remaining
-    ├─ price ≥ T3?           → Close remainder (full target)
-    ├─ trailing_sl active?   → Update SL = peak - 1×ATR
-    ├─ pnl &lt; MAX_LOSS_PCT?   → CLOSE (max_loss -15% per trade)
-    └─ hold &lt; MIN_HOLD_MIN?  → Do not exit on regime flip alone (30 min hold)</code></pre>
-<hr />
-<h2 id="saas-dashboard">6. SaaS Dashboard</h2>
-<h3 id="technology-stack">6.1 Technology Stack</h3>
+<h2 id="saas-dashboard-nextjs">8. SaaS Dashboard (NextJS)</h2>
+<h3 id="technology-stack">8.1 Technology Stack</h3>
 <table>
 <thead>
 <tr>
 <th>Layer</th>
 <th>Technology</th>
-<th>Version</th>
 </tr>
 </thead>
 <tbody>
 <tr>
-<td><strong>Framework</strong></td>
-<td>Next.js (App Router)</td>
-<td>14.2.35</td>
+<td>Framework</td>
+<td>Next.js 14 (App Router)</td>
 </tr>
 <tr>
-<td><strong>Language</strong></td>
+<td>Language</td>
 <td>TypeScript</td>
-<td>5.2.2</td>
 </tr>
 <tr>
-<td><strong>UI</strong></td>
-<td>React + Tailwind CSS + shadcn/ui</td>
-<td>18.2.0</td>
+<td>Styling</td>
+<td>Tailwind CSS + shadcn/ui components</td>
 </tr>
 <tr>
-<td><strong>ORM</strong></td>
+<td>ORM</td>
 <td>Prisma</td>
-<td>6.7.0</td>
 </tr>
 <tr>
-<td><strong>Database</strong></td>
-<td>PostgreSQL</td>
-<td>(Railway managed)</td>
+<td>Database</td>
+<td>PostgreSQL (Railway)</td>
 </tr>
 <tr>
-<td><strong>Auth</strong></td>
-<td>NextAuth.js</td>
-<td>4.24.11</td>
+<td>Auth</td>
+<td>NextAuth.js (credentials provider)</td>
 </tr>
 <tr>
-<td><strong>Animations</strong></td>
-<td>Framer Motion</td>
-<td>10.18.0</td>
+<td>Payments</td>
+<td>Razorpay webhooks</td>
 </tr>
 <tr>
-<td><strong>Charts</strong></td>
-<td>Recharts</td>
-<td>3.7.0</td>
-</tr>
-<tr>
-<td><strong>Icons</strong></td>
-<td>Lucide React</td>
-<td>0.446.0</td>
-</tr>
-<tr>
-<td><strong>Payments</strong></td>
-<td>Razorpay</td>
-<td>webhook-based</td>
-</tr>
-<tr>
-<td><strong>State</strong></td>
-<td>Zustand</td>
-<td>5.0.3</td>
-</tr>
-<tr>
-<td><strong>Notifications</strong></td>
-<td>Sonner (toast)</td>
-<td>1.5.0</td>
+<td>Deployment</td>
+<td>Railway (Docker)</td>
 </tr>
 </tbody>
 </table>
-<hr />
-<h3 id="application-pages">6.2 Application Pages</h3>
-<h4 id="public-pages">Public Pages</h4>
+<h3 id="application-pages">8.2 Application Pages</h3>
 <table>
 <colgroup>
-<col style="width: 31%" />
-<col style="width: 27%" />
-<col style="width: 40%" />
+<col style="width: 35%" />
+<col style="width: 65%" />
 </colgroup>
 <thead>
 <tr>
 <th>Route</th>
-<th>File</th>
-<th>Purpose</th>
+<th>Description</th>
 </tr>
 </thead>
 <tbody>
 <tr>
 <td><code>/</code></td>
-<td><code>app/page.tsx</code></td>
-<td>Landing page (hero, features, pricing CTA)</td>
+<td>Landing page (marketing)</td>
 </tr>
 <tr>
-<td><code>/login</code></td>
-<td><code>app/login/page.tsx</code></td>
-<td>User login (email/password, NextAuth)</td>
+<td><code>/dashboard</code></td>
+<td>Main dashboard: BTC regime, coin states, active trades, segment
+heatmap, bot cards</td>
 </tr>
 <tr>
-<td><code>/signup</code></td>
-<td><code>app/signup/page.tsx</code></td>
-<td>Registration with tier selection</td>
+<td><code>/tradebook</code></td>
+<td>Full trade history with P&amp;L charts, filter by bot/status</td>
 </tr>
 <tr>
-<td><code>/pricing</code></td>
-<td><code>app/pricing/page.tsx</code></td>
-<td>Plan comparison (Free / Pro / Ultra)</td>
+<td><code>/settings</code></td>
+<td>API key management, bot configuration</td>
 </tr>
 <tr>
-<td><code>/howto</code></td>
-<td><code>app/howto/page.tsx</code></td>
-<td>User guide, getting started</td>
+<td><code>/admin</code></td>
+<td>Admin panel: all users, subscription management, engine
+diagnostics</td>
 </tr>
 </tbody>
 </table>
-<h4 id="protected-pages-auth-required">Protected Pages (auth
-required)</h4>
+<h3 id="api-routes-complete-list-44-routes">8.3 API Routes — Complete
+List (44 routes)</h3>
+<p><strong>Bot Management:</strong></p>
 <table>
 <colgroup>
-<col style="width: 31%" />
-<col style="width: 27%" />
-<col style="width: 40%" />
+<col style="width: 29%" />
+<col style="width: 33%" />
+<col style="width: 37%" />
 </colgroup>
 <thead>
 <tr>
 <th>Route</th>
-<th>File</th>
+<th>Method</th>
 <th>Purpose</th>
 </tr>
 </thead>
 <tbody>
 <tr>
-<td><code>/dashboard</code></td>
-<td><code>app/dashboard/</code></td>
-<td>Main control panel: HMM regimes, live positions, metrics</td>
+<td><code>/api/bots/create</code></td>
+<td>POST</td>
+<td>Create new bot record in DB</td>
 </tr>
 <tr>
-<td><code>/bots</code></td>
-<td><code>app/bots/</code></td>
-<td>Create/manage bot instances, start/stop</td>
+<td><code>/api/bots/toggle</code></td>
+<td>POST</td>
+<td>Start/stop bot: registers with engine, validates exchange,
+opens/closes sessions</td>
 </tr>
 <tr>
-<td><code>/trades</code></td>
-<td><code>app/trades/</code></td>
-<td>Trade history, open trades, P&amp;L breakdown</td>
+<td><code>/api/bots/kill</code></td>
+<td>POST</td>
+<td>Emergency kill: closes all trades, stops bot</td>
 </tr>
 <tr>
-<td><code>/performance</code></td>
-<td><code>app/performance/</code></td>
-<td>Session analytics: ROI, Sharpe, drawdown, win rate</td>
+<td><code>/api/bots/retire</code></td>
+<td>POST</td>
+<td>Archive/retire bot</td>
 </tr>
 <tr>
-<td><code>/intelligence</code></td>
-<td><code>app/intelligence/</code></td>
-<td>Sentiment signals, order flow data</td>
+<td><code>/api/bots/config</code></td>
+<td>POST</td>
+<td>Update bot configuration</td>
 </tr>
 <tr>
-<td><code>/account</code></td>
-<td><code>app/account/</code></td>
-<td>Profile, exchange API keys, subscription info</td>
+<td><code>/api/bots/delete</code></td>
+<td>POST</td>
+<td>Delete bot and all associated records</td>
+</tr>
+<tr>
+<td><code>/api/bots/logs</code></td>
+<td>GET</td>
+<td>Fetch bot logs</td>
+</tr>
+<tr>
+<td><code>/api/bots/broadcast-log</code></td>
+<td>GET</td>
+<td>Signal broadcast audit log from engine</td>
 </tr>
 </tbody>
 </table>
-<h4 id="admin-pages-roleadmin-only">Admin Pages (role=admin only)</h4>
+<p><strong>Engine State:</strong></p>
+<table>
+<colgroup>
+<col style="width: 29%" />
+<col style="width: 33%" />
+<col style="width: 37%" />
+</colgroup>
+<thead>
+<tr>
+<th>Route</th>
+<th>Method</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>/api/bot-state</code></td>
+<td>GET</td>
+<td>Primary dashboard data: engine state, coin states, trades, heatmap,
+per-bot stats</td>
+</tr>
+<tr>
+<td><code>/api/health</code></td>
+<td>GET</td>
+<td>NextJS app health check</td>
+</tr>
+<tr>
+<td><code>/api/engine-logs</code></td>
+<td>GET</td>
+<td>Engine log tail</td>
+</tr>
+<tr>
+<td><code>/api/engine-debug</code></td>
+<td>GET</td>
+<td>Engine debug diagnostics</td>
+</tr>
+<tr>
+<td><code>/api/cycle-snapshot</code></td>
+<td>POST</td>
+<td>Receive per-cycle signal archive from engine; persists to DB</td>
+</tr>
+<tr>
+<td><code>/api/debug</code></td>
+<td>GET</td>
+<td>Debug info</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Trades:</strong></p>
+<table>
+<colgroup>
+<col style="width: 29%" />
+<col style="width: 33%" />
+<col style="width: 37%" />
+</colgroup>
+<thead>
+<tr>
+<th>Route</th>
+<th>Method</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>/api/trades</code></td>
+<td>GET</td>
+<td>List user trades from DB</td>
+</tr>
+<tr>
+<td><code>/api/trades/close</code></td>
+<td>POST</td>
+<td>Close specific trade (proxies to engine)</td>
+</tr>
+<tr>
+<td><code>/api/trades/exit-all</code></td>
+<td>POST</td>
+<td>Close all active trades</td>
+</tr>
+<tr>
+<td><code>/api/trades/sync</code></td>
+<td>POST</td>
+<td>Manually reconcile engine trades → Prisma</td>
+</tr>
+<tr>
+<td><code>/api/reset-trades</code></td>
+<td>POST</td>
+<td>Clear all trades (paper mode)</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Auth &amp; Users:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Route</th>
+<th>Method</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>/api/auth/[...nextauth]</code></td>
+<td>ALL</td>
+<td>NextAuth handler</td>
+</tr>
+<tr>
+<td><code>/api/signup</code></td>
+<td>POST</td>
+<td>User registration</td>
+</tr>
+<tr>
+<td><code>/api/sessions</code></td>
+<td>GET</td>
+<td>Bot session list</td>
+</tr>
+<tr>
+<td><code>/api/sessions/backfill</code></td>
+<td>POST</td>
+<td>Backfill session statistics</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Subscription:</strong></p>
+<table>
+<colgroup>
+<col style="width: 29%" />
+<col style="width: 33%" />
+<col style="width: 37%" />
+</colgroup>
+<thead>
+<tr>
+<th>Route</th>
+<th>Method</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>/api/subscription/status</code></td>
+<td>GET</td>
+<td>Current subscription tier and status</td>
+</tr>
+<tr>
+<td><code>/api/webhooks/razorpay</code></td>
+<td>POST</td>
+<td>Payment webhook handler</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Admin:</strong></p>
+<table>
+<colgroup>
+<col style="width: 29%" />
+<col style="width: 33%" />
+<col style="width: 37%" />
+</colgroup>
+<thead>
+<tr>
+<th>Route</th>
+<th>Method</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>/api/admin/users</code></td>
+<td>GET</td>
+<td>All users list</td>
+</tr>
+<tr>
+<td><code>/api/admin/bots</code></td>
+<td>GET</td>
+<td>All bots across users</td>
+</tr>
+<tr>
+<td><code>/api/admin/stats</code></td>
+<td>GET</td>
+<td>Platform-wide statistics</td>
+</tr>
+<tr>
+<td><code>/api/admin/audit</code></td>
+<td>GET</td>
+<td>Audit log</td>
+</tr>
+<tr>
+<td><code>/api/admin/subscriptions/change</code></td>
+<td>POST</td>
+<td>Modify user subscription</td>
+</tr>
+<tr>
+<td><code>/api/admin/engine</code></td>
+<td>GET/POST</td>
+<td>Engine admin controls</td>
+</tr>
+<tr>
+<td><code>/api/admin/cleanup-trades</code></td>
+<td>POST</td>
+<td>Cleanup orphaned trades</td>
+</tr>
+<tr>
+<td><code>/api/admin/close-engine-trade</code></td>
+<td>POST</td>
+<td>Force-close specific engine trade</td>
+</tr>
+<tr>
+<td><code>/api/admin/mark-trades-closed</code></td>
+<td>POST</td>
+<td>Bulk mark trades as closed</td>
+</tr>
+<tr>
+<td><code>/api/admin/reset-engine-tradebook</code></td>
+<td>POST</td>
+<td>Reset engine tradebook</td>
+</tr>
+<tr>
+<td><code>/api/admin/trade-timeline</code></td>
+<td>GET</td>
+<td>Trade timeline view</td>
+</tr>
+<tr>
+<td><code>/api/admin/orchestrator/health</code></td>
+<td>GET</td>
+<td>Orchestrator health</td>
+</tr>
+<tr>
+<td><code>/api/admin/orchestrator/control</code></td>
+<td>POST</td>
+<td>Orchestrator control</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Market &amp; Exchange:</strong></p>
+<table>
+<colgroup>
+<col style="width: 29%" />
+<col style="width: 33%" />
+<col style="width: 37%" />
+</colgroup>
+<thead>
+<tr>
+<th>Route</th>
+<th>Method</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>/api/live-market</code></td>
+<td>GET</td>
+<td>Live market prices</td>
+</tr>
+<tr>
+<td><code>/api/exchange/validate</code></td>
+<td>GET</td>
+<td>Validate exchange API keys</td>
+</tr>
+<tr>
+<td><code>/api/exchange/positions</code></td>
+<td>GET</td>
+<td>Live exchange positions</td>
+</tr>
+<tr>
+<td><code>/api/wallet-balance</code></td>
+<td>GET</td>
+<td>Exchange wallet balance</td>
+</tr>
+<tr>
+<td><code>/api/performance</code></td>
+<td>GET</td>
+<td>Bot performance metrics</td>
+</tr>
+<tr>
+<td><code>/api/settings/api-keys</code></td>
+<td>POST/GET</td>
+<td>Manage exchange API keys (encrypted)</td>
+</tr>
+</tbody>
+</table>
+<h3 id="bot-lifecycle">8.4 Bot Lifecycle</h3>
+<pre><code>1. CREATE:    POST /api/bots/create
+              → Bot record in DB (status=&quot;stopped&quot;, isActive=false)
+
+2. CONFIGURE: POST /api/bots/config
+              → BotConfig record: mode, segment, capitalPerTrade, maxLossPct, etc.
+
+3. ACTIVATE:  POST /api/bots/toggle { botId, isActive: true }
+              a. Subscription gate check (free tier can&#39;t start live bots)
+              b. Exchange validation (live mode: test CoinDCX keys)
+              c. POST /api/set-bot-id to engine → adds to ENGINE_ACTIVE_BOTS
+              d. POST /api/set-config to engine → max_loss_pct, capital_per_trade
+              e. POST /api/set-mode if live → switches engine to live mode
+              f. createBotSession() in DB
+              g. Bot.isActive=true, status=&quot;running&quot;, startedAt=now
+
+4. TRADING:   Engine picks bot&#39;s segment, stamps trades with bot_id
+              bot-state GET syncs trades engine → Prisma every 10s (dashboard poll)
+
+5. DEACTIVATE: POST /api/bots/toggle { botId, isActive: false }
+              a. POST /api/remove-bot-id from engine
+              b. Live mode: POST /api/exit-all-live → close CoinDCX positions
+              c. Close Prisma trades (if exchange close succeeded)
+              d. closeBotSession() in DB
+              e. POST /api/set-mode paper (revert engine)
+              f. Bot.isActive=false, status=&quot;stopped&quot;, stoppedAt=now</code></pre>
+<h3 id="auto-re-registration">8.5 Auto Re-Registration</h3>
+<p>After engine restart, <code>ENGINE_ACTIVE_BOTS</code> is cleared
+(in-memory). On every <code>GET /api/bot-state</code>:</p>
+<div class="sourceCode" id="cb14"><pre
+class="sourceCode typescript"><code class="sourceCode typescript"><span id="cb14-1"><a href="#cb14-1" aria-hidden="true" tabindex="-1"></a>For each active bot <span class="kw">in</span> DB<span class="op">:</span></span>
+<span id="cb14-2"><a href="#cb14-2" aria-hidden="true" tabindex="-1"></a>  modeKey <span class="op">=</span> bot<span class="st">&#39;s mode (live or paper)</span></span>
+<span id="cb14-3"><a href="#cb14-3" aria-hidden="true" tabindex="-1"></a>  engineData <span class="op">=</span> already<span class="op">-</span>fetched engine response <span class="cf">for</span> that mode</span>
+<span id="cb14-4"><a href="#cb14-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb14-5"><a href="#cb14-5" aria-hidden="true" tabindex="-1"></a>  <span class="co">// Guard: skip ONLY if engine is unreachable (null)</span></span>
+<span id="cb14-6"><a href="#cb14-6" aria-hidden="true" tabindex="-1"></a>  <span class="co">// Do NOT skip if registered_bot_ids is empty — that&#39;s post-restart state</span></span>
+<span id="cb14-7"><a href="#cb14-7" aria-hidden="true" tabindex="-1"></a>  <span class="cf">if</span> engineDataByMode[modeKey] <span class="op">===</span> null<span class="op">:</span> skip   <span class="co">// engine unreachable</span></span>
+<span id="cb14-8"><a href="#cb14-8" aria-hidden="true" tabindex="-1"></a>  <span class="cf">if</span> engineDataByMode[modeKey] <span class="op">===</span> undefined<span class="op">:</span> skip  <span class="co">// not fetched</span></span>
+<span id="cb14-9"><a href="#cb14-9" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb14-10"><a href="#cb14-10" aria-hidden="true" tabindex="-1"></a>  <span class="cf">if</span> bot<span class="op">.</span><span class="at">id</span> NOT <span class="kw">in</span> registered_bot_ids<span class="op">:</span></span>
+<span id="cb14-11"><a href="#cb14-11" aria-hidden="true" tabindex="-1"></a>    POST <span class="op">/</span>api<span class="op">/</span><span class="kw">set</span><span class="op">-</span>bot<span class="op">-</span>id to engine  <span class="co">// re-register</span></span></code></pre></div>
+<p>This guard is critical: <code>registered_bot_ids=[]</code> (empty
+list) means the engine restarted and needs re-registration.
+<code>null</code> means engine is offline and we shouldn’t attempt
+registration.</p>
+<p>For mixed-mode users (some bots live, some paper), both engines are
+fetched in parallel and re-registration is done per-engine.</p>
+<h3 id="trade-sync-flow">8.6 Trade Sync Flow</h3>
+<p>Every <code>GET /api/bot-state</code> call:</p>
+<ol type="1">
+<li>Determine engine mode (live/paper) based on user’s active bots</li>
+<li>Fetch engine data from primary engine; if mixed modes, fetch both
+engines</li>
+<li>For each user bot with <code>startedAt</code> set:
+<ul>
+<li>Pull engine tradebook trades matching bot’s mode from cache</li>
+<li>Call <code>syncEngineTrades(botTrades, bot.id, bot.startedAt)</code>
+→ upsert to Prisma Trade table</li>
+</ul></li>
+<li>Fetch user’s trades from Prisma via
+<code>getUserTrades(userId)</code></li>
+<li>Enrich with live engine data (unrealized P&amp;L not stored in
+Prisma)</li>
+</ol>
+<h3 id="btc-confidence-display">8.7 BTC Confidence Display</h3>
+<p>The dashboard displays BTC “confidence” as a 0–100 integer. BTC’s raw
+HMM margin is near-zero (CHOP/high-volatility state conviction is low).
+Instead:</p>
+<div class="sourceCode" id="cb15"><pre
+class="sourceCode typescript"><code class="sourceCode typescript"><span id="cb15-1"><a href="#cb15-1" aria-hidden="true" tabindex="-1"></a><span class="co">// Regime string format: &quot;1d=BULLISH(0.45) | 1h=BEARISH(0.32) | 15m=SIDEWAYS/CHOP(0.08)&quot;</span></span>
+<span id="cb15-2"><a href="#cb15-2" aria-hidden="true" tabindex="-1"></a><span class="kw">const</span> matches <span class="op">=</span> regimeStr<span class="op">.</span><span class="fu">match</span>(<span class="ss">/</span><span class="sc">\(([\d.]+)\)</span><span class="ss">/g</span>)</span>
+<span id="cb15-3"><a href="#cb15-3" aria-hidden="true" tabindex="-1"></a><span class="co">// Extract: [0.45, 0.32, 0.08]</span></span>
+<span id="cb15-4"><a href="#cb15-4" aria-hidden="true" tabindex="-1"></a><span class="kw">const</span> avg <span class="op">=</span> values<span class="op">.</span><span class="fu">reduce</span>((a<span class="op">,</span> b) <span class="kw">=&gt;</span> a <span class="op">+</span> b) <span class="op">/</span> values<span class="op">.</span><span class="at">length</span></span>
+<span id="cb15-5"><a href="#cb15-5" aria-hidden="true" tabindex="-1"></a><span class="cf">return</span> <span class="bu">Math</span><span class="op">.</span><span class="fu">round</span>(avg <span class="op">*</span> <span class="dv">100</span>)   <span class="co">// → e.g. 28</span></span></code></pre></div>
+<p>Fallback chain: conviction → raw margin → 0.</p>
+<hr />
+<h2 id="data-routing-end-to-end">9. Data Routing — End-to-End</h2>
+<h4 id="engine-dashboard-read-path">Engine → Dashboard (Read path)</h4>
+<pre><code>Engine writes:          data/multi_bot_state.json
+                        data/tradebook.json
+                        data/segment_heatmap.json
+                        data/athena_decisions.json
+                        data/signal_broadcast.log
+
+bot-state/route.ts:    GET → engine /api/all (every dashboard poll)
+                        → Merge with Prisma trades
+                        → Return unified JSON to dashboard-client.tsx
+
+dashboard-client.tsx:   Renders BTC regime panel, coin heatmap,
+                        active trades list, segment heatmap cards,
+                        bot status cards, Athena decision feed</code></pre>
+<h4 id="trade-recording-write-path">Trade Recording (Write path)</h4>
+<pre><code>Engine:                 tradebook.open_trade() → data/tradebook.json
+
+bot-state/route.ts:    syncEngineTrades() → Prisma Trade.upsert()
+                        (keyed by trade_id field)
+
+dashboard-client.tsx:   Displays from Prisma (via getUserTrades)
+                        Active trades show unrealized P&amp;L from engine</code></pre>
+<h4 id="bot-registration-flow">Bot Registration Flow</h4>
+<pre><code>User clicks &quot;Start&quot;:   bots/toggle POST → validates subscription
+                        → engine /api/set-bot-id (adds to ENGINE_ACTIVE_BOTS)
+                        → engine /api/set-config (max_loss, capital)
+                        → DB: bot.isActive=true
+
+Engine _tick():        reads config.ENGINE_ACTIVE_BOTS
+                        → scans segment for each bot
+                        → stamps trades with bot_id
+
+bot-state GET:         checks registered_bot_ids from engine response
+                        → if bot missing: auto re-register</code></pre>
+<h4 id="cycle-snapshot-audit-path">Cycle Snapshot (Audit path)</h4>
+<pre><code>After each _tick():    Engine POSTs to dashboard /api/cycle-snapshot
+                        → Prisma CycleSnapshot, CoinScanResult, SegmentHeatmapEntry
+                        (background thread, non-blocking, 10s timeout)</code></pre>
+<hr />
+<h2 id="deployment-infrastructure">10. Deployment &amp;
+Infrastructure</h2>
+<p><strong>Platform:</strong> Railway (Docker containers)</p>
+<p><strong>Engine service:</strong> <code>engine_api.py</code> is the
+Flask entrypoint. <code>main.py</code> (RegimeMasterBot) runs in a
+background thread started at Flask app init.</p>
+<p><strong>SaaS service:</strong> NextJS app in
+<code>sentinel-saas/nextjs_space/</code>.</p>
+<p><strong>Two-engine setup:</strong> Separate Railway services for
+paper and live trading. Environment variable
+<code>ENGINE_URL_PAPER</code> and <code>ENGINE_URL_LIVE</code> control
+which engine each user’s bots connect to (set in Railway env vars for
+the NextJS service).</p>
+<p><strong>Auto-restart:</strong> Engine thread has 5-retry exponential
+backoff + infinite recovery loop. SIGTERM handler ensures graceful
+shutdown on Railway redeploy.</p>
+<p><strong>Key environment variables:</strong></p>
+<table>
+<colgroup>
+<col style="width: 35%" />
+<col style="width: 32%" />
+<col style="width: 32%" />
+</colgroup>
+<thead>
+<tr>
+<th>Variable</th>
+<th>Service</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>BINANCE_API_KEY/SECRET</code></td>
+<td>Engine</td>
+<td>Paper trading data</td>
+</tr>
+<tr>
+<td><code>COINDCX_API_KEY/SECRET</code></td>
+<td>Engine</td>
+<td>Live order execution</td>
+</tr>
+<tr>
+<td><code>GEMINI_API_KEY</code></td>
+<td>Engine</td>
+<td>Athena LLM</td>
+</tr>
+<tr>
+<td><code>ENGINE_API_SECRET</code></td>
+<td>Engine</td>
+<td>Bearer token auth for all engine endpoints</td>
+</tr>
+<tr>
+<td><code>ALLOW_LIVE_TRADING</code></td>
+<td>Engine</td>
+<td>Safety guard; must be <code>true</code> to enable live mode</td>
+</tr>
+<tr>
+<td><code>PAPER_TRADE</code></td>
+<td>Engine</td>
+<td>Default mode (overridden at runtime by set-mode)</td>
+</tr>
+<tr>
+<td><code>ENGINE_BOT_ID</code></td>
+<td>Engine</td>
+<td>Default bot ID (overridden by set-bot-id)</td>
+</tr>
+<tr>
+<td><code>ENGINE_BOT_NAME</code></td>
+<td>Engine</td>
+<td>Default bot name</td>
+</tr>
+<tr>
+<td><code>DATABASE_URL</code></td>
+<td>SaaS</td>
+<td>PostgreSQL connection string</td>
+</tr>
+<tr>
+<td><code>NEXTAUTH_SECRET</code></td>
+<td>SaaS</td>
+<td>Session encryption</td>
+</tr>
+<tr>
+<td><code>ENGINE_URL_PAPER</code></td>
+<td>SaaS</td>
+<td>Paper engine Flask URL</td>
+</tr>
+<tr>
+<td><code>ENGINE_URL_LIVE</code></td>
+<td>SaaS</td>
+<td>Live engine Flask URL</td>
+</tr>
+<tr>
+<td><code>ORCHESTRATOR_URL</code></td>
+<td>SaaS</td>
+<td>Orchestrator service URL (default http://localhost:5000)</td>
+</tr>
+<tr>
+<td><code>ENGINE_INTERNAL_SECRET</code></td>
+<td>SaaS/Engine</td>
+<td>Secret for cycle-snapshot POST auth</td>
+</tr>
+<tr>
+<td><code>TELEGRAM_BOT_TOKEN/CHAT_ID</code></td>
+<td>Engine</td>
+<td>Telegram alerts (TELEGRAM_ENABLED=False by default)</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="configuration-reference">11. Configuration Reference</h2>
+<p>Key parameters from <code>config.py</code> and their effect:</p>
+<h4 id="trading-loop">Trading Loop</h4>
+<table>
+<colgroup>
+<col style="width: 39%" />
+<col style="width: 32%" />
+<col style="width: 28%" />
+</colgroup>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Default</th>
+<th>Effect</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>LOOP_INTERVAL_SECONDS</code></td>
+<td>10</td>
+<td>Heartbeat interval</td>
+</tr>
+<tr>
+<td><code>ANALYSIS_INTERVAL_SECONDS</code></td>
+<td>900</td>
+<td>Full analysis cycle (15 minutes)</td>
+</tr>
+<tr>
+<td><code>SCAN_INTERVAL_CYCLES</code></td>
+<td>4</td>
+<td>Rebuild coin pool every N cycles (1 hour)</td>
+</tr>
+<tr>
+<td><code>TOP_COINS_LIMIT</code></td>
+<td>50</td>
+<td>Max coins in scan pool</td>
+</tr>
+<tr>
+<td><code>MAX_CONCURRENT_POSITIONS</code></td>
+<td>10</td>
+<td>Max simultaneous open positions</td>
+</tr>
+</tbody>
+</table>
+<h4 id="multi-tf-hmm">Multi-TF HMM</h4>
+<table>
+<colgroup>
+<col style="width: 39%" />
+<col style="width: 32%" />
+<col style="width: 28%" />
+</colgroup>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Default</th>
+<th>Effect</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>MULTI_TF_ENABLED</code></td>
+<td>True</td>
+<td>Use 3-TF aggregation (disable for legacy 1H-only)</td>
+</tr>
+<tr>
+<td><code>MULTI_TF_TIMEFRAMES</code></td>
+<td>[“1d”,“1h”,“15m”]</td>
+<td>Timeframes per coin</td>
+</tr>
+<tr>
+<td><code>MULTI_TF_CANDLE_LIMIT</code></td>
+<td>300</td>
+<td>Candles fetched per TF</td>
+</tr>
+<tr>
+<td><code>MULTI_TF_WEIGHTS</code></td>
+<td>{1d:40, 1h:35, 15m:25}</td>
+<td>Conviction weighting</td>
+</tr>
+<tr>
+<td><code>MULTI_TF_MIN_AGREEMENT</code></td>
+<td>2</td>
+<td>Minimum TFs agreeing to produce signal</td>
+</tr>
+<tr>
+<td><code>HMM_N_STATES</code></td>
+<td>3</td>
+<td>Bull/Bear/Chop (4-state CRASH removed — merged into BEAR)</td>
+</tr>
+<tr>
+<td><code>HMM_RETRAIN_HOURS</code></td>
+<td>24</td>
+<td>Model retraining frequency</td>
+</tr>
+</tbody>
+</table>
+<h4 id="segment-scanner">Segment Scanner</h4>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Default</th>
+<th>Effect</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>SCANNER_SEGMENT_ROTATION</code></td>
+<td>True</td>
+<td>Enable 15-min block rotation</td>
+</tr>
+<tr>
+<td><code>SEGMENT_SCAN_LIMIT</code></td>
+<td>3</td>
+<td>Top N segments selected by heatmap</td>
+</tr>
+<tr>
+<td><code>SCANNER_COINS_PER_SEGMENT</code></td>
+<td>5</td>
+<td>Max coins per segment in shortlist</td>
+</tr>
+<tr>
+<td><code>MAX_ACTIVE_PER_SEGMENT</code></td>
+<td>1</td>
+<td>Correlation control</td>
+</tr>
+</tbody>
+</table>
+<h4 id="conviction-deploy">Conviction &amp; Deploy</h4>
+<table>
+<colgroup>
+<col style="width: 39%" />
+<col style="width: 32%" />
+<col style="width: 28%" />
+</colgroup>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Default</th>
+<th>Effect</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>MIN_CONVICTION_FOR_DEPLOY</code></td>
+<td>60</td>
+<td>Gate before Athena call</td>
+</tr>
+<tr>
+<td><code>TOP_COINS_PER_SEGMENT</code></td>
+<td>1</td>
+<td>Athena evaluates top N per segment per bot</td>
+</tr>
+<tr>
+<td><code>CONVICTION_WEIGHT_HMM</code></td>
+<td>71</td>
+<td>HMM factor weight (out of 100)</td>
+</tr>
+<tr>
+<td><code>CONVICTION_WEIGHT_FUNDING</code></td>
+<td>11</td>
+<td>Funding rate factor weight</td>
+</tr>
+<tr>
+<td><code>CONVICTION_WEIGHT_OI</code></td>
+<td>11</td>
+<td>OI change factor weight</td>
+</tr>
+<tr>
+<td><code>CONVICTION_WEIGHT_BTC_MACRO</code></td>
+<td>7</td>
+<td>BTC macro alignment factor</td>
+</tr>
+</tbody>
+</table>
+<h4 id="athena">Athena</h4>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Default</th>
+<th>Effect</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>LLM_REASONING_ENABLED</code></td>
+<td>True</td>
+<td>Enable Athena layer</td>
+</tr>
+<tr>
+<td><code>LLM_MODEL</code></td>
+<td>gemini-2.5-flash</td>
+<td>Gemini model</td>
+</tr>
+<tr>
+<td><code>LLM_CACHE_MINUTES</code></td>
+<td>10</td>
+<td>Cache decision per coin</td>
+</tr>
+<tr>
+<td><code>LLM_MAX_CALLS_PER_CYCLE</code></td>
+<td>5</td>
+<td>Rate limit per analysis cycle</td>
+</tr>
+<tr>
+<td><code>LLM_VETO_THRESHOLD</code></td>
+<td>0.30</td>
+<td>Confidence below this → auto-VETO</td>
+</tr>
+<tr>
+<td><code>LLM_TIMEOUT_SECONDS</code></td>
+<td>30</td>
+<td>API call timeout</td>
+</tr>
+</tbody>
+</table>
+<h4 id="risk-exit">Risk / Exit</h4>
+<table>
+<colgroup>
+<col style="width: 39%" />
+<col style="width: 32%" />
+<col style="width: 28%" />
+</colgroup>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Default</th>
+<th>Effect</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>CAPITAL_PER_TRADE</code></td>
+<td>100</td>
+<td>USD per trade (fixed)</td>
+</tr>
+<tr>
+<td><code>MAX_LOSS_PER_TRADE_PCT</code></td>
+<td>-35</td>
+<td>Hard stop (leveraged P&amp;L%)</td>
+</tr>
+<tr>
+<td><code>TRAILING_SL_ENABLED</code></td>
+<td>True</td>
+<td>Enable stepped profit lock</td>
+</tr>
+<tr>
+<td><code>TRAILING_SL_STEPS</code></td>
+<td>10-step ladder</td>
+<td>First step: +5% trigger → breakeven</td>
+</tr>
+<tr>
+<td><code>EXECUTION_ESCAPE_ATR</code></td>
+<td>2.0</td>
+<td>Cancel pending limit if price moves &gt;2 ATR</td>
+</tr>
+<tr>
+<td><code>EXECUTION_TIF_MINUTES</code></td>
+<td>60</td>
+<td>Pending limit order lifetime</td>
+</tr>
+<tr>
+<td><code>EXECUTION_ATR_PULLBACK</code></td>
+<td>True</td>
+<td>Place limit at 20-EMA instead of market</td>
+</tr>
+<tr>
+<td><code>EXECUTION_DYNAMIC_LEVERAGE</code></td>
+<td>True</td>
+<td>ATR%-based leverage (overrides conviction tiers)</td>
+</tr>
+<tr>
+<td><code>EXECUTION_MAX_LEVERAGE</code></td>
+<td>25</td>
+<td>Dynamic leverage ceiling</td>
+</tr>
+<tr>
+<td><code>EXECUTION_MIN_LEVERAGE</code></td>
+<td>10</td>
+<td>Dynamic leverage floor</td>
+</tr>
+</tbody>
+</table>
+<h4 id="disabled-features-in-config-not-active">Disabled Features (in
+config, not active)</h4>
+<table>
+<colgroup>
+<col style="width: 31%" />
+<col style="width: 27%" />
+<col style="width: 41%" />
+</colgroup>
+<thead>
+<tr>
+<th>Feature</th>
+<th>Status</th>
+<th>Config flag</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Sentiment Engine (FinBERT/VADER)</td>
+<td>DISABLED</td>
+<td><code>SENTIMENT_ENABLED=False</code></td>
+</tr>
+<tr>
+<td>Order Flow Engine (L2 depth)</td>
+<td>DISABLED</td>
+<td><code>ORDERFLOW_ENABLED=False</code></td>
+</tr>
+<tr>
+<td>Multi-Target Partial Profit</td>
+<td>DISABLED</td>
+<td><code>MULTI_TARGET_ENABLED=False</code></td>
+</tr>
+<tr>
+<td>Weekend Skip</td>
+<td>DISABLED</td>
+<td><code>WEEKEND_SKIP_ENABLED=False</code></td>
+</tr>
+<tr>
+<td>Regime-Change Exits</td>
+<td>DISABLED</td>
+<td>Code in <code>_check_exits()</code> is a no-op</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="prisma-database-schema-summary">Prisma Database Schema
+Summary</h2>
 <table>
 <colgroup>
 <col style="width: 25%" />
@@ -1674,946 +2411,78 @@ required)</h4>
 </colgroup>
 <thead>
 <tr>
-<th>Route</th>
-<th>Component</th>
+<th>Model</th>
+<th>Key Fields</th>
 <th>Purpose</th>
 </tr>
 </thead>
 <tbody>
 <tr>
-<td><code>/admin</code></td>
-<td><code>admin-client.tsx</code></td>
-<td>Full admin control panel</td>
+<td><code>User</code></td>
+<td>id, email, password, role</td>
+<td>User accounts</td>
 </tr>
 <tr>
-<td>↳ User Analytics</td>
-<td><code>user-analytics.tsx</code></td>
-<td>Signups, churn, active users</td>
+<td><code>Subscription</code></td>
+<td>userId, tier, status, trialEndsAt</td>
+<td>Subscription gating</td>
 </tr>
 <tr>
-<td>↳ Revenue Dashboard</td>
-<td><code>revenue-dashboard.tsx</code></td>
-<td>ARR, ARPU, subscription metrics</td>
+<td><code>ExchangeApiKey</code></td>
+<td>userId, exchange, apiKey (encrypted)</td>
+<td>Per-user exchange credentials</td>
 </tr>
 <tr>
-<td>↳ Subscription Mgmt</td>
-<td><code>subscription-mgmt.tsx</code></td>
-<td>Override user tiers, Razorpay reconciliation</td>
+<td><code>Bot</code></td>
+<td>userId, name, exchange, isActive, startedAt</td>
+<td>Bot instances</td>
 </tr>
 <tr>
-<td>↳ Engine Control</td>
-<td><code>engine-control.tsx</code></td>
-<td>Start/stop bot engine globally</td>
+<td><code>BotConfig</code></td>
+<td>botId, mode, capitalPerTrade, maxLossPct, segment, brainType</td>
+<td>Bot settings</td>
 </tr>
 <tr>
-<td>↳ System Health</td>
-<td><code>system-health.tsx</code></td>
-<td>CPU, memory, disk, uptime</td>
+<td><code>BotState</code></td>
+<td>botId, engineStatus, lastCycleAt, coinStates</td>
+<td>Engine state mirror</td>
 </tr>
 <tr>
-<td>↳ Audit Log</td>
-<td><code>audit-log.tsx</code></td>
-<td>API calls, user actions</td>
-</tr>
-</tbody>
-</table>
-<hr />
-<h3 id="api-routes">6.3 API Routes</h3>
-<p>All routes in <code>sentinel-saas/nextjs_space/app/api/</code>:</p>
-<h4 id="bot-management">Bot Management</h4>
-<table>
-<colgroup>
-<col style="width: 28%" />
-<col style="width: 25%" />
-<col style="width: 46%" />
-</colgroup>
-<thead>
-<tr>
-<th>Method</th>
-<th>Route</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>POST</td>
-<td><code>/api/bots/create</code></td>
-<td>Create new bot for authenticated user</td>
+<td><code>BotSession</code></td>
+<td>botId, startedAt, endedAt, totalTrades, totalPnl</td>
+<td>Trading session records</td>
 </tr>
 <tr>
-<td>POST</td>
-<td><code>/api/bots/delete</code></td>
-<td>Delete bot and its trades</td>
+<td><code>Trade</code></td>
+<td>botId, coin, position, entryPrice, stopLoss, takeProfit, status,
+totalPnl</td>
+<td>Individual trades</td>
 </tr>
 <tr>
-<td>POST</td>
-<td><code>/api/bots/toggle</code></td>
-<td>Start (creates BotSession) or Stop bot</td>
+<td><code>PartialBooking</code></td>
+<td>tradeId, target, exitPrice, pnl</td>
+<td>Partial profit bookings</td>
 </tr>
 <tr>
-<td>POST</td>
-<td><code>/api/bots/kill</code></td>
-<td>Emergency kill — closes all paper trades immediately</td>
+<td><code>CycleSnapshot</code></td>
+<td>cycleNumber, btcRegime, coinsScanned, deployedCount</td>
+<td>Per-cycle audit records</td>
 </tr>
 <tr>
-<td>GET/POST</td>
-<td><code>/api/bots/config</code></td>
-<td>Read/write bot configuration</td>
+<td><code>CoinScanResult</code></td>
+<td>cycleId, symbol, regime, conviction, deployStatus</td>
+<td>Per-coin scan results</td>
 </tr>
 <tr>
-<td>GET</td>
-<td><code>/api/bots/logs</code></td>
-<td>Fetch bot activity logs</td>
-</tr>
-<tr>
-<td>GET</td>
-<td><code>/api/bot-state</code></td>
-<td>Live bot state (regimes, positions, cycle info)</td>
+<td><code>SegmentHeatmapEntry</code></td>
+<td>cycleId, segment, compositeScore, isSelected</td>
+<td>Heatmap per cycle</td>
 </tr>
 </tbody>
 </table>
-<h4 id="trade-management">Trade Management</h4>
-<table>
-<thead>
-<tr>
-<th>Method</th>
-<th>Route</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>GET</td>
-<td><code>/api/trades</code></td>
-<td>All trades for user (syncs from engine)</td>
-</tr>
-<tr>
-<td>POST</td>
-<td><code>/api/trades/close</code></td>
-<td>Manually close a specific trade</td>
-</tr>
-<tr>
-<td>POST</td>
-<td><code>/api/reset-trades</code></td>
-<td>Clear all trades (admin/test only)</td>
-</tr>
-</tbody>
-</table>
-<h4 id="session-management">Session Management</h4>
-<table>
-<colgroup>
-<col style="width: 28%" />
-<col style="width: 25%" />
-<col style="width: 46%" />
-</colgroup>
-<thead>
-<tr>
-<th>Method</th>
-<th>Route</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>GET</td>
-<td><code>/api/sessions</code></td>
-<td>List all bot sessions with metrics</td>
-</tr>
-<tr>
-<td>POST</td>
-<td><code>/api/sessions/backfill</code></td>
-<td>Admin: tag legacy trades as Session 0</td>
-</tr>
-</tbody>
-</table>
-<h4 id="exchange-wallet">Exchange &amp; Wallet</h4>
-<table>
-<thead>
-<tr>
-<th>Method</th>
-<th>Route</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>POST</td>
-<td><code>/api/exchange/validate</code></td>
-<td>Test API credentials (no storage)</td>
-</tr>
-<tr>
-<td>GET</td>
-<td><code>/api/exchange/positions</code></td>
-<td>Live positions from exchange</td>
-</tr>
-<tr>
-<td>GET</td>
-<td><code>/api/wallet-balance</code></td>
-<td>Account balance using stored keys</td>
-</tr>
-<tr>
-<td>GET/POST</td>
-<td><code>/api/settings/api-keys</code></td>
-<td>Read/write encrypted API keys</td>
-</tr>
-</tbody>
-</table>
-<h4 id="user-subscription">User &amp; Subscription</h4>
-<table>
-<colgroup>
-<col style="width: 28%" />
-<col style="width: 25%" />
-<col style="width: 46%" />
-</colgroup>
-<thead>
-<tr>
-<th>Method</th>
-<th>Route</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>POST</td>
-<td><code>/api/signup</code></td>
-<td>Register new user</td>
-</tr>
-<tr>
-<td>GET</td>
-<td><code>/api/subscription/status</code></td>
-<td>Current tier, trial status, expiry</td>
-</tr>
-<tr>
-<td>POST</td>
-<td><code>/api/subscription/update</code></td>
-<td>Upgrade/downgrade plan</td>
-</tr>
-<tr>
-<td>POST</td>
-<td><code>/api/webhooks/razorpay</code></td>
-<td>Razorpay payment confirmed → activate tier</td>
-</tr>
-</tbody>
-</table>
-<h4 id="system">System</h4>
-<table>
-<thead>
-<tr>
-<th>Method</th>
-<th>Route</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>GET</td>
-<td><code>/api/health</code></td>
-<td>API health check</td>
-</tr>
-<tr>
-<td>GET</td>
-<td><code>/api/live-market</code></td>
-<td>Live price feed</td>
-</tr>
-<tr>
-<td>GET</td>
-<td><code>/api/debug</code></td>
-<td>Debug info (engine PID, state dump)</td>
-</tr>
-</tbody>
-</table>
-<hr />
-<h3 id="database-schema">6.4 Database Schema</h3>
-<p><strong>12 Models</strong> in PostgreSQL via Prisma ORM.</p>
-<h4 id="entity-relationship-overview">Entity Relationship Overview</h4>
-<pre><code>User
-  ├── Subscription (1:1)
-  ├── ExchangeApiKey[] (1:many — one per exchange)
-  ├── Bot[] (1:many)
-  │     ├── BotConfig (1:1)
-  │     ├── BotState (1:1)
-  │     ├── BotSession[] (1:many)
-  │     └── Trade[] (1:many)
-  │           └── PartialBooking[] (1:many)
-  ├── Account[] (NextAuth OAuth)
-  └── Session[] (NextAuth sessions)</code></pre>
-<h4 id="model-details">Model Details</h4>
-<p><strong>User</strong></p>
-<pre><code>id, email (unique), name, password (hashed), role (user|admin)
-referralCode, phone, createdAt, updatedAt</code></pre>
-<p><strong>Subscription</strong></p>
-<pre><code>id, userId (unique), tier (free|pro|ultra), status (trial|active|expired)
-coinScans (0=unlimited), trialEndsAt, currentPeriodEnd
-razorpayPaymentId, razorpayOrderId</code></pre>
-<p><strong>ExchangeApiKey</strong></p>
-<pre><code>id, userId, exchange (binance|coindcx)
-apiKey (AES-256-GCM encrypted), apiSecret (AES-256-GCM encrypted)
-encryptionIv (comma-separated key IV + secret IV)
-isActive, createdAt, updatedAt
-UNIQUE: (userId, exchange)</code></pre>
-<p><strong>Bot</strong></p>
-<pre><code>id, userId, name, exchange, status (running|stopped|paused|error)
-isActive, startedAt, stoppedAt, createdAt, updatedAt</code></pre>
-<p><strong>BotConfig</strong></p>
-<pre><code>id, botId (unique), mode (paper|live)
-capitalPerTrade, maxOpenTrades, slMultiplier, tpMultiplier, maxLossPct
-multiTargetEnabled, t1/t2/t3Multiplier, t1/t2BookPct
-coinList (JSON array), leverageTiers (JSON)</code></pre>
-<p><strong>BotState</strong></p>
-<pre><code>id, botId (unique), engineStatus (idle|running|error)
-lastCycleAt, cycleCount, cycleDurationMs
-coinStates (JSON: {SYMBOL: {regime, features, signal}})
-errorMessage, errorAt, updatedAt</code></pre>
-<p><strong>Trade</strong></p>
-<pre><code>id, botId, coin, position (long|short), regime, confidence, mode (paper|live)
-leverage, capital, quantity, entryPrice, currentPrice, exitPrice
-stopLoss, takeProfit, t1/t2/t3Price, t1/t2Hit (bool)
-trailingSl, trailingTp, trailingActive, trailSlCount
-activePnl, activePnlPercent, totalPnl, totalPnlPercent
-status (active|closed|cancelled), exitReason, exitPercent
-exchangeOrderId, exchangePositionId, sessionId
-entryTime, exitTime, createdAt, updatedAt</code></pre>
-<p><strong>BotSession</strong></p>
-<pre><code>id, botId, sessionIndex (0=legacy, 1=first run...)
-startedAt, endedAt, status (active|closed), mode (paper|live)
-totalTrades, closedTrades, winTrades
-totalPnl, roi (totalPnl/totalCapital×100), winRate (winTrades/closedTrades×100)
-maxDrawdown, bestTrade, worstTrade, totalCapital
-createdAt, updatedAt</code></pre>
-<p><strong>PartialBooking</strong></p>
-<pre><code>id, tradeId, target (T1|T2|T3)
-bookPercent, quantity, exitPrice, pnl, pnlPercent
-createdAt</code></pre>
-<hr />
-<h3 id="authentication-authorization">6.5 Authentication &amp;
-Authorization</h3>
-<p><strong>Provider:</strong> NextAuth.js v4 with JWT strategy.</p>
-<h4 id="auth-flow">Auth Flow</h4>
-<pre><code>User submits email + password
-  → /api/auth/[...nextauth]
-  → CredentialsProvider validates against Prisma User (bcrypt compare)
-  → JWT created with {id, email, name, role}
-  → Session cookie set (httpOnly, secure)
-  → Middleware checks session on every protected route</code></pre>
-<h4 id="authorization-levels">Authorization Levels</h4>
-<table>
-<thead>
-<tr>
-<th>Role</th>
-<th>Access</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><code>user</code></td>
-<td>Own bots, trades, sessions, account settings</td>
-</tr>
-<tr>
-<td><code>admin</code></td>
-<td>All users’ data, engine control, subscription management</td>
-</tr>
-</tbody>
-</table>
-<h4 id="session-in-api-routes">Session in API Routes</h4>
-<div class="sourceCode" id="cb38"><pre
-class="sourceCode typescript"><code class="sourceCode typescript"><span id="cb38-1"><a href="#cb38-1" aria-hidden="true" tabindex="-1"></a><span class="kw">const</span> session <span class="op">=</span> <span class="cf">await</span> <span class="fu">getServerSession</span>(authOptions)<span class="op">;</span></span>
-<span id="cb38-2"><a href="#cb38-2" aria-hidden="true" tabindex="-1"></a><span class="cf">if</span> (<span class="op">!</span>session<span class="op">?.</span><span class="at">user</span>) <span class="cf">return</span> <span class="dv">401</span><span class="op">;</span></span>
-<span id="cb38-3"><a href="#cb38-3" aria-hidden="true" tabindex="-1"></a><span class="kw">const</span> userId <span class="op">=</span> (session<span class="op">.</span><span class="at">user</span> <span class="im">as</span> <span class="dt">any</span>)<span class="op">.</span><span class="at">id</span><span class="op">;</span></span>
-<span id="cb38-4"><a href="#cb38-4" aria-hidden="true" tabindex="-1"></a><span class="kw">const</span> isAdmin <span class="op">=</span> (session<span class="op">.</span><span class="at">user</span> <span class="im">as</span> <span class="dt">any</span>)<span class="op">.</span><span class="at">role</span> <span class="op">===</span> <span class="st">&#39;admin&#39;</span><span class="op">;</span></span>
-<span id="cb38-5"><a href="#cb38-5" aria-hidden="true" tabindex="-1"></a><span class="co">// isAdmin bypasses userId filter — can see all data</span></span></code></pre></div>
-<hr />
-<h3 id="subscription-system">6.6 Subscription System</h3>
-<h4 id="tiers">Tiers</h4>
-<table>
-<thead>
-<tr>
-<th>Tier</th>
-<th>Coin Scans</th>
-<th>Price</th>
-<th>Features</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><strong>Free</strong></td>
-<td>0 (trial)</td>
-<td>$0</td>
-<td>7-day trial, limited coins</td>
-</tr>
-<tr>
-<td><strong>Pro</strong></td>
-<td>15</td>
-<td>$X/mo</td>
-<td>Multi-coin, paper trading</td>
-</tr>
-<tr>
-<td><strong>Ultra</strong></td>
-<td>50 (unlimited)</td>
-<td>$XX/mo</td>
-<td>All features, live trading</td>
-</tr>
-</tbody>
-</table>
-<h4 id="payment-flow-razorpay">Payment Flow (Razorpay)</h4>
-<pre><code>User clicks Upgrade → /pricing
-  → Creates Razorpay order → returns order_id
-  → User completes payment in Razorpay checkout
-  → Razorpay sends webhook to /api/webhooks/razorpay
-  → Verify signature (HMAC-SHA256)
-  → Update subscription.tier + status + currentPeriodEnd in Prisma
-  → Send confirmation email</code></pre>
-<hr />
-<h3 id="exchange-api-key-management">6.7 Exchange API Key
-Management</h3>
-<h4 id="security-model">Security Model</h4>
-<p>API keys are never stored in plaintext. Full encryption pipeline:</p>
-<pre><code>User enters key + secret in browser
-  → POST /api/settings/api-keys (HTTPS)
-  → Server: encryptApiKeys(key, secret) using AES-256-GCM
-      ├── Generate random 16-byte IV for key
-      ├── Generate random 16-byte IV for secret
-      ├── Encrypt: ciphertext + auth_tag
-      └── Store: {apiKey, apiSecret, encryptionIv} in ExchangeApiKey table
-
-Decryption (for wallet-balance / exchange validation):
-  → Fetch ExchangeApiKey from DB
-  → decryptApiKeys(encApiKey, encApiSecret, encryptionIv)
-  → Use decrypted keys for single API call
-  → Never log or return raw keys to client</code></pre>
-<p><strong>ENCRYPTION_KEY</strong> must be set as a 64-character hex
-string in Railway env vars. Never change it after keys are stored — all
-stored keys become unreadable.</p>
-<hr />
-<h3 id="bot-session-lifecycle">6.8 Bot Session Lifecycle</h3>
-<p>A <strong>BotSession</strong> captures one complete bot run (start →
-stop) as a discrete record with aggregated metrics.</p>
-<h4 id="session-states">Session States</h4>
-<pre><code>Bot START button clicked
-  → createBotSession(botId, mode)
-  → BotSession: {status: &quot;active&quot;, sessionIndex: N, startedAt: now}
-  → syncEngineTrades() tags new trades with sessionId
-
-Bot STOP button clicked
-  → closeBotSession(botId)
-  → Close open paper trades: {status: &quot;closed&quot;, exitReason: &quot;BOT_STOPPED&quot;}
-  → For live trades: POST ENGINE_API_URL/api/close-all
-  → Compute metrics: totalPnl, roi, winRate, maxDrawdown, bestTrade, worstTrade
-  → BotSession: {status: &quot;closed&quot;, endedAt: now, ...metrics}</code></pre>
-<h4 id="session-metrics-formula">Session Metrics Formula</h4>
-<pre><code>ROI (%) = totalPnl / totalCapital × 100
-totalCapital = Σ(trade.capital) for all trades in session
-winRate (%) = winTrades / closedTrades × 100
-winTrades = trades where totalPnl &gt; 0</code></pre>
-<h4 id="legacy-session-session-0">Legacy Session (Session 0)</h4>
-<p>For trades created before session tracking was introduced:</p>
-<pre><code>POST /api/sessions/backfill (admin only)
-  → Creates BotSession {sessionIndex: 0, status: &quot;closed&quot;}
-  → Tags all untagged trades with this sessionId
-  → Computes metrics from historical trade data</code></pre>
-<hr />
-<h2 id="data-flow-integration">7. Data Flow &amp; Integration</h2>
-<h3 id="trade-sync-engine-dashboard">Trade Sync: Engine → Dashboard</h3>
-<p>The Python engine writes to <code>tradebook.json</code>. The Next.js
-dashboard syncs this into PostgreSQL on every <code>/api/trades</code>
-request:</p>
-<pre><code>1. GET /api/trades (Next.js API route)
-   │
-   ├─ Find userBot in Prisma (Bot where userId = session.user.id)
-   │
-   ├─ If userBot.startedAt is set:
-   │    │
-   │    ├─ Fetch engine trades from ENGINE_API_URL/api/trades
-   │    │
-   │    └─ syncEngineTrades(engineTrades, botId, botStartedAt)
-   │          ├─ DELETE trades where entryTime &lt; botStartedAt (purge stale)
-   │          └─ UPSERT each engine trade into Prisma Trade table
-   │               └─ Tag with sessionId = active BotSession
-   │
-   └─ Return trades from Prisma (source of truth)</code></pre>
-<h3 id="live-bot-state-engine-dashboard">Live Bot State: Engine →
-Dashboard</h3>
-<pre><code>Dashboard polls GET /api/bot-state every 10 seconds
-  → Fetches from ENGINE_API_URL/api/bot-state
-  → Falls back to Prisma BotState if engine unreachable
-  → Returns: {coinStates, activeTrades, engineStatus, lastCycleAt}</code></pre>
-<h3 id="commands-dashboard-engine">Commands: Dashboard → Engine</h3>
-<pre><code>User clicks START / STOP / KILL in dashboard
-  → POST /api/bots/toggle or /api/bots/kill
-  → Writes JSON to data/commands.json:
-       {&quot;command&quot;: &quot;STOP&quot;, &quot;timestamp&quot;: &quot;2026-03-07T10:00:00+05:30&quot;}
-  → Python bot reads commands.json on every 30-second heartbeat
-  → Executes command: start analysis, stop loop, close positions</code></pre>
-<hr />
-<h2 id="backtesting-experimentation">8. Backtesting &amp;
-Experimentation</h2>
-<h3 id="methodology">Methodology</h3>
-<p>All backtests use <strong>walk-forward validation</strong> (not
-in-sample): - Train on 80% of data - Test on remaining 20% - Roll
-forward window - Report average Sharpe, IC, win rate across all
-windows</p>
-<h3 id="experiment-results-summary">Experiment Results Summary</h3>
-<table>
-<colgroup>
-<col style="width: 37%" />
-<col style="width: 20%" />
-<col style="width: 41%" />
-</colgroup>
-<thead>
-<tr>
-<th>Experiment</th>
-<th>File</th>
-<th>Key Finding</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>3-state calibration</td>
-<td><code>experiment_3state_calibration.py</code></td>
-<td>3-state Sharpe 1.22 &gt; 4-state 0.72</td>
-</tr>
-<tr>
-<td>Feature selection</td>
-<td><code>experiment_features_weights.py</code></td>
-<td>6-feature set optimal (Sharpe 0.667)</td>
-</tr>
-<tr>
-<td>S/R 4h IC test</td>
-<td><code>experiment_sr_4h_ic.py</code></td>
-<td>IC = -0.010, t = -0.81 (not significant)</td>
-</tr>
-<tr>
-<td>100-coin evaluation</td>
-<td><code>backtest_fronttest_100coins.py</code></td>
-<td>Generated coin_tiers.csv</td>
-</tr>
-<tr>
-<td>Model comparison</td>
-<td><code>backtest_compare.py</code></td>
-<td>v1 vs v2 head-to-head</td>
-</tr>
-</tbody>
-</table>
-<h3 id="coin-tier-generation">Coin Tier Generation</h3>
-<pre><code>tools/experiment_3state_calibration.py
-  → Fetches 1 year of OHLCV for 100 coins
-  → Runs HMM + conviction system on each
-  → Walk-forward Sharpe per coin
-  → Outputs data/coin_tiers.csv
-       Tier A: Sharpe ≥ 1.0
-       Tier B: Sharpe 0.5–1.0
-       Tier C: Sharpe &lt; 0.5</code></pre>
-<h3 id="running-a-backtest">Running a Backtest</h3>
-<div class="sourceCode" id="cb48"><pre
-class="sourceCode bash"><code class="sourceCode bash"><span id="cb48-1"><a href="#cb48-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Historical backtest (single coin, 1 year)</span></span>
-<span id="cb48-2"><a href="#cb48-2" aria-hidden="true" tabindex="-1"></a><span class="ex">python</span> tools/backtest_historical.py <span class="at">--coin</span> BTC <span class="at">--days</span> 365</span>
-<span id="cb48-3"><a href="#cb48-3" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb48-4"><a href="#cb48-4" aria-hidden="true" tabindex="-1"></a><span class="co"># 100-coin walk-forward evaluation</span></span>
-<span id="cb48-5"><a href="#cb48-5" aria-hidden="true" tabindex="-1"></a><span class="ex">python</span> tools/backtest_fronttest_100coins.py</span>
-<span id="cb48-6"><a href="#cb48-6" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb48-7"><a href="#cb48-7" aria-hidden="true" tabindex="-1"></a><span class="co"># Compare two model versions</span></span>
-<span id="cb48-8"><a href="#cb48-8" aria-hidden="true" tabindex="-1"></a><span class="ex">python</span> tools/backtest_compare.py <span class="at">--v1</span> baseline <span class="at">--v2</span> 6features</span>
-<span id="cb48-9"><a href="#cb48-9" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb48-10"><a href="#cb48-10" aria-hidden="true" tabindex="-1"></a><span class="co"># Sentiment backtester</span></span>
-<span id="cb48-11"><a href="#cb48-11" aria-hidden="true" tabindex="-1"></a><span class="ex">python</span> sentiment_backtester.py <span class="at">--coin</span> BTC <span class="at">--days</span> 30</span></code></pre></div>
-<hr />
-<h2 id="deployment-infrastructure">9. Deployment &amp;
-Infrastructure</h2>
-<h3 id="docker-build">Docker Build</h3>
-<p>Multi-stage build combining Python 3.11 + Node.js 20:</p>
-<div class="sourceCode" id="cb49"><pre
-class="sourceCode dockerfile"><code class="sourceCode dockerfile"><span id="cb49-1"><a href="#cb49-1" aria-hidden="true" tabindex="-1"></a>Stage 1 (deps): Install Python requirements + Node modules</span>
-<span id="cb49-2"><a href="#cb49-2" aria-hidden="true" tabindex="-1"></a>Stage 2 (builder): npx prisma generate + next build</span>
-<span id="cb49-3"><a href="#cb49-3" aria-hidden="true" tabindex="-1"></a>Stage 3 (runner): Copy built app, expose port 3000</span>
-<span id="cb49-4"><a href="#cb49-4" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb49-5"><a href="#cb49-5" aria-hidden="true" tabindex="-1"></a>Startup: start.sh</span>
-<span id="cb49-6"><a href="#cb49-6" aria-hidden="true" tabindex="-1"></a>  → npx next start -p 3000  (dashboard)</span>
-<span id="cb49-7"><a href="#cb49-7" aria-hidden="true" tabindex="-1"></a>  → Python bot spawned via dashboard UI (not started at boot)</span></code></pre></div>
-<h3 id="railway-deployment">Railway Deployment</h3>
-<pre><code>Service: sentinel-saas (Next.js + Python)
-  Port: 3000 (Next.js)
-  Build: Dockerfile in sentinel-saas/nextjs_space/
-  Start: npx next start -p 8080
-
-Database: Railway PostgreSQL plugin
-  → DATABASE_URL automatically injected
-
-Auto-deploy: On every git push to main branch</code></pre>
-<h3 id="required-environment-variables">Required Environment
-Variables</h3>
-<table>
-<colgroup>
-<col style="width: 31%" />
-<col style="width: 28%" />
-<col style="width: 40%" />
-</colgroup>
-<thead>
-<tr>
-<th>Variable</th>
-<th>Purpose</th>
-<th>Where to Set</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><code>DATABASE_URL</code></td>
-<td>PostgreSQL connection string</td>
-<td>Railway (auto-set)</td>
-</tr>
-<tr>
-<td><code>NEXTAUTH_SECRET</code></td>
-<td>JWT signing key (random 32+ chars)</td>
-<td>Railway</td>
-</tr>
-<tr>
-<td><code>NEXTAUTH_URL</code></td>
-<td>App URL (https://your-app.railway.app)</td>
-<td>Railway</td>
-</tr>
-<tr>
-<td><code>ENCRYPTION_KEY</code></td>
-<td>AES-256-GCM key for API key storage (64-char hex)</td>
-<td>Railway</td>
-</tr>
-<tr>
-<td><code>ENGINE_API_URL</code></td>
-<td>URL to Python Flask API</td>
-<td>Railway</td>
-</tr>
-<tr>
-<td><code>BINANCE_API_KEY</code></td>
-<td>Binance API (paper trade)</td>
-<td>Railway</td>
-</tr>
-<tr>
-<td><code>BINANCE_API_SECRET</code></td>
-<td>Binance API secret</td>
-<td>Railway</td>
-</tr>
-<tr>
-<td><code>COINDCX_API_KEY</code></td>
-<td>CoinDCX API (live trade)</td>
-<td>Railway</td>
-</tr>
-<tr>
-<td><code>COINDCX_API_SECRET</code></td>
-<td>CoinDCX API secret</td>
-<td>Railway</td>
-</tr>
-<tr>
-<td><code>TELEGRAM_BOT_TOKEN</code></td>
-<td>Telegram alerts</td>
-<td>Railway</td>
-</tr>
-<tr>
-<td><code>TELEGRAM_CHAT_ID</code></td>
-<td>Telegram chat ID</td>
-<td>Railway</td>
-</tr>
-<tr>
-<td><code>RAZORPAY_KEY_ID</code></td>
-<td>Payment gateway</td>
-<td>Railway</td>
-</tr>
-<tr>
-<td><code>RAZORPAY_KEY_SECRET</code></td>
-<td>Payment gateway secret</td>
-<td>Railway</td>
-</tr>
-<tr>
-<td><code>RAZORPAY_WEBHOOK_SECRET</code></td>
-<td>Webhook signature validation</td>
-<td>Railway</td>
-</tr>
-</tbody>
-</table>
-<h3 id="digitalocean-alternative-deploy.md">DigitalOcean Alternative
-(DEPLOY.md)</h3>
-<div class="sourceCode" id="cb51"><pre
-class="sourceCode bash"><code class="sourceCode bash"><span id="cb51-1"><a href="#cb51-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Ubuntu 24.04 Droplet</span></span>
-<span id="cb51-2"><a href="#cb51-2" aria-hidden="true" tabindex="-1"></a><span class="ex">apt</span> install docker.io docker-compose nginx certbot</span>
-<span id="cb51-3"><a href="#cb51-3" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb51-4"><a href="#cb51-4" aria-hidden="true" tabindex="-1"></a><span class="co"># Clone repo + set .env</span></span>
-<span id="cb51-5"><a href="#cb51-5" aria-hidden="true" tabindex="-1"></a><span class="ex">docker-compose</span> up <span class="at">-d</span></span>
-<span id="cb51-6"><a href="#cb51-6" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb51-7"><a href="#cb51-7" aria-hidden="true" tabindex="-1"></a><span class="co"># SSL with Let&#39;s Encrypt</span></span>
-<span id="cb51-8"><a href="#cb51-8" aria-hidden="true" tabindex="-1"></a><span class="ex">certbot</span> <span class="at">--nginx</span> <span class="at">-d</span> yourdomain.com</span></code></pre></div>
-<h3 id="database-migrations">Database Migrations</h3>
-<div class="sourceCode" id="cb52"><pre
-class="sourceCode bash"><code class="sourceCode bash"><span id="cb52-1"><a href="#cb52-1" aria-hidden="true" tabindex="-1"></a><span class="bu">cd</span> sentinel-saas/nextjs_space</span>
-<span id="cb52-2"><a href="#cb52-2" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb52-3"><a href="#cb52-3" aria-hidden="true" tabindex="-1"></a><span class="co"># Development (destructive reset allowed)</span></span>
-<span id="cb52-4"><a href="#cb52-4" aria-hidden="true" tabindex="-1"></a><span class="ex">npx</span> prisma db push <span class="at">--accept-data-loss</span></span>
-<span id="cb52-5"><a href="#cb52-5" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb52-6"><a href="#cb52-6" aria-hidden="true" tabindex="-1"></a><span class="co"># Production (tracked migrations)</span></span>
-<span id="cb52-7"><a href="#cb52-7" aria-hidden="true" tabindex="-1"></a><span class="ex">npx</span> prisma migrate dev <span class="at">--name</span> add_bot_sessions</span>
-<span id="cb52-8"><a href="#cb52-8" aria-hidden="true" tabindex="-1"></a><span class="ex">npx</span> prisma generate</span></code></pre></div>
-<hr />
-<h2 id="testing">10. Testing</h2>
-<h3 id="unit-test-suite">Unit Test Suite</h3>
-<p><strong>File:</strong> <code>tests/test_unit.py</code>
-<strong>Total:</strong> 140 tests — all passing <strong>Policy:</strong>
-No real API calls — all external dependencies mocked</p>
-<div class="sourceCode" id="cb53"><pre
-class="sourceCode bash"><code class="sourceCode bash"><span id="cb53-1"><a href="#cb53-1" aria-hidden="true" tabindex="-1"></a><span class="ex">python</span> <span class="at">-m</span> pytest tests/test_unit.py <span class="at">-v</span> <span class="at">--tb</span><span class="op">=</span>short</span></code></pre></div>
-<h3 id="test-coverage-by-module">Test Coverage by Module</h3>
-<table>
-<colgroup>
-<col style="width: 30%" />
-<col style="width: 30%" />
-<col style="width: 39%" />
-</colgroup>
-<thead>
-<tr>
-<th>Class</th>
-<th>Tests</th>
-<th>Coverage</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><code>TestConfigNewConstants</code></td>
-<td>9</td>
-<td>Config values, env var loading</td>
-</tr>
-<tr>
-<td><code>TestRiskManagerScoring</code></td>
-<td>50</td>
-<td>Conviction formula, all 8 factors, leverage bands</td>
-</tr>
-<tr>
-<td><code>TestExecutionEngineUnit</code></td>
-<td>16</td>
-<td>Order logic, multi-target booking, trailing SL</td>
-</tr>
-<tr>
-<td><code>TestDataPipelineUnit</code></td>
-<td>7</td>
-<td>OHLCV fetch (mocked), fallback logic</td>
-</tr>
-<tr>
-<td><code>TestSentimentSourcesUnit</code></td>
-<td>6</td>
-<td>API mocking (CryptoPanic, RSS, Fear &amp; Greed)</td>
-</tr>
-<tr>
-<td><code>TestFeatureEngineUnit</code></td>
-<td>8</td>
-<td>RSI, ATR, VWAP calculations</td>
-</tr>
-<tr>
-<td><code>TestSentimentEngineUnit</code></td>
-<td>8</td>
-<td>Sentiment aggregation, VADER integration</td>
-</tr>
-<tr>
-<td><code>TestHMMBrainUnit</code></td>
-<td>16</td>
-<td>Training, regime prediction, confidence, retrain</td>
-</tr>
-<tr>
-<td><code>TestCoinScannerUnit</code></td>
-<td>7</td>
-<td>Tier filtering, coin ordering</td>
-</tr>
-</tbody>
-</table>
-<hr />
-<h2 id="configuration-reference">11. Configuration Reference</h2>
-<h3 id="key-config-values-config.py">Key Config Values
-(<code>config.py</code>)</h3>
-<h4 id="hmm">HMM</h4>
-<div class="sourceCode" id="cb54"><pre
-class="sourceCode python"><code class="sourceCode python"><span id="cb54-1"><a href="#cb54-1" aria-hidden="true" tabindex="-1"></a>HMM_N_STATES <span class="op">=</span> <span class="dv">3</span>           <span class="co"># Bull, Chop, Bear</span></span>
-<span id="cb54-2"><a href="#cb54-2" aria-hidden="true" tabindex="-1"></a>HMM_COVARIANCE <span class="op">=</span> <span class="st">&quot;full&quot;</span>    <span class="co"># Full covariance matrix</span></span>
-<span id="cb54-3"><a href="#cb54-3" aria-hidden="true" tabindex="-1"></a>HMM_ITERATIONS <span class="op">=</span> <span class="dv">100</span>       <span class="co"># EM iterations</span></span>
-<span id="cb54-4"><a href="#cb54-4" aria-hidden="true" tabindex="-1"></a>HMM_LOOKBACK <span class="op">=</span> <span class="dv">250</span>         <span class="co"># Training candles (15m)</span></span>
-<span id="cb54-5"><a href="#cb54-5" aria-hidden="true" tabindex="-1"></a>HMM_RETRAIN_HOURS <span class="op">=</span> <span class="dv">24</span>     <span class="co"># Retrain frequency</span></span></code></pre></div>
-<h4 id="bot-loop">Bot Loop</h4>
-<div class="sourceCode" id="cb55"><pre
-class="sourceCode python"><code class="sourceCode python"><span id="cb55-1"><a href="#cb55-1" aria-hidden="true" tabindex="-1"></a>LOOP_INTERVAL_SECONDS <span class="op">=</span> <span class="dv">30</span>      <span class="co"># Heartbeat</span></span>
-<span id="cb55-2"><a href="#cb55-2" aria-hidden="true" tabindex="-1"></a>ANALYSIS_INTERVAL_SECONDS <span class="op">=</span> <span class="dv">300</span> <span class="co"># Full cycle (5 min)</span></span>
-<span id="cb55-3"><a href="#cb55-3" aria-hidden="true" tabindex="-1"></a>ERROR_RETRY_SECONDS <span class="op">=</span> <span class="dv">60</span>        <span class="co"># Error retry</span></span></code></pre></div>
-<h4 id="multi-coin">Multi-Coin</h4>
-<div class="sourceCode" id="cb56"><pre
-class="sourceCode python"><code class="sourceCode python"><span id="cb56-1"><a href="#cb56-1" aria-hidden="true" tabindex="-1"></a>MAX_CONCURRENT_POSITIONS <span class="op">=</span> <span class="dv">15</span>   <span class="co"># Max open trades</span></span>
-<span id="cb56-2"><a href="#cb56-2" aria-hidden="true" tabindex="-1"></a>TOP_COINS_LIMIT <span class="op">=</span> <span class="dv">25</span>            <span class="co"># Coins to scan</span></span>
-<span id="cb56-3"><a href="#cb56-3" aria-hidden="true" tabindex="-1"></a>CAPITAL_PER_COIN_PCT <span class="op">=</span> <span class="fl">0.05</span>     <span class="co"># 5% of balance per coin</span></span>
-<span id="cb56-4"><a href="#cb56-4" aria-hidden="true" tabindex="-1"></a>SCAN_INTERVAL_CYCLES <span class="op">=</span> <span class="dv">4</span>        <span class="co"># Re-scan every 20 min</span></span></code></pre></div>
-<h4 id="risk">Risk</h4>
-<div class="sourceCode" id="cb57"><pre
-class="sourceCode python"><code class="sourceCode python"><span id="cb57-1"><a href="#cb57-1" aria-hidden="true" tabindex="-1"></a>RISK_PER_TRADE <span class="op">=</span> <span class="fl">0.04</span>           <span class="co"># 4% balance at risk per trade</span></span>
-<span id="cb57-2"><a href="#cb57-2" aria-hidden="true" tabindex="-1"></a>KILL_SWITCH_DRAWDOWN <span class="op">=</span> <span class="fl">0.10</span>     <span class="co"># 10% 24h drawdown → stop</span></span>
-<span id="cb57-3"><a href="#cb57-3" aria-hidden="true" tabindex="-1"></a>MAX_LOSS_PER_TRADE_PCT <span class="op">=</span> <span class="op">-</span><span class="dv">15</span>    <span class="co"># Hard max-loss per trade</span></span>
-<span id="cb57-4"><a href="#cb57-4" aria-hidden="true" tabindex="-1"></a>MIN_HOLD_MINUTES <span class="op">=</span> <span class="dv">30</span>           <span class="co"># Min hold before regime exit</span></span></code></pre></div>
-<h4 id="multi-target">Multi-Target</h4>
-<div class="sourceCode" id="cb58"><pre
-class="sourceCode python"><code class="sourceCode python"><span id="cb58-1"><a href="#cb58-1" aria-hidden="true" tabindex="-1"></a>MT_RR_RATIO <span class="op">=</span> <span class="dv">5</span>                 <span class="co"># Risk : T3 = 1:5</span></span>
-<span id="cb58-2"><a href="#cb58-2" aria-hidden="true" tabindex="-1"></a>MT_T1_FRAC <span class="op">=</span> <span class="fl">0.333</span>              <span class="co"># T1 at 33.3% of T3 distance</span></span>
-<span id="cb58-3"><a href="#cb58-3" aria-hidden="true" tabindex="-1"></a>MT_T2_FRAC <span class="op">=</span> <span class="fl">0.666</span>              <span class="co"># T2 at 66.6% of T3 distance</span></span>
-<span id="cb58-4"><a href="#cb58-4" aria-hidden="true" tabindex="-1"></a>MT_T1_BOOK_PCT <span class="op">=</span> <span class="fl">0.25</span>           <span class="co"># Book 25% at T1</span></span>
-<span id="cb58-5"><a href="#cb58-5" aria-hidden="true" tabindex="-1"></a>MT_T2_BOOK_PCT <span class="op">=</span> <span class="fl">0.50</span>           <span class="co"># Book 50% of remaining at T2</span></span></code></pre></div>
-<h4 id="trailing-sl">Trailing SL</h4>
-<div class="sourceCode" id="cb59"><pre
-class="sourceCode python"><code class="sourceCode python"><span id="cb59-1"><a href="#cb59-1" aria-hidden="true" tabindex="-1"></a>TRAILING_SL_ENABLED <span class="op">=</span> <span class="va">True</span></span>
-<span id="cb59-2"><a href="#cb59-2" aria-hidden="true" tabindex="-1"></a>TRAILING_SL_ACTIVATION_ATR <span class="op">=</span> <span class="fl">1.0</span>  <span class="co"># Activate after 1×ATR move in favor</span></span>
-<span id="cb59-3"><a href="#cb59-3" aria-hidden="true" tabindex="-1"></a>TRAILING_SL_DISTANCE_ATR <span class="op">=</span> <span class="fl">1.0</span>    <span class="co"># Trail 1×ATR behind peak</span></span></code></pre></div>
-<h4 id="sentiment">Sentiment</h4>
-<div class="sourceCode" id="cb60"><pre
-class="sourceCode python"><code class="sourceCode python"><span id="cb60-1"><a href="#cb60-1" aria-hidden="true" tabindex="-1"></a>SENTIMENT_ENABLED <span class="op">=</span> <span class="va">True</span></span>
-<span id="cb60-2"><a href="#cb60-2" aria-hidden="true" tabindex="-1"></a>SENTIMENT_CACHE_MINUTES <span class="op">=</span> <span class="dv">15</span>   <span class="co"># Cache per-coin results</span></span>
-<span id="cb60-3"><a href="#cb60-3" aria-hidden="true" tabindex="-1"></a>SENTIMENT_WINDOW_HOURS <span class="op">=</span> <span class="dv">4</span>     <span class="co"># Lookback window</span></span>
-<span id="cb60-4"><a href="#cb60-4" aria-hidden="true" tabindex="-1"></a>SENTIMENT_MIN_ARTICLES <span class="op">=</span> <span class="dv">3</span>     <span class="co"># Min articles for valid score</span></span></code></pre></div>
-<hr />
-<h2 id="glossary">12. Glossary</h2>
-<table>
-<colgroup>
-<col style="width: 35%" />
-<col style="width: 64%" />
-</colgroup>
-<thead>
-<tr>
-<th>Term</th>
-<th>Definition</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><strong>HMM</strong></td>
-<td>Hidden Markov Model — probabilistic sequence model for regime
-classification</td>
-</tr>
-<tr>
-<td><strong>Gaussian HMM</strong></td>
-<td>HMM where observations follow Gaussian (normal) distributions per
-state</td>
-</tr>
-<tr>
-<td><strong>Regime</strong></td>
-<td>Market state: BULL (uptrend), CHOP (sideways), BEAR (downtrend)</td>
-</tr>
-<tr>
-<td><strong>Margin Confidence</strong></td>
-<td><code>best_prob - 2nd_best_prob</code> — how decisive the HMM
-prediction is</td>
-</tr>
-<tr>
-<td><strong>Conviction Score</strong></td>
-<td>0–100 composite score gating trade entry and determining
-leverage</td>
-</tr>
-<tr>
-<td><strong>Leverage Band</strong></td>
-<td>Leverage level (0x/10x/15x/25x/35x) mapped from conviction
-score</td>
-</tr>
-<tr>
-<td><strong>T1 / T2 / T3</strong></td>
-<td>Partial take-profit targets — 25% / 50% / remainder of position</td>
-</tr>
-<tr>
-<td><strong>Trailing SL</strong></td>
-<td>Stop-loss that moves with price peak, never backward</td>
-</tr>
-<tr>
-<td><strong>ATR</strong></td>
-<td>Average True Range — measure of volatility (price range per
-bar)</td>
-</tr>
-<tr>
-<td><strong>Kill Switch</strong></td>
-<td>Portfolio-level circuit breaker (10% drawdown in 24h → all positions
-closed)</td>
-</tr>
-<tr>
-<td><strong>Coin Tier</strong></td>
-<td>Classification A (trade) / B (monitor) / C (avoid) by walk-forward
-Sharpe</td>
-</tr>
-<tr>
-<td><strong>VWAP</strong></td>
-<td>Volume-Weighted Average Price — intraday fair value</td>
-</tr>
-<tr>
-<td><strong>Funding Rate</strong></td>
-<td>Periodic payment between long/short holders in perpetual
-futures</td>
-</tr>
-<tr>
-<td><strong>Open Interest (OI)</strong></td>
-<td>Total outstanding contracts — rising OI confirms directional
-conviction</td>
-</tr>
-<tr>
-<td><strong>Order Flow</strong></td>
-<td>Taker buy/sell imbalance — who is aggressing the book</td>
-</tr>
-<tr>
-<td><strong>Cumulative Delta</strong></td>
-<td>Running sum of (buy volume - sell volume)</td>
-</tr>
-<tr>
-<td><strong>BotSession</strong></td>
-<td>One complete bot run (start → stop) with aggregated performance
-metrics</td>
-</tr>
-<tr>
-<td><strong>ROI</strong></td>
-<td><code>totalPnl / totalCapital × 100</code> — return on capital
-deployed</td>
-</tr>
-<tr>
-<td><strong>IC</strong></td>
-<td>Information Coefficient — correlation between signal and forward
-return</td>
-</tr>
-<tr>
-<td><strong>Walk-Forward</strong></td>
-<td>Out-of-sample backtesting: train on past, test on future, roll
-window</td>
-</tr>
-<tr>
-<td><strong>Paper Trade</strong></td>
-<td>Simulated trade on testnet — no real money, used by SaaS users</td>
-</tr>
-<tr>
-<td><strong>Live Trade</strong></td>
-<td>Real futures trade on CoinDCX with actual capital</td>
-</tr>
-<tr>
-<td><strong>Isolated Margin</strong></td>
-<td>Position margin isolated from rest of account — limits loss to trade
-capital</td>
-</tr>
-<tr>
-<td><strong>AES-256-GCM</strong></td>
-<td>Military-grade authenticated encryption used for API key
-storage</td>
-</tr>
-<tr>
-<td><strong>Prisma</strong></td>
-<td>TypeScript ORM (Object-Relational Mapper) for PostgreSQL</td>
-</tr>
-<tr>
-<td><strong>NextAuth</strong></td>
-<td>Authentication library for Next.js — handles JWT sessions</td>
-</tr>
-<tr>
-<td><strong>Engine API</strong></td>
-<td>Flask REST server bridging Python bot ↔︎ Next.js dashboard</td>
-</tr>
-<tr>
-<td><strong>syncEngineTrades</strong></td>
-<td>Function that syncs tradebook.json → PostgreSQL Trade table</td>
-</tr>
-<tr>
-<td><strong>ENCRYPTION_KEY</strong></td>
-<td>64-char hex env var used as AES-256-GCM key for API key
-encryption</td>
-</tr>
-</tbody>
-</table>
-<hr />
-<p><em>Document generated: March 2026</em> <em>Project: Regime-Master
-(HMMBOT) | GitHub: https://github.com/nikhildha/Synapticbots</em></p>
+<p><strong>Trade field <code>bot_id</code></strong> (snake_case in
+engine JSON) maps to Prisma <code>Trade.botId</code> during sync. The
+sync key is <code>trade_id</code> (engine) → matched against existing
+Prisma records for upsert.</p>
 </body>
 </html>
