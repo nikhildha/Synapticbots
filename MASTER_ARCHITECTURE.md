@@ -1,9 +1,8 @@
-# Synaptic (Regime-Master) — Master Architecture & Documentation
+# Synaptic — Master Architecture & Developer Reference
 
-**Version:** Production v3 — March 2026 (Tiered MTF Signal Pipeline)
-**GitHub:** https://github.com/nikhildha/Synapticbots
+**Version:** Production v4 — March 2026 (Multi-TF HMM + Athena LLM)
 **Deployment:** Railway (Docker, PostgreSQL)
-**Exchanges:** CoinDCX (live), Binance Futures (paper/testnet)
+**Exchanges:** CoinDCX (live), Binance (paper/testnet data source)
 
 ---
 
@@ -12,1408 +11,1127 @@
 1. [System Overview](#1-system-overview)
 2. [High-Level Architecture](#2-high-level-architecture)
 3. [Python Trading Engine](#3-python-trading-engine)
-   - 3.1 [Main Bot Loop (main.py)](#31-main-bot-loop)
-   - 3.2 [Data Pipeline (data_pipeline.py)](#32-data-pipeline)
-   - 3.3 [Feature Engine (feature_engine.py)](#33-feature-engine)
-   - 3.4 [HMM Brain (hmm_brain.py)](#34-hmm-brain)
-   - 3.5 [Coin Scanner (coin_scanner.py)](#35-coin-scanner)
-   - 3.6 [Risk Manager (risk_manager.py)](#36-risk-manager)
-   - 3.7 [Execution Engine (execution_engine.py)](#37-execution-engine)
-   - 3.8 [Order Flow Engine (orderflow_engine.py)](#38-order-flow-engine)
-   - 3.9 [Sentiment Engine](#39-sentiment-engine)
-   - 3.10 [Tradebook (tradebook.py)](#310-tradebook)
-   - 3.11 [Engine API (engine_api.py)](#311-engine-api)
-4. [Brain Logic — Deep Dive](#4-brain-logic--deep-dive)
-5. [Risk Management System](#5-risk-management-system)
-6. [SaaS Dashboard (sentinel-saas)](#6-saas-dashboard)
-   - 6.1 [Technology Stack](#61-technology-stack)
-   - 6.2 [Application Pages](#62-application-pages)
-   - 6.3 [API Routes](#63-api-routes)
-   - 6.4 [Database Schema](#64-database-schema)
-   - 6.5 [Authentication & Authorization](#65-authentication--authorization)
-   - 6.6 [Subscription System](#66-subscription-system)
-   - 6.7 [Exchange API Key Management](#67-exchange-api-key-management)
-   - 6.8 [Bot Session Lifecycle](#68-bot-session-lifecycle)
-7. [Data Flow & Integration](#7-data-flow--integration)
-8. [Backtesting & Experimentation](#8-backtesting--experimentation)
-9. [Deployment & Infrastructure](#9-deployment--infrastructure)
-10. [Testing](#10-testing)
+   - 3.1 [Main Bot Loop (main.py)](#31-main-bot-loop-mainpy)
+   - 3.2 [Data Pipeline (data_pipeline.py)](#32-data-pipeline-data_pipelinepy)
+   - 3.3 [Feature Engine (feature_engine.py)](#33-feature-engine-feature_enginepy)
+   - 3.4 [HMM Brain (hmm_brain.py)](#34-hmm-brain-hmm_brainpy)
+   - 3.5 [Segment Features (segment_features.py)](#35-segment-features-segment_featurespy)
+   - 3.6 [Coin Scanner (coin_scanner.py)](#36-coin-scanner-coin_scannerpy)
+   - 3.7 [Risk Manager (risk_manager.py)](#37-risk-manager-risk_managerpy)
+   - 3.8 [Execution Engine (execution_engine.py)](#38-execution-engine-execution_enginepy)
+   - 3.9 [Tradebook (tradebook.py)](#39-tradebook-tradebookpy)
+   - 3.10 [Athena LLM Layer (llm_reasoning.py)](#310-athena-llm-layer-llm_reasoningpy)
+   - 3.11 [Engine API (engine_api.py)](#311-engine-api-engine_apipy)
+4. [Signal Pipeline — End-to-End Flow](#4-signal-pipeline--end-to-end-flow)
+5. [Exit Mechanics](#5-exit-mechanics)
+6. [Risk Management](#6-risk-management)
+7. [Crypto Segments](#7-crypto-segments)
+8. [SaaS Dashboard (NextJS)](#8-saas-dashboard-nextjs)
+   - 8.1 [Technology Stack](#81-technology-stack)
+   - 8.2 [Application Pages](#82-application-pages)
+   - 8.3 [API Routes — Complete List](#83-api-routes--complete-list)
+   - 8.4 [Bot Lifecycle](#84-bot-lifecycle)
+   - 8.5 [Auto Re-Registration](#85-auto-re-registration)
+   - 8.6 [Trade Sync Flow](#86-trade-sync-flow)
+   - 8.7 [BTC Confidence Display](#87-btc-confidence-display)
+9. [Data Routing — End-to-End](#9-data-routing--end-to-end)
+10. [Deployment & Infrastructure](#10-deployment--infrastructure)
 11. [Configuration Reference](#11-configuration-reference)
-12. [Glossary](#12-glossary)
-
----
-
-## 📚 Deep-Dive Documentation
-
-For full technical detail, see the companion documents in this repo:
-
-| Document | What It Covers |
-|---|---|
-| [BRAIN_DEEP_DIVE.md](BRAIN_DEEP_DIVE.md) | HMM internals, feature engineering, margin confidence, full 27-combination MTF truth table, ATR pullback gate formulas, Athena design |
-| [MAIN_ENGINE.md](MAIN_ENGINE.md) | `main.py` engine loop, `_tick()` phases 1-7, `_analyze_coin()` step-by-step, position management, kill switches, all action codes |
-| [DEPLOY.md](DEPLOY.md) | Railway deployment, env vars, Docker config |
 
 ---
 
 ## 1. System Overview
 
-**Regime-Master** is a production-grade algorithmic cryptocurrency trading system built on a 3-state Gaussian Hidden Markov Model (HMM) for market regime detection, combined with multi-factor conviction scoring, dynamic leverage management, and a full SaaS dashboard for multi-user deployment.
+Synaptic (Project Regime-Master) is an automated cryptocurrency futures trading system. It uses Hidden Markov Models (HMM) on multiple timeframes to classify market regimes (Bull/Bear/Chop), then routes signals through an LLM reasoning layer (Athena) before executing trades.
 
-### What It Does
+The system is multi-tenant: multiple users can run isolated bots simultaneously on a shared engine. Each bot is scoped to a market segment (L1, L2, AI, etc.) and executes trades with its own `bot_id` stamp for full trade isolation.
 
-- Scans up to 25 crypto coins every 5 minutes using HMM regime classification
-- Scores each opportunity across 8 conviction factors (0–100 scale)
-- Dynamically assigns leverage (0x to 35x) based on conviction score
-- Opens long or short futures positions with multi-target partial profit booking (T1/T2/T3)
-- Trails stop-losses using ATR-based dynamic rules
-- Shuts down automatically if portfolio drawdown exceeds 10% in 24 hours
-- Sends real-time Telegram alerts for all trade events
-- Exposes full status and control via a Next.js SaaS dashboard with per-user bots
+**Who it's for:** Internal use — the engine operator deploys bots for end-users via the SaaS dashboard.
 
-### Key Design Principles
-
-| Principle | Implementation |
-|-----------|---------------|
-| **Regime-aware trading** | Only trades in BULL/BEAR; avoids CHOP for trend strategies |
-| **Evidence-gated leverage** | Leverage unlocked only when conviction score ≥ 40 |
-| **Anti-liquidation** | Isolated margin, ATR stops, kill switch at 10% drawdown |
-| **Multi-target exit** | 25% booked at T1, 50% at T2, remainder runs to T3 |
-| **Per-user isolation** | Each SaaS user has their own bot, trades, API keys, and session history |
-| **Encryption at rest** | Exchange API keys encrypted with AES-256-GCM before DB storage |
+**What it does:**
+- Every 15 minutes: scans a segment-based coin pool, runs 3-TF HMM analysis per coin, computes conviction scores, calls Athena for final LLM validation, and deploys limit or market orders
+- Every 10 seconds (heartbeat): updates unrealized P&L, manages trailing SL steps, checks exit conditions, handles limit order expiry/fill
+- Persists all state to JSON files (engine) and PostgreSQL (SaaS dashboard)
 
 ---
 
 ## 2. High-Level Architecture
 
 ```
-┌─────────────────────────────────────────────────────────────────────┐
-│                        RAILWAY CONTAINER                            │
-│                                                                     │
-│  ┌─────────────────────────┐    ┌──────────────────────────────┐   │
-│  │   Python Trading Engine  │    │   Next.js SaaS Dashboard     │   │
-│  │                          │    │   (Port 3000)                │   │
-│  │  main.py (bot loop)      │◄───┤   React + TypeScript         │   │
-│  │  hmm_brain.py            │    │   Prisma ORM → PostgreSQL    │   │
-│  │  feature_engine.py       │    │   NextAuth (JWT sessions)    │   │
-│  │  risk_manager.py         │    │   AES-256-GCM key storage    │   │
-│  │  execution_engine.py     │    └───────────────┬──────────────┘   │
-│  │  sentiment_engine.py     │                    │                  │
-│  │  orderflow_engine.py     │    ┌───────────────▼──────────────┐   │
-│  │  coin_scanner.py         │    │   Flask Engine API           │   │
-│  │  tradebook.py            │◄───┤   (Port 5000)                │   │
-│  │                          │    │   /api/bot-state             │   │
-│  └────────────┬─────────────┘    │   /api/trades                │   │
-│               │                  │   /api/close-trade           │   │
-│               │                  │   /api/health                │   │
-│  ┌────────────▼─────────────┐    └──────────────────────────────┘   │
-│  │   /app/data/ (shared)    │                                       │
-│  │   bot_state.json         │    ┌──────────────────────────────┐   │
-│  │   tradebook.json         │    │   PostgreSQL Database         │   │
-│  │   sentiment_log.csv      │    │   (Railway Postgres)          │   │
-│  │   coin_tiers.csv         │    │   Users, Bots, Trades,        │   │
-│  │   commands.json          │    │   Sessions, API Keys          │   │
-│  └──────────────────────────┘    └──────────────────────────────┘   │
-└─────────────────────────────────────────────────────────────────────┘
-          │                                    │
-          ▼                                    ▼
-  ┌───────────────┐                   ┌────────────────┐
-  │  CoinDCX API  │                   │   Binance API  │
-  │  (Live Trade) │                   │  (Paper/Test)  │
-  └───────────────┘                   └────────────────┘
+┌─────────────────────────────────────────────────────────────────┐
+│                        Railway Platform                          │
+│                                                                   │
+│  ┌──────────────────────────┐    ┌──────────────────────────┐   │
+│  │   Python Trading Engine  │    │   NextJS SaaS Dashboard  │   │
+│  │   (Flask + main loop)    │    │   (Next.js 14 App Router)│   │
+│  │                          │    │                          │   │
+│  │  engine_api.py (Flask)   │◄───│  /api/bot-state GET      │   │
+│  │  └─ main.py (bot loop)   │    │  /api/bots/toggle POST   │   │
+│  │     ├─ hmm_brain.py      │    │  /api/trades/* POST      │   │
+│  │     ├─ feature_engine.py │    │                          │   │
+│  │     ├─ coin_scanner.py   │    │  Prisma ORM → PostgreSQL │   │
+│  │     ├─ risk_manager.py   │    │  NextAuth sessions        │   │
+│  │     ├─ llm_reasoning.py  │    │  Subscription gating     │   │
+│  │     ├─ tradebook.py      │    └──────────────────────────┘   │
+│  │     └─ execution_engine  │                                    │
+│  │                          │    ┌──────────────────────────┐   │
+│  │  Data: data/*.json       │    │   PostgreSQL Database    │   │
+│  └──────────────────────────┘    │   User / Bot / Trade     │   │
+│                                   │   BotSession / CycleSnap │   │
+│  ┌──────────────────────────┐    └──────────────────────────┘   │
+│  │  External APIs           │                                    │
+│  │  CoinDCX (live orders)   │                                    │
+│  │  Binance (OHLCV data)    │                                    │
+│  │  Gemini API (Athena LLM) │                                    │
+│  └──────────────────────────┘                                    │
+└─────────────────────────────────────────────────────────────────┘
 ```
 
-### Component Responsibilities
+**Two-layer architecture:**
+- **Python Engine** — stateful trading loop, market analysis, order execution, tradebook. Exposes a Flask REST API. State persisted in `data/*.json`.
+- **NextJS SaaS** — user-facing dashboard, bot management, trade display, subscription. Reads engine state via HTTP. Writes user/bot/trade records to PostgreSQL.
 
-| Component | Language | Port | Responsibility |
-|-----------|----------|------|----------------|
-| **main.py** | Python | — | Bot orchestration loop, cycle management |
-| **engine_api.py** | Python/Flask | 5000 | REST API for dashboard ↔ engine communication |
-| **Next.js App** | TypeScript | 3000 | SaaS dashboard, user management, API layer |
-| **PostgreSQL** | SQL | 5432 | Persistent storage (users, bots, trades, sessions) |
-| **CoinDCX** | External | — | Live futures trading (Indian exchange) |
-| **Binance Futures** | External | — | Paper/testnet trading |
+The two layers communicate via HTTP only. The engine has no direct DB access; the SaaS dashboard has no direct market data access.
 
 ---
 
 ## 3. Python Trading Engine
 
-### 3.1 Main Bot Loop
+### 3.1 Main Bot Loop (main.py)
 
-**File:** `main.py` (56.5 KB)
+**Entry point:** `engine_api.py` starts `RegimeMasterBot` in a background thread via `_run_engine()`.
 
-The `RegimeMasterBot` class contains the entire bot lifecycle.
+**Two timing loops:**
 
-#### Timing Architecture
+| Loop | Interval | Purpose |
+|------|----------|---------|
+| Heartbeat (`_heartbeat`) | 10 seconds (`LOOP_INTERVAL_SECONDS`) | Trailing SL sync, limit order management, P&L updates, pause/halt checks |
+| Analysis Cycle (`_tick`) | 15 minutes (`ANALYSIS_INTERVAL_SECONDS`) | Full coin scan, HMM analysis, conviction scoring, Athena call, trade deployment |
 
+**`_tick()` — Full Analysis Cycle steps:**
+
+1. Check weekly tier re-classification (background thread if due)
+2. Reset Athena rate limiter for the new cycle
+3. Refresh segment heatmap JSON (cheap ticker call)
+4. Rebuild coin pool from `get_active_bot_segment_pool(ENGINE_ACTIVE_BOTS)` every `SCAN_INTERVAL_CYCLES` cycles
+5. Rotate through pool in batches; skip already-deployed coins
+6. Fetch live CoinDCX prices (funding rates, etc.)
+7. Fetch balance; retry up to 3x in live mode if $0
+8. Check kill switch (10% drawdown in 24h)
+9. Run `_check_exits()` — syncs `_active_positions` dict from tradebook (regime-change exits disabled)
+10. BTC flash-crash macro veto (blocks all BUY signals if BTC drops >1.5% in 15m)
+11. `_analyze_coin()` for each symbol → builds `raw_results` list
+12. Deploy loop — iterates per registered bot in `ENGINE_ACTIVE_BOTS`:
+    - Filter raw_results to bot's segment
+    - Pick top `TOP_COINS_PER_SEGMENT` (=1) coin by conviction
+    - Skip if conviction < `MIN_CONVICTION_FOR_DEPLOY` (60)
+    - Skip if `bot_id:symbol` already in active tradebook keys (duplicate guard)
+    - Call Athena — VETO or EXECUTE
+    - Execute trade, stamp with `bot_id`
+    - Record in tradebook via `tradebook.open_trade()`
+13. Save multi-state JSON for dashboard
+14. POST cycle snapshot to dashboard `/api/cycle-snapshot` (background thread)
+
+**`_heartbeat()` tasks:**
+- Read `engine_state.json` — skip if paused/halted
+- Process commands file (KILL/CLOSE_ALL)
+- `_sync_positions()` — remove closed trades from `_active_positions`
+- `_manage_limit_orders()` — TIF expiry, escape hatch, paper fills, virtual limit triggers
+- `tradebook.update_unrealized()` — P&L updates, trailing SL stepping, SL/TP exit checks (paper)
+- Live mode: sync CoinDCX positions, sync live TP/SL
+
+**Key in-memory state:**
 ```
-Every 30 seconds (LOOP_INTERVAL_SECONDS):
-  └── Heartbeat loop
-        ├── Read commands.json (START / STOP / PAUSE / CLOSE_ALL)
-        ├── Update engine_state.json (health, uptime, CPU)
-        └── Every 300 seconds (ANALYSIS_INTERVAL_SECONDS = 5 min):
-              └── Full analysis cycle
-                    ├── Coin scanner: refresh top coins (every 4 cycles = 20 min)
-                    ├── For each coin:
-                    │     ├── Fetch OHLCV (15m, 1h, 4h)
-                    │     ├── Compute features
-                    │     ├── HMM predict → (regime, confidence)
-                    │     ├── Compute conviction score (8 factors)
-                    │     ├── If score ≥ 40 and no open position: open trade
-                    │     └── If open position: check SL/TP/T1/T2/trailing
-                    └── Sync tradebook → write engine_state.json
+_multi_tf_brains: dict[symbol → MultiTFHMMBrain]   # 3-TF brains per coin
+_coin_brains:     dict[tf_key → HMMBrain]           # per-coin-per-TF brain cache
+_coin_states:     dict[symbol → dict]               # dashboard state per coin
+_active_positions: dict[bot_id:symbol → dict]       # active position tracker
+_live_prices:     dict[cdx_pair → dict]             # live funding/price data
 ```
 
-#### Key Methods
+**Segment inference fallback:** `_infer_segment_from_name(bot_name)` maps bot name keywords → segment when `segment_filter` is not in registration payload.
 
-| Method | Purpose |
-|--------|---------|
-| `run()` | Entry point — starts the bot loop |
-| `_heartbeat()` | 30-second cycle — read commands, update state |
-| `_analysis_cycle()` | 5-minute cycle — full HMM scan across all coins |
-| `_analyze_coin(symbol)` | Per-coin regime detection + conviction scoring |
-| `_manage_position(symbol)` | Monitor open position: SL/TP/T1/T2 checks |
-| `_process_commands()` | Handle dashboard commands (start, stop, pause, close-all) |
-| `_update_engine_state()` | Write engine health to data/engine_state.json |
-
-#### Bot States
-
-```
-IDLE → RUNNING → PAUSED → RUNNING → STOPPED
-              ↓
-           KILLED (kill switch triggered)
-```
+**Signal broadcast audit log:** Every signal event (FILTERED, ATHENA_DECISION, SIGNAL_DISPATCH, TRADEBOOK_RECORDED) is written to `data/signal_broadcast.log` via `_bcast()`. Rotates daily, 7-day retention.
 
 ---
 
-### 3.2 Data Pipeline
+### 3.2 Data Pipeline (data_pipeline.py)
 
-**File:** `data_pipeline.py` (8.2 KB)
+Unified OHLCV data layer. Always tries CoinDCX first, falls back to Binance.
 
-Responsible for all market data ingestion.
+| Function | Description |
+|----------|-------------|
+| `fetch_klines(symbol, interval, limit)` | Primary kline fetcher. CoinDCX → Binance fallback |
+| `fetch_futures_klines(symbol, interval, limit)` | Futures klines. Paper→Binance Futures, Live→CoinDCX |
+| `get_multi_timeframe_data(symbol)` | Fetches 15m, 1h, 4h simultaneously |
+| `get_current_price(symbol)` | Live price. Always CoinDCX, Binance fallback |
+| `_get_binance_client()` | Lazy singleton Binance client |
 
-#### Data Sources
+**Supported intervals:** 1m, 3m, 5m, 15m, 30m, 1h, 4h, 1d, 1w
 
-| Source | Purpose | Fallback |
-|--------|---------|---------|
-| **Binance Futures** | OHLCV for all timeframes (primary) | CoinDCX |
-| **CoinDCX** | Live spot/futures prices | Binance |
-| **Binance Spot** | Funding rate proxy (perpetual funding) | — |
-
-#### Timeframes Used
-
-| Timeframe | Purpose | Candles |
-|-----------|---------|---------|
-| `15m` | Entry/exit timing, HMM training data | 250 candles |
-| `1h` | Trend confirmation | 100 candles |
-| `4h` | Macro regime, S/R lookback | 150 candles |
-| `1d` | Long-term trend context | 60 candles |
-
-#### Key Function
-
-```python
-def fetch_ohlcv(symbol, interval, limit=250) -> pd.DataFrame:
-    # Returns: open, high, low, close, volume columns
-    # Tries Binance first, falls back to CoinDCX
-    # Normalizes column names and datetime index
-```
+The `_parse_klines_df()` function normalizes raw kline arrays to a clean OHLCV DataFrame with `timestamp` (datetime), `open`, `high`, `low`, `close`, `volume` columns.
 
 ---
 
-### 3.3 Feature Engine
+### 3.3 Feature Engine (feature_engine.py)
 
-**File:** `feature_engine.py` (11.6 KB)
+**Two-pass computation:**
 
-Computes all technical indicators and the 6 HMM input features.
+**Pass 1 — HMM Features** (`compute_hmm_features(df, btc_df=None)`):
 
-#### HMM Feature Set (6 Features)
+| Feature | Description |
+|---------|-------------|
+| `log_return` | Log(close/close.shift(1)) |
+| `volatility` | (high - low) / close |
+| `volume_change` | Log(volume/volume.shift), clipped ±3 |
+| `vol_zscore` | Z-score of volume vs 24-period SMA, clipped ±5 |
+| `rel_strength_btc` | Asset return - BTC return (requires btc_df); jittered to prevent singular covariance |
+| `liquidity_vacuum` | Abs log-return / (ATR14/price), clipped 0-5 |
+| `exhaustion_tail` | Wick skew × vol_zscore (captures rejection candles) |
+| `amihud_illiquidity` | Abs log-return / dollar volume × 1e8, clipped 0-10 |
+| `volume_trend_intensity` | EMA5/EMA20 of volume (momentum of volume) |
+| `swing_l` | 10-candle rolling min of low (for RM3_Swing SL) |
+| `swing_h` | 10-candle rolling max of high (for RM3_Swing SL) |
 
-These 6 features are the inputs to the Gaussian HMM. Selected via greedy ablation — adding `funding_proxy` and `adx` boosted Sharpe from 0.258 → 0.667.
+**Pass 2 — Technical Indicators** (`compute_indicators(df)`): Adds `rsi`, `bb_upper`, `bb_middle`, `bb_lower`, `atr`.
 
-| Feature | Formula | Why It Matters |
-|---------|---------|---------------|
-| `log_return` | `ln(close_t / close_{t-1})` | Raw price momentum signal |
-| `volatility` | Rolling 20-period std of log_return | Regime separator (low in BULL, high in BEAR) |
-| `volume_change` | `(vol_t - vol_{t-1}) / vol_{t-1}` | Volume expansion confirms breakouts |
-| `rsi_norm` | `(RSI_14 - 50) / 50` | Normalized [-1, +1] momentum indicator |
-| `funding_proxy` | `close / EMA(close, 20) - 1` | Proxy for futures funding sentiment |
-| `adx` | Average Directional Index (14) | Trend strength (separates trend from chop) |
+**Convenience:** `compute_all_features(df)` runs both passes.
 
-#### Additional Technical Indicators (for Conviction Scoring)
-
-| Indicator | Purpose |
-|-----------|---------|
-| ATR (14) | Stop-loss/take-profit placement |
-| VWAP | Intraday fair value reference |
-| EMA (20, 50, 200) | Trend direction across timeframes |
-| Bollinger Bands (20, 2σ) | Sideways/CHOP strategy entry |
-| Support/Resistance Zones | Price levels using pivot point method |
-| RSI divergence | Momentum vs price mismatch |
-
-#### Key Functions
-
-```python
-def compute_hmm_features(df) -> pd.DataFrame:
-    # Returns df with HMM_FEATURES columns added
-
-def compute_atr(df, period=14) -> pd.Series:
-    # True Range rolling mean
-
-def compute_vwap(df) -> pd.Series:
-    # (price × volume).cumsum() / volume.cumsum()
-
-def compute_sr_position(df_4h, lookback=50) -> float:
-    # Returns position relative to S/R: -1 (at support) to +1 (at resistance)
-```
+**Other exported functions:**
+- `compute_ema(series, length)` — EWM with adjust=False
+- `compute_trend(df)` → 'UP'/'DOWN'/'FLAT' via EMA 20/50 crossover
+- `compute_atr(df, length=14)` — EWM ATR
+- `compute_support_resistance(df)` → dict with support/resistance/pivot/bb_pos
+- `compute_sr_position(df)` → (sr_position, vwap_position) for conviction scoring
+- `compute_vwap(df, window=20)` — rolling VWAP
 
 ---
 
-### 3.4 HMM Brain
+### 3.4 HMM Brain (hmm_brain.py)
 
-**File:** `hmm_brain.py` (8.5 KB)
+#### `HMMBrain` — Single coin, single timeframe
 
-The core intelligence module. Wraps `hmmlearn.GaussianHMM` with regime labeling and margin confidence.
+**Model:** `GaussianHMM` from hmmlearn. `n_components=3` (HMM_N_STATES), `covariance_type="full"`, 100 iterations.
 
-#### Model Parameters
+**Training (`train(df)`):**
+1. Extracts coin's specific feature list from `segment_features.py`
+2. Z-score normalizes features (stores mean/std for prediction scaling)
+3. Fits GaussianHMM
+4. Calls `_build_state_map()` to assign canonical regime labels
 
-| Parameter | Value | Reason |
-|-----------|-------|--------|
-| `n_states` | 3 | BULL / CHOP / BEAR (4-state tried: Sharpe 0.72 vs 1.22 for 3-state) |
-| `covariance_type` | `full` | Captures cross-feature correlations |
-| `n_iter` | 100 | EM convergence iterations |
-| `lookback` | 250 candles | ~2.6 days of 15m data |
-| `retrain_every` | 24 hours | Adapts to new market conditions |
+**`_build_state_map()`:**
+- Finds `log_return` index in `self.features` dynamically (NOT hardcoded 0)
+- Finds `volatility` index in `self.features` dynamically (NOT hardcoded 1)
+- Sorts raw HMM states by mean log-return (descending)
+- Maps: highest return → BULL (0), middle → CHOP (2), lowest → BEAR (1)
+- For 4-state models: uses volatility to distinguish CHOP from BEAR among middle states
 
-#### Why CRASH State Was Removed
+**Prediction (`predict(df)`):**
+- Returns `(canonical_state: int, confidence: float)`
+- Confidence = **margin** = best_prob - 2nd_best_prob (range 0.0–1.0)
+- Raw max-posterior was always 99%+ regardless of accuracy; margin measures decisiveness
 
-When 4-state HMM was tested, the CRASH state achieved only **10.9% directional accuracy** — worse than random (25% for 4 states). The 3-state model (Sharpe 1.22) significantly outperforms 4-state (Sharpe 0.72). CRASH events are now classified as extreme BEAR.
+**Retrain trigger:** `needs_retrain()` returns True if model is untrained or age > `HMM_RETRAIN_HOURS` (24h)
 
-#### State Labeling Algorithm
+#### `MultiTFHMMBrain` — Multi-timeframe aggregator
 
-After training, raw HMM states have no semantic meaning (they're just 0, 1, 2). The `_build_state_map()` method re-labels them by sorting on mean log-return:
+Manages 3 separate `HMMBrain` instances per coin (1d, 1h, 15m).
 
-```python
-sorted_indices = np.argsort(means)[::-1]
-# sorted_indices[0] = highest mean log-return → BULL
-# sorted_indices[1] = middle return          → CHOP
-# sorted_indices[2] = lowest mean log-return → BEAR
+**Conviction computation (`get_conviction()`):**
+
+```
+Timeframe weights: 1d=40%, 1h=35%, 15m=25%
+
+For each TF with a non-CHOP prediction:
+  Direction vote: BULL→BUY, BEAR→SELL, CHOP→no vote
+
+Consensus = majority of non-CHOP votes
+  If tied: return 0, None, 0
+
+Weighted score per TF (if agrees with consensus):
+  margin >= 0.30 → full weight (100%)
+  margin >= 0.20 → 85% weight
+  margin >= 0.10 → 65% weight
+  margin >= 0.05 → 40% weight
+  below 0.05    → 20% weight
+
+Disagreement = 0 (no penalty, no contribution)
+CHOP = 0
+
+conviction = sum(w × tier_multiplier), clipped 0–100
 ```
 
-#### Confidence: Margin vs Raw Posterior
+Minimum agreement required: 2 of 3 TFs (`MULTI_TF_MIN_AGREEMENT`).
 
-**Problem with raw posterior:** `model.predict_proba()` returned values of 99%+ for nearly every prediction regardless of actual accuracy. This made it completely uncalibrated and useless as a confidence signal.
-
-**Solution — Margin confidence:**
-```python
-sorted_p = np.sort(probs)[::-1]
-confidence = sorted_p[0] - sorted_p[1]  # best - 2nd_best
-```
-
-| Margin | Interpretation |
-|--------|---------------|
-| 0.0 – 0.10 | Very uncertain (below LOW threshold → no trade) |
-| 0.10 – 0.25 | Low confidence |
-| 0.25 – 0.40 | Medium confidence |
-| 0.40 – 0.60 | Medium-high confidence |
-| 0.60 – 1.00 | High confidence |
-
-#### Margin Confidence Tiers
-
-```python
-HMM_CONF_TIER thresholds:
-  HIGH      = 0.60   → full HMM score (44 pts)
-  MED_HIGH  = 0.40   → ~33 pts
-  MED       = 0.25   → ~22 pts
-  LOW       = 0.10   → ~11 pts
-  < 0.10            → 0 pts (HMM untrusted)
-```
-
-#### Retraining Schedule
-
-The model retrains every 24 hours (`HMM_RETRAIN_HOURS = 24`) on the latest 250 candles of 15m OHLCV. `needs_retrain()` checks `datetime.utcnow() - last_trained > 24h`.
+**Regime summary format** (used in dashboard): `"1d=BULLISH(0.45) | 1h=BULLISH(0.32) | 15m=SIDEWAYS/CHOP(0.08)"`
 
 ---
 
-### 3.5 Coin Scanner
+### 3.5 Segment Features (segment_features.py)
 
-**File:** `coin_scanner.py` (10.3 KB)
+Per-coin feature lists determined via 15m Permutation Likelihood backtesting across 8 segments and 4 timeframes.
 
-Dynamically selects which coins to trade each cycle.
+**Global default:** `ALL_HMM_FEATURES` — 9 features used for unknown/unmapped coins.
 
-#### Coin Tier Classification
+**`COIN_FEATURES` dict:** 41 coins with individually optimized feature subsets. Examples:
 
-Tiers determined by backtesting Sharpe ratio on forward-test windows (from `tools/experiment_3state_calibration.py`). Stored in `data/coin_tiers.csv`.
+| Coin | Features |
+|------|----------|
+| BTCUSDT | vol_zscore, log_return, volume_trend_intensity, liquidity_vacuum, amihud_illiquidity, exhaustion_tail, volatility, volume_change |
+| SOLUSDT | vol_zscore, liquidity_vacuum, amihud_illiquidity, volume_trend_intensity, exhaustion_tail, log_return, rel_strength_btc |
+| TAOUSDT | vol_zscore, liquidity_vacuum, log_return, rel_strength_btc, amihud_illiquidity, volume_trend_intensity, exhaustion_tail |
 
-| Tier | Criteria | Coins |
-|------|---------|-------|
-| **A (Trade)** | Forward-test Sharpe ≥ 1.0 | ENA, SEI, ZEC, PHA, CHZ, PEPE, ADA, XRP, TIA, ETHFI, DOGE, AAVE, WLD, AR, ETC, BCH, FET, KAVA |
-| **B (Monitor)** | Sharpe 0.5–1.0 | BTC, ETH, SOL (and others) |
-| **C (Avoid)** | Sharpe < 0.5 or volatile | CAKE, FXS, DOT, XLM, AVAX, SHIB, TAO, WIF, AUDIO, GALA, OP, INJ, SUI, NEAR, BNB, BONK, LTC |
+Note: BTCUSDT includes `log_return` explicitly because `_build_state_map()` searches for it by name — this is required for correct state ordering.
 
-#### Scan Process
-
-```
-1. Fetch top 50 coins by 24h USDT volume from Binance
-2. Filter out Tier C coins
-3. Sort: Tier A coins first, then Tier B by volume
-4. Return top N = TOP_COINS_LIMIT (25) for analysis
-5. Re-scan every SCAN_INTERVAL_CYCLES = 4 (every 20 minutes)
-```
+**API:**
+- `get_features_for_coin(coin)` → returns coin-specific list or ALL_HMM_FEATURES fallback
+- `get_segment_for_coin(coin)` → returns segment name from `config.CRYPTO_SEGMENTS`, defaults to "L1"
 
 ---
 
-### 3.6 Risk Manager
+### 3.6 Coin Scanner (coin_scanner.py)
 
-**File:** `risk_manager.py` (18.2 KB)
+#### Scan Pool Building
 
-Enforces all risk rules. The "Anti-Liquidation" module.
+`get_active_bot_segment_pool(active_bots)` — called each cycle in `_tick()`:
 
-#### Conviction Score Formula
+1. Inspect `segment_filter` for each active bot
+2. If any bot has `segment_filter="ALL"` or no bots registered → trigger dynamic segment selection
+3. Dynamic mode: call `get_hottest_segments(SEGMENT_SCAN_LIMIT=3)` → writes `data/segment_heatmap.json`
+4. Compile coins from all target segments
+5. Apply static exclusions (`COIN_EXCLUDE` + `EXCLUDED_COINS`) and dynamic exclusions (`coin_exclusions.json`)
+6. **Always insert PRIMARY_SYMBOL (BTCUSDT) at index 0** — required for BTC macro context and dashboard display
 
-The conviction score (0–100) gates every trade and determines leverage:
+#### Institutional Segment Heatmap (`get_hottest_segments`)
 
-```
-Score = HMM(44) + BTC_macro(7) + Funding(11) + SR_VWAP(2)
-      + OI(11) + Vol(0) + Sentiment(15) + OrderFlow(10)
-      = 100 pts maximum
-```
+3-Pillar scoring for each segment:
 
-| Factor | Max Points | What It Measures |
-|--------|-----------|-----------------|
-| **HMM Regime** | 44 | Regime type + margin confidence tier |
-| **Sentiment** | 15 | VADER/FinBERT + CryptoPanic + Fear & Greed score |
-| **Funding Rate** | 11 | Funding rate direction + magnitude (futures sentiment) |
-| **Open Interest** | 11 | OI trend — rising OI confirms new money in direction |
-| **Order Flow** | 10 | Taker buy/sell imbalance + L2 depth ratio |
-| **BTC Macro** | 7 | BTC correlation (coin moves with BTC regime) |
-| **S/R + VWAP** | 2 | Entry near support (long) or resistance (short) |
-| **Volatility** | 0 | Filter only — blocks trade if ATR% out of range |
+| Pillar | Formula | Weight |
+|--------|---------|--------|
+| VW-RR (Volume-Weighted Relative Return) | Σ(coin_change × volume_weight) | Part of composite |
+| Benchmark Alpha | VW-RR - BTC 24h return | Part of composite |
+| Participation Breadth | % coins moving in segment direction | Multiplier |
 
-#### HMM Conviction Points Breakdown
+`composite_score = VW-RR × (breadth_pct / 100)`
 
-| Regime | Margin Tier | Points |
-|--------|------------|--------|
-| BULL / BEAR | HIGH (≥0.60) | 44 |
-| BULL / BEAR | MED_HIGH (≥0.40) | 33 |
-| BULL / BEAR | MED (≥0.25) | 22 |
-| BULL / BEAR | LOW (≥0.10) | 11 |
-| CHOP | Any | 0 (no trend trade) |
-| Any | < 0.10 | 0 (model untrusted) |
+Segments ranked by absolute composite score. Top `SEGMENT_SCAN_LIMIT` (3) returned.
 
-#### Leverage Bands
+#### Coin Tier System
 
-```
-Conviction Score → Leverage
-< 40             → 0x   (no trade)
-40 – 54          → 10x
-55 – 69          → 15x
-70 – 84          → 25x
-85 – 100         → 35x
-```
+Coins classified into Tier A/B/C via weekly calibration experiment (`tools/weekly_reclassify.py`):
+- Tier A: stable forward Sharpe ≥ 1.0 — promoted to front of scan queue
+- Tier C: excluded from shortlist
 
-#### Position Sizing Formula
+`reload_coin_tiers()` called after background reclassification completes.
 
-```
-risk_amount = balance × RISK_PER_TRADE (4%)
-stop_distance = ATR × sl_multiplier(leverage)
-quantity = risk_amount / stop_distance
-max_qty = (balance × leverage) / entry_price
-final_qty = min(quantity, max_qty)
-```
+#### Dynamic Exclusions
 
-#### ATR Multipliers by Leverage
+`auto_exclude_coin(symbol)` adds coins with insufficient data (<60 candles) to `data/coin_exclusions.json`. Persisted across restarts.
 
-Higher leverage → tighter stops to maintain consistent portfolio risk:
+---
 
-| Leverage | SL Multiplier | TP Multiplier | Risk:Reward |
-|----------|-------------|-------------|------------|
-| 1–4x | 1.5 | 3.0 | 1:2 |
-| 5–9x | 1.2 | 2.4 | 1:2 |
-| 10–24x | 1.0 | 2.0 | 1:2 |
-| 25–49x | 0.7 | 1.4 | 1:2 |
-| ≥ 50x | 0.5 | 1.0 | 1:2 |
+### 3.7 Risk Manager (risk_manager.py)
+
+#### Risk Manager Routing
+
+| Segment | Risk Manager |
+|---------|-------------|
+| L1 | RM2_ATR |
+| L2, AI, DePIN, Gaming, RWA, DeFi, Meme | RM3_Swing |
+
+`config.get_optimal_rm(symbol)` returns the RM ID for a given symbol.
+
+#### Stop Loss / Take Profit Computation (`calculate_optimal_stops`)
+
+**RM2_ATR:**
+- multiplier `m = 2.5` (3.5 for Meme/AI segments)
+- `SL = entry - direction × (m × ATR)`
+- `TP = entry + direction × (m × 2.0 × ATR)` → 1:2 R:R
+
+**RM3_Swing:**
+- `SL = swing_l` (for BUY) or `swing_h` (for SELL) — 10-candle rolling local extremum
+- Falls back to `entry - direction × (3.0 × ATR)` if swing level is invalid
+- `TP = entry + direction × (risk_dist × 2.5)` → 2.5R R:R on actual swing risk
+
+#### Leverage Selection
+
+Two paths:
+1. **Dynamic ATR-based** (`EXECUTION_DYNAMIC_LEVERAGE=True`, primary): linear scale from ATR%
+   - ATR% ≤ 0.5% → 25x
+   - ATR% ≥ 1.5% → 10x
+   - Linear between [10x, 25x]
+2. **Conviction-based** (legacy fallback): conviction score → leverage tier
+
+#### Conviction Score (5 active factors, 0–100)
+
+| Factor | Weight | Source |
+|--------|--------|--------|
+| HMM Confidence (margin tier) | 71 | `_score_hmm()` |
+| BTC Macro Regime alignment | 7 | `_score_btc_macro()` |
+| Funding Rate carry signal | 11 | `_score_funding()` |
+| Open Interest Change | 11 | `_score_oi()` |
+| Order Flow | 0 (disabled) | — |
+| SR + VWAP | 0 (removed) | — |
+| Sentiment | 0 (removed) | — |
+| Volatility quality | 0 (removed) | — |
+
+Minimum conviction to proceed to Athena: 60 (`MIN_CONVICTION_FOR_DEPLOY`)
 
 #### Kill Switch
 
-```python
-KILL_SWITCH_DRAWDOWN = 0.10  # 10% portfolio loss in 24h → bot stops
+`check_kill_switch()` triggers if portfolio drawdown ≥ 10% in 24h. Writes KILL command to `data/commands.json`, closes all positions.
 
-if drawdown_24h >= 0.10:
-    self._killed = True
-    close_all_positions()
-    send_telegram_alert("KILL SWITCH TRIGGERED")
-```
-
-#### Volatility Filter
-
-```python
-VOL_MIN_ATR_PCT = 0.003  # 0.3% minimum ATR (too quiet = no trade)
-VOL_MAX_ATR_PCT = 0.06   # 6.0% maximum ATR (too chaotic = no trade)
-```
-
----
-
-### 3.7 Execution Engine
-
-**File:** `execution_engine.py` (21.7 KB)
-
-Handles all order placement — paper (simulation) and live (real exchange).
-
-#### Trading Modes
-
-| Mode | Exchange | Real Money | Purpose |
-|------|---------|-----------|---------|
-| Paper | Binance Testnet | No | Safe testing, SaaS user copy-trades |
-| Live | CoinDCX | Yes | Real margin futures (admin/advanced users) |
-
-#### Multi-Target Profit Booking (T1/T2/T3)
-
-The primary exit strategy. Configured in `config.py`:
+#### Margin-First Position Sizing (`calculate_margin_first_position`)
 
 ```
-MT_RR_RATIO = 5         (SL : T3 = 1:5)
-MT_T1_FRAC  = 0.333     T1 at 33.3% of T3 distance
-MT_T2_FRAC  = 0.666     T2 at 66.6% of T3 distance
-MT_T1_BOOK_PCT = 0.25   Book 25% of qty at T1
-MT_T2_BOOK_PCT = 0.50   Book 50% of remaining qty at T2
-```
+For each leverage tier [35, 25, 15, 10, 5] (descending):
+  If tier > conviction_leverage: skip
+  sl_mult = get_atr_multipliers(lev)[0]
+  loss_at_sl = (atr × sl_mult / price) × lev × 100  [% of margin]
+  If loss_at_sl <= max_loss_pct: use this leverage
 
-**Example (LONG @ $100, ATR = $2, SL mult = 1.0 at 10x leverage):**
-```
-Entry  = $100.00
-SL     = $98.00  (entry - 1×ATR)
-T1     = $103.33  (entry + 1.667×ATR)  → book 25%
-T2     = $106.67  (entry + 3.333×ATR)  → book 50% of remaining
-T3     = $110.00  (entry + 5.0×ATR)    → close remainder
-```
-
-**PnL per stage at 10x leverage on $100 capital:**
-- T1 hit: +$8.33 profit on 25% of position
-- T2 hit: +$16.67 profit on 37.5% of position
-- T3 hit: +$25.00 profit on 37.5% of position
-- Max T3 PnL (all targets hit): +$16.67 per $100 capital
-
-#### Trailing Stop-Loss
-
-```python
-TRAILING_SL_ENABLED = True
-TRAILING_SL_ACTIVATION_ATR = 1.0  # Activates when price moves 1×ATR in favor
-TRAILING_SL_DISTANCE_ATR = 1.0    # SL stays 1×ATR behind price peak
-
-# Logic:
-if price_move_favor >= 1.0 × ATR:
-    trail_active = True
-    new_sl = peak_price - 1.0 × ATR  # trails peak, never goes backward
-```
-
-#### Order Flow
-
-```
-open_position()
-  ├── Validate conviction score ≥ 40
-  ├── Calculate position size (2% risk rule)
-  ├── Set SL, T1, T2, T3 levels
-  ├── Place market order (paper: simulate, live: CoinDCX REST API)
-  └── Log to tradebook.json
-
-close_position(reason)
-  ├── Place market close order
-  ├── Record exit price, PnL, exit reason
-  ├── Append PartialBooking records for T1/T2
-  └── Mark trade as "closed" in tradebook
+If final_leverage < MIN_LEVERAGE_FLOOR (5): skip trade
+quantity = (margin × final_leverage) / price
 ```
 
 ---
 
-### 3.8 Order Flow Engine
+### 3.8 Execution Engine (execution_engine.py)
 
-**File:** `orderflow_engine.py` (37.9 KB)
+Handles paper vs live order routing. Paper trades go to Binance testnet; live trades go to CoinDCX.
 
-Analyzes microstructure signals from the order book.
+**Limit order mechanics:**
+- If `EXECUTION_ATR_PULLBACK=True` and `ema_15m_20` is available: places limit order at 20-EMA
+- Otherwise: market order
+- Virtual Ghost Limits (`EXECUTION_VIRTUAL_LIMITS=True`): limit orders held locally in tradebook as `status=OPEN`, not sent to exchange until triggered — prevents margin deadlock
 
-#### Signals Computed
-
-| Signal | Method | Conviction Impact |
-|--------|--------|-----------------|
-| **L2 Depth Imbalance** | (bid_vol - ask_vol) / (bid_vol + ask_vol) | Directional pressure |
-| **Taker Buy/Sell Flow** | Aggressor-side trade flow from recent trades | Short-term momentum |
-| **Cumulative Delta** | Running sum of (buy_vol - sell_vol) | Sustained buying/selling pressure |
-| **Weighted Price Levels** | Volume-weighted bid/ask clusters | Key price magnets |
-
-These feed into the **Order Flow factor (10 pts)** of the conviction score.
+**SL/TP placement:**
+- Calls `RiskManager.calculate_optimal_stops()` using coin's segment RM
+- Returns `(stop_loss, take_profit, rm_id)` passed to `tradebook.open_trade()` as `override_sl/override_tp`
 
 ---
 
-### 3.9 Sentiment Engine
+### 3.9 Tradebook (tradebook.py)
 
-**Files:** `sentiment_engine.py` (21.1 KB), `sentiment_sources.py` (18.5 KB)
+Persistent trade journal in `data/tradebook.json`. Thread-safe via `_book_lock`.
 
-#### Data Sources
-
-| Source | Weight | API/Method |
-|--------|--------|-----------|
-| **CryptoPanic** | Primary news | REST API (free key, rate limited) |
-| **RSS Feeds** | 5 outlets (CoinDesk, CoinTelegraph, Decrypt, The Block, Blockworks) | `feedparser` library |
-| **Reddit** | r/CryptoCurrency, coin-specific subs | PRAW (OAuth) or public JSON |
-| **Fear & Greed Index** | Macro sentiment | alternative.me API |
-
-#### NLP Pipeline
+#### Trade Status Lifecycle
 
 ```
-Raw text → VADER (always, fast) → score [-1, +1]
-         → FinBERT (optional, lazy-load, ~400MB PyTorch model)
-              → probability for [positive, negative, neutral]
-         → Weighted average → final_score
+OPEN    (limit order placed, awaiting fill)
+  ↓ fill detected (paper: price crosses, live: virtual trigger)
+ACTIVE  (position live, P&L tracked)
+  ↓ exit condition met
+CLOSED  (final P&L recorded)
 
-Buzz = article count in last 4 hours (SENTIMENT_WINDOW_HOURS)
-Momentum = change in score from previous period
+Also:
+CANCELLED  (limit order cancelled — TIF_EXPIRED or ESCAPE_HATCH)
 ```
 
-#### Output: SentimentSignal
+#### Key Functions
 
-```python
-@dataclass
-class SentimentSignal:
-    score: float        # -1.0 (very bearish) to +1.0 (very bullish)
-    confidence: float   # 0.0 to 1.0 (based on article count)
-    buzz: int           # number of relevant articles
-    momentum: float     # score change vs last period
-    alert: bool         # True = hack/exploit detected → hard veto (conviction = 0)
+| Function | Purpose |
+|----------|---------|
+| `open_trade(...)` | Record new entry; deduplicates by `symbol+profile_id` |
+| `close_trade(trade_id, symbol, exit_price, reason)` | Record exit, compute P&L, fees |
+| `cancel_trade(trade_id, reason)` | Cancel OPEN limit; no P&L recorded |
+| `activate_limit_order(trade_id, fill_price, fill_qty)` | OPEN → ACTIVE transition |
+| `update_unrealized(prices, funding_rates)` | Batch P&L update + exit checks |
+| `update_trade(trade_id, updates)` | Patch any trade fields |
+| `get_active_trades()` | Returns list of ACTIVE + OPEN trades |
+
+#### P&L Computation
+
+```
+raw_pnl = (exit_price - entry_price) × quantity    [LONG]
+raw_pnl = (entry_price - exit_price) × quantity    [SHORT]
+
+Note: quantity is already leveraged (= capital × leverage / price)
+DO NOT multiply by leverage again.
+
+commission = (entry_notional + exit_notional) × TAKER_FEE (0.05%)
+net_pnl = raw_pnl - commission - funding_cost
+pnl_pct = net_pnl / capital × 100
 ```
 
-#### Integration in Conviction Score
+#### Funding Rate Accumulation
 
-```python
-# Sentiment contributes up to 15 pts
-if alert:
-    conviction_score = 0  # Hard veto — overrides everything
-else:
-    sentiment_pts = normalize(score) × 15
+Every heartbeat, `update_unrealized()` checks how many 8-hour intervals have elapsed since `last_funding_check`. Uses live CoinDCX funding rate if available, else `DEFAULT_FUNDING_RATE` (0.01%). Accumulates in `trade["funding_cost"]`.
+
+#### Trailing SL — Stepped Profit Lock (`TRAILING_SL_STEPS`)
+
+Every heartbeat, for each ACTIVE trade:
+
 ```
+For each step (trigger_pnl_pct, lock_pnl_pct) in TRAILING_SL_STEPS:
+  If pnl_pct >= trigger_pnl AND step_idx > stepped_lock_level:
+    lock_price_move = (lock_pnl / 100) / leverage
+    new_sl = entry × (1 + lock_price_move)   [LONG]
+    new_sl = entry × (1 - lock_price_move)   [SHORT]
+    If new_sl improves on trailing_sl: update it
+    stepped_lock_level = step_idx
+```
+
+Steps defined in `TRAILING_SL_STEPS`:
+- At +5% P&L → SL to breakeven
+- At +10% → lock +5%
+- At +15% → lock +10%
+- ... continues to +50% → lock +45%
+
+For live trades: calls `ExecutionEngine.modify_sl_live()` to update exchange SL order.
 
 ---
 
-### 3.10 Tradebook
+### 3.10 Athena LLM Layer (llm_reasoning.py)
 
-**File:** `tradebook.py` (39.3 KB)
+File: `llm_reasoning.py` — class `AthenaEngine`
 
-Persistent trade ledger backed by `data/tradebook.json`.
+**Model:** `gemini-2.5-flash` via Google Generative AI REST API (`https://generativelanguage.googleapis.com/v1beta/models/...`)
 
-#### Trade Lifecycle
+**Design:** Fail-open. If API is unavailable, returns `AthenaDecision(action="EXECUTE", adjusted_confidence=1.0)` — trades are never blocked due to infrastructure failure.
 
-```
-OPEN → [T1_HIT] → [T2_HIT] → CLOSED
-     → SL_HIT   → CLOSED
-     → MANUAL    → CLOSED
-     → KILL_SW   → CLOSED
-```
-
-#### Data Stored Per Trade
+#### Signal Context Sent to Athena
 
 ```python
 {
-    "trade_id": "T-0042-DOGEUSDT",
-    "symbol": "DOGEUSDT",
-    "side": "long",
-    "regime": "BULLISH",
-    "confidence": 0.73,
-    "conviction_score": 82,
-    "leverage": 25,
-    "capital": 100.0,
-    "entry_price": 0.1234,
-    "current_price": 0.1267,
-    "sl": 0.1215,
-    "t1": 0.1256, "t2": 0.1278, "t3": 0.1300,
-    "t1_hit": True, "t2_hit": False,
-    "trailing_sl": 0.1245, "trailing_active": True,
-    "pnl": 5.34,
-    "status": "active",
-    "entry_time": "2026-03-07T10:00:00Z"
+  "ticker":         symbol,           # e.g. "SOLUSDT"
+  "side":           "BUY"/"SELL",
+  "leverage":       int,
+  "hmm_confidence": float,           # HMM margin (0.0–1.0)
+  "hmm_regime":     str,             # e.g. "BULLISH"
+  "conviction":     float,           # 0–100 multi-factor score
+  "current_price":  float,
+  "atr":            float,
+  "atr_pct":        float,           # ATR as % of price
+  "trend":          str,             # EMA20/50 trend direction
+  "signal_type":    str,             # "TREND_FOLLOW" or "REVERSAL_PULLBACK"
+  "ema_15m_20":     float,
+  "tf_agreement":   int,             # 0–3 TFs agreeing
+  "btc_regime":     str,             # from BTCUSDT coin state
+}
+```
+
+#### Athena Prompt
+
+Athena acts as Lead Investment Officer. Tasks per coin:
+1. Technical price action (candles, momentum)
+2. Support & Resistance levels
+3. FVG and Order Blocks
+4. Current news (Gemini web grounding)
+5. BTC macro regime alignment
+6. Final conviction: LONG / SHORT / SKIP
+7. Leverage and position size recommendation
+
+HMM signal carries 40% weight; Athena's own analysis carries 60%.
+
+#### Decision Mapping
+
+| Athena Output | Engine Action |
+|--------------|--------------|
+| LONG or SHORT | EXECUTE |
+| SKIP | VETO |
+| adjusted_confidence < 0.30 (LLM_VETO_THRESHOLD) | VETO (forced) |
+
+#### Rate Limiting & Caching
+
+- Max 5 API calls per cycle (`LLM_MAX_CALLS_PER_CYCLE`)
+- Cache per coin for 10 minutes (`LLM_CACHE_MINUTES`)
+- `reset_cycle()` called at start of each `_tick()`
+
+#### Decision Logging
+
+All non-cached decisions logged to `data/athena_decisions.json` (last 200 entries) and in-memory buffer (last 50).
+
+#### `AthenaDecision` dataclass
+
+```python
+@dataclass
+class AthenaDecision:
+    action: str              # EXECUTE, VETO, REDUCE_SIZE
+    adjusted_confidence: float
+    reasoning: str
+    risk_flags: list
+    athena_direction: str    # LONG, SHORT, SKIP (original)
+    model: str
+    latency_ms: int
+    cached: bool
+```
+
+---
+
+### 3.11 Engine API (engine_api.py)
+
+Flask app wrapping the trading bot. Auth: Bearer token via `ENGINE_API_SECRET` env var. All routes require auth except `/api/health`.
+
+Engine runs in background thread via `_run_engine()` with auto-restart: up to 5 retries with exponential backoff (10s base), then 5-minute recovery cooldown before infinite retry.
+
+#### Engine API Endpoints (26 total)
+
+| Method | Endpoint | Purpose |
+|--------|----------|---------|
+| GET | `/api/all` | Primary dashboard endpoint: multi_bot_state, tradebook, engine_state, segment_heatmap, athena state, registered_bot_ids |
+| GET | `/api/health` | Engine status, uptime, cycle info, memory, crash history (no auth) |
+| GET | `/api/gemini-health` | Validate Gemini API key connectivity |
+| POST | `/api/close-trade` | Close single trade (live: CoinDCX first, then tradebook) |
+| POST | `/api/close-all` | Queue CLOSE_ALL command |
+| POST | `/api/exit-all-live` | Immediately close all CoinDCX positions + tradebook (called on bot stop) |
+| POST | `/api/reset-trades` | Clear all tradebook entries (paper mode only) |
+| POST | `/api/sync-exchange` | Reconcile tradebook with CoinDCX positions |
+| POST | `/api/set-mode` | Switch paper/live mode at runtime |
+| GET | `/api/validate-exchange` | Test exchange API key; returns balance |
+| POST | `/api/set-config` | Apply per-bot risk config (max_loss_pct, capital_per_trade, max_open_trades) |
+| POST | `/api/set-bot-id` | Register bot with engine (adds to ENGINE_ACTIVE_BOTS) |
+| POST | `/api/remove-bot-id` | Deregister bot from ENGINE_ACTIVE_BOTS |
+| POST | `/api/restart` | Force-restart engine thread |
+| POST | `/api/resume` | Clear paused/halted state |
+| GET | `/api/broadcast-log` | Last N lines of signal_broadcast.log as structured JSON |
+| POST | `/api/pause` | Pause engine (optional halt_until timestamp) |
+| GET | `/api/scanner` | Latest coin scanner results |
+| GET | `/api/athena` | Athena state + recent decisions |
+| POST | `/api/force-cycle` | Trigger immediate analysis cycle |
+| GET | `/api/multi-state` | Raw multi_bot_state.json |
+| GET | `/api/trade-history` | All tradebook entries |
+| GET | `/api/segment-heatmap` | Latest segment heatmap |
+| POST | `/api/kill-switch` | Trigger kill switch immediately |
+| POST | `/api/reset-kill-switch` | Reset kill switch |
+| GET | `/api/coin-state` | State for a specific coin |
+
+**`/api/all` response structure:**
+```json
+{
+  "multi": { "coin_states": {...}, "last_analysis_time": "...", "deployed_count": N },
+  "tradebook": { "trades": [...], "summary": {...} },
+  "engine": { "status": "running", ... },
+  "heatmap": { "segments": [...] },
+  "athena": { "enabled": true, "model": "gemini-2.5-flash", "recent_decisions": [...] },
+  "registered_bot_ids": ["botId1", "botId2"]
 }
 ```
 
 ---
 
-### 3.11 Engine API
+## 4. Signal Pipeline — End-to-End Flow
 
-**File:** `engine_api.py` (8.8 KB)
+```
+Every 15 minutes:
 
-Flask REST server that bridges Python engine ↔ Next.js dashboard.
+1. SCAN POOL
+   get_active_bot_segment_pool(ENGINE_ACTIVE_BOTS)
+   → BTC always first, then segment coins (exclusions applied)
 
-#### Endpoints
+2. FOR EACH COIN IN BATCH:
+   a. fetch_klines(symbol, "1h", 250)            [1h data for legacy brain]
+   b. For each TF in ["1d", "1h", "15m"]:
+      - fetch_klines(symbol, tf, 300)
+      - compute_all_features(df_tf)
+      - HMMBrain.train(df_tf)  [if needs_retrain()]
+      - MultiTFHMMBrain.set_brain(tf, brain)
+      - tf_data[tf] = df_tf_feat
 
-| Method | Endpoint | Returns |
-|--------|---------|---------|
-| GET | `/api/health` | Engine status, uptime, cycle count |
-| GET | `/api/bot-state` | All coin regimes, active positions, engine state |
-| GET | `/api/trades` | All trades from tradebook.json |
-| POST | `/api/close-trade` | Close a specific trade by trade_id or symbol |
-| POST | `/api/close-all` | Close all open positions (KILL_ALL command) |
+   c. MultiTFHMMBrain.predict(tf_data)
+   d. conviction, side, tf_agreement = mtf_brain.get_conviction()
+      → If side=None (no consensus): return None
+
+   e. Macro Veto: if side=BUY and BTC dropped >1.5% in 15m: skip
+
+   f. Volatility filter: ATR% must be in [0.3%, 6%]
+
+   g. Conviction threshold: if conviction < 60: skip
+
+   h. Fetch 15m data for ema_15m_20 (limit order target)
+
+   i. Return raw_result dict: {symbol, side, conviction, confidence, atr, ema_15m_20, ...}
+
+3. SORT raw_results by conviction DESC
+
+4. FOR EACH BOT in ENGINE_ACTIVE_BOTS:
+   a. Filter raw_results to bot's segment
+   b. Pick top 1 coin (TOP_COINS_PER_SEGMENT=1)
+   c. Check duplicate: if bot_id:symbol in active tradebook → skip
+   d. ATHENA CALL:
+      - Build llm_ctx with ticker, side, hmm_confidence, conviction, btc_regime, etc.
+      - AthenaEngine.validate_signal(llm_ctx)
+      - If action=VETO: skip
+      - If API fails: auto-EXECUTE (fail-open)
+   e. EXECUTE:
+      - ExecutionEngine.execute_trade(symbol, side, leverage, quantity, atr, ema_15m_20, ...)
+      - → CoinDCX limit/market order (live) or Binance testnet (paper)
+   f. RECORD:
+      - tradebook.open_trade(..., bot_id=bot_id, all_bot_ids=[bot_id], ...)
+      - _active_positions[f"{bot_id}:{symbol}"] = {...}
+```
 
 ---
 
-## 4. Brain Logic — Deep Dive
+## 5. Exit Mechanics
 
-> See **[BRAIN_DEEP_DIVE.md](BRAIN_DEEP_DIVE.md)** for the complete technical reference.
+All exits except MAX_LOSS are handled in `tradebook.update_unrealized()` (called every 10s heartbeat). For live trades, CoinDCX handles SL/TP at the exchange level; tradebook mirrors state via `_sync_coindcx_positions()`.
 
-### Why Hidden Markov Model?
+| Exit Trigger | Threshold | Notes |
+|-------------|-----------|-------|
+| **MAX_LOSS** | `pnl_pct <= -35%` (configurable via `set-config`) | Hard stop. Fires BEFORE fixed SL for deep SELL trades where EMA20 SL is above market (SELL enters above EMA20, SL = EMA20 above entry → hit requires -45%+ move, MAX_LOSS catches at -35% first). This is by design, not a bug. |
+| **Fixed SL / TP** | `current_price <= trailing_sl` (LONG) or `>= trailing_sl` (SHORT) | Uses trailing_sl value (which starts at fixed SL and improves as TRAILING_SL_STEPS activate) |
+| **Trailing SL Steps** | +5% P&L → breakeven; +10% → lock +5%; etc. | 10-step ladder up to +50% trigger → +45% lock. Modifies `trailing_sl` in-place |
+| **Escape Hatch** | Price moves > `2.0 × ATR` from OPEN limit order entry price | Cancels OPEN limit order: `status=CANCELLED`, P&L=0. Prevents stale limit orders from filling far from intended price |
+| **TIF Expiry** | OPEN limit order age > 60 minutes (`EXECUTION_TIF_MINUTES`) | Cancels OPEN limit order: `status=CANCELLED`, P&L=0 |
+| **Regime-change exits** | DISABLED | `_check_exits()` only syncs `_active_positions` dict; no regime-based forced closes. Backtest showed regime exits hurt returns |
+| **Kill Switch** | Portfolio drawdown ≥ 10% in 24h | Closes all positions, halts new deployments |
+| **KILL_SWITCH command** | Manual trigger from dashboard | Same as kill switch |
 
-Markets cycle through regimes (trending, ranging, volatile). Unlike indicators that react to price, an HMM learns the **hidden state** (regime) from observable features:
+**73% early exit root cause (documented):** SELL trades entered when EMA20 is above market price. RM2_ATR places SL at EMA20 above entry. For SL to be hit, price would need to rally 45%+ from entry. MAX_LOSS at -35% fires first. This is correct behavior — MAX_LOSS acts as a wider safety net for trades where the structural SL is effectively out of reach.
 
-1. **Probabilistic** — outputs confidence, not binary signal
-2. **Temporal** — considers sequences of observations, not just current bar
-3. **Unsupervised** — discovers regimes from data without labeling
+---
 
-### 3-State Model (Production)
+## 6. Risk Management
 
-| Regime | Trade | Strategy |
-|--------|-------|---------|
-| **BULL** | Long only | Trend following |
-| **BEAR** | Short only | Trend following |
-| **CHOP** | Sideways | Mean reversion (Bollinger Bands, RSI) |
+#### Leverage Tiers
 
-4-state (CRASH) was tested and **removed**: Sharpe dropped from 1.22 → 0.72. CRASH classified as extreme BEAR.
+| Conviction Score | Leverage |
+|-----------------|---------|
+| < 60 | 0 (no trade) |
+| 60–69 | 15x |
+| 70–94 | 25x |
+| ≥ 95 | 35x |
 
-### Margin Confidence
+Dynamic ATR leverage overrides conviction tiers when `EXECUTION_DYNAMIC_LEVERAGE=True` (default):
 
-Raw HMM posterior is always 99%+ (uncalibrated). Solution:
+| ATR% | Leverage |
+|------|---------|
+| ≤ 0.5% | 25x |
+| ≥ 1.5% | 10x |
+| Between | Linear interpolation |
+
+#### Capital Allocation
+
+- `CAPITAL_PER_TRADE = $100` per trade (fixed)
+- `PAPER_MAX_CAPITAL = $2,500` total portfolio (25 slots × $100)
+- Live mode: caps margin at `min($100, balance × 5%)` via `CAPITAL_PER_COIN_PCT`
+
+#### ATR Multipliers by Leverage
+
 ```python
-confidence = sorted_probs[0] - sorted_probs[1]   # best - second_best
+def get_atr_multipliers(leverage):
+    if leverage >= 50: return (0.5, 1.0)
+    elif leverage >= 10: return (1.0, 2.0)   # 1:2 R:R — backtest-proven
+    elif leverage >= 5:  return (1.2, 2.4)
+    else:                return (1.5, 3.0)
 ```
-| Margin | Conviction Points |
-|--------|------------------|
-| ≥ 0.60 | 44 (max) |
-| ≥ 0.40 | 33 |
-| ≥ 0.25 | 22 |
-| ≥ 0.10 | 11 |
-| < 0.10 | 0 (model untrusted) |
 
-### Tiered MTF Signal Logic (v3 — March 2026)
+#### Key Risk Parameters
 
-Every coin is evaluated across 15m, 1H, and 4H regimes. The combination of these three regimes determines the signal tier:
-
-| Tier | Condition | Action |
-|------|-----------|--------|
-| **1 — Trend Follow** | All TFs agree (or CHOP mixed in) | Full conviction trade |
-| **2A — Reversal** | 15m flipped vs 1H+4H | Gate: 15m EMA20 ± ATR pullback zone. Cap conviction at 55%. `signal_type=REVERSAL_PULLBACK` |
-| **2B — Trend Resume** | 15m+4H agree, 1H lagging | Gate: 1H EMA20 ± ATR pullback zone. Cap conviction at 60%. `signal_type=TREND_RESUME_PULLBACK` |
-| **3 — Noise Block** | 1H and 4H directly contradict | Hard block. `action=MTF_CONFLICT` |
-| **Skip** | 15m=CHOP or only 1 TF signals | No trade |
-
-**The core rule:** The 4H is the authority. Trading against the 4H is always blocked (Tier 3). Trading with the 4H but ahead of the 1H is allowed with pullback confirmation (Tier 2B).
-
-See `BRAIN_DEEP_DIVE.md §8-9` for the complete 27-combination truth table and pullback zone formulas.
-
-### Support/Resistance Weighting
-
-IC ~-0.01 (weak). Weight maintained at 2 pts — below threshold to increase, not zero enough to remove.
+| Parameter | Value | Effect |
+|-----------|-------|--------|
+| `MAX_LOSS_PER_TRADE_PCT` | -35% | Hard stop on leveraged P&L% |
+| `MIN_LEVERAGE_FLOOR` | 5x | Skip trade if risk-capped leverage drops below 5x |
+| `KILL_SWITCH_DRAWDOWN` | 10% | Portfolio drawdown threshold for kill switch |
+| `RISK_PER_TRADE` | 4% | Risk % used in `calculate_position_size()` |
+| `MIN_CONVICTION_FOR_DEPLOY` | 60 | Minimum conviction before Athena call |
+| `VOL_MIN_ATR_PCT` | 0.3% | Minimum volatility to trade |
+| `VOL_MAX_ATR_PCT` | 6.0% | Maximum volatility to trade |
+| `MACRO_VETO_BTC_DROP_PCT` | 1.5% | BTC flash crash threshold to block BUY signals |
 
 ---
 
-## 5. Risk Management System
+## 7. Crypto Segments
 
-### Five-Layer Risk Hierarchy
+| Segment | Coins | Risk Manager |
+|---------|-------|-------------|
+| L1 | BTCUSDT, ETHUSDT, SOLUSDT, BNBUSDT, AVAXUSDT, SUIUSDT | RM2_ATR |
+| L2 | ARBUSDT, OPUSDT, POLUSDT, MNTUSDT, STRKUSDT, IMXUSDT, RONINUSDT | RM3_Swing |
+| DeFi | UNIUSDT, AAVEUSDT, CRVUSDT, JUPUSDT, RUNEUSDT, PENDLEUSDT, LINKUSDT | RM3_Swing |
+| AI | TAOUSDT, INJUSDT, WLDUSDT | RM3_Swing |
+| Meme | DOGEUSDT, SHIBUSDT, PEPEUSDT, BONKUSDT | RM3_Swing |
+| RWA | ONDOUSDT, POLYXUSDT, TRUUSDT | RM3_Swing |
+| Gaming | AXSUSDT, SANDUSDT, PIXELUSDT, IOTXUSDT | RM3_Swing |
+| DePIN | ARUSDT, HNTUSDT | RM3_Swing |
+| Modular | TIAUSDT, DYMUSDT | RM3_Swing |
+| Oracles | PYTHUSDT, TRBUSDT, API3USDT | RM3_Swing |
 
-```
-Layer 1: Conviction Gating    → Score < 40 = NO TRADE
-Layer 2: Leverage Bands       → Score → 0x / 10x / 15x / 25x / 35x
-Layer 3: Position Sizing      → 4% risk per trade (ATR-based)
-Layer 4: Trade-Level Stops    → SL + T1/T2/T3 + trailing SL
-Layer 5: Portfolio Kill Switch→ 10% drawdown in 24h → stop all
-```
+**Excluded globally:** `AKTUSDT, FETUSDT, WIFUSDT, FILUSDT` — removed from all segment lists at import time.
 
-### Trade Execution Decision Tree
+**Static exchange exclusions** (scanner level): `EURUSDT, WBTCUSDT, USDCUSDT, TUSDUSDT, BUSDUSDT, USTUSDT, DAIUSDT, FDUSDUSDT, CVCUSDT, USD1USDT`
 
-```
-Coin available?
-│
-├─ No → Skip
-└─ Yes
-     │
-     ├─ Already have open position?
-     │    └─ Yes → Monitor SL/TP, skip new entry
-     │
-     └─ No open position
-          │
-          ├─ Fetch OHLCV → Compute features → HMM predict
-          │
-          ├─ Regime == CHOP? → Use sideways_strategy
-          │
-          ├─ Compute conviction score (8 factors)
-          │
-          ├─ Score < 40? → SKIP (no trade)
-          │
-          ├─ Volatility filter pass? → ATR% in [0.3%, 6%]
-          │
-          ├─ Kill switch active? → BLOCK all trades
-          │
-          └─ OPEN TRADE
-               ├─ Calculate leverage band (10x / 15x / 25x / 35x)
-               ├─ Size position (4% risk rule)
-               ├─ Set SL (ATR × sl_mult)
-               ├─ Set T1, T2, T3 targets
-               └─ Place order (paper or live)
-```
-
-### Exit Logic
-
-```
-Every 30-second heartbeat:
-  For each open position:
-    ├─ price ≤ SL?           → CLOSE (stop_loss)
-    ├─ price ≥ T1 (not hit)? → Book 25%, set SL to breakeven
-    ├─ price ≥ T2 (not hit)? → Book 50% of remaining
-    ├─ price ≥ T3?           → Close remainder (full target)
-    ├─ trailing_sl active?   → Update SL = peak - 1×ATR
-    ├─ pnl < MAX_LOSS_PCT?   → CLOSE (max_loss -15% per trade)
-    └─ hold < MIN_HOLD_MIN?  → Do not exit on regime flip alone (30 min hold)
-```
+**Segment rotation:** `SCANNER_SEGMENT_ROTATION=True`. Updates master shortlist every 1 hour; determines active segments from 15-minute time block within the hour. `MAX_ACTIVE_PER_SEGMENT=1` limits correlation.
 
 ---
 
-## 6. SaaS Dashboard
+## 8. SaaS Dashboard (NextJS)
 
-### 6.1 Technology Stack
+### 8.1 Technology Stack
 
-| Layer | Technology | Version |
-|-------|-----------|---------|
-| **Framework** | Next.js (App Router) | 14.2.35 |
-| **Language** | TypeScript | 5.2.2 |
-| **UI** | React + Tailwind CSS + shadcn/ui | 18.2.0 |
-| **ORM** | Prisma | 6.7.0 |
-| **Database** | PostgreSQL | (Railway managed) |
-| **Auth** | NextAuth.js | 4.24.11 |
-| **Animations** | Framer Motion | 10.18.0 |
-| **Charts** | Recharts | 3.7.0 |
-| **Icons** | Lucide React | 0.446.0 |
-| **Payments** | Razorpay | webhook-based |
-| **State** | Zustand | 5.0.3 |
-| **Notifications** | Sonner (toast) | 1.5.0 |
+| Layer | Technology |
+|-------|-----------|
+| Framework | Next.js 14 (App Router) |
+| Language | TypeScript |
+| Styling | Tailwind CSS + shadcn/ui components |
+| ORM | Prisma |
+| Database | PostgreSQL (Railway) |
+| Auth | NextAuth.js (credentials provider) |
+| Payments | Razorpay webhooks |
+| Deployment | Railway (Docker) |
 
----
+### 8.2 Application Pages
 
-### 6.2 Application Pages
+| Route | Description |
+|-------|-------------|
+| `/` | Landing page (marketing) |
+| `/dashboard` | Main dashboard: BTC regime, coin states, active trades, segment heatmap, bot cards |
+| `/tradebook` | Full trade history with P&L charts, filter by bot/status |
+| `/settings` | API key management, bot configuration |
+| `/admin` | Admin panel: all users, subscription management, engine diagnostics |
 
-#### Public Pages
+### 8.3 API Routes — Complete List (44 routes)
 
-| Route | File | Purpose |
-|-------|------|---------|
-| `/` | `app/page.tsx` | Landing page (hero, features, pricing CTA) |
-| `/login` | `app/login/page.tsx` | User login (email/password, NextAuth) |
-| `/signup` | `app/signup/page.tsx` | Registration with tier selection |
-| `/pricing` | `app/pricing/page.tsx` | Plan comparison (Free / Pro / Ultra) |
-| `/howto` | `app/howto/page.tsx` | User guide, getting started |
+**Bot Management:**
 
-#### Protected Pages (auth required)
+| Route | Method | Purpose |
+|-------|--------|---------|
+| `/api/bots/create` | POST | Create new bot record in DB |
+| `/api/bots/toggle` | POST | Start/stop bot: registers with engine, validates exchange, opens/closes sessions |
+| `/api/bots/kill` | POST | Emergency kill: closes all trades, stops bot |
+| `/api/bots/retire` | POST | Archive/retire bot |
+| `/api/bots/config` | POST | Update bot configuration |
+| `/api/bots/delete` | POST | Delete bot and all associated records |
+| `/api/bots/logs` | GET | Fetch bot logs |
+| `/api/bots/broadcast-log` | GET | Signal broadcast audit log from engine |
 
-| Route | File | Purpose |
-|-------|------|---------|
-| `/dashboard` | `app/dashboard/` | Main control panel: HMM regimes, live positions, metrics |
-| `/bots` | `app/bots/` | Create/manage bot instances, start/stop |
-| `/trades` | `app/trades/` | Trade history, open trades, P&L breakdown |
-| `/performance` | `app/performance/` | Session analytics: ROI, Sharpe, drawdown, win rate |
-| `/intelligence` | `app/intelligence/` | Sentiment signals, order flow data |
-| `/account` | `app/account/` | Profile, exchange API keys, subscription info |
+**Engine State:**
 
-#### Admin Pages (role=admin only)
+| Route | Method | Purpose |
+|-------|--------|---------|
+| `/api/bot-state` | GET | Primary dashboard data: engine state, coin states, trades, heatmap, per-bot stats |
+| `/api/health` | GET | NextJS app health check |
+| `/api/engine-logs` | GET | Engine log tail |
+| `/api/engine-debug` | GET | Engine debug diagnostics |
+| `/api/cycle-snapshot` | POST | Receive per-cycle signal archive from engine; persists to DB |
+| `/api/debug` | GET | Debug info |
 
-| Route | Component | Purpose |
-|-------|-----------|---------|
-| `/admin` | `admin-client.tsx` | Full admin control panel |
-| ↳ User Analytics | `user-analytics.tsx` | Signups, churn, active users |
-| ↳ Revenue Dashboard | `revenue-dashboard.tsx` | ARR, ARPU, subscription metrics |
-| ↳ Subscription Mgmt | `subscription-mgmt.tsx` | Override user tiers, Razorpay reconciliation |
-| ↳ Engine Control | `engine-control.tsx` | Start/stop bot engine globally |
-| ↳ System Health | `system-health.tsx` | CPU, memory, disk, uptime |
-| ↳ Audit Log | `audit-log.tsx` | API calls, user actions |
+**Trades:**
 
----
+| Route | Method | Purpose |
+|-------|--------|---------|
+| `/api/trades` | GET | List user trades from DB |
+| `/api/trades/close` | POST | Close specific trade (proxies to engine) |
+| `/api/trades/exit-all` | POST | Close all active trades |
+| `/api/trades/sync` | POST | Manually reconcile engine trades → Prisma |
+| `/api/reset-trades` | POST | Clear all trades (paper mode) |
 
-### 6.3 API Routes
+**Auth & Users:**
 
-All routes in `sentinel-saas/nextjs_space/app/api/`:
+| Route | Method | Purpose |
+|-------|--------|---------|
+| `/api/auth/[...nextauth]` | ALL | NextAuth handler |
+| `/api/signup` | POST | User registration |
+| `/api/sessions` | GET | Bot session list |
+| `/api/sessions/backfill` | POST | Backfill session statistics |
 
-#### Bot Management
+**Subscription:**
 
-| Method | Route | Description |
-|--------|-------|-------------|
-| POST | `/api/bots/create` | Create new bot for authenticated user |
-| POST | `/api/bots/delete` | Delete bot and its trades |
-| POST | `/api/bots/toggle` | Start (creates BotSession) or Stop bot |
-| POST | `/api/bots/kill` | Emergency kill — closes all paper trades immediately |
-| GET/POST | `/api/bots/config` | Read/write bot configuration |
-| GET | `/api/bots/logs` | Fetch bot activity logs |
-| GET | `/api/bot-state` | Live bot state (regimes, positions, cycle info) |
+| Route | Method | Purpose |
+|-------|--------|---------|
+| `/api/subscription/status` | GET | Current subscription tier and status |
+| `/api/webhooks/razorpay` | POST | Payment webhook handler |
 
-#### Trade Management
+**Admin:**
 
-| Method | Route | Description |
-|--------|-------|-------------|
-| GET | `/api/trades` | All trades for user (syncs from engine) |
-| POST | `/api/trades/close` | Manually close a specific trade |
-| POST | `/api/reset-trades` | Clear all trades (admin/test only) |
+| Route | Method | Purpose |
+|-------|--------|---------|
+| `/api/admin/users` | GET | All users list |
+| `/api/admin/bots` | GET | All bots across users |
+| `/api/admin/stats` | GET | Platform-wide statistics |
+| `/api/admin/audit` | GET | Audit log |
+| `/api/admin/subscriptions/change` | POST | Modify user subscription |
+| `/api/admin/engine` | GET/POST | Engine admin controls |
+| `/api/admin/cleanup-trades` | POST | Cleanup orphaned trades |
+| `/api/admin/close-engine-trade` | POST | Force-close specific engine trade |
+| `/api/admin/mark-trades-closed` | POST | Bulk mark trades as closed |
+| `/api/admin/reset-engine-tradebook` | POST | Reset engine tradebook |
+| `/api/admin/trade-timeline` | GET | Trade timeline view |
+| `/api/admin/orchestrator/health` | GET | Orchestrator health |
+| `/api/admin/orchestrator/control` | POST | Orchestrator control |
 
-#### Session Management
+**Market & Exchange:**
 
-| Method | Route | Description |
-|--------|-------|-------------|
-| GET | `/api/sessions` | List all bot sessions with metrics |
-| POST | `/api/sessions/backfill` | Admin: tag legacy trades as Session 0 |
+| Route | Method | Purpose |
+|-------|--------|---------|
+| `/api/live-market` | GET | Live market prices |
+| `/api/exchange/validate` | GET | Validate exchange API keys |
+| `/api/exchange/positions` | GET | Live exchange positions |
+| `/api/wallet-balance` | GET | Exchange wallet balance |
+| `/api/performance` | GET | Bot performance metrics |
+| `/api/settings/api-keys` | POST/GET | Manage exchange API keys (encrypted) |
 
-#### Exchange & Wallet
-
-| Method | Route | Description |
-|--------|-------|-------------|
-| POST | `/api/exchange/validate` | Test API credentials (no storage) |
-| GET | `/api/exchange/positions` | Live positions from exchange |
-| GET | `/api/wallet-balance` | Account balance using stored keys |
-| GET/POST | `/api/settings/api-keys` | Read/write encrypted API keys |
-
-#### User & Subscription
-
-| Method | Route | Description |
-|--------|-------|-------------|
-| POST | `/api/signup` | Register new user |
-| GET | `/api/subscription/status` | Current tier, trial status, expiry |
-| POST | `/api/subscription/update` | Upgrade/downgrade plan |
-| POST | `/api/webhooks/razorpay` | Razorpay payment confirmed → activate tier |
-
-#### System
-
-| Method | Route | Description |
-|--------|-------|-------------|
-| GET | `/api/health` | API health check |
-| GET | `/api/live-market` | Live price feed |
-| GET | `/api/debug` | Debug info (engine PID, state dump) |
-
----
-
-### 6.4 Database Schema
-
-**12 Models** in PostgreSQL via Prisma ORM.
-
-#### Entity Relationship Overview
+### 8.4 Bot Lifecycle
 
 ```
-User
-  ├── Subscription (1:1)
-  ├── ExchangeApiKey[] (1:many — one per exchange)
-  ├── Bot[] (1:many)
-  │     ├── BotConfig (1:1)
-  │     ├── BotState (1:1)
-  │     ├── BotSession[] (1:many)
-  │     └── Trade[] (1:many)
-  │           └── PartialBooking[] (1:many)
-  ├── Account[] (NextAuth OAuth)
-  └── Session[] (NextAuth sessions)
+1. CREATE:    POST /api/bots/create
+              → Bot record in DB (status="stopped", isActive=false)
+
+2. CONFIGURE: POST /api/bots/config
+              → BotConfig record: mode, segment, capitalPerTrade, maxLossPct, etc.
+
+3. ACTIVATE:  POST /api/bots/toggle { botId, isActive: true }
+              a. Subscription gate check (free tier can't start live bots)
+              b. Exchange validation (live mode: test CoinDCX keys)
+              c. POST /api/set-bot-id to engine → adds to ENGINE_ACTIVE_BOTS
+              d. POST /api/set-config to engine → max_loss_pct, capital_per_trade
+              e. POST /api/set-mode if live → switches engine to live mode
+              f. createBotSession() in DB
+              g. Bot.isActive=true, status="running", startedAt=now
+
+4. TRADING:   Engine picks bot's segment, stamps trades with bot_id
+              bot-state GET syncs trades engine → Prisma every 10s (dashboard poll)
+
+5. DEACTIVATE: POST /api/bots/toggle { botId, isActive: false }
+              a. POST /api/remove-bot-id from engine
+              b. Live mode: POST /api/exit-all-live → close CoinDCX positions
+              c. Close Prisma trades (if exchange close succeeded)
+              d. closeBotSession() in DB
+              e. POST /api/set-mode paper (revert engine)
+              f. Bot.isActive=false, status="stopped", stoppedAt=now
 ```
 
-#### Model Details
+### 8.5 Auto Re-Registration
 
-**User**
-```
-id, email (unique), name, password (hashed), role (user|admin)
-referralCode, phone, createdAt, updatedAt
-```
-
-**Subscription**
-```
-id, userId (unique), tier (free|pro|ultra), status (trial|active|expired)
-coinScans (0=unlimited), trialEndsAt, currentPeriodEnd
-razorpayPaymentId, razorpayOrderId
-```
-
-**ExchangeApiKey**
-```
-id, userId, exchange (binance|coindcx)
-apiKey (AES-256-GCM encrypted), apiSecret (AES-256-GCM encrypted)
-encryptionIv (comma-separated key IV + secret IV)
-isActive, createdAt, updatedAt
-UNIQUE: (userId, exchange)
-```
-
-**Bot**
-```
-id, userId, name, exchange, status (running|stopped|paused|error)
-isActive, startedAt, stoppedAt, createdAt, updatedAt
-```
-
-**BotConfig**
-```
-id, botId (unique), mode (paper|live)
-capitalPerTrade, maxOpenTrades, slMultiplier, tpMultiplier, maxLossPct
-multiTargetEnabled, t1/t2/t3Multiplier, t1/t2BookPct
-coinList (JSON array), leverageTiers (JSON)
-```
-
-**BotState**
-```
-id, botId (unique), engineStatus (idle|running|error)
-lastCycleAt, cycleCount, cycleDurationMs
-coinStates (JSON: {SYMBOL: {regime, features, signal}})
-errorMessage, errorAt, updatedAt
-```
-
-**Trade**
-```
-id, botId, coin, position (long|short), regime, confidence, mode (paper|live)
-leverage, capital, quantity, entryPrice, currentPrice, exitPrice
-stopLoss, takeProfit, t1/t2/t3Price, t1/t2Hit (bool)
-trailingSl, trailingTp, trailingActive, trailSlCount
-activePnl, activePnlPercent, totalPnl, totalPnlPercent
-status (active|closed|cancelled), exitReason, exitPercent
-exchangeOrderId, exchangePositionId, sessionId
-entryTime, exitTime, createdAt, updatedAt
-```
-
-**BotSession**
-```
-id, botId, sessionIndex (0=legacy, 1=first run...)
-startedAt, endedAt, status (active|closed), mode (paper|live)
-totalTrades, closedTrades, winTrades
-totalPnl, roi (totalPnl/totalCapital×100), winRate (winTrades/closedTrades×100)
-maxDrawdown, bestTrade, worstTrade, totalCapital
-createdAt, updatedAt
-```
-
-**PartialBooking**
-```
-id, tradeId, target (T1|T2|T3)
-bookPercent, quantity, exitPrice, pnl, pnlPercent
-createdAt
-```
-
----
-
-### 6.5 Authentication & Authorization
-
-**Provider:** NextAuth.js v4 with JWT strategy.
-
-#### Auth Flow
-
-```
-User submits email + password
-  → /api/auth/[...nextauth]
-  → CredentialsProvider validates against Prisma User (bcrypt compare)
-  → JWT created with {id, email, name, role}
-  → Session cookie set (httpOnly, secure)
-  → Middleware checks session on every protected route
-```
-
-#### Authorization Levels
-
-| Role | Access |
-|------|--------|
-| `user` | Own bots, trades, sessions, account settings |
-| `admin` | All users' data, engine control, subscription management |
-
-#### Session in API Routes
+After engine restart, `ENGINE_ACTIVE_BOTS` is cleared (in-memory). On every `GET /api/bot-state`:
 
 ```typescript
-const session = await getServerSession(authOptions);
-if (!session?.user) return 401;
-const userId = (session.user as any).id;
-const isAdmin = (session.user as any).role === 'admin';
-// isAdmin bypasses userId filter — can see all data
+For each active bot in DB:
+  modeKey = bot's mode (live or paper)
+  engineData = already-fetched engine response for that mode
+
+  // Guard: skip ONLY if engine is unreachable (null)
+  // Do NOT skip if registered_bot_ids is empty — that's post-restart state
+  if engineDataByMode[modeKey] === null: skip   // engine unreachable
+  if engineDataByMode[modeKey] === undefined: skip  // not fetched
+
+  if bot.id NOT in registered_bot_ids:
+    POST /api/set-bot-id to engine  // re-register
+```
+
+This guard is critical: `registered_bot_ids=[]` (empty list) means the engine restarted and needs re-registration. `null` means engine is offline and we shouldn't attempt registration.
+
+For mixed-mode users (some bots live, some paper), both engines are fetched in parallel and re-registration is done per-engine.
+
+### 8.6 Trade Sync Flow
+
+Every `GET /api/bot-state` call:
+
+1. Determine engine mode (live/paper) based on user's active bots
+2. Fetch engine data from primary engine; if mixed modes, fetch both engines
+3. For each user bot with `startedAt` set:
+   - Pull engine tradebook trades matching bot's mode from cache
+   - Call `syncEngineTrades(botTrades, bot.id, bot.startedAt)` → upsert to Prisma Trade table
+4. Fetch user's trades from Prisma via `getUserTrades(userId)`
+5. Enrich with live engine data (unrealized P&L not stored in Prisma)
+
+### 8.7 BTC Confidence Display
+
+The dashboard displays BTC "confidence" as a 0–100 integer. BTC's raw HMM margin is near-zero (CHOP/high-volatility state conviction is low). Instead:
+
+```typescript
+// Regime string format: "1d=BULLISH(0.45) | 1h=BEARISH(0.32) | 15m=SIDEWAYS/CHOP(0.08)"
+const matches = regimeStr.match(/\(([\d.]+)\)/g)
+// Extract: [0.45, 0.32, 0.08]
+const avg = values.reduce((a, b) => a + b) / values.length
+return Math.round(avg * 100)   // → e.g. 28
+```
+
+Fallback chain: conviction → raw margin → 0.
+
+---
+
+## 9. Data Routing — End-to-End
+
+#### Engine → Dashboard (Read path)
+
+```
+Engine writes:          data/multi_bot_state.json
+                        data/tradebook.json
+                        data/segment_heatmap.json
+                        data/athena_decisions.json
+                        data/signal_broadcast.log
+
+bot-state/route.ts:    GET → engine /api/all (every dashboard poll)
+                        → Merge with Prisma trades
+                        → Return unified JSON to dashboard-client.tsx
+
+dashboard-client.tsx:   Renders BTC regime panel, coin heatmap,
+                        active trades list, segment heatmap cards,
+                        bot status cards, Athena decision feed
+```
+
+#### Trade Recording (Write path)
+
+```
+Engine:                 tradebook.open_trade() → data/tradebook.json
+
+bot-state/route.ts:    syncEngineTrades() → Prisma Trade.upsert()
+                        (keyed by trade_id field)
+
+dashboard-client.tsx:   Displays from Prisma (via getUserTrades)
+                        Active trades show unrealized P&L from engine
+```
+
+#### Bot Registration Flow
+
+```
+User clicks "Start":   bots/toggle POST → validates subscription
+                        → engine /api/set-bot-id (adds to ENGINE_ACTIVE_BOTS)
+                        → engine /api/set-config (max_loss, capital)
+                        → DB: bot.isActive=true
+
+Engine _tick():        reads config.ENGINE_ACTIVE_BOTS
+                        → scans segment for each bot
+                        → stamps trades with bot_id
+
+bot-state GET:         checks registered_bot_ids from engine response
+                        → if bot missing: auto re-register
+```
+
+#### Cycle Snapshot (Audit path)
+
+```
+After each _tick():    Engine POSTs to dashboard /api/cycle-snapshot
+                        → Prisma CycleSnapshot, CoinScanResult, SegmentHeatmapEntry
+                        (background thread, non-blocking, 10s timeout)
 ```
 
 ---
 
-### 6.6 Subscription System
-
-#### Tiers
-
-| Tier | Coin Scans | Price | Features |
-|------|-----------|-------|---------|
-| **Free** | 0 (trial) | $0 | 7-day trial, limited coins |
-| **Pro** | 15 | $X/mo | Multi-coin, paper trading |
-| **Ultra** | 50 (unlimited) | $XX/mo | All features, live trading |
-
-#### Payment Flow (Razorpay)
-
-```
-User clicks Upgrade → /pricing
-  → Creates Razorpay order → returns order_id
-  → User completes payment in Razorpay checkout
-  → Razorpay sends webhook to /api/webhooks/razorpay
-  → Verify signature (HMAC-SHA256)
-  → Update subscription.tier + status + currentPeriodEnd in Prisma
-  → Send confirmation email
-```
-
----
-
-### 6.7 Exchange API Key Management
-
-#### Security Model
-
-API keys are never stored in plaintext. Full encryption pipeline:
-
-```
-User enters key + secret in browser
-  → POST /api/settings/api-keys (HTTPS)
-  → Server: encryptApiKeys(key, secret) using AES-256-GCM
-      ├── Generate random 16-byte IV for key
-      ├── Generate random 16-byte IV for secret
-      ├── Encrypt: ciphertext + auth_tag
-      └── Store: {apiKey, apiSecret, encryptionIv} in ExchangeApiKey table
-
-Decryption (for wallet-balance / exchange validation):
-  → Fetch ExchangeApiKey from DB
-  → decryptApiKeys(encApiKey, encApiSecret, encryptionIv)
-  → Use decrypted keys for single API call
-  → Never log or return raw keys to client
-```
-
-**ENCRYPTION_KEY** must be set as a 64-character hex string in Railway env vars. Never change it after keys are stored — all stored keys become unreadable.
-
----
-
-### 6.8 Bot Session Lifecycle
-
-A **BotSession** captures one complete bot run (start → stop) as a discrete record with aggregated metrics.
-
-#### Session States
-
-```
-Bot START button clicked
-  → createBotSession(botId, mode)
-  → BotSession: {status: "active", sessionIndex: N, startedAt: now}
-  → syncEngineTrades() tags new trades with sessionId
-
-Bot STOP button clicked
-  → closeBotSession(botId)
-  → Close open paper trades: {status: "closed", exitReason: "BOT_STOPPED"}
-  → For live trades: POST ENGINE_API_URL/api/close-all
-  → Compute metrics: totalPnl, roi, winRate, maxDrawdown, bestTrade, worstTrade
-  → BotSession: {status: "closed", endedAt: now, ...metrics}
-```
-
-#### Session Metrics Formula
-
-```
-ROI (%) = totalPnl / totalCapital × 100
-totalCapital = Σ(trade.capital) for all trades in session
-winRate (%) = winTrades / closedTrades × 100
-winTrades = trades where totalPnl > 0
-```
-
-#### Legacy Session (Session 0)
-
-For trades created before session tracking was introduced:
-```
-POST /api/sessions/backfill (admin only)
-  → Creates BotSession {sessionIndex: 0, status: "closed"}
-  → Tags all untagged trades with this sessionId
-  → Computes metrics from historical trade data
-```
-
----
-
-## 7. Data Flow & Integration
-
-### Trade Sync: Engine → Dashboard
-
-The Python engine writes to `tradebook.json`. The Next.js dashboard syncs this into PostgreSQL on every `/api/trades` request:
-
-```
-1. GET /api/trades (Next.js API route)
-   │
-   ├─ Find userBot in Prisma (Bot where userId = session.user.id)
-   │
-   ├─ If userBot.startedAt is set:
-   │    │
-   │    ├─ Fetch engine trades from ENGINE_API_URL/api/trades
-   │    │
-   │    └─ syncEngineTrades(engineTrades, botId, botStartedAt)
-   │          ├─ DELETE trades where entryTime < botStartedAt (purge stale)
-   │          └─ UPSERT each engine trade into Prisma Trade table
-   │               └─ Tag with sessionId = active BotSession
-   │
-   └─ Return trades from Prisma (source of truth)
-```
-
-### Live Bot State: Engine → Dashboard
-
-```
-Dashboard polls GET /api/bot-state every 10 seconds
-  → Fetches from ENGINE_API_URL/api/bot-state
-  → Falls back to Prisma BotState if engine unreachable
-  → Returns: {coinStates, activeTrades, engineStatus, lastCycleAt}
-```
-
-### Commands: Dashboard → Engine
-
-```
-User clicks START / STOP / KILL in dashboard
-  → POST /api/bots/toggle or /api/bots/kill
-  → Writes JSON to data/commands.json:
-       {"command": "STOP", "timestamp": "2026-03-07T10:00:00+05:30"}
-  → Python bot reads commands.json on every 30-second heartbeat
-  → Executes command: start analysis, stop loop, close positions
-```
-
----
-
-## 8. Backtesting & Experimentation
-
-### Methodology
-
-All backtests use **walk-forward validation** (not in-sample):
-- Train on 80% of data
-- Test on remaining 20%
-- Roll forward window
-- Report average Sharpe, IC, win rate across all windows
-
-### Experiment Results Summary
-
-| Experiment | File | Key Finding |
-|-----------|------|------------|
-| 3-state calibration | `experiment_3state_calibration.py` | 3-state Sharpe 1.22 > 4-state 0.72 |
-| Feature selection | `experiment_features_weights.py` | 6-feature set optimal (Sharpe 0.667) |
-| S/R 4h IC test | `experiment_sr_4h_ic.py` | IC = -0.010, t = -0.81 (not significant) |
-| 100-coin evaluation | `backtest_fronttest_100coins.py` | Generated coin_tiers.csv |
-| Model comparison | `backtest_compare.py` | v1 vs v2 head-to-head |
-
-### Coin Tier Generation
-
-```
-tools/experiment_3state_calibration.py
-  → Fetches 1 year of OHLCV for 100 coins
-  → Runs HMM + conviction system on each
-  → Walk-forward Sharpe per coin
-  → Outputs data/coin_tiers.csv
-       Tier A: Sharpe ≥ 1.0
-       Tier B: Sharpe 0.5–1.0
-       Tier C: Sharpe < 0.5
-```
-
-### Running a Backtest
-
-```bash
-# Historical backtest (single coin, 1 year)
-python tools/backtest_historical.py --coin BTC --days 365
-
-# 100-coin walk-forward evaluation
-python tools/backtest_fronttest_100coins.py
-
-# Compare two model versions
-python tools/backtest_compare.py --v1 baseline --v2 6features
-
-# Sentiment backtester
-python sentiment_backtester.py --coin BTC --days 30
-```
-
----
-
-## 9. Deployment & Infrastructure
-
-### Docker Build
-
-Multi-stage build combining Python 3.11 + Node.js 20:
-
-```dockerfile
-Stage 1 (deps): Install Python requirements + Node modules
-Stage 2 (builder): npx prisma generate + next build
-Stage 3 (runner): Copy built app, expose port 3000
-
-Startup: start.sh
-  → npx next start -p 3000  (dashboard)
-  → Python bot spawned via dashboard UI (not started at boot)
-```
-
-### Railway Deployment
-
-```
-Service: sentinel-saas (Next.js + Python)
-  Port: 3000 (Next.js)
-  Build: Dockerfile in sentinel-saas/nextjs_space/
-  Start: npx next start -p 8080
-
-Database: Railway PostgreSQL plugin
-  → DATABASE_URL automatically injected
-
-Auto-deploy: On every git push to main branch
-```
-
-### Required Environment Variables
-
-| Variable | Purpose | Where to Set |
-|----------|---------|-------------|
-| `DATABASE_URL` | PostgreSQL connection string | Railway (auto-set) |
-| `NEXTAUTH_SECRET` | JWT signing key (random 32+ chars) | Railway |
-| `NEXTAUTH_URL` | App URL (https://your-app.railway.app) | Railway |
-| `ENCRYPTION_KEY` | AES-256-GCM key for API key storage (64-char hex) | Railway |
-| `ENGINE_API_URL` | URL to Python Flask API | Railway |
-| `BINANCE_API_KEY` | Binance API (paper trade) | Railway |
-| `BINANCE_API_SECRET` | Binance API secret | Railway |
-| `COINDCX_API_KEY` | CoinDCX API (live trade) | Railway |
-| `COINDCX_API_SECRET` | CoinDCX API secret | Railway |
-| `TELEGRAM_BOT_TOKEN` | Telegram alerts | Railway |
-| `TELEGRAM_CHAT_ID` | Telegram chat ID | Railway |
-| `RAZORPAY_KEY_ID` | Payment gateway | Railway |
-| `RAZORPAY_KEY_SECRET` | Payment gateway secret | Railway |
-| `RAZORPAY_WEBHOOK_SECRET` | Webhook signature validation | Railway |
-
-### DigitalOcean Alternative (DEPLOY.md)
-
-```bash
-# Ubuntu 24.04 Droplet
-apt install docker.io docker-compose nginx certbot
-
-# Clone repo + set .env
-docker-compose up -d
-
-# SSL with Let's Encrypt
-certbot --nginx -d yourdomain.com
-```
-
-### Database Migrations
-
-```bash
-cd sentinel-saas/nextjs_space
-
-# Development (destructive reset allowed)
-npx prisma db push --accept-data-loss
-
-# Production (tracked migrations)
-npx prisma migrate dev --name add_bot_sessions
-npx prisma generate
-```
-
----
-
-## 10. Testing
-
-### Unit Test Suite
-
-**File:** `tests/test_unit.py`
-**Total:** 140 tests — all passing
-**Policy:** No real API calls — all external dependencies mocked
-
-```bash
-python -m pytest tests/test_unit.py -v --tb=short
-```
-
-### Test Coverage by Module
-
-| Class | Tests | Coverage |
-|-------|-------|---------|
-| `TestConfigNewConstants` | 9 | Config values, env var loading |
-| `TestRiskManagerScoring` | 50 | Conviction formula, all 8 factors, leverage bands |
-| `TestExecutionEngineUnit` | 16 | Order logic, multi-target booking, trailing SL |
-| `TestDataPipelineUnit` | 7 | OHLCV fetch (mocked), fallback logic |
-| `TestSentimentSourcesUnit` | 6 | API mocking (CryptoPanic, RSS, Fear & Greed) |
-| `TestFeatureEngineUnit` | 8 | RSI, ATR, VWAP calculations |
-| `TestSentimentEngineUnit` | 8 | Sentiment aggregation, VADER integration |
-| `TestHMMBrainUnit` | 16 | Training, regime prediction, confidence, retrain |
-| `TestCoinScannerUnit` | 7 | Tier filtering, coin ordering |
+## 10. Deployment & Infrastructure
+
+**Platform:** Railway (Docker containers)
+
+**Engine service:** `engine_api.py` is the Flask entrypoint. `main.py` (RegimeMasterBot) runs in a background thread started at Flask app init.
+
+**SaaS service:** NextJS app in `sentinel-saas/nextjs_space/`.
+
+**Two-engine setup:** Separate Railway services for paper and live trading. Environment variable `ENGINE_URL_PAPER` and `ENGINE_URL_LIVE` control which engine each user's bots connect to (set in Railway env vars for the NextJS service).
+
+**Auto-restart:** Engine thread has 5-retry exponential backoff + infinite recovery loop. SIGTERM handler ensures graceful shutdown on Railway redeploy.
+
+**Key environment variables:**
+
+| Variable | Service | Purpose |
+|----------|---------|---------|
+| `BINANCE_API_KEY/SECRET` | Engine | Paper trading data |
+| `COINDCX_API_KEY/SECRET` | Engine | Live order execution |
+| `GEMINI_API_KEY` | Engine | Athena LLM |
+| `ENGINE_API_SECRET` | Engine | Bearer token auth for all engine endpoints |
+| `ALLOW_LIVE_TRADING` | Engine | Safety guard; must be `true` to enable live mode |
+| `PAPER_TRADE` | Engine | Default mode (overridden at runtime by set-mode) |
+| `ENGINE_BOT_ID` | Engine | Default bot ID (overridden by set-bot-id) |
+| `ENGINE_BOT_NAME` | Engine | Default bot name |
+| `DATABASE_URL` | SaaS | PostgreSQL connection string |
+| `NEXTAUTH_SECRET` | SaaS | Session encryption |
+| `ENGINE_URL_PAPER` | SaaS | Paper engine Flask URL |
+| `ENGINE_URL_LIVE` | SaaS | Live engine Flask URL |
+| `ORCHESTRATOR_URL` | SaaS | Orchestrator service URL (default http://localhost:5000) |
+| `ENGINE_INTERNAL_SECRET` | SaaS/Engine | Secret for cycle-snapshot POST auth |
+| `TELEGRAM_BOT_TOKEN/CHAT_ID` | Engine | Telegram alerts (TELEGRAM_ENABLED=False by default) |
 
 ---
 
 ## 11. Configuration Reference
 
-### Key Config Values (`config.py`)
+Key parameters from `config.py` and their effect:
 
-#### HMM
+#### Trading Loop
 
-```python
-HMM_N_STATES = 3           # Bull, Chop, Bear
-HMM_COVARIANCE = "full"    # Full covariance matrix
-HMM_ITERATIONS = 100       # EM iterations
-HMM_LOOKBACK = 250         # Training candles (15m)
-HMM_RETRAIN_HOURS = 24     # Retrain frequency
-```
+| Parameter | Default | Effect |
+|-----------|---------|--------|
+| `LOOP_INTERVAL_SECONDS` | 10 | Heartbeat interval |
+| `ANALYSIS_INTERVAL_SECONDS` | 900 | Full analysis cycle (15 minutes) |
+| `SCAN_INTERVAL_CYCLES` | 4 | Rebuild coin pool every N cycles (1 hour) |
+| `TOP_COINS_LIMIT` | 50 | Max coins in scan pool |
+| `MAX_CONCURRENT_POSITIONS` | 10 | Max simultaneous open positions |
 
-#### Bot Loop
+#### Multi-TF HMM
 
-```python
-LOOP_INTERVAL_SECONDS = 30      # Heartbeat
-ANALYSIS_INTERVAL_SECONDS = 300 # Full cycle (5 min)
-ERROR_RETRY_SECONDS = 60        # Error retry
-```
+| Parameter | Default | Effect |
+|-----------|---------|--------|
+| `MULTI_TF_ENABLED` | True | Use 3-TF aggregation (disable for legacy 1H-only) |
+| `MULTI_TF_TIMEFRAMES` | ["1d","1h","15m"] | Timeframes per coin |
+| `MULTI_TF_CANDLE_LIMIT` | 300 | Candles fetched per TF |
+| `MULTI_TF_WEIGHTS` | {1d:40, 1h:35, 15m:25} | Conviction weighting |
+| `MULTI_TF_MIN_AGREEMENT` | 2 | Minimum TFs agreeing to produce signal |
+| `HMM_N_STATES` | 3 | Bull/Bear/Chop (4-state CRASH removed — merged into BEAR) |
+| `HMM_RETRAIN_HOURS` | 24 | Model retraining frequency |
 
-#### Multi-Coin
+#### Segment Scanner
 
-```python
-MAX_CONCURRENT_POSITIONS = 15   # Max open trades
-TOP_COINS_LIMIT = 25            # Coins to scan
-CAPITAL_PER_COIN_PCT = 0.05     # 5% of balance per coin
-SCAN_INTERVAL_CYCLES = 4        # Re-scan every 20 min
-```
+| Parameter | Default | Effect |
+|-----------|---------|--------|
+| `SCANNER_SEGMENT_ROTATION` | True | Enable 15-min block rotation |
+| `SEGMENT_SCAN_LIMIT` | 3 | Top N segments selected by heatmap |
+| `SCANNER_COINS_PER_SEGMENT` | 5 | Max coins per segment in shortlist |
+| `MAX_ACTIVE_PER_SEGMENT` | 1 | Correlation control |
 
-#### Risk
+#### Conviction & Deploy
 
-```python
-RISK_PER_TRADE = 0.04           # 4% balance at risk per trade
-KILL_SWITCH_DRAWDOWN = 0.10     # 10% 24h drawdown → stop
-MAX_LOSS_PER_TRADE_PCT = -15    # Hard max-loss per trade
-MIN_HOLD_MINUTES = 30           # Min hold before regime exit
-```
+| Parameter | Default | Effect |
+|-----------|---------|--------|
+| `MIN_CONVICTION_FOR_DEPLOY` | 60 | Gate before Athena call |
+| `TOP_COINS_PER_SEGMENT` | 1 | Athena evaluates top N per segment per bot |
+| `CONVICTION_WEIGHT_HMM` | 71 | HMM factor weight (out of 100) |
+| `CONVICTION_WEIGHT_FUNDING` | 11 | Funding rate factor weight |
+| `CONVICTION_WEIGHT_OI` | 11 | OI change factor weight |
+| `CONVICTION_WEIGHT_BTC_MACRO` | 7 | BTC macro alignment factor |
 
-#### Multi-Target
+#### Athena
 
-```python
-MT_RR_RATIO = 5                 # Risk : T3 = 1:5
-MT_T1_FRAC = 0.333              # T1 at 33.3% of T3 distance
-MT_T2_FRAC = 0.666              # T2 at 66.6% of T3 distance
-MT_T1_BOOK_PCT = 0.25           # Book 25% at T1
-MT_T2_BOOK_PCT = 0.50           # Book 50% of remaining at T2
-```
+| Parameter | Default | Effect |
+|-----------|---------|--------|
+| `LLM_REASONING_ENABLED` | True | Enable Athena layer |
+| `LLM_MODEL` | gemini-2.5-flash | Gemini model |
+| `LLM_CACHE_MINUTES` | 10 | Cache decision per coin |
+| `LLM_MAX_CALLS_PER_CYCLE` | 5 | Rate limit per analysis cycle |
+| `LLM_VETO_THRESHOLD` | 0.30 | Confidence below this → auto-VETO |
+| `LLM_TIMEOUT_SECONDS` | 30 | API call timeout |
 
-#### Trailing SL
+#### Risk / Exit
 
-```python
-TRAILING_SL_ENABLED = True
-TRAILING_SL_ACTIVATION_ATR = 1.0  # Activate after 1×ATR move in favor
-TRAILING_SL_DISTANCE_ATR = 1.0    # Trail 1×ATR behind peak
-```
+| Parameter | Default | Effect |
+|-----------|---------|--------|
+| `CAPITAL_PER_TRADE` | 100 | USD per trade (fixed) |
+| `MAX_LOSS_PER_TRADE_PCT` | -35 | Hard stop (leveraged P&L%) |
+| `TRAILING_SL_ENABLED` | True | Enable stepped profit lock |
+| `TRAILING_SL_STEPS` | 10-step ladder | First step: +5% trigger → breakeven |
+| `EXECUTION_ESCAPE_ATR` | 2.0 | Cancel pending limit if price moves >2 ATR |
+| `EXECUTION_TIF_MINUTES` | 60 | Pending limit order lifetime |
+| `EXECUTION_ATR_PULLBACK` | True | Place limit at 20-EMA instead of market |
+| `EXECUTION_DYNAMIC_LEVERAGE` | True | ATR%-based leverage (overrides conviction tiers) |
+| `EXECUTION_MAX_LEVERAGE` | 25 | Dynamic leverage ceiling |
+| `EXECUTION_MIN_LEVERAGE` | 10 | Dynamic leverage floor |
 
-#### Sentiment
+#### Disabled Features (in config, not active)
 
-```python
-SENTIMENT_ENABLED = True
-SENTIMENT_CACHE_MINUTES = 15   # Cache per-coin results
-SENTIMENT_WINDOW_HOURS = 4     # Lookback window
-SENTIMENT_MIN_ARTICLES = 3     # Min articles for valid score
-```
-
----
-
-## 12. Glossary
-
-| Term | Definition |
-|------|-----------|
-| **HMM** | Hidden Markov Model — probabilistic sequence model for regime classification |
-| **Gaussian HMM** | HMM where observations follow Gaussian (normal) distributions per state |
-| **Regime** | Market state: BULL (uptrend), CHOP (sideways), BEAR (downtrend) |
-| **Margin Confidence** | `best_prob - 2nd_best_prob` — how decisive the HMM prediction is |
-| **Conviction Score** | 0–100 composite score gating trade entry and determining leverage |
-| **Leverage Band** | Leverage level (0x/10x/15x/25x/35x) mapped from conviction score |
-| **T1 / T2 / T3** | Partial take-profit targets — 25% / 50% / remainder of position |
-| **Trailing SL** | Stop-loss that moves with price peak, never backward |
-| **ATR** | Average True Range — measure of volatility (price range per bar) |
-| **Kill Switch** | Portfolio-level circuit breaker (10% drawdown in 24h → all positions closed) |
-| **Coin Tier** | Classification A (trade) / B (monitor) / C (avoid) by walk-forward Sharpe |
-| **VWAP** | Volume-Weighted Average Price — intraday fair value |
-| **Funding Rate** | Periodic payment between long/short holders in perpetual futures |
-| **Open Interest (OI)** | Total outstanding contracts — rising OI confirms directional conviction |
-| **Order Flow** | Taker buy/sell imbalance — who is aggressing the book |
-| **Cumulative Delta** | Running sum of (buy volume - sell volume) |
-| **BotSession** | One complete bot run (start → stop) with aggregated performance metrics |
-| **ROI** | `totalPnl / totalCapital × 100` — return on capital deployed |
-| **IC** | Information Coefficient — correlation between signal and forward return |
-| **Walk-Forward** | Out-of-sample backtesting: train on past, test on future, roll window |
-| **Paper Trade** | Simulated trade on testnet — no real money, used by SaaS users |
-| **Live Trade** | Real futures trade on CoinDCX with actual capital |
-| **Isolated Margin** | Position margin isolated from rest of account — limits loss to trade capital |
-| **AES-256-GCM** | Military-grade authenticated encryption used for API key storage |
-| **Prisma** | TypeScript ORM (Object-Relational Mapper) for PostgreSQL |
-| **NextAuth** | Authentication library for Next.js — handles JWT sessions |
-| **Engine API** | Flask REST server bridging Python bot ↔ Next.js dashboard |
-| **syncEngineTrades** | Function that syncs tradebook.json → PostgreSQL Trade table |
-| **ENCRYPTION_KEY** | 64-char hex env var used as AES-256-GCM key for API key encryption |
+| Feature | Status | Config flag |
+|---------|--------|------------|
+| Sentiment Engine (FinBERT/VADER) | DISABLED | `SENTIMENT_ENABLED=False` |
+| Order Flow Engine (L2 depth) | DISABLED | `ORDERFLOW_ENABLED=False` |
+| Multi-Target Partial Profit | DISABLED | `MULTI_TARGET_ENABLED=False` |
+| Weekend Skip | DISABLED | `WEEKEND_SKIP_ENABLED=False` |
+| Regime-Change Exits | DISABLED | Code in `_check_exits()` is a no-op |
 
 ---
 
-*Document generated: March 2026*
-*Project: Regime-Master (HMMBOT) | GitHub: https://github.com/nikhildha/Synapticbots*
+## Prisma Database Schema Summary
+
+| Model | Key Fields | Purpose |
+|-------|-----------|---------|
+| `User` | id, email, password, role | User accounts |
+| `Subscription` | userId, tier, status, trialEndsAt | Subscription gating |
+| `ExchangeApiKey` | userId, exchange, apiKey (encrypted) | Per-user exchange credentials |
+| `Bot` | userId, name, exchange, isActive, startedAt | Bot instances |
+| `BotConfig` | botId, mode, capitalPerTrade, maxLossPct, segment, brainType | Bot settings |
+| `BotState` | botId, engineStatus, lastCycleAt, coinStates | Engine state mirror |
+| `BotSession` | botId, startedAt, endedAt, totalTrades, totalPnl | Trading session records |
+| `Trade` | botId, coin, position, entryPrice, stopLoss, takeProfit, status, totalPnl | Individual trades |
+| `PartialBooking` | tradeId, target, exitPrice, pnl | Partial profit bookings |
+| `CycleSnapshot` | cycleNumber, btcRegime, coinsScanned, deployedCount | Per-cycle audit records |
+| `CoinScanResult` | cycleId, symbol, regime, conviction, deployStatus | Per-coin scan results |
+| `SegmentHeatmapEntry` | cycleId, segment, compositeScore, isSelected | Heatmap per cycle |
+
+**Trade field `bot_id`** (snake_case in engine JSON) maps to Prisma `Trade.botId` during sync. The sync key is `trade_id` (engine) → matched against existing Prisma records for upsert.

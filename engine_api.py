@@ -185,6 +185,33 @@ def _clear_stale_pause():
 
 _clear_stale_pause()
 
+# ── Startup: load persistent active bots ─────────────────────────────
+ACTIVE_BOTS_FILE = os.path.join(config.DATA_DIR, "active_bots.json")
+
+def _load_active_bots():
+    """Load persistent active bots from disk on startup."""
+    try:
+        if os.path.exists(ACTIVE_BOTS_FILE):
+            with open(ACTIVE_BOTS_FILE, "r") as f:
+                bots = json.load(f)
+                if isinstance(bots, list):
+                    config.ENGINE_ACTIVE_BOTS = bots
+                    if bots:
+                        config.ENGINE_BOT_ID = bots[-1].get("bot_id", "")
+                    logger.info("🔄 Loaded %d active bots from persistent storage.", len(bots))
+    except Exception as e:
+        logger.warning("Startup: could not load active_bots.json: %s", e)
+
+def _save_active_bots():
+    """Save active bots to disk."""
+    try:
+        with open(ACTIVE_BOTS_FILE, "w") as f:
+            json.dump(config.ENGINE_ACTIVE_BOTS, f, indent=2)
+    except Exception as e:
+        logger.error("Failed to save active_bots.json: %s", e)
+
+_load_active_bots()
+
 # ── Startup diagnostics: verify mode ─────────────────────────────────
 logger.info(
     "🔧 ENGINE MODE DIAGNOSTIC: PAPER_TRADE env=%s | config.PAPER_TRADE=%s | EXCHANGE_LIVE=%s",
@@ -832,6 +859,7 @@ def api_set_bot_id():
         "user_id": user_id or config.ENGINE_USER_ID,
         "segment_filter": segment_filter,
     })
+    _save_active_bots()
 
     logger.info(
         "🔑 Bot added: %s (%s) → active_bots=%d (user: %s) segment=%s",
@@ -866,6 +894,7 @@ def api_remove_bot_id():
     # If removed bot was the current ENGINE_BOT_ID, switch to first remaining
     if config.ENGINE_BOT_ID == bot_id:
         config.ENGINE_BOT_ID = config.ENGINE_ACTIVE_BOTS[0]["bot_id"] if config.ENGINE_ACTIVE_BOTS else ""
+    _save_active_bots()
 
     logger.info("🔑 Bot removed: %s (%d → %d active)", bot_id, before, after)
 
