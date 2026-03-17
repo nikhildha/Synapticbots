@@ -128,7 +128,20 @@ class AthenaEngine:
         self._cycle_call_count = 0
         self._cycle_start = 0.0
         self._initialized = False
-        self._decision_log = []  # In-memory log (last 50)
+        self._decision_log = self._load_decision_log()  # Persisted across restarts
+
+    def _load_decision_log(self) -> list:
+        """Load persisted decision log from disk on startup."""
+        try:
+            log_path = config.LLM_LOG_FILE
+            if os.path.exists(log_path):
+                with open(log_path, "r") as f:
+                    entries = json.loads(f.read())
+                if isinstance(entries, list):
+                    return entries[-50:]
+        except Exception:
+            pass
+        return []
 
     def _ensure_initialized(self):
         """Lazy-init the Gemini REST client."""
