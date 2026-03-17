@@ -571,7 +571,8 @@ class RegimeMasterBot:
 
 
         # ── 5. Deploy: Top HMM coin per segment → Athena final call ────────────────
-        # raw_results already sorted by conviction (desc)
+        # Sort by conviction desc so top_coins[:N] picks highest-conviction coin per segment
+        raw_results.sort(key=lambda r: r.get("conviction", 0), reverse=True)
         # For each registered segment bot:
         #   1. Find the best HMM coin in that bot's segment from raw_results
         #   2. Skip if bot already has that coin open (duplicate check)
