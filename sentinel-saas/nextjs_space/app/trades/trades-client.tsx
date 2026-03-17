@@ -245,7 +245,7 @@ export function TradesClient({ trades: initialTrades }: TradesClientProps) {
       } catch { /* silent — keep last known prices */ }
     }
     fetchLivePrices();
-    const timer = setInterval(fetchLivePrices, 3000);
+    const timer = setInterval(fetchLivePrices, 1000);
     return () => clearInterval(timer);
   }, [trades]);
 
