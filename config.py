@@ -24,7 +24,7 @@ COINDCX_API_SECRET = os.getenv("COINDCX_API_SECRET", "")
 COINDCX_BASE_URL = "https://api.coindcx.com"
 COINDCX_PUBLIC_URL = "https://public.coindcx.com"
 COINDCX_MARGIN_CURRENCY = os.getenv("COINDCX_MARGIN_CURRENCY", "USDT")
-EXCHANGE_LIVE = os.getenv("EXCHANGE_LIVE", "")  # "coindcx" or "binance"
+EXCHANGE_LIVE = os.getenv("EXCHANGE_LIVE", "coindcx")  # "coindcx" (default) or "binance"
 BINANCE_FUTURES_TESTNET = os.getenv("BINANCE_FUTURES_TESTNET", "true").lower() == "true"
 
 # ─── Exchange Fees ──────────────────────────────────────────────────────────────
