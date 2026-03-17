@@ -1121,6 +1121,7 @@ def api_force_signal():
         bot_id = (config.ENGINE_ACTIVE_BOTS[0]["bot_id"]
                   if config.ENGINE_ACTIVE_BOTS else config.ENGINE_BOT_ID)
 
+        import coindcx_client as _cdx
         trade_id = tb.open_trade(
             symbol=symbol,
             side=side,
@@ -1134,6 +1135,7 @@ def api_force_signal():
             capital=result.get("capital", capital),
             bot_id=bot_id,
             exchange=result.get("exchange", "coindcx" if not config.PAPER_TRADE else "paper"),
+            pair=result.get("pair") or _cdx.to_coindcx_pair(symbol),
             mode=result.get("mode", "LIVE" if not config.PAPER_TRADE else "PAPER"),
             position_id=result.get("position_id"),
         )
