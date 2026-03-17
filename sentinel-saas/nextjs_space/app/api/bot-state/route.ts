@@ -80,50 +80,68 @@ export async function GET() {
             ),
         };
 
-        // ─── Auto-Re-Registration: re-push bots if engine restarted ─────────
-        // Engine restart clears ENGINE_ACTIVE_BOTS in memory. Any active DB bot
-        // not in registered_bot_ids needs to be re-pushed via /api/set-bot-id.
+        // ─── Auto-Re-Registration: re-push ALL BOTS if engine restarted ─────
+        // Engine restart clears ENGINE_ACTIVE_BOTS in memory. If ANY bot is missing,
+        // we proactively fetch all active bots from the DB and push them back.
+        // This ensures non-admin bots are not orphaned when an admin connects first!
         if (userId && userBots.length > 0) {
-            const activeBots = userBots.filter((b: any) => b.isActive);
-            for (const ub of activeBots) {
+            const activeUserBots = userBots.filter((b: any) => b.isActive);
+            let needsSync = false;
+            
+            for (const ub of activeUserBots) {
                 const botMode = ((ub.config as any)?.mode || 'paper').toLowerCase();
                 const modeKey = botMode.startsWith('live') ? 'live' : 'paper';
-                const reRegUrl = getEngineUrl(modeKey as EngineMode);
-                if (!reRegUrl) continue;
-                // Skip only if the engine is UNREACHABLE (null response) — NOT if it
-                // responded with an empty registered_bot_ids (that's exactly the post-
-                // restart state where re-registration is needed).
-                if (engineDataByMode[modeKey] === undefined) continue; // engine not fetched for this mode
-                if (engineDataByMode[modeKey] === null) continue;      // engine unreachable
-                if (!registeredByMode[modeKey].has(ub.id)) {
-                    console.log(`[bot-state] Re-registering bot ${ub.id} (${ub.name}) — not in ${modeKey} engine active list (engine may have restarted)`);
-                    try {
-                        await fetch(`${reRegUrl}/api/set-bot-id`, {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({
-                                bot_id: ub.id,
-                                bot_name: ub.name,
-                                user_id: userId,
-                                brain_type: (ub.config as any)?.brainType || 'adaptive',
-                                segment_filter: (ub.config as any)?.segment || 'ALL',
-                            }),
-                            signal: AbortSignal.timeout(5000),
-                        });
-                        // Also restore risk config — engine restart resets CAPITAL_PER_TRADE
-                        // to the config.py default ($100). Without this, every restart ignores
-                        // the user's configured capitalPerTrade setting.
-                        await fetch(`${reRegUrl}/api/set-config`, {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({
-                                capital_per_trade: (ub.config as any)?.capitalPerTrade ?? 100,
-                                max_loss_pct:      (ub.config as any)?.maxLossPct ?? -15,
-                            }),
-                            signal: AbortSignal.timeout(5000),
-                        });
-                    } catch (e) {
-                        console.warn(`[bot-state] Re-registration failed for bot ${ub.id}:`, e);
+                if (engineDataByMode[modeKey] !== null && engineDataByMode[modeKey] !== undefined && !registeredByMode[modeKey].has(ub.id)) {
+                    needsSync = true;
+                    break;
+                }
+            }
+
+            if (needsSync) {
+                console.log(`[bot-state] Engine missing bots. Re-registering ALL active bots for ALL users.`);
+                const allActiveBots = await prisma.bot.findMany({ where: { isActive: true } });
+                for (const ubRaw of allActiveBots) {
+                    const ub: any = ubRaw;
+                    const botMode = (ub.config?.mode || 'paper').toLowerCase();
+                    const modeKey = botMode.startsWith('live') ? 'live' : 'paper';
+                    const reRegUrl = getEngineUrl(modeKey as EngineMode);
+                    if (!reRegUrl) continue;
+                    if (engineDataByMode[modeKey] === undefined) continue;
+                    if (engineDataByMode[modeKey] === null) continue;
+                    
+                    if (!registeredByMode[modeKey].has(ub.id)) {
+                        console.log(`[bot-state] Restoring orphaned bot ${ub.id} (${ub.name}) for user ${ub.userId} to ${modeKey} engine.`);
+                        try {
+                            const apiSecret = process.env.ENGINE_API_SECRET || '';
+                            const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+                            if (apiSecret) headers['Authorization'] = `Bearer ${apiSecret}`;
+                            
+                            await fetch(`${reRegUrl}/api/set-bot-id`, {
+                                method: 'POST',
+                                headers,
+                                body: JSON.stringify({
+                                    bot_id: ub.id,
+                                    bot_name: ub.name,
+                                    user_id: ub.userId,
+                                    brain_type: ub.config?.brainType || 'adaptive',
+                                    segment_filter: ub.config?.segment || 'ALL',
+                                }),
+                                signal: AbortSignal.timeout(5000),
+                            });
+                            await fetch(`${reRegUrl}/api/set-config`, {
+                                method: 'POST',
+                                headers,
+                                body: JSON.stringify({
+                                    capital_per_trade: ub.config?.capitalPerTrade ?? 100,
+                                    max_loss_pct:      ub.config?.maxLossPct ?? -15,
+                                }),
+                                signal: AbortSignal.timeout(5000),
+                            });
+                            // Mark as registered so we don't duplicate logic
+                            registeredByMode[modeKey].add(ub.id);
+                        } catch (e) {
+                            console.warn(`[bot-state] Re-registration failed for bot ${ub.id}:`, e);
+                        }
                     }
                 }
             }
