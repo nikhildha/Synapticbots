@@ -529,8 +529,8 @@ class RegimeMasterBot:
         # BTCUSDT is the macro regime reference for every coin's conviction score.
         # It must be analyzed on EVERY cycle regardless of which batch rotation is active.
         scan_symbols = symbols if "BTCUSDT" in symbols else ["BTCUSDT"] + list(symbols)
-        logger.info("📡 Scanning %d coins | active tradebook keys: %d",
-                    len(scan_symbols), len(tradebook_active_keys))
+        logger.info("📡 Scanning %d coins | active global symbols: %d",
+                    len(scan_symbols), len(active_symbols))
 
         # ── 4b. Macro Veto Overlay (BTC Flash Crash Detection) ──
         btc_flash_crash = False
@@ -814,7 +814,7 @@ class RegimeMasterBot:
                     "entry_price": entry_price,
                     "quantity": fill_qty,
                 }
-                tradebook_active_keys.add(pos_key)
+                active_symbols.add(sym)
                 self._trade_count += 1
                 deployed += 1
 
