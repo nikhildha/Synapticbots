@@ -195,6 +195,17 @@ export function AthenaPanel({ athena, perBot = {} }: Props) {
                                             {isLong ? '↑ LONG' : isShort ? '↓ SHORT' : d.side}
                                         </span>
                                     )}
+                                    {/* Leverage & Size */}
+                                    {parsed.leverage && (
+                                        <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 4, background: 'rgba(0,229,255,0.08)', color: '#00E5FF', border: '1px solid rgba(0,229,255,0.15)' }}>
+                                            {parsed.leverage}
+                                        </span>
+                                    )}
+                                    {parsed.size && (
+                                        <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 4, background: 'rgba(255,179,0,0.08)', color: '#FFB300', border: '1px solid rgba(255,179,0,0.15)' }}>
+                                            {parsed.size}
+                                        </span>
+                                    )}
                                 </div>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                                     {/* Confidence bar */}
@@ -217,16 +228,6 @@ export function AthenaPanel({ athena, perBot = {} }: Props) {
 
                                 {/* Metric chips */}
                                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5, marginBottom: parsed.support || parsed.resistance ? 8 : 0 }}>
-                                    {parsed.leverage && (
-                                        <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 4, background: 'rgba(0,229,255,0.08)', color: '#00E5FF', border: '1px solid rgba(0,229,255,0.15)' }}>
-                                            ⚡ {parsed.leverage}
-                                        </span>
-                                    )}
-                                    {parsed.size && (
-                                        <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 4, background: 'rgba(255,179,0,0.08)', color: '#FFB300', border: '1px solid rgba(255,179,0,0.15)' }}>
-                                            📊 {parsed.size}
-                                        </span>
-                                    )}
                                     {d.latency_ms > 0 && (
                                         <span style={{ fontSize: 10, padding: '2px 8px', borderRadius: 4, background: 'rgba(255,255,255,0.04)', color: 'var(--color-text-muted)' }}>
                                             {(d.latency_ms / 1000).toFixed(1)}s
