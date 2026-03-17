@@ -51,12 +51,12 @@ export default function AuditLog() {
 
     // Future: fetch from /api/admin/audit-log
     useEffect(() => {
-        // Placeholder for real audit log API
-        // setLoading(true);
-        // fetch('/api/admin/audit-log')
-        //   .then(r => r.json())
-        //   .then(data => setLogs(data.logs || []))
-        //   .finally(() => setLoading(false));
+        setLoading(true);
+        fetch('/api/admin/audit-log')
+          .then(r => r.json())
+          .then(data => setLogs(data.logs || []))
+          .catch(err => console.error("Error fetching audit logs:", err))
+          .finally(() => setLoading(false));
     }, []);
 
     const filteredLogs = logs.filter(log => {

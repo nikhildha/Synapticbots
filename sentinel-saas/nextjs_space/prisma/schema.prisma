@@ -322,3 +322,20 @@ model VerificationToken {
 
   @@unique([identifier, token])
 }
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  timestamp DateTime @default(now())
+  actor     String
+  actorRole String   @default("system")
+  action    String
+  category  String   @default("system")
+  details   String   @db.Text
+  ipAddress String?
+  severity  String   @default("info")
+  createdAt DateTime @default(now())
+
+  @@index([category])
+  @@index([severity])
+  @@index([timestamp])
+}
