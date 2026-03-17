@@ -384,7 +384,14 @@ class RegimeMasterBot:
         except Exception as _pab_err:
             logger.warning("⚠️  Bot pull failed: %s", _pab_err)
 
-        # ── 0b. Reset Athena rate limiter for this cycle ─────────
+        # ── 0b. Fail fast: no bots = skip scan entirely ──────────
+        # Avoids running expensive HMM analysis only to discard results.
+        if not config.ENGINE_ACTIVE_BOTS:
+            logger.warning("⚠️  ENGINE_ACTIVE_BOTS empty — skipping scan this cycle. "
+                           "Check SAAS_API_URL and that at least one bot is active.")
+            return
+
+        # ── 0c. Reset Athena rate limiter for this cycle ─────────
         if self._athena:
             self._athena.reset_cycle()
 
@@ -556,7 +563,7 @@ class RegimeMasterBot:
                 if symbol == "BTCUSDT":
                     logger.error("🚨 BTC analysis failed: %s", e, exc_info=True)
                 else:
-                    logger.debug("Error analyzing %s: %s", symbol, e)
+                    logger.warning("⚠️ Analysis failed for %s: %s", symbol, e)  # H3 Fix: visible in prod logs
                 
             # Aggressive GC: Clear memory physically bounded by MTF array instantiations immediately
             # so the baseline RAM never scales to n_coins during a single heartbeat cycle.
@@ -585,6 +592,7 @@ class RegimeMasterBot:
 
         deployed_trades = []
         deployed = 0
+        athena_calls_this_cycle = 0  # H4: track Athena calls to enforce LLM_MAX_CALLS_PER_CYCLE
 
         for target in _tick_active_bots:
             bot_id   = target.get("bot_id", config.ENGINE_BOT_ID)
@@ -644,22 +652,49 @@ class RegimeMasterBot:
                            "active trade already open for this bot")
                     continue
 
+                # ── C4 Fix: Enforce MAX_OPEN_TRADES cap ──────────────────────────
+                max_trades = getattr(config, "MAX_OPEN_TRADES", 25)
+                if tradebook_active_count + deployed >= max_trades:
+                    logger.warning(
+                        "🛑 MAX_OPEN_TRADES cap reached (%d open + %d this tick = %d >= limit %d) — "
+                        "skipping [%s] %s", tradebook_active_count, deployed,
+                        tradebook_active_count + deployed, max_trades, bot_name, sym
+                    )
+                    self._coin_states.setdefault(sym, {}).setdefault("bot_deploy_statuses", {})[bot_id] = (
+                        f"FILTERED: max open trades cap ({max_trades}) reached"
+                    )
+                    continue
+
                 if self.risk.check_kill_switch():
                     return
 
                 # ── Conviction-based leverage ─────────────────────────────────────
+                # H2 Fix: 4-tier scale — borderline signals (60–69) get reduced leverage
                 if conviction >= 95:
                     lev = 20
                 elif conviction >= 80:
                     lev = 15
-                else:
+                elif conviction >= 70:
                     lev = 10
+                else:
+                    lev = 5   # 60–69: passed threshold but weak signal
 
                 # ── Athena: FINAL CALL (gates deployment) ────────────────────────
                 current_price = self._coin_states.get(sym, {}).get("price", 0)
                 atr_val = top.get("atr", 0)
                 athena_decision = None
                 if self._athena and config.LLM_REASONING_ENABLED:
+                    # H4 Fix: enforce per-cycle call cap to prevent rate-limit burst
+                    llm_cap = getattr(config, "LLM_MAX_CALLS_PER_CYCLE", 10)
+                    if athena_calls_this_cycle >= llm_cap:
+                        logger.warning(
+                            "⚠️ Athena cap reached (%d/%d) — skipping [%s] %s (fail-closed)",
+                            athena_calls_this_cycle, llm_cap, bot_name, sym
+                        )
+                        self._coin_states.setdefault(sym, {}).setdefault("bot_deploy_statuses", {})[bot_id] = (
+                            f"FILTERED: Athena cap ({llm_cap} calls/cycle) reached"
+                        )
+                        continue
                     try:
                         llm_ctx = {
                             "ticker":         sym,
@@ -678,6 +713,7 @@ class RegimeMasterBot:
                             "btc_regime":     self._coin_states.get("BTCUSDT", {}).get("regime", "UNKNOWN"),
                         }
                         athena_decision = self._athena.validate_signal(llm_ctx)
+                        athena_calls_this_cycle += 1  # H4: count successful calls
                         self._coin_states.setdefault(sym, {})["athena_state"] = {
                             "action":    athena_decision.action,
                             "confidence": athena_decision.adjusted_confidence,
@@ -693,8 +729,18 @@ class RegimeMasterBot:
                                     bot_name, sym, athena_decision.action,
                                     athena_decision.adjusted_confidence * 100)
                     except Exception as e:
-                        logger.warning("⚠️ Athena call failed for %s: %s — failing open (deploy anyway)", sym, e)
-                        athena_decision = None  # fail open: treat as EXECUTE
+                        logger.error("⚠️ Athena call failed for %s: %s — skipping trade (fail-closed)", sym, e)
+                        self._coin_states.setdefault(sym, {})["athena_state"] = {
+                            "action": "ERROR",
+                            "confidence": 0,
+                            "reasoning": str(e)[:200],
+                            "risk_flags": ["athena_api_error"],
+                            "model": "error",
+                            "latency_ms": 0,
+                        }
+                        self._coin_states.setdefault(sym, {}).setdefault("bot_deploy_statuses", {})[bot_id] = \
+                            f"FILTERED: Athena error — {str(e)[:80]}"
+                        continue  # fail-closed: skip this trade
 
                 # Athena VETO — coin blocked
                 if athena_decision and athena_decision.action not in ("EXECUTE", "LONG", "SHORT"):
@@ -760,11 +806,17 @@ class RegimeMasterBot:
                 fill_sl      = result.get("stop_loss",  0)      if result else 0
                 fill_tp      = result.get("take_profit", 0)     if result else 0
 
-                if entry_price <= 0 and not config.PAPER_TRADE:
-                    _bcast("EXEC_ZERO_PRICE", self._cycle_count, bot_name, bot_id, sym,
-                           top["side"], seg_name, top["confidence"], "entry_price=0")
-                    self._coin_states.setdefault(sym, {}).setdefault("bot_deploy_statuses", {})[bot_id] = "FILTERED: zero entry price"
-                    continue
+                # H5 Fix: validate entry_price in ALL modes, not just live
+                if entry_price <= 0:
+                    if config.PAPER_TRADE and current_price > 0:
+                        # Paper mode: execution engine returned 0 — use last known price as fallback
+                        entry_price = current_price
+                        logger.warning("⚠️ PAPER zero entry_price for %s — using current_price %.6f", sym, entry_price)
+                    else:
+                        _bcast("EXEC_ZERO_PRICE", self._cycle_count, bot_name, bot_id, sym,
+                               top["side"], seg_name, top["confidence"], "entry_price=0")
+                        self._coin_states.setdefault(sym, {}).setdefault("bot_deploy_statuses", {})[bot_id] = "FILTERED: zero entry price"
+                        continue
 
                 # Each bot in the outer loop owns its own trade record.
                 # Using the current bot_id (not matching_bot_ids[0]) is critical:
@@ -1116,8 +1168,9 @@ class RegimeMasterBot:
                     }
                     return None
 
-            # Conviction threshold check (brain-specific)
-            conv_min = brain_cfg.get("conviction_min", 60)
+            # Conviction threshold check — single source: config.MIN_CONVICTION_FOR_DEPLOY
+            # (removed brain_cfg["conviction_min"] duplicate — was a second gate with same value)
+            conv_min = config.MIN_CONVICTION_FOR_DEPLOY
             if conviction < conv_min:
                 self._coin_states[symbol] = {
                     "symbol": symbol, "regime": regime_summary,
