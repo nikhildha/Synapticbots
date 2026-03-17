@@ -729,18 +729,8 @@ class RegimeMasterBot:
                                     bot_name, sym, athena_decision.action,
                                     athena_decision.adjusted_confidence * 100)
                     except Exception as e:
-                        logger.error("⚠️ Athena call failed for %s: %s — skipping trade (fail-closed)", sym, e)
-                        self._coin_states.setdefault(sym, {})["athena_state"] = {
-                            "action": "ERROR",
-                            "confidence": 0,
-                            "reasoning": str(e)[:200],
-                            "risk_flags": ["athena_api_error"],
-                            "model": "error",
-                            "latency_ms": 0,
-                        }
-                        self._coin_states.setdefault(sym, {}).setdefault("bot_deploy_statuses", {})[bot_id] = \
-                            f"FILTERED: Athena error — {str(e)[:80]}"
-                        continue  # fail-closed: skip this trade
+                        logger.warning("⚠️ Athena call failed for %s: %s — failing open (deploy anyway)", sym, e)
+                        athena_decision = None  # fail open: treat as EXECUTE
 
                 # Athena VETO — coin blocked
                 if athena_decision and athena_decision.action not in ("EXECUTE", "LONG", "SHORT"):
