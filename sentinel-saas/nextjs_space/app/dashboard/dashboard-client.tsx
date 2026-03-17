@@ -309,8 +309,8 @@ export function DashboardClient({ user, stats, bots, recentTrades }: DashboardCl
   const liveRealizedPnl = liveClosedModeTrades.reduce((sum: number, t: any) =>
     sum + (parseFloat(t.realized_pnl) || parseFloat(t.totalPnl) || parseFloat(t.pnl) || 0), 0);
 
-  // Total = realized + unrealized (all from tradebook)
-  const paperTotalPnl = paperRealizedPnl + paperUnrealizedPnl;
+  // Total = realized + unrealized (pull exactly from tradebook summary for consistency)
+  const paperTotalPnl = (botState?.tradebook?.summary?.total_realized_pnl || 0) + paperUnrealizedPnl;
   const liveTotalModePnl = liveRealizedPnl + liveUnrealizedPnl;
 
   // Derive MAX_CAPITAL and CAPITAL_PER_TRADE from bot configs (not hardcoded)
