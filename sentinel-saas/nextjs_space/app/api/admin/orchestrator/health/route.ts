@@ -13,7 +13,7 @@ export async function GET() {
         }
 
         const orchestratorUrl = process.env.ORCHESTRATOR_URL || 'http://localhost:5000';
-        const res = await fetch(`${orchestratorUrl}/health`, { signal: AbortSignal.timeout(3000) });
+        const res = await fetch(`${orchestratorUrl}/api/health`, { signal: AbortSignal.timeout(3000) });
 
         if (res.ok) {
             const data = await res.json();

@@ -289,9 +289,7 @@ export function DashboardClient({ user, stats, bots, recentTrades }: DashboardCl
     const pos = (t.side || t.position || '').toUpperCase();
     const isLong = pos === 'BUY' || pos === 'LONG';
     if (entry <= 0) return 0;
-    const isLive = (t.mode || '').toUpperCase().includes('LIVE');
-    const effectiveLev = isLive ? 1 : lev;
-    return Math.round((isLong ? current - entry : entry - current) / entry * effectiveLev * cap * 10000) / 10000;
+    return Math.round((isLong ? current - entry : entry - current) / entry * lev * cap * 10000) / 10000;
   };
 
   // Paper vs Live splits
