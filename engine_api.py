@@ -1331,7 +1331,17 @@ def _engine_watchdog():
             start_engine()
 
 
-# ─── Entry Point ──────────────────────────────────────────────────────
+# ─── API Initialisation ───────────────────────────────────────────────
+
+# Start the trading engine and watchdog in background
+# This MUST happen at module scope so it runs even if Railway uses Gunicorn/Flask instead of python
+start_engine()
+
+_watchdog_thread = threading.Thread(target=_engine_watchdog, daemon=True, name="EngineWatchdog")
+_watchdog_thread.start()
+logger.info("🐕 Engine watchdog started (checks every 60s)")
+
+# ─── Entry Point (Local Testing) ──────────────────────────────────────
 
 if __name__ == "__main__":
     logging.basicConfig(
@@ -1341,16 +1351,7 @@ if __name__ == "__main__":
     )
 
     # Install SIGTERM handler BEFORE starting anything else
-    # This ensures Railway container stops cleanly (not as a crash)
     _setup_sigterm_handler()
-
-    # Start the trading engine in background
-    start_engine()
-
-    # Start watchdog thread to auto-restart engine if it dies
-    _watchdog_thread = threading.Thread(target=_engine_watchdog, daemon=True, name="EngineWatchdog")
-    _watchdog_thread.start()
-    logger.info("🐕 Engine watchdog started (checks every 60s)")
 
     # Start Flask API server
     port = int(os.environ.get("PORT", 3001))
