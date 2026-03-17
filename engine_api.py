@@ -223,9 +223,7 @@ def pull_active_bots_from_saas():
 
     mode = "paper" if config.PAPER_TRADE else "live"
     url = f"{saas_url.rstrip('/')}/api/internal/active-bots?mode={mode}"
-    headers = {}
-    if config.ENGINE_API_SECRET:
-        headers["Authorization"] = f"Bearer {config.ENGINE_API_SECRET}"
+    headers = {"X-Synaptic-Internal": "engine-pull"}
 
     try:
         import urllib.request

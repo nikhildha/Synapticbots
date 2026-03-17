@@ -18,7 +18,7 @@ ENGINE_BOT_NAME = os.getenv("ENGINE_BOT_NAME", "") # Human-readable bot name sho
 ENGINE_ACTIVE_BOTS = []  # List of {bot_id, user_id, segment_filter} — refreshed every cycle from SaaS DB
 # Pull-based bot registry: engine fetches active bots from SaaS API (no push registration needed)
 SAAS_API_URL    = os.getenv("SAAS_API_URL", "")       # e.g. https://your-app.vercel.app
-ENGINE_API_SECRET = os.getenv("ENGINE_API_SECRET", "") # Shared secret for internal API auth
+# ENGINE_API_SECRET is deprecated (Replaced by X-Synaptic-Internal header)
 PAPER_MAX_CAPITAL = 2500       # Total portfolio: 25 slots × $100/trade
 
 # ─── CoinDCX API (used for LIVE trading) ────────────────────────────────────────

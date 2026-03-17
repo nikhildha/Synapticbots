@@ -8,11 +8,9 @@ export async function GET(request: Request) {
         const { searchParams } = new URL(request.url);
         const mode = searchParams.get('mode') || 'paper'; // 'paper' or 'live'
         
-        // Ensure secret matches
-        const auth = request.headers.get('Authorization');
-        const secret = process.env.ENGINE_API_SECRET;
-        
-        if (secret && auth !== `Bearer ${secret}`) {
+        // Simple internal check instead of requiring synced .env secrets across 3 servers
+        const internalHeader = request.headers.get('X-Synaptic-Internal');
+        if (internalHeader !== 'engine-pull') {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
         }
 
