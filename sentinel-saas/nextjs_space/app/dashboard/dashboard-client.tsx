@@ -298,19 +298,34 @@ export function DashboardClient({ user, stats, bots, recentTrades }: DashboardCl
   const liveModeTrades = liveActiveTrades.filter((t: any) => (t.mode || '').toUpperCase().includes('LIVE'));
   const liveClosedModeTrades = liveClosedTrades.filter((t: any) => (t.mode || '').toUpperCase().includes('LIVE'));
 
-  // PnL from tradebook — active uses unrealized_pnl, closed uses realized_pnl
-  const paperUnrealizedPnl = paperActiveTrades.reduce((sum: number, t: any) =>
-    sum + (parseFloat(t.unrealized_pnl) || parseFloat(t.activePnl) || 0), 0);
-  const liveUnrealizedPnl = liveModeTrades.reduce((sum: number, t: any) =>
-    sum + (parseFloat(t.unrealized_pnl) || parseFloat(t.activePnl) || 0), 0);
+  // PnL from tradebook — active leverages livePrices just like trades-client.tsx
+  const calcUnrealized = (tradesList: any[]) => {
+    return tradesList.reduce((sum: number, t: any) => {
+      const sym = (t.symbol || (t.coin || '') + 'USDT').toUpperCase();
+      const cp = livePrices[sym] || t.current_price || t.currentPrice || t.entry_price || t.entryPrice;
+      const entry = t.entry_price || t.entryPrice || 0;
+      const cap = t.capital || t.position_size || 100;
+      const lev = t.leverage || 1;
+      if (!cp || !entry || entry === 0 || cap === 0) return sum;
+
+      const pos = (t.side || t.position || '').toLowerCase();
+      const isLong = pos === 'long' || pos === 'buy';
+      const diff = isLong ? (cp - entry) : (entry - cp);
+      const pnl = Math.round(diff / entry * lev * cap * 10000) / 10000;
+      return sum + pnl;
+    }, 0);
+  };
+
+  const paperUnrealizedPnl = calcUnrealized(paperActiveTrades);
+  const liveUnrealizedPnl = calcUnrealized(liveModeTrades);
 
   const paperRealizedPnl = paperClosedTrades.reduce((sum: number, t: any) =>
     sum + (parseFloat(t.realized_pnl) || parseFloat(t.totalPnl) || parseFloat(t.pnl) || 0), 0);
   const liveRealizedPnl = liveClosedModeTrades.reduce((sum: number, t: any) =>
     sum + (parseFloat(t.realized_pnl) || parseFloat(t.totalPnl) || parseFloat(t.pnl) || 0), 0);
 
-  // Total = realized + unrealized (pull exactly from tradebook summary for consistency)
-  const paperTotalPnl = (botState?.tradebook?.summary?.total_realized_pnl || 0) + paperUnrealizedPnl;
+  // Total = realized + unrealized (live calculated)
+  const paperTotalPnl = paperRealizedPnl + paperUnrealizedPnl;
   const liveTotalModePnl = liveRealizedPnl + liveUnrealizedPnl;
 
   // Derive MAX_CAPITAL and CAPITAL_PER_TRADE from bot configs (not hardcoded)
