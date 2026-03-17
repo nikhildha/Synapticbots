@@ -1050,6 +1050,117 @@ def api_resume():
         return jsonify({"status": "error", "message": str(e)}), 500
 
 
+@app.route("/api/force-signal", methods=["POST"])
+def api_force_signal():
+    """
+    Inject a manual test signal directly into the execution engine.
+    Bypasses HMM analysis — use for connection testing only.
+
+    Body (all optional except symbol/side):
+      symbol   — e.g. "BTCUSDT"  (default: PRIMARY_SYMBOL)
+      side     — "BUY" or "SELL" (default: "BUY")
+      capital  — USD per trade   (default: config.CAPITAL_PER_TRADE)
+      leverage — integer         (default: 5)
+    """
+    auth_err = _check_auth()
+    if auth_err:
+        return auth_err
+
+    if not _engine_bot:
+        return jsonify({"success": False, "error": "Engine not initialised yet"}), 503
+
+    data     = request.get_json() or {}
+    symbol   = data.get("symbol",   config.PRIMARY_SYMBOL)
+    side     = data.get("side",     "BUY").upper()
+    capital  = float(data.get("capital",  getattr(config, "CAPITAL_PER_TRADE", 100.0)))
+    leverage = int(data.get("leverage", 5))
+
+    if side not in ("BUY", "SELL"):
+        return jsonify({"success": False, "error": "side must be BUY or SELL"}), 400
+
+    try:
+        from data_pipeline import get_current_price, fetch_klines
+        from feature_engine import compute_all_features
+
+        price = get_current_price(symbol) or 0
+        if price <= 0:
+            return jsonify({"success": False, "error": f"Could not fetch price for {symbol}"}), 400
+
+        # Estimate ATR from recent candles
+        atr = price * 0.015  # 1.5% fallback
+        try:
+            df = fetch_klines(symbol, "1h", limit=50)
+            if df is not None and len(df) > 14:
+                df2 = compute_all_features(df)
+                if "atr" in df2.columns:
+                    atr = float(df2["atr"].iloc[-1])
+        except Exception:
+            pass
+
+        quantity = (capital * leverage) / max(price, 0.0001)
+
+        logger.info("🧪 FORCE-SIGNAL: %s %s @ $%.2f | %dx | qty=%.6f | capital=$%.2f",
+                    side, symbol, price, leverage, quantity, capital)
+
+        result = _engine_bot.executor.execute_trade(
+            symbol=symbol,
+            side=side,
+            leverage=leverage,
+            quantity=quantity,
+            atr=atr,
+            ema_15m_20=None,   # force MARKET order (no virtual limit)
+            regime=1,
+            confidence=0.80,
+            reason="force-signal test",
+        )
+
+        if result is None:
+            return jsonify({"success": False, "error": "execute_trade returned None — check engine logs"}), 400
+
+        # Record in tradebook under first registered bot (or ENGINE_BOT_ID)
+        bot_id = (config.ENGINE_ACTIVE_BOTS[0]["bot_id"]
+                  if config.ENGINE_ACTIVE_BOTS else config.ENGINE_BOT_ID)
+
+        trade_id = tradebook.open_trade(
+            symbol=symbol,
+            side=side,
+            leverage=result.get("leverage", leverage),
+            quantity=result.get("quantity", quantity),
+            entry_price=result.get("entry_price", price),
+            atr=atr,
+            regime=1,
+            confidence=0.80,
+            reason="force-signal test",
+            capital=result.get("capital", capital),
+            bot_id=bot_id,
+            exchange=result.get("exchange", "coindcx" if not config.PAPER_TRADE else "paper"),
+            mode=result.get("mode", "LIVE" if not config.PAPER_TRADE else "PAPER"),
+            position_id=result.get("position_id"),
+        )
+
+        logger.info("🧪 FORCE-SIGNAL recorded: trade_id=%s entry=%.4f", trade_id, result.get("entry_price", 0))
+        return jsonify({
+            "success":     True,
+            "trade_id":    trade_id,
+            "symbol":      symbol,
+            "side":        side,
+            "entry_price": result.get("entry_price", price),
+            "quantity":    result.get("quantity", quantity),
+            "leverage":    result.get("leverage", leverage),
+            "capital":     result.get("capital", capital),
+            "stop_loss":   result.get("stop_loss"),
+            "take_profit": result.get("take_profit"),
+            "mode":        result.get("mode"),
+            "exchange":    result.get("exchange"),
+            "order_type":  result.get("order_type"),
+            "position_id": result.get("position_id"),
+        })
+
+    except Exception as e:
+        logger.error("force-signal error: %s", e, exc_info=True)
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
 @app.route("/api/broadcast-log", methods=["GET"])
 def api_broadcast_log():
     """Return last N lines of signal_broadcast.log as structured JSON."""
