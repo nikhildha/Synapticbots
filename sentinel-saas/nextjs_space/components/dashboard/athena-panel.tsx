@@ -202,7 +202,7 @@ export function AthenaPanel({ athena }: Props) {
                                             </div>
                                             <div style={{ background: 'rgba(0,0,0,0.3)', padding: 12, borderRadius: 10, border: '1px solid rgba(255,255,255,0.03)' }}>
                                                 <div style={{ fontSize: 10, color: 'var(--color-text-muted)', marginBottom: 4, textTransform: 'uppercase' }}>Processing Time</div>
-                                                <div style={{ fontSize: 18, fontWeight: 800, color: '#00E5FF' }}>{d.latency_ms > 0 ? \`\${d.latency_ms}ms\` : 'Cached'}</div>
+                                                <div style={{ fontSize: 18, fontWeight: 800, color: '#00E5FF' }}>{d.latency_ms > 0 ? `${d.latency_ms}ms` : 'Cached'}</div>
                                             </div>
                                         </div>
 
