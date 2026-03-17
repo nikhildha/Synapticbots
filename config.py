@@ -230,7 +230,7 @@ MAX_ACTIVE_PER_SEGMENT = 1          # Correlation control: max 1 trade per segme
 EXECUTION_ATR_PULLBACK = True       # Wait for Limit Order at 20-EMA instead of market buying
 EXECUTION_TIF_MINUTES = 60          # Max lifespan of a pending limit order (1 hour)
 EXECUTION_ESCAPE_ATR = 2.0          # Cancel pending order if market price moves > 2.0 ATR away
-EXECUTION_VIRTUAL_LIMITS = True     # Use Virtual Ghost Limits (held locally) to prevent margin deadlock
+EXECUTION_VIRTUAL_LIMITS = os.getenv("EXECUTION_VIRTUAL_LIMITS", "true").lower() == "true"  # Use Virtual Ghost Limits (held locally) to prevent margin deadlock
 EXECUTION_TOXIC_FLOW_ATR = 1.0      # Cancel limit if trigger candle closes > 1.0 ATR against trend
 EXECUTION_MAX_LEVERAGE = 25         # Max leverage limit to avoid wicks
 EXECUTION_MIN_LEVERAGE = 10         # Min leverage floor

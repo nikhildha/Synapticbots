@@ -764,6 +764,12 @@ class RegimeMasterBot:
                 # the admin bot, causing non-admin trades to be stamped with the wrong
                 # owner and the per-bot duplicate key (bot_id:symbol) to never match
                 # the stored trade, so non-admin bots would open new trades every cycle.
+                # Map execution result status to tradebook status:
+                # "OPEN" (virtual limit waiting) → "OPEN", "FILLED" (market) → "ACTIVE"
+                result_status = (result.get("status") or "ACTIVE") if result else "ACTIVE"
+                tb_status = "OPEN" if result_status == "OPEN" else "ACTIVE"
+                tb_order_type = result.get("order_type") if result else None
+
                 tradebook.open_trade(
                     symbol=sym,
                     side=top["side"],
@@ -786,6 +792,8 @@ class RegimeMasterBot:
                     rm_id=result.get("rm_id") if result else None,
                     override_sl=fill_sl if fill_sl > 0 else None,
                     override_tp=fill_tp if fill_tp > 0 else None,
+                    status=tb_status,
+                    order_type=tb_order_type,
                 )
 
                 _bcast("TRADEBOOK_RECORDED", self._cycle_count, bot_name, bot_id, sym,
@@ -1753,7 +1761,8 @@ class RegimeMasterBot:
                             tradebook.activate_limit_order(trade_id, result["entry_price"], result.get("quantity", trade["quantity"]))
                             tradebook.update_trade(trade_id, {
                                 "position_id": result.get("position_id"),
-                                "exchange": result.get("exchange", "coindcx")
+                                "exchange": result.get("exchange", "coindcx"),
+                                "pair": result.get("pair"),
                             })
                             # Add to active positions tracker
                             self._active_positions[f"{trade.get('bot_id', config.ENGINE_BOT_ID)}:{sym}"] = {

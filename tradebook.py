@@ -103,7 +103,8 @@ def open_trade(symbol, side, leverage, quantity, entry_price, atr,
                regime, confidence, reason="", capital=100.0, mode=None, user_id=None,
                profile_id="standard", bot_name="Synaptic Adaptive",
                exchange=None, pair=None, position_id=None, bot_id=None, all_bot_ids=None,
-               rm_id=None, override_sl=None, override_tp=None, status="ACTIVE"):
+               rm_id=None, override_sl=None, override_tp=None, status="ACTIVE",
+               order_type=None):
     """
     Record a new trade entry in the tradebook.
 
@@ -237,6 +238,7 @@ def open_trade(symbol, side, leverage, quantity, entry_price, atr,
         "pair":             pair,
         "position_id":      position_id,
         "rm_id":            rm_id,
+        "order_type":       order_type,
     }
 
     book["trades"].append(trade)
