@@ -661,6 +661,14 @@ class RegimeMasterBot:
                 if self.risk.check_kill_switch():
                     return
 
+                # ── Conviction-based leverage ─────────────────────────────────────
+                if conviction >= 95:
+                    lev = 20
+                elif conviction >= 80:
+                    lev = 15
+                else:
+                    lev = 10
+
                 # ── Athena: FINAL CALL (gates deployment) ────────────────────────
                 current_price = self._coin_states.get(sym, {}).get("price", 0)
                 atr_val = top.get("atr", 0)
@@ -670,7 +678,7 @@ class RegimeMasterBot:
                         llm_ctx = {
                             "ticker":         sym,
                             "side":           top["side"],
-                            "leverage":       top.get("leverage", 10),
+                            "leverage":       lev,
                             "hmm_confidence": top["confidence"],
                             "hmm_regime":     top.get("regime_name", ""),
                             "conviction":     conviction,
@@ -711,17 +719,9 @@ class RegimeMasterBot:
                            f"Athena vetoed: {athena_decision.action} — {athena_decision.reasoning[:80]}")
                     continue
 
-                # ── Build trade dict (replaces _evaluate_for_profile) ─────────────
-                # Use per-bot capital if stored in ENGINE_ACTIVE_BOTS entry, else global config
+                # ── Build trade dict ──────────────────────────────────────────────
                 capital     = target.get("capital_per_trade") or getattr(config, "CAPITAL_PER_TRADE", 100.0)
-                # Conviction-based leverage: higher signal quality → higher leverage
-                if conviction >= 95:
-                    lev = 20
-                elif conviction >= 80:
-                    lev = 15
-                else:
-                    lev = 10
-                qty         = top.get("quantity", (capital * lev) / max(current_price, 0.0001))
+                qty         = (capital * lev) / max(current_price, 0.0001)
                 reason_str  = top.get("reason", f"{top.get('regime_name','')} {int(top['confidence']*100)}%")
 
                 # SIGNAL_DISPATCH broadcast
@@ -1543,118 +1543,6 @@ class RegimeMasterBot:
         }
 
     # ─── Profile Evaluation ──────────────────────────────────────────────────
-
-    def _evaluate_for_profile(self, raw, profile_id, profile, balance):
-        """
-        Take a raw coin analysis result and apply brain-specific or profile
-        conviction → leverage mapping + position sizing.
-        Returns a trade dict ready for deployment, or None if filtered out.
-        """
-        conviction = raw["conviction"]
-        symbol = raw["symbol"]
-
-        # Multi-TF path: use brain_cfg for leverage + SL/TP
-        brain_cfg = raw.get("brain_cfg")
-        if brain_cfg:
-            leverage = brain_cfg["leverage"]
-            max_loss_pct = brain_cfg.get("max_loss_pct", abs(config.MAX_LOSS_PER_TRADE_PCT))
-        else:
-            # Legacy path: profile-based leverage
-            leverage = self.risk.get_conviction_leverage_for_profile(conviction, profile)
-            max_loss_pct = abs(config.MAX_LOSS_PER_TRADE_PCT)
-
-        if leverage == 0:
-            logger.warning("⛔ [%s] %s: leverage=0 (conviction=%.1f below profile min)",
-                        profile_id, symbol, conviction)
-            self._coin_states.setdefault(symbol, {})["deploy_status"] = "FILTERED: low conviction"
-            return None
-
-        # Check profile's max position limit
-        profile_prefix = f"{profile_id}:"
-        profile_active = sum(1 for k in self._active_positions if k.startswith(profile_prefix))
-        max_pos = brain_cfg.get("max_positions", profile.get("max_positions", config.MAX_CONCURRENT_POSITIONS)) if brain_cfg else profile.get("max_positions", config.MAX_CONCURRENT_POSITIONS)
-        if profile_active >= max_pos:
-            logger.warning("⛔ [%s] %s: max positions reached (%d/%d)",
-                        profile_id, symbol, profile_active, max_pos)
-            self._coin_states.setdefault(symbol, {})["deploy_status"] = f"FILTERED: max positions ({profile_active}/{max_pos})"
-            return None
-
-        # Position sizing — always requires valid balance for correct user experience
-        user_budget = brain_cfg.get("capital_per_trade", 100.0) if brain_cfg else profile.get("capital_per_trade", 100.0)
-
-        if not config.PAPER_TRADE and balance <= 0:
-            logger.warning("⛔ [%s] %s: LIVE balance=$0 — cannot deploy", profile_id, symbol)
-            self._coin_states.setdefault(symbol, {})["deploy_status"] = "FILTERED: zero balance"
-            return None
-
-        # ── Margin-First Position Sizing ──
-        margin = user_budget
-
-        # Live mode: ensure margin doesn't exceed wallet balance
-        if not config.PAPER_TRADE and balance > 0:
-            margin = min(margin, balance * config.CAPITAL_PER_COIN_PCT)
-
-        current_price = self._coin_states.get(symbol, {}).get("price", 0)
-        if current_price <= 0:
-            logger.warning("⛔ [%s] %s: current_price=0, cannot size position", profile_id, symbol)
-            self._coin_states.setdefault(symbol, {})["deploy_status"] = "FILTERED: no price data"
-            return None
-
-        # ── Dynamic Leverage Selection (Execution Alpha) ──
-        if getattr(config, 'EXECUTION_DYNAMIC_LEVERAGE', True):
-            atr_pct = raw["atr"] / current_price
-            min_lev = getattr(config, 'EXECUTION_MIN_LEVERAGE', 10)
-            max_lev = getattr(config, 'EXECUTION_MAX_LEVERAGE', 25)
-            
-            # Linear scaling: 0.5% ATR (low vol) = 25x, 1.5% ATR (high vol) = 10x
-            if atr_pct >= 0.015:
-                dyn_leverage = min_lev
-            elif atr_pct <= 0.005:
-                dyn_leverage = max_lev
-            else:
-                ratio = (0.015 - atr_pct) / 0.010
-                dyn_leverage = int(min_lev + ratio * (max_lev - min_lev))
-            
-            # Limit strictly to the [min_lev, max_lev] boundaries
-            leverage = max(min_lev, min(dyn_leverage, max_lev))
-
-        quantity, final_leverage = self.risk.calculate_margin_first_position(
-            margin, current_price, raw["atr"], leverage
-        )
-        if quantity <= 0:
-            logger.warning("⛔ [%s] %s: trade skipped — risk too high at min leverage (margin=$%.0f price=%.4f atr=%.4f)",
-                        profile_id, symbol, margin, current_price, raw["atr"])
-            self._coin_states.setdefault(symbol, {})["deploy_status"] = "FILTERED: risk too high"
-            return None
-
-        # Use the risk-capped leverage (may be lower than conviction leverage)
-        leverage = final_leverage
-        brain_id = raw.get("brain_id", "legacy")
-        brain_label = brain_cfg["label"] if brain_cfg else profile["label"]
-
-        logger.debug(
-            "✅ [%s] %s PASS: conviction=%.1f lev=%dx margin=$%.0f qty=%.6f price=%.2f brain=%s",
-            profile_id, symbol, conviction, leverage, margin, quantity, current_price, brain_id,
-        )
-
-        return {
-            "symbol": symbol,
-            "side": raw["side"],
-            "leverage": leverage,
-            "quantity": quantity,
-            "atr": raw["atr"],
-            "ema_15m_20": raw.get("ema_15m_20"),
-            "swing_l": raw.get("swing_l"),
-            "swing_h": raw.get("swing_h"),
-            "regime": raw["regime"],
-            "regime_name": raw["regime_name"],
-            "confidence": raw["confidence"],
-            "conviction": conviction,
-            "profile_id": profile_id,
-            "bot_name": brain_label,
-            "brain_id": brain_id,
-            "reason": f"{brain_label} | {raw['reason']} | lev={leverage}x",
-        }
 
     # ─── Exit & Sync Logic ────────────────────────────────────────────────────
 

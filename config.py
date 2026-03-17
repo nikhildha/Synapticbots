@@ -133,8 +133,6 @@ CONFIDENCE_LOW = 0.92    # 92–96% → 15x  (optimized from 0.85, below 92% = n
 # ─── Capital per trade (used by all bots — uniform sizing) ─────────────────────
 CAPITAL_PER_TRADE = 100        # $100 per trade, fixed
 
-EXECUTION_DYNAMIC_LEVERAGE = True   # Select leverage (10x-25x) based on current ATR%
-
 # ─── Risk Management ────────────────────────────────────────────────────────────
 RISK_PER_TRADE = 0.04
 KILL_SWITCH_DRAWDOWN = 0.10   # Pause bot if 10% drawdown in 24h
@@ -228,10 +226,6 @@ SCANNER_SEGMENT_ROTATION = True     # Rotate market segments every hour
 SCANNER_COINS_PER_SEGMENT = 5       # Scan top 5 highest-volume coins within the active segment
 SEGMENT_SCAN_LIMIT = 2              # Focus on the Top 2 hottest segments
 MAX_ACTIVE_PER_SEGMENT = 1          # Correlation control: max 1 trade per segment
-
-# ─── Execution ───────────────────────────────────────────────────────────────────
-EXECUTION_MAX_LEVERAGE = 25         # Max leverage limit to avoid wicks
-EXECUTION_MIN_LEVERAGE = 10         # Min leverage floor
 
 
 
