@@ -1333,11 +1333,12 @@ def _engine_watchdog():
 
 # ─── API Initialisation ───────────────────────────────────────────────
 
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s [%(name)s] %(levelname)s: %(message)s",
-    datefmt="%Y-%m-%d %H:%M:%S",
-)
+# Ensure we have a StreamHandler for stdout (Railway console) since basicConfig is blocked
+_stream_handler = logging.StreamHandler(sys.stdout)
+_stream_handler.setFormatter(logging.Formatter("%(asctime)s [%(name)s] %(levelname)s: %(message)s", "%Y-%m-%d %H:%M:%S"))
+_stream_handler.setLevel(logging.INFO)
+logging.getLogger().addHandler(_stream_handler)
+logging.getLogger().setLevel(logging.INFO)
 
 # Start the trading engine and watchdog in background
 # This MUST happen at module scope so it runs even if Railway uses Gunicorn/Flask instead of python
