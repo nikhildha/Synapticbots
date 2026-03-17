@@ -1333,6 +1333,12 @@ def _engine_watchdog():
 
 # ─── API Initialisation ───────────────────────────────────────────────
 
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(name)s] %(levelname)s: %(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S",
+)
+
 # Start the trading engine and watchdog in background
 # This MUST happen at module scope so it runs even if Railway uses Gunicorn/Flask instead of python
 start_engine()
@@ -1344,11 +1350,6 @@ logger.info("🐕 Engine watchdog started (checks every 60s)")
 # ─── Entry Point (Local Testing) ──────────────────────────────────────
 
 if __name__ == "__main__":
-    logging.basicConfig(
-        level=logging.INFO,
-        format="%(asctime)s [%(name)s] %(levelname)s: %(message)s",
-        datefmt="%Y-%m-%d %H:%M:%S",
-    )
 
     # Install SIGTERM handler BEFORE starting anything else
     _setup_sigterm_handler()
