@@ -384,12 +384,12 @@ class RegimeMasterBot:
         except Exception as _pab_err:
             logger.warning("⚠️  Bot pull failed: %s", _pab_err)
 
-        # ── 0b. Fail fast: no bots = skip scan entirely ──────────
-        # Avoids running expensive HMM analysis only to discard results.
+        # ── 0b. Removed Fail Fast Block ──────────
+        # We must NOT return early here, otherwise the engine stucks at Cycle 0
+        # and the dashboard appears dead. If NO bots are active, the pool logic below
+        # will naturally scan 0 altcoins, but process BTCUSDT & Heatmap to keep the UI alive.
         if not config.ENGINE_ACTIVE_BOTS:
-            logger.warning("⚠️  ENGINE_ACTIVE_BOTS empty — skipping scan this cycle. "
-                           "Check SAAS_API_URL and that at least one bot is active.")
-            return
+            logger.info("ℹ️  ENGINE_ACTIVE_BOTS is empty. Will scan only BTCUSDT for dashboard heartbeat.")
 
         # ── 0c. Reset Athena rate limiter for this cycle ─────────
         if self._athena:
@@ -928,16 +928,19 @@ class RegimeMasterBot:
                 })
 
             # Collect segment heatmap data
-            heatmap = []
+            heatmap = {}
             try:
                 heatmap_file = getattr(config, "HEATMAP_STATE_FILE", "data/segment_heatmap.json")
                 if os.path.exists(heatmap_file):
                     with open(heatmap_file, "r") as f:
                         hmap = json.load(f)
                     segs = hmap.get("segments", [])
+                    btc_24h = hmap.get("btc_24h", 0)
                     selected = {s.get("segment") for s in segs[:2]}  # top-2 are selected
+                    
+                    segments_list = []
                     for i, seg in enumerate(segs):
-                        heatmap.append({
+                        segments_list.append({
                             "segment":         seg.get("segment"),
                             "composite_score": seg.get("composite_score"),
                             "vw_rr":           seg.get("vw_rr"),
@@ -946,6 +949,11 @@ class RegimeMasterBot:
                             "is_selected":     seg.get("segment") in selected,
                             "rank":            i + 1,
                         })
+                    
+                    heatmap = {
+                        "segments": segments_list,
+                        "btc_24h": btc_24h
+                    }
             except Exception:
                 pass
 
