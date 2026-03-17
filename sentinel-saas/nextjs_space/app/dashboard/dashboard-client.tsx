@@ -7,7 +7,7 @@ import { BotCard } from '@/components/bot-card';
 import { RegimeCard, PnlCard, ActivePositionsCard, SignalSummaryTable } from '@/components/dashboard/command-center';
 
 import { AthenaPanel } from '@/components/dashboard/athena-panel';
-import { TerminalFeed } from '@/components/dashboard/terminal-feed';
+
 import { SegmentHeatmap } from '@/components/dashboard/segment-heatmap';
 import { Bot, TrendingUp, Activity, DollarSign, Zap } from 'lucide-react';
 import Link from 'next/link';
@@ -657,7 +657,7 @@ export function DashboardClient({ user, stats, bots, recentTrades }: DashboardCl
             )}
           </motion.div>
 
-          {/* ═══ Row 4: Athena Intelligence & Engine Terminal ═══ */}
+          {/* ═══ Row 4: Athena Intelligence ═══ */}
           {(botState?.athena?.enabled || bots?.some((b: any) => (b.name || '').toLowerCase().includes('athena'))) && (
             <motion.div
               initial={{ opacity: 0, y: 20 }}
@@ -665,23 +665,12 @@ export function DashboardClient({ user, stats, bots, recentTrades }: DashboardCl
               transition={{ delay: 0.27 }}
               className="mt-6 mb-8"
             >
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                <div className="lg:col-span-2 flex flex-col h-full min-h-[400px]">
-                  <AthenaPanel
-                    athena={botState?.athena || { enabled: true, recent_decisions: [], model: 'gemini-2.5-flash' }}
-                    coinStates={multi?.coin_states}
-                    perBot={botState?.perBot || {}}
-                  />
-                </div>
-                {/* Engine Activity Feed */}
-                <div className="lg:col-span-1 border border-white/5 rounded-xl flex flex-col h-full min-h-[400px]">
-                  <TerminalFeed
-                    coinStates={multi?.coin_states}
-                    cycle={multi?.cycle}
-                    activeTrades={botState?.tradebook?.trades || []}
-                    athenaEnabled={botState?.athena?.enabled}
-                  />
-                </div>
+              <div className="flex flex-col h-full min-h-[400px]">
+                <AthenaPanel
+                  athena={botState?.athena || { enabled: true, recent_decisions: [], model: 'gemini-2.5-flash' }}
+                  coinStates={multi?.coin_states}
+                  perBot={botState?.perBot || {}}
+                />
               </div>
             </motion.div>
           )}

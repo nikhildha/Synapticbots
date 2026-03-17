@@ -519,18 +519,8 @@ class RegimeMasterBot:
         # SOLE SOURCE OF TRUTH: tradebook active count
         tradebook_active = tradebook.get_active_trades()
         tradebook_active_count = len(tradebook_active)
-        # Build set of bot_id:symbol keys for active trades (per-bot scope)
-        # IMPORTANT: use bot_id from the trade, not profile_id — so the per-bot
-        # duplicate check at pos_key = f"{bot_id}:{sym}" actually works.
-        tradebook_active_keys = set()
-        for t in tradebook_active:
-            tid = t.get("bot_id", "").strip()
-            pid = t.get("profile_id", "standard")
-            sym_t = t['symbol']
-            if tid:
-                tradebook_active_keys.add(f"{tid}:{sym_t}")
-            # Also add profile_id variant as fallback (legacy trades without bot_id)
-            tradebook_active_keys.add(f"{pid}:{sym_t}")
+        # Build set of globally active symbols (to prevent ANY duplicate trades)
+        active_symbols = {t['symbol'] for t in tradebook_active}
         raw_results = []
 
         # Scan ALL symbols — do NOT skip based on other bots' deployed coins.
@@ -649,13 +639,13 @@ class RegimeMasterBot:
                     )
                     continue
 
-                # Skip if already in this position (duplicate check)
-                if pos_key in tradebook_active_keys:
-                    logger.debug("🔄 [%s] %s already open — skip", bot_name, sym)
+                # Global duplicate check (skip if ANY bot is already trading this coin)
+                if sym in active_symbols:
+                    logger.debug("🔄 [%s] %s already open globally — skip", bot_name, sym)
                     self._coin_states.setdefault(sym, {})["deploy_status"] = "FILTERED: active trade exists"
                     _bcast("FILTERED_DUPLICATE", self._cycle_count, bot_name, bot_id, sym,
                            top.get("side", ""), seg_name, top.get("confidence", 0),
-                           "active trade already open for this bot:symbol")
+                           "active trade already open globally")
                     continue
 
                 if self.risk.check_kill_switch():
