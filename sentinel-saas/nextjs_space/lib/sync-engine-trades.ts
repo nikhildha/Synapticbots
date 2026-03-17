@@ -18,7 +18,8 @@ const SYNC_THROTTLE_MS = 30_000;
 export async function syncEngineTrades(
     engineTrades: any[],
     botId: string,
-    botStartedAt: Date | null
+    botStartedAt: Date | null,
+    userId?: string
 ): Promise<number> {
     if (!engineTrades || engineTrades.length === 0) return 0;
 
@@ -80,8 +81,14 @@ export async function syncEngineTrades(
                 if (tradeBotId && tradeBotId !== botId) {
                     continue;
                 }
-                if (!tradeBotId && botId) {
-                    continue;
+                // Allow AUTO_SYNCED/orphaned trades (no bot_id) if user_id matches —
+                // happens when engine restarts and places trade before re-registration
+                if (!tradeBotId) {
+                    const tradeUserId = (t.user_id || '').trim();
+                    if (!tradeUserId || !userId || tradeUserId !== userId) {
+                        continue;
+                    }
+                    // falls through — associate this orphaned trade with the current bot
                 }
             }
 

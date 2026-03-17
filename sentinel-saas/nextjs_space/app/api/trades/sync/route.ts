@@ -84,7 +84,7 @@ export async function POST(request: Request) {
                     }
                 }
                 if (engineTradeCache[botMode].length > 0) {
-                    const count = await syncEngineTrades(engineTradeCache[botMode], ub.id, ub.startedAt);
+                    const count = await syncEngineTrades(engineTradeCache[botMode], ub.id, ub.startedAt, userId);
                     tradesSynced += count;
                 }
             } catch (err) {

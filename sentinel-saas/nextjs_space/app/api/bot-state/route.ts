@@ -183,7 +183,7 @@ export async function GET() {
                     }
                     const botTrades = engineTradeCache[botMode];
                     if (botTrades.length > 0) {
-                        await syncEngineTrades(botTrades, ub.id, ub.startedAt);
+                        await syncEngineTrades(botTrades, ub.id, ub.startedAt, userId);
                     }
                 } catch (err) {
                     console.error(`[bot-state] Trade sync failed for bot ${ub.id}:`, err);
