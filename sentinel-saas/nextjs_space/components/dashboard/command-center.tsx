@@ -771,8 +771,8 @@ export function SignalSummaryTable({ coinStates, multi, heatmap: heatmapProp }: 
                 const engineUptime = liveMulti?.uptime_seconds || 0;
                 const tsAge = engineTs ? (Date.now() - new Date(String(engineTs)).getTime()) : Infinity;
                 const isEngineOn = engineStatus === 'running' || engineUptime > 0 || tsAge < 1200000;
-                // Detect if engine is mid-cycle (ON but no recent completed cycle)
-                const isScanning = isEngineOn && (!engineTs || tsAge > 600000);
+                // Detect if engine is mid-cycle (ON but no recent completed cycle). Allow 14m before showing SCANNING.
+                const isScanning = isEngineOn && (!engineTs || tsAge > 840000);
                 const nextCycleLabel = (() => {
                     const nextRaw = liveMulti?.next_analysis_time;
                     try {
