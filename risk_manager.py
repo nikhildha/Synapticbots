@@ -363,21 +363,6 @@ class RiskManager:
             return -config.CONVICTION_FUNDING_PENALTY
 
     @staticmethod
-    def _score_sr_vwap(sr_position, vwap_position, side: str) -> float:
-        """Factor 4: Support/Resistance + VWAP position (max 10 pts).
-        sr_position: 0=at support, 1=at resistance. vwap_position: >0 above VWAP."""
-        w = config.CONVICTION_WEIGHT_SR_VWAP
-        if sr_position is None and vwap_position is None:
-            return w * 0.45  # no data — mild positive
-        sr_pts, vwap_pts = 0.0, 0.0
-        if sr_position is not None:
-            sr_pts = (1.0 - sr_position if side == "BUY" else sr_position) * (w * 0.6)
-        if vwap_position is not None:
-            if (side == "BUY" and vwap_position > 0) or (side == "SELL" and vwap_position < 0):
-                vwap_pts = w * 0.4
-        return sr_pts + vwap_pts
-
-    @staticmethod
     def _score_oi(oi_change, side: str) -> float:
         """Factor 5: Open Interest change (max 8 pts).
         Growing OI confirms fresh positioning; falling OI signals unwinding."""
@@ -400,36 +385,6 @@ class RiskManager:
             if oi_change > config.OI_CHANGE_HIGH:
                 return -config.CONVICTION_OI_PENALTY
             return w * 0.30
-
-    @staticmethod
-    def _score_volatility(volatility) -> float:
-        """Factor 6: Volatility quality filter (max 5 pts).
-        Ideal vol is between VOL_MIN and 50% of VOL_MAX; extreme vol reduces score."""
-        w = config.CONVICTION_WEIGHT_VOL
-        if volatility is None:
-            return w * 0.60
-        if config.VOL_MIN_ATR_PCT <= volatility <= config.VOL_MAX_ATR_PCT * 0.5:
-            return w           # ideal range
-        if volatility <= config.VOL_MAX_ATR_PCT:
-            return w * 0.60
-        return w * 0.10        # too volatile
-
-    @staticmethod
-    def _score_sentiment(sentiment_score) -> float:
-        """Factor 7: News/social sentiment (max 15 pts).
-        Strongly negative news → penalty; strongly positive → full score."""
-        w = config.CONVICTION_WEIGHT_SENTIMENT
-        if sentiment_score is None:
-            return w * 0.30    # no data — mild
-        if sentiment_score < config.SENTIMENT_VETO_THRESHOLD:
-            return -config.CONVICTION_SENTIMENT_STRONG_PENALTY
-        if sentiment_score < config.CONVICTION_SENTIMENT_NEG_THRESHOLD:
-            return -config.CONVICTION_SENTIMENT_MILD_PENALTY
-        if sentiment_score < -config.CONVICTION_SENTIMENT_NEG_THRESHOLD:
-            return w * 0.30    # neutral band
-        if sentiment_score < config.SENTIMENT_STRONG_POS:
-            return w * 0.75    # moderately positive
-        return w               # strongly positive
 
     @staticmethod
     def _score_orderflow(orderflow_score, side: str) -> float:

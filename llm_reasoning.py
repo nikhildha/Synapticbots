@@ -32,8 +32,6 @@ logger = logging.getLogger("Athena")
 # Setup dedicated file logger for Athena
 if not logger.handlers:
     try:
-        import os
-        import config
         os.makedirs(config.DATA_DIR, exist_ok=True)
         athena_log_file = os.path.join(config.DATA_DIR, "athena_system.log")
         file_handler = logging.FileHandler(athena_log_file, encoding="utf-8")

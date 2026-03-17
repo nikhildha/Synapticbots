@@ -3,103 +3,72 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth-options';
 import { prisma } from '@/lib/prisma';
 import { syncEngineTrades, getUserTrades } from '@/lib/sync-engine-trades';
-import { getEngineUrl, type EngineMode } from '@/lib/engine-url';
+import { getEngineUrl } from '@/lib/engine-url';
 
 export const dynamic = 'force-dynamic';
 
-async function fetchEngineData(mode: EngineMode = 'live') {
-    const url = getEngineUrl(mode);
-    console.log(`[bot-state] fetchEngineData(${mode}) → url=${url || '<EMPTY>'}`);
+async function fetchEngineData(url: string) {
     if (!url) return null;
+    const secret = process.env.ENGINE_API_SECRET;
+    const headers: Record<string, string> = secret ? { Authorization: `Bearer ${secret}` } : {};
     try {
         const res = await fetch(`${url}/api/all`, {
             cache: 'no-store',
             signal: AbortSignal.timeout(8000),
+            headers,
         });
-        console.log(`[bot-state] Engine ${mode} response: ${res.status} ${res.statusText}`);
         if (res.ok) return await res.json();
-        console.error(`[bot-state] Engine ${mode} non-OK: ${res.status}`);
+        console.error(`[bot-state] Engine non-OK: ${res.status} ${url}`);
     } catch (err) {
-        console.error(`[bot-state] Engine API (${mode}) fetch failed:`, err);
+        console.error(`[bot-state] Engine fetch failed (${url}):`, err);
     }
     return null;
 }
 
 export async function GET() {
     try {
-        // Get session to filter trades by user
         const session = await getServerSession(authOptions);
         const userId = (session?.user as any)?.id;
 
-        // Determine which engine to call based on user's active bot mode
-        // C1 FIX: default to 'paper' for safety (not 'live')
-        let engineMode: EngineMode = 'paper';
+        // ── Signals: always from primary engine — same for ALL users ──
+        // HMM + Athena analysis is shared. Paper vs live is execution-only, not signal-only.
+        // Live engine is primary; fall back to paper if live URL not configured.
+        const primaryUrl = getEngineUrl('live') || getEngineUrl('paper');
+        const engineData = await fetchEngineData(primaryUrl);
+
+        const multi = engineData?.multi || { coin_states: {}, last_analysis_time: null, deployed_count: 0 };
+        const engineState = engineData?.engine || { status: primaryUrl ? 'unknown' : 'not_configured' };
+        const coinStates = multi.coin_states || {};
+        const engineTrades: any[] = engineData?.tradebook?.trades || [];
+
+        // ── Per-User Trades: each bot syncs from its own engine ──
+        // Paper bot → paper engine, live bot → live engine.
+        // Signal display above is decoupled from this — users always see shared signals.
+        let trades: any[] = [];
         let userBots: any[] = [];
-        if (userId) {
-            // MULTI-BOT FIX: fetch ALL user bots for broadcast sync
+
+        if (session && userId) {
             userBots = await prisma.bot.findMany({
                 where: { userId },
                 include: { config: true },
                 orderBy: [{ isActive: 'desc' }, { updatedAt: 'desc' }],
             });
-            // Use live engine for DASHBOARD display if ANY active bot is live
-            const hasLiveBot = userBots.some((b: any) =>
-                b.isActive && (b.config?.mode || '').toLowerCase().includes('live')
-            );
-            if (hasLiveBot) engineMode = 'live';
-        }
 
-        // Fetch engine data for DASHBOARD UI (coin states, engine status, etc.)
-        // Always fetch both engines when URLs are configured so we have per-engine
-        // registered_bot_ids for correct re-registration and full pending order lists.
-        const hasMixedModes = userBots.some((b: any) =>
-            b.isActive && (b.config?.mode || '').toLowerCase().includes('live')
-        ) && userBots.some((b: any) =>
-            b.isActive && !(b.config?.mode || '').toLowerCase().includes('live')
-        );
+            // Cache trades per engine URL to avoid duplicate fetches across bots
+            const engineTradeCache: Record<string, any[]> = {};
 
-        const [engineData, altEngineData] = await Promise.all([
-            fetchEngineData(engineMode),
-            // Fetch the opposite engine when user has bots on both engines
-            hasMixedModes ? fetchEngineData(engineMode === 'live' ? 'paper' : 'live') : Promise.resolve(null),
-        ]);
-
-        // Engine self-heals by pulling active bots from /api/internal/active-bots every 3 cycles.
-        // No push re-registration needed here.
-
-        const multi = engineData?.multi || { coin_states: {}, last_analysis_time: null, deployed_count: 0 };
-        const engineTradebook = engineData?.tradebook || { trades: [], summary: {} };
-        const engineState = engineData?.engine || { status: getEngineUrl(engineMode) ? 'unknown' : 'not_configured' };
-
-        // Build the engine state part of the response (shared — not per-user)
-        const coinStates = multi.coin_states || {};
-        // Merge trades from both engines so pending_orders enrichment covers all modes
-        const altTrades: any[] = altEngineData?.tradebook?.trades || [];
-        const engineTradesRaw = [...(engineTradebook.trades || []), ...altTrades];
-
-        // Pre-build engine trade cache from already-fetched data (avoids duplicate HTTP calls below)
-        const prefetchedEngineCache: Record<string, any[]> = {
-            [engineMode]: engineTradebook.trades || [],
-            ...(altEngineData ? { [engineMode === 'live' ? 'paper' : 'live']: altTrades } : {}),
-        };
-
-        // ─── Per-User Trade Isolation ────────────────────────────────
-        let trades: any[] = [];
-
-        if (session && userId) {
-            // ISOLATION FIX: sync each bot from its OWN engine (not one engine for all)
-            // This prevents paper bots from getting live trades and vice versa.
-            const engineTradeCache: Record<string, any[]> = { ...prefetchedEngineCache };
             for (const ub of userBots) {
                 if (!ub.startedAt) continue;
-                const botMode: EngineMode = ((ub.config as any)?.mode || 'paper').toLowerCase().includes('live') ? 'live' : 'paper';
+                const isLive = (ub.config?.mode || 'paper').toLowerCase().includes('live');
+                const botEngineUrl = getEngineUrl(isLive ? 'live' : 'paper');
+                if (!botEngineUrl) continue;
+
                 try {
-                    // Use pre-fetched engine data if available; only fetch if not already cached
-                    if (!engineTradeCache[botMode]) {
-                        const data = await fetchEngineData(botMode);
-                        engineTradeCache[botMode] = data?.tradebook?.trades || [];
+                    if (!(botEngineUrl in engineTradeCache)) {
+                        const data = await fetchEngineData(botEngineUrl);
+                        engineTradeCache[botEngineUrl] = data?.tradebook?.trades || [];
                     }
-                    const botTrades = engineTradeCache[botMode];
+                    const botTrades = engineTradeCache[botEngineUrl];
                     if (botTrades.length > 0) {
                         await syncEngineTrades(botTrades, ub.id, ub.startedAt, userId);
                     }
@@ -112,61 +81,38 @@ export async function GET() {
                 trades = await getUserTrades(userId);
             } catch (err) {
                 console.error('[bot-state] getUserTrades failed:', err);
-                trades = [];
-            }
-
-            // Enrich Prisma trades with live engine data (not stored in Prisma)
-            if (engineTradesRaw.length > 0 && trades.length > 0) {
-                const engineMap = new Map<string, any>();
-                for (const et of engineTradesRaw) {
-                    const eid = et.trade_id || et.id;
-                    if (eid) engineMap.set(eid, et);
-                }
-                trades = trades.map((t: any) => {
-                    const engineTrade = engineMap.get(t.trade_id);
-                    if (engineTrade) {
-                        return { ...t };
-                    }
-                    return t;
-                });
             }
         }
 
         const activeTrades = trades.filter((t: any) => (t.status || '').toUpperCase() === 'ACTIVE');
 
-        // ─── Timing fields: fallback computation when engine doesn't provide them ──
-        // Engine writes timestamps as datetime.now(IST).replace(tzinfo=None) — IST with no TZ marker.
-        // The dashboard's formatIST() appends 'Z' if no TZ is found, causing double-offset.
-        // Fix: tag bare timestamps with +05:30 so they're correctly interpreted as IST.
+        // ─── Timing fields ────────────────────────────────────────────────────────
+        // Engine writes bare IST timestamps (no TZ marker). Tag them so the dashboard
+        // doesn't double-offset by appending 'Z'.
         const normalizeTs = (ts: any): string | null => {
             if (!ts) return null;
             const s = String(ts);
-            // Already has Z or ±HH:MM → leave as-is
             if (/Z$|[+-]\d{2}:\d{2}$/.test(s)) return s;
-            // Bare timestamp from engine → it's IST, tag it
             return s + '+05:30';
         };
 
         const lastAnalysis = normalizeTs(multi.last_analysis_time) || normalizeTs(multi.timestamp) || null;
-        const intervalSec = multi.analysis_interval_seconds || 300; // default 5min
+        const intervalSec = multi.analysis_interval_seconds || 300;
         let nextAnalysis = normalizeTs(multi.next_analysis_time) || null;
         if (!nextAnalysis && lastAnalysis && intervalSec) {
             try {
                 const lastMs = new Date(lastAnalysis).getTime();
-                if (!isNaN(lastMs)) {
-                    nextAnalysis = new Date(lastMs + intervalSec * 1000).toISOString();
-                }
+                if (!isNaN(lastMs)) nextAnalysis = new Date(lastMs + intervalSec * 1000).toISOString();
             } catch { /* silent */ }
         }
 
-        // ─── Per-Bot Stats for bot cards ────────────────────────────
+        // ─── Per-Bot Stats for bot cards ─────────────────────────────────────────
         const perBot: Record<string, { activeTrades: number; totalTrades: number; activePnl: number; totalPnl: number; capital: number }> = {};
         for (const t of trades) {
             const bid = t.bot_id || t.botId || 'unknown';
             if (!perBot[bid]) perBot[bid] = { activeTrades: 0, totalTrades: 0, activePnl: 0, totalPnl: 0, capital: 0 };
             perBot[bid].totalTrades++;
-            const isActive = (t.status || '').toUpperCase() === 'ACTIVE';
-            if (isActive) {
+            if ((t.status || '').toUpperCase() === 'ACTIVE') {
                 perBot[bid].activeTrades++;
                 perBot[bid].activePnl += t.activePnl || t.unrealized_pnl || 0;
                 perBot[bid].capital += t.capital || 100;
@@ -178,28 +124,17 @@ export async function GET() {
         return NextResponse.json({
             state: {
                 regime: multi.macro_regime || coinStates?.BTCUSDT?.regime || 'WAITING',
-                // FIX: BTC is a macro-only coin — conviction is never set for it.
-                // The raw HMM margin (conf) is near-zero for CHOP/HIGH_VOLATILITY.
-                // Real signal: parse the per-TF margins from the regime string like
-                //   "1d=HIGH_VOL(0.92) | 1h=BEARISH(0.76) | 15m=BEARISH(0.84)"
-                // Average those bracket values → meaningful 0-100 display confidence.
                 confidence: (() => {
                     const btc = coinStates?.BTCUSDT;
                     const regimeStr: string = btc?.regime || '';
-
-                    // Parse all (x.xx) margin values from the regime string
                     const matches = regimeStr.match(/\(([\d.]+)\)/g);
-                    if (matches && matches.length > 0) {
+                    if (matches?.length) {
                         const values = matches
                             .map((m: string) => parseFloat(m.replace(/[()]/g, '')))
                             .filter((v: number) => !isNaN(v) && v > 0 && v <= 1);
-                        if (values.length > 0) {
-                            const avg = values.reduce((a: number, b: number) => a + b, 0) / values.length;
-                            return Math.round(avg * 100); // convert 0.84 → 84
-                        }
+                        if (values.length > 0)
+                            return Math.round(values.reduce((a: number, b: number) => a + b, 0) / values.length * 100);
                     }
-
-                    // Fallbacks: conviction (unlikely for BTC), then raw margin
                     const conviction = btc?.conviction;
                     if (conviction != null && conviction > 0) return conviction;
                     const margin = btc?.confidence;
@@ -217,15 +152,11 @@ export async function GET() {
                 eligible_count: Object.values(coinStates).filter((c: any) => (c.action || '').includes('ELIGIBLE')).length,
                 deployed_count: multi.deployed_count || 0,
                 total_trades: trades.length,
-                active_positions: Object.fromEntries(
-                    activeTrades.map((t: any) => [t.symbol, t])
-                ),
+                active_positions: Object.fromEntries(activeTrades.map((t: any) => [t.symbol, t])),
                 coin_states: coinStates,
                 cycle: multi.cycle || 0,
-                // Engine health signals for frontend status detection
                 status: engineState?.status || 'unknown',
                 uptime_seconds: engineState?.uptime_seconds || 0,
-                // Timing fields — always populated
                 last_analysis_time: lastAnalysis,
                 next_analysis_time: nextAnalysis,
                 analysis_interval_seconds: intervalSec,
@@ -238,12 +169,10 @@ export async function GET() {
 
             tradebook: {
                 trades,
-                // Pending engine orders (LIMIT / VIRTUAL_LIMIT awaiting fill — not yet in DB)
-                pending_orders: engineTradesRaw.filter((t: any) =>
+                pending_orders: engineTrades.filter((t: any) =>
                     (t.status || '').toUpperCase() === 'OPEN' &&
                     (t.order_type || '').toUpperCase().includes('LIMIT')
                 ),
-                // F2 FIX: compute per-user summary from user's trades, not engine-wide
                 summary: {
                     total_trades: trades.length,
                     active_trades: activeTrades.length,
@@ -255,12 +184,8 @@ export async function GET() {
             },
             engine: engineState,
             _debug: {
-                engineMode,
-                hasMixedModes,
-                liveUrl: getEngineUrl('live') ? '✓ set' : '✗ empty',
-                paperUrl: getEngineUrl('paper') ? '✓ set' : '✗ empty',
+                primaryUrl: primaryUrl ? '✓' : '✗ not configured',
                 engineDataOk: !!engineData,
-                altEngineDataOk: !!altEngineData,
                 totalBots: userBots.length,
                 activeBots: userBots.filter((b: any) => b.isActive).length,
             },

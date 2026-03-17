@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { Header } from '@/components/header';
 import { ActiveTradesChart } from '@/components/active-trades-chart';
-import { Download, TrendingUp, TrendingDown, Clock, Search, X, BarChart3, RefreshCw, Trash2 } from 'lucide-react';
+import { Download, Search, X, BarChart3, Trash2 } from 'lucide-react';
 import { motion } from 'framer-motion';
 
 /* ═══ Types ═══ */
@@ -28,6 +28,17 @@ const fmt$ = (v: number) => (v >= 0 ? '+' : '') + v.toFixed(2);
 const fmtPct = (v: number) => (v >= 0 ? '+' : '') + v.toFixed(1) + '%';
 const fmtPrice = (v: number) => v.toFixed(4);
 const pnlColor = (v: number) => v > 0 ? '#22C55E' : v < 0 ? '#EF4444' : '#6B7280';
+
+// Shared helpers — eliminate repeated inline logic
+const tradeSym = (t: any) => (t.symbol || (t.coin || '') + 'USDT').toUpperCase();
+const tradeIsLong = (t: any) => { const p = (t.position || '').toLowerCase(); return p === 'long' || p === 'buy'; };
+const calcLivePnl = (t: any, cp: number) => {
+  if (!cp || !t.entryPrice || t.entryPrice === 0) return { pnl: 0, pnlPct: 0 };
+  const diff = tradeIsLong(t) ? (cp - t.entryPrice) : (t.entryPrice - cp);
+  const pnl = Math.round(diff / t.entryPrice * t.leverage * t.capital * 10000) / 10000;
+  const pnlPct = t.capital > 0 ? Math.round(pnl / t.capital * 100 * 100) / 100 : 0;
+  return { pnl, pnlPct };
+};
 
 /* ═══ Determine if a trade is truly active ═══ */
 function isTradeActive(t: any): boolean {
@@ -162,47 +173,33 @@ export function TradesClient({ trades: initialTrades }: TradesClientProps) {
   const [trades, setTrades] = useState<Trade[]>(initialTrades);
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'closed'>('active');
   const [closingTradeId, setClosingTradeId] = useState<string | null>(null);
-  const [confirmingTradeId, setConfirmingTradeId] = useState<string | null>(null); // two-click Book Profit
-  const [confirmingClear, setConfirmingClear] = useState(false); // two-click Clear Trades
+  const [confirmingTradeId, setConfirmingTradeId] = useState<string | null>(null);
+  const [confirmingClear, setConfirmingClear] = useState(false);
 
   const [livePrices, setLivePrices] = useState<Record<string, number>>({});
   const [posFilter, setPosFilter] = useState<string>('all');
-  const [regimeFilter, setRegimeFilter] = useState<string>('all');
   const [coinSearch, setCoinSearch] = useState('');
   const [pnlFilter, setPnlFilter] = useState<'all' | 'profit' | 'loss'>('all');
   const [modeFilter, setModeFilter] = useState<'all' | 'paper' | 'live'>('all');
   const [sessionFilter, setSessionFilter] = useState<string>('all');
-  const [lastRefresh, setLastRefresh] = useState<string>('');
-  const [isRefreshing, setIsRefreshing] = useState(false);
   const [isClearing, setIsClearing] = useState(false);
   const [clearSuccess, setClearSuccess] = useState<string | null>(null);
   const [isExitingAll, setIsExitingAll] = useState(false);
   const [confirmExitAll, setConfirmExitAll] = useState(false);
-  const clearPauseRef = useRef(false); // blocks auto-refresh after clearing
-  const [pendingOrders, setPendingOrders] = useState<any[]>([]); // engine-side OPEN limit orders
+  const clearPauseRef = useRef(false);
 
   useEffect(() => { setMounted(true); }, []);
 
   // Auto-refresh from engine every 15s
   const refreshTrades = useCallback(async () => {
-    // Skip refresh if trades were just cleared (pause for 30s)
     if (clearPauseRef.current) return;
-    setIsRefreshing(true);
     try {
       const res = await fetch('/api/bot-state', { cache: 'no-store' });
       if (res.ok) {
         const data = await res.json();
-        const raw = data?.tradebook?.trades || [];
-        // Always update — even if empty — so stale trades get cleared
-        setTrades(raw.map(mapTrade));
-        setPendingOrders(data?.tradebook?.pending_orders || []);
-        setLastRefresh(new Date().toLocaleTimeString());
+        setTrades((data?.tradebook?.trades || []).map(mapTrade));
       }
-    } catch {
-      // silent
-    } finally {
-      setIsRefreshing(false);
-    }
+    } catch { /* silent */ }
   }, []);
 
   // Live price polling from Binance REST every 3s for active trade symbols
@@ -210,17 +207,11 @@ export function TradesClient({ trades: initialTrades }: TradesClientProps) {
   useEffect(() => {
     async function fetchLivePrices() {
       const activeTrades = (trades ?? []).filter(t => (t.status || '').toLowerCase() === 'active');
-      const activeSymbols = [...new Set(
-        activeTrades.map(t => (t.symbol || (t.coin ?? '') + 'USDT').toUpperCase()).filter(Boolean)
-      )];
+      const activeSymbols = [...new Set(activeTrades.map(tradeSym).filter(Boolean))];
       if (activeSymbols.length === 0) return;
 
-      // Build entry price lookup for sanity checks
       const entryPriceBySymbol: Record<string, number> = {};
-      activeTrades.forEach(t => {
-        const sym = (t.symbol || (t.coin ?? '') + 'USDT').toUpperCase();
-        entryPriceBySymbol[sym] = t.entryPrice || 0;
-      });
+      activeTrades.forEach(t => { entryPriceBySymbol[tradeSym(t)] = t.entryPrice || 0; });
 
       try {
         // Fetch all active symbols in one batch request (max 100 in Binance batch)
@@ -261,7 +252,6 @@ export function TradesClient({ trades: initialTrades }: TradesClientProps) {
       const tStatus = (t.status || '').toLowerCase();
       const tMode = (t.mode || '').toLowerCase();
       const tPos = (t.position || '').toLowerCase();
-      const tRegime = (t.regime || '').toLowerCase();
 
       // Double-check active/closed using original trade data, not just mapped status
       const tradeIsActive = tStatus === 'active';
@@ -275,19 +265,15 @@ export function TradesClient({ trades: initialTrades }: TradesClientProps) {
           : ['short', 'sell'].includes(tPos);
         if (!posMatch) return false;
       }
-      if (regimeFilter !== 'all' && !tRegime.includes(regimeFilter)) return false;
       if (coinSearch && !t.coin.toLowerCase().includes(coinSearch.toLowerCase())) return false;
-      if (pnlFilter === 'profit') {
+      if (pnlFilter !== 'all') {
         const pnl = tStatus === 'active' ? t.activePnl : t.totalPnl;
-        if (pnl <= 0) return false;
-      }
-      if (pnlFilter === 'loss') {
-        const pnl = tStatus === 'active' ? t.activePnl : t.totalPnl;
-        if (pnl >= 0) return false;
+        if (pnlFilter === 'profit' && pnl <= 0) return false;
+        if (pnlFilter === 'loss' && pnl >= 0) return false;
       }
       return true;
     });
-  }, [trades, statusFilter, modeFilter, posFilter, regimeFilter, coinSearch, pnlFilter, sessionFilter]);
+  }, [trades, statusFilter, modeFilter, posFilter, coinSearch, pnlFilter, sessionFilter]);
 
   /* ── Portfolio Stats (respects master mode filter) ── */
   const CAPITAL_PER_TRADE = 100;
@@ -306,27 +292,14 @@ export function TradesClient({ trades: initialTrades }: TradesClientProps) {
     const realizedPnl = closed.reduce((s, t) => s + (t.totalPnl || 0), 0);
     // Recalculate unrealized PnL from live prices (matches table P&L formula)
     const unrealizedPnl = active.reduce((s, t) => {
-      const sym = (t.symbol || t.coin + 'USDT').toUpperCase();
-      const cp = livePrices[sym] || t.currentPrice || t.entryPrice;
-      if (!cp || !t.entryPrice || t.entryPrice === 0) return s;
-      const pos = (t.position || '').toLowerCase();
-      const isLong = pos === 'long' || pos === 'buy';
-      const diff = isLong ? (cp - t.entryPrice) : (t.entryPrice - cp);
-      const pnl = Math.round(diff / t.entryPrice * t.leverage * t.capital * 10000) / 10000;
-      return s + pnl;
+      const cp = livePrices[tradeSym(t)] || t.currentPrice || t.entryPrice;
+      return s + calcLivePnl(t, cp).pnl;
     }, 0);
     const combinedPnl = realizedPnl + unrealizedPnl;
 
-    // Compute P&L % from live prices for active trades (avoids stale engine values)
     const activePnlPcts = active.map(t => {
-      const sym = (t.symbol || t.coin + 'USDT').toUpperCase();
-      const cp = livePrices[sym] || t.currentPrice || t.entryPrice;
-      if (!cp || !t.entryPrice || t.entryPrice === 0 || !t.capital || t.capital === 0) return 0;
-      const pos = (t.position || '').toLowerCase();
-      const isLong = pos === 'long' || pos === 'buy';
-      const diff = isLong ? (cp - t.entryPrice) : (t.entryPrice - cp);
-      const pnl = Math.round(diff / t.entryPrice * t.leverage * t.capital * 10000) / 10000;
-      return Math.round(pnl / t.capital * 100 * 100) / 100;
+      const cp = livePrices[tradeSym(t)] || t.currentPrice || t.entryPrice;
+      return calcLivePnl(t, cp).pnlPct;
     });
     const allPnlPcts = [
       ...closed.map(t => t.totalPnlPercent || 0),
@@ -390,7 +363,10 @@ export function TradesClient({ trades: initialTrades }: TradesClientProps) {
     a.click(); URL.revokeObjectURL(url);
   };
 
-  const uniqueRegimes = useMemo(() => [...new Set(trades?.map(t => t.regime?.toLowerCase()).filter(Boolean))], [trades]);
+  const showMsg = useCallback((msg: string, ms = 5000) => {
+    setClearSuccess(msg);
+    setTimeout(() => setClearSuccess(null), ms);
+  }, []);
 
   // Unique sessions for dropdown: { id, label }
   const uniqueSessions = useMemo(() => {
@@ -421,16 +397,13 @@ export function TradesClient({ trades: initialTrades }: TradesClientProps) {
         // Pause auto-refresh for 30s so cleared state isn't overwritten
         clearPauseRef.current = true;
         setTimeout(() => { clearPauseRef.current = false; }, 30000);
-        setClearSuccess(`✅ Cleared ${data.deletedCount || 0} trades`);
-        setTimeout(() => setClearSuccess(null), 8000);
+        showMsg(`✅ Cleared ${data.deletedCount || 0} trades`, 8000);
       } else {
         const err = await res.json();
-        setClearSuccess(`❌ ${err.error || 'Failed to clear trades'}`);
-        setTimeout(() => setClearSuccess(null), 5000);
+        showMsg(`❌ ${err.error || 'Failed to clear trades'}`);
       }
     } catch {
-      setClearSuccess('❌ Network error');
-      setTimeout(() => setClearSuccess(null), 5000);
+      showMsg('❌ Network error');
     } finally {
       setIsClearing(false);
     }
@@ -478,21 +451,13 @@ export function TradesClient({ trades: initialTrades }: TradesClientProps) {
                       });
                       const data = await res.json();
                       if (data.success) {
-                        setClearSuccess(`Exited ${data.totalClosed} trades · PnL: $${(data.totalPnl || 0).toFixed(2)}`);
-                        setTimeout(() => setClearSuccess(null), 8000);
-                        // Refresh
-                        const refreshRes = await fetch('/api/bot-state', { cache: 'no-store' });
-                        if (refreshRes.ok) {
-                          const rd = await refreshRes.json();
-                          setTrades((rd?.tradebook?.trades || []).map(mapTrade));
-                        }
+                        showMsg(`Exited ${data.totalClosed} trades · PnL: $${(data.totalPnl || 0).toFixed(2)}`, 8000);
+                        refreshTrades();
                       } else {
-                        setClearSuccess(`Error: ${data.error}`);
-                        setTimeout(() => setClearSuccess(null), 5000);
+                        showMsg(`Error: ${data.error}`);
                       }
                     } catch {
-                      setClearSuccess('Exit all failed');
-                      setTimeout(() => setClearSuccess(null), 5000);
+                      showMsg('Exit all failed');
                     } finally {
                       setIsExitingAll(false);
                     }
@@ -655,23 +620,13 @@ export function TradesClient({ trades: initialTrades }: TradesClientProps) {
                     <tbody>
                       {filtered.map(t => {
                         const isActive = (t.status || '').toLowerCase() === 'active';
-                        const sym = (t.symbol || t.coin + 'USDT').toUpperCase();
+                        const sym = tradeSym(t);
                         const livePrice = livePrices[sym];
                         const currentPrice = isActive ? (livePrice || t.currentPrice || t.entryPrice) : null;
-                        const pos = (t.position || '').toLowerCase();
-                        const isLong = pos === 'long' || pos === 'buy';
-                        // Recalculate P&L from live price for active trades
-                        let pnl: number, pnlPct: number;
-                        if (isActive && currentPrice) {
-                          const diff = isLong ? (currentPrice - t.entryPrice) : (t.entryPrice - currentPrice);
-                          // E2 FIX: CoinDCX live trades have already-leveraged qty
-                          pnl = t.entryPrice > 0 ? Math.round(diff / t.entryPrice * t.leverage * t.capital * 10000) / 10000 : 0;
-                          pnlPct = t.capital > 0 ? Math.round(pnl / t.capital * 100 * 100) / 100 : 0;
-                        } else {
-                          pnl = t.totalPnl;
-                          pnlPct = t.totalPnlPercent;
-                        }
-                        const duration = getDuration(t.entryTime, t.exitTime);
+                        const isLong = tradeIsLong(t);
+                        const { pnl, pnlPct } = isActive && currentPrice
+                          ? calcLivePnl(t, currentPrice)
+                          : { pnl: t.totalPnl, pnlPct: t.totalPnlPercent };
 
                         return (
                           <tr key={t.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
@@ -759,12 +714,10 @@ export function TradesClient({ trades: initialTrades }: TradesClientProps) {
                                         setTrades(prev => prev.filter(tr => tr.id !== t.id));
                                       } else {
                                         const err = await res.json();
-                                        setClearSuccess(`❌ ${err.error || 'Failed to close trade'}`);
-                                        setTimeout(() => setClearSuccess(null), 5000);
+                                        showMsg(`❌ ${err.error || 'Failed to close trade'}`);
                                       }
                                     } catch {
-                                      setClearSuccess('❌ Network error');
-                                      setTimeout(() => setClearSuccess(null), 5000);
+                                      showMsg('❌ Network error');
                                     } finally {
                                       setClosingTradeId(null);
                                     }

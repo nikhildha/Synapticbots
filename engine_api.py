@@ -238,6 +238,8 @@ def pull_active_bots_from_saas():
         config.ENGINE_ACTIVE_BOTS = bots
         if bots:
             config.ENGINE_BOT_ID = bots[-1].get("bot_id", config.ENGINE_BOT_ID)
+        else:
+            logger.warning("⚠️  SaaS returned 0 active %s bots — deploy loop will be skipped this cycle", mode)
         _save_active_bots()
         logger.info("✅ Pulled %d active %s bots from SaaS DB", len(bots), mode)
         return True

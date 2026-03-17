@@ -33,6 +33,7 @@ export async function GET(request: Request) {
             bot_id: bot.id,
             user_id: bot.userId,
             bot_name: bot.name,
+            mode: (bot.config?.mode || 'paper').toLowerCase().includes('live') ? 'live' : 'paper',
             brain_type: bot.config?.brainType || 'adaptive',
             segment_filter: bot.config?.segment || 'ALL',
             capital_per_trade: bot.config?.capitalPerTrade ?? 100,
