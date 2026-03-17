@@ -58,9 +58,9 @@ export function SegmentHeatmap({ heatmapData, loading = false }: SegmentHeatmapP
   const sortedSegments = [...heatmapData.segments].sort((a, b) => b.composite_score - a.composite_score);
   const btc24h = heatmapData.btc_24h || 0;
 
-  // Identify the Top 2 Absolute Momentum segments (the ones the engine actually scans)
+  // Identify the Top Absolute Momentum segments (the engine scans config.SEGMENT_SCAN_LIMIT, which is 3)
   const absSorted = [...heatmapData.segments].sort((a, b) => b.abs_score - a.abs_score);
-  const top2Targets = absSorted.slice(0, 2).map((s) => s.segment);
+  const top2Targets = absSorted.slice(0, 3).map((s) => s.segment);
 
   return (
     <div className="mb-8 p-6 rounded-2xl border border-white/5" style={{ background: 'rgba(17, 24, 39, 0.6)', backdropFilter: 'blur(12px)' }}>
