@@ -268,9 +268,6 @@ class RegimeMasterBot:
         # Always: sync positions (detect SL/TP auto-closes)
         self._sync_positions()
 
-        # Always: manage OPEN limit orders (Expiry, Escape Hatch, Paper Fills)
-        self._manage_limit_orders()
-
         # Always: update unrealized P&L + trailing SL/TP (with live funding rates)
         try:
             # Build funding rates dict from live CoinDCX prices
@@ -764,12 +761,6 @@ class RegimeMasterBot:
                 # the admin bot, causing non-admin trades to be stamped with the wrong
                 # owner and the per-bot duplicate key (bot_id:symbol) to never match
                 # the stored trade, so non-admin bots would open new trades every cycle.
-                # Map execution result status to tradebook status:
-                # "OPEN" (virtual limit waiting) → "OPEN", "FILLED" (market) → "ACTIVE"
-                result_status = (result.get("status") or "ACTIVE") if result else "ACTIVE"
-                tb_status = "OPEN" if result_status == "OPEN" else "ACTIVE"
-                tb_order_type = result.get("order_type") if result else None
-
                 tradebook.open_trade(
                     symbol=sym,
                     side=top["side"],
@@ -782,7 +773,7 @@ class RegimeMasterBot:
                     reason=reason_str,
                     capital=fill_capital,
                     user_id=user_id,
-                    profile_id="segment",   # fixed — no more conservative/balanced/aggressive
+                    profile_id="segment",
                     bot_name=bot_name,
                     exchange=result.get("exchange") if result else None,
                     pair=result.get("pair") if result else None,
@@ -792,8 +783,6 @@ class RegimeMasterBot:
                     rm_id=result.get("rm_id") if result else None,
                     override_sl=fill_sl if fill_sl > 0 else None,
                     override_tp=fill_tp if fill_tp > 0 else None,
-                    status=tb_status,
-                    order_type=tb_order_type,
                 )
 
                 _bcast("TRADEBOOK_RECORDED", self._cycle_count, bot_name, bot_id, sym,
@@ -1682,123 +1671,6 @@ class RegimeMasterBot:
                 )
         except Exception as e:
             logger.warning("Could not load tradebook positions on startup: %s", e)
-
-    def _manage_limit_orders(self):
-        """Manage 'OPEN' limit orders (Paper Fills, TIF expiry & Escape Hatch)."""
-        open_trades = [t for t in tradebook.get_active_trades() if t["status"] == "OPEN"]
-        if not open_trades:
-            return
-            
-        import coindcx_client as cdx
-        from data_pipeline import get_current_price
-
-        for trade in open_trades:
-            try:
-                sym = trade["symbol"]
-                trade_id = trade["trade_id"]
-                entry_time = datetime.fromisoformat(trade["entry_timestamp"].replace("Z", "+00:00")).replace(tzinfo=None)
-                elapsed_min = (datetime.utcnow() - entry_time).total_seconds() / 60.0
-                is_live = (trade.get("mode") or "").upper().startswith("LIVE")
-                
-                # 1. Check TIF Expiry
-                if elapsed_min > config.EXECUTION_TIF_MINUTES:
-                    logger.info("⏳ Limit Order %s (%s) expired after %.1fm (TIF). Cancelling.", trade_id, sym, elapsed_min)
-                    if is_live and trade.get("position_id"):
-                        try:
-                            # Note: CoinDCX expects order_id, we saved it as position_id
-                            cdx.cancel_order(trade["position_id"])
-                        except Exception as e:
-                            logger.error("Failed to cancel CoinDCX order %s: %s", trade["position_id"], e)
-                    tradebook.cancel_trade(trade_id, reason="TIF_EXPIRED")
-                    continue
-                    
-                # 2. Get current price
-                current_price = get_current_price(sym)
-                if not current_price:
-                    continue
-                    
-                # 3. Paper Mode: Simulated Fill
-                if not is_live:
-                    if (trade["side"] == "BUY" and current_price <= trade["entry_price"]) or \
-                       (trade["side"] == "SELL" and current_price >= trade["entry_price"]):
-                        logger.info("🟢 PAPER Limit Order %s (%s) FILLED at %.6f. Transitioning to ACTIVE.", trade_id, sym, current_price)
-                        tradebook.activate_limit_order(trade_id, trade["entry_price"], trade["quantity"])
-                        self._active_positions[f"{trade.get('profile_id', 'standard')}:{sym}"] = {
-                            "regime": trade.get("regime", "UNKNOWN"),
-                            "confidence": trade.get("confidence", 0),
-                            "side": trade.get("side", "BUY"),
-                            "entry_time": datetime.now(IST).replace(tzinfo=None).isoformat(),
-                            "leverage": trade.get("leverage", 1),
-                            "entry_price": trade["entry_price"],
-                            "quantity": trade["quantity"]
-                        }
-                        continue
-                        
-                # 4. LIVE Virtual Limit Orders: Real Execution Fill
-                elif is_live and trade.get("order_type") == "VIRTUAL_LIMIT":
-                    if (trade["side"] == "BUY" and current_price <= trade["entry_price"]) or \
-                       (trade["side"] == "SELL" and current_price >= trade["entry_price"]):
-                        logger.info("🟢 LIVE VIRTUAL Limit %s (%s) Triggered at %.6f! Executing Market Order.", trade_id, sym, current_price)
-                        
-                        rev_regimes = {v: k for k, v in config.REGIME_NAMES.items()}
-                        reg_id = rev_regimes.get(trade.get("regime", "UNKNOWN"), 1)
-                        
-                        # Use self.executor to place a fallback market order
-                        result = self.executor.execute_trade(
-                            symbol=sym,
-                            side=trade["side"],
-                            leverage=trade["leverage"],
-                            quantity=trade["quantity"],
-                            atr=trade.get("atr", trade.get("atr_at_entry", 0.01)),
-                            ema_15m_20=None,  # Force MARKET
-                            regime=reg_id,
-                            confidence=trade.get("confidence", 0),
-                            reason=f"Ghost Limit Trigger: {trade.get('reason', '')}"
-                        )
-                        
-                        if result and result.get("entry_price", 0) > 0:
-                            # Activate the virtual limit in the tradebook & attach exchange info
-                            tradebook.activate_limit_order(trade_id, result["entry_price"], result.get("quantity", trade["quantity"]))
-                            tradebook.update_trade(trade_id, {
-                                "position_id": result.get("position_id"),
-                                "exchange": result.get("exchange", "coindcx"),
-                                "pair": result.get("pair"),
-                            })
-                            # Add to active positions tracker
-                            self._active_positions[f"{trade.get('bot_id', config.ENGINE_BOT_ID)}:{sym}"] = {
-                                "profile_id": trade.get("profile_id", "standard"),
-                                "bot_name": trade.get("bot_name", "Athena Bot"),
-                                "regime": trade.get("regime", "UNKNOWN"),
-                                "confidence": trade.get("confidence", 0),
-                                "side": trade["side"],
-                                "entry_time": datetime.now(IST).replace(tzinfo=None).isoformat(),
-                                "leverage": result.get("leverage", trade.get("leverage", 1)),
-                                "entry_price": result["entry_price"],
-                                "quantity": result.get("quantity", trade["quantity"]),
-                                "exchange": result.get("exchange", "coindcx"),
-                                "position_id": result.get("position_id")
-                            }
-                        else:
-                            logger.error("🔴 LIVE VIRTUAL Limit %s (%s) Market Execution FAIL! Canceling.", trade_id, sym)
-                            tradebook.cancel_trade(trade_id, reason="EXCHANGE_MARKET_FAIL")
-                        continue
-
-                # 4. Check Escape Hatch
-                atr_at_entry = trade.get("atr_at_entry", 0)
-                if atr_at_entry > 0:
-                    dist = abs(current_price - trade["entry_price"])
-                    if dist > config.EXECUTION_ESCAPE_ATR * atr_at_entry:
-                        logger.info("🏃 Escape Hatch triggered for %s (%s) | Dist: %.4f > Threshold: %.4f. Cancelling.", 
-                                    trade_id, sym, dist, config.EXECUTION_ESCAPE_ATR * atr_at_entry)
-                        if is_live and trade.get("position_id"):
-                            try:
-                                cdx.cancel_order(trade["position_id"])
-                            except Exception as e:
-                                logger.error("Failed to cancel CoinDCX order %s: %s", trade["position_id"], e)
-                        tradebook.cancel_trade(trade_id, reason="ESCAPE_HATCH")
-
-            except Exception as e:
-                logger.error("Error managing limit order %s: %s", trade.get("trade_id", "unknown"), e)
 
     def _sync_positions(self):
         """

@@ -117,88 +117,34 @@ class ExecutionEngine:
 
         regime_name = config.REGIME_NAMES.get(regime, "UNKNOWN")
 
-        # ── Paper Trade Mode (Binance) ────────────────────────────
+        # ── Paper Trade Mode ────────────────────────────────────────
         if config.PAPER_TRADE:
             from data_pipeline import get_current_price
             current_price = get_current_price(symbol) or 0
-            
-            is_limit = config.EXECUTION_ATR_PULLBACK and ema_15m_20 is not None
-            entry_price = ema_15m_20 if is_limit else current_price
-            order_type = "LIMIT" if is_limit else "MARKET"
-
-            sl, tp, rm_id = self.risk.calculate_optimal_stops(symbol, entry_price, atr, side, leverage, swing_l, swing_h)
-
+            sl, tp, rm_id = self.risk.calculate_optimal_stops(symbol, current_price, atr, side, leverage, swing_l, swing_h)
             log_entry = {
-                "timestamp":  datetime.utcnow().isoformat(),
-                "symbol":     symbol,
-                "side":       side,
-                "leverage":   leverage,
-                "quantity":   quantity,
-                "entry_price": entry_price,
-                "stop_loss":  sl,
+                "timestamp":   datetime.utcnow().isoformat(),
+                "symbol":      symbol,
+                "side":        side,
+                "leverage":    leverage,
+                "quantity":    quantity,
+                "entry_price": current_price,
+                "stop_loss":   sl,
                 "take_profit": tp,
-                "capital":    round(quantity * entry_price / (leverage or 1), 2) if (leverage or 0) > 0 and (entry_price or 0) > 0 else 100.0,
-                "regime":     regime_name,
-                "confidence": f"{confidence:.2f}" if confidence else "N/A",
-                "reason":     reason,
-                "rm_id":      rm_id,
-                "mode":       "PAPER",
-                "order_type": order_type,
-                "status":     "OPEN" if is_limit else "FILLED",
-                "created_at": time.time(), # Used for TIF tracking
-                "atr_at_entry": atr,       # Used for Escape Hatch
+                "capital":     round(quantity * current_price / (leverage or 1), 2) if (leverage or 0) > 0 and (current_price or 0) > 0 else 100.0,
+                "regime":      regime_name,
+                "confidence":  f"{confidence:.2f}" if confidence else "N/A",
+                "reason":      reason,
+                "rm_id":       rm_id,
+                "mode":        "PAPER",
+                "order_type":  "MARKET",
+                "status":      "FILLED",
             }
             self._log_trade(log_entry)
-            logger.info(
-                "PAPER %s %s %s @ %.2f | %dx | SL=%.2f TP=%.2f | %s",
-                order_type, side, symbol, entry_price, leverage, sl, tp, regime_name,
-            )
+            logger.info("PAPER MARKET %s %s @ %.2f | %dx | SL=%.2f TP=%.2f | %s", side, symbol, current_price, leverage, sl, tp, regime_name)
             return log_entry
 
-        # ── Virtual Live Trade (Ghost Limits) ───────────────────────
-        is_limit = config.EXECUTION_ATR_PULLBACK and ema_15m_20 is not None
-        if is_limit and getattr(config, "EXECUTION_VIRTUAL_LIMITS", True):
-            from data_pipeline import get_current_price
-            current_price = get_current_price(symbol) or 0
-            entry_price = ema_15m_20
-            
-            # Check Toxic Flow (if the trigger candle closes significantly worse than the setup)
-            toxic_atr = getattr(config, "EXECUTION_TOXIC_FLOW_ATR", 1.0)
-            if toxic_atr > 0:
-                if side == "BUY" and current_price < entry_price - (atr * toxic_atr):
-                    logger.warning("☣️ VIRTUAL LIMIT TOXIC FLOW: BUY %s blocked! Price %.4f is >1 ATR below entry %.4f", symbol, current_price, entry_price)
-                    return None
-                elif side == "SELL" and current_price > entry_price + (atr * toxic_atr):
-                    logger.warning("☣️ VIRTUAL LIMIT TOXIC FLOW: SELL %s blocked! Price %.4f is >1 ATR above entry %.4f", symbol, current_price, entry_price)
-                    return None
-
-            sl, tp, rm_id = self.risk.calculate_optimal_stops(symbol, entry_price, atr, side, leverage, swing_l, swing_h)
-
-            log_entry = {
-                "timestamp":  datetime.utcnow().isoformat(),
-                "symbol":     symbol,
-                "side":       side,
-                "leverage":   leverage,
-                "quantity":   quantity,
-                "entry_price": entry_price,
-                "stop_loss":  sl,
-                "take_profit": tp,
-                "capital":    round(quantity * entry_price / (leverage or 1), 2) if (leverage or 0) > 0 and (entry_price or 0) > 0 else 100.0,
-                "regime":     regime_name,
-                "confidence": f"{confidence:.2f}" if confidence else "N/A",
-                "reason":     reason,
-                "rm_id":      rm_id,
-                "mode":       "LIVE",
-                "order_type": "VIRTUAL_LIMIT",
-                "status":     "OPEN",
-                "created_at": time.time(),
-                "atr_at_entry": atr,
-            }
-            self._log_trade(log_entry)
-            logger.info("👻 VIRTUAL GHOST LIMIT LIVE: %s %s @ %.4f | SL=%.4f TP=%.4f", side, symbol, entry_price, sl, tp)
-            return log_entry
-
-        # ── Live Trade (Market Order Fallback) ──────────────────────
+        # ── Live Trade (Market Order) ────────────────────────────────
         exchange = getattr(config, 'EXCHANGE_LIVE', '').lower()
         if exchange == 'binance':
             return self._execute_binance_live(symbol, side, leverage, quantity, atr,
@@ -218,33 +164,25 @@ class ExecutionEngine:
         from data_pipeline import get_current_price
         current_price = get_current_price(symbol) or 0
         
-        is_limit = config.EXECUTION_ATR_PULLBACK and ema_15m_20 is not None
-        entry_price = ema_15m_20 if is_limit else current_price
-        
-        sl, tp, rm_id = self.risk.calculate_optimal_stops(symbol, entry_price, atr, side, leverage, swing_l, swing_h)
-
-        order_type = "LIMIT" if is_limit else "MARKET"
-        limit_price = entry_price if is_limit else None
+        sl, tp, rm_id = self.risk.calculate_optimal_stops(symbol, current_price, atr, side, leverage, swing_l, swing_h)
 
         result = client.open_position(
             symbol=symbol, side=side, quantity=quantity,
             leverage=leverage, sl_price=sl, tp_price=tp,
-            order_type=order_type, limit_price=limit_price
+            order_type="MARKET", limit_price=None
         )
 
         if result.get("status") in ("FILLED", "OPEN"):
-            fill_price = result.get("avg_price", entry_price)
+            fill_price = result.get("avg_price", current_price)
             fill_qty = result.get("filled_qty", quantity)
-            # Use original quantity for margin if it's an OPEN limit order
-            margin_qty = fill_qty if result.get("status") == "FILLED" else quantity
-            margin = margin_qty * fill_price / leverage
+            margin = fill_qty * fill_price / leverage
 
             log_entry = {
                 "timestamp":    datetime.utcnow().isoformat(),
                 "symbol":       symbol,
                 "side":         side,
                 "leverage":     leverage,
-                "quantity":     margin_qty,
+                "quantity":     fill_qty,
                 "entry_price":  fill_price,
                 "stop_loss":    sl,
                 "take_profit":  tp,
@@ -256,8 +194,8 @@ class ExecutionEngine:
                 "mode":         "LIVE-BINANCE",
                 "exchange":     "binance",
                 "order_id":     result.get("order_id"),
-                "order_type":   order_type,
-                "status":       result.get("status"),
+                "order_type":   "MARKET",
+                "status":       "FILLED",
                 "created_at":   time.time(),
             }
             self._log_trade(log_entry)
@@ -451,19 +389,13 @@ class ExecutionEngine:
                 return None
             price, quantity, leverage, wallet = validated
 
-            is_limit = config.EXECUTION_ATR_PULLBACK and ema_15m_20 is not None
-            entry_price = self._cdx_price_round(ema_15m_20) if is_limit else price
-
-            sl, tp, rm_id = self.risk.calculate_optimal_stops(symbol, entry_price, atr, side, leverage, swing_l, swing_h)
+            sl, tp, rm_id = self.risk.calculate_optimal_stops(symbol, price, atr, side, leverage, swing_l, swing_h)
             sl = self._cdx_price_round(sl)
             tp = self._cdx_price_round(tp)
 
-            order_type = "limit_order" if is_limit else "market_order"
-            limit_price = entry_price if is_limit else None
-
             result = self._place_cdx_order_with_retry(
                 symbol, pair, side, quantity, leverage, price, sl, tp, wallet, cdx,
-                order_type=order_type, limit_price=limit_price
+                order_type="market_order", limit_price=None
             )
             if result is None:
                 return None
@@ -503,8 +435,8 @@ class ExecutionEngine:
                 "pair":         pair,
                 "position_id":  confirmed.get("position_id"),
                 "order_result": str(result),
-                "order_type":   order_type,
-                "status":       "OPEN" if is_limit else "FILLED",
+                "order_type":   "MARKET",
+                "status":       "FILLED",
                 "created_at":   time.time(),
             }
             self._log_trade(log_entry)
