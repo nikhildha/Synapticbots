@@ -167,12 +167,12 @@ export function AthenaPanel({ athena, perBot = {} }: Props) {
                         }}>
                             {/* Decision header row */}
                             <div style={{
-                                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                                display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 10,
                                 padding: '10px 14px',
                                 borderBottom: `1px solid ${cfg.border}`,
                                 background: `${cfg.badgeBg.replace('0.10', '0.05')}`,
                             }}>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
                                     {/* Status dot */}
                                     <div style={{ width: 7, height: 7, borderRadius: '50%', background: cfg.dot, boxShadow: `0 0 6px ${cfg.dot}` }} />
                                     <span style={{ fontWeight: 800, fontSize: 15, color: '#E8EDF5', letterSpacing: 0 }}>
