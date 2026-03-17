@@ -1,15 +1,13 @@
 'use client';
 
-/**
- * Athena Intelligence Panel — Lead Investment Officer decisions
- * Rethemed to match app cyberpunk palette (cyan / dark glass / monospace data)
- */
+import { useState, useEffect } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Activity, ShieldAlert, Zap, Lock, Eye, Cpu } from 'lucide-react';
 
 interface AthenaDecision {
     symbol: string;
     time: string;
     side?: string;
-    conviction?: number;
     action: string;
     adjusted_confidence: number;
     reasoning: string;
@@ -23,7 +21,6 @@ interface AthenaState {
     model?: string;
     initialized?: boolean;
     cycle_calls?: number;
-    cache_size?: number;
     recent_decisions?: AthenaDecision[];
 }
 
@@ -33,22 +30,11 @@ interface Props {
     perBot?: Record<string, { activeTrades: number; totalTrades: number; activePnl: number; totalPnl: number; capital: number }>;
 }
 
-const ACTION_CONFIG: Record<string, { border: string; badge: string; badgeBg: string; label: string; dot: string }> = {
-    EXECUTE: { border: 'rgba(0,255,136,0.18)', badge: '#00FF88', badgeBg: 'rgba(0,255,136,0.10)', label: 'EXECUTE', dot: '#00FF88' },
-    REDUCE_SIZE: { border: 'rgba(255,179,0,0.18)', badge: '#FFB300', badgeBg: 'rgba(255,179,0,0.10)', label: 'REDUCE', dot: '#FFB300' },
-    VETO: { border: 'rgba(255,59,92,0.18)', badge: '#FF3B5C', badgeBg: 'rgba(255,59,92,0.10)', label: 'VETO', dot: '#FF3B5C' },
+const ACTION_THEMES: Record<string, { color: string; glow: string; label: string }> = {
+    EXECUTE: { color: '#00FF88', glow: 'rgba(0,255,136,0.3)', label: 'APPROVED' },
+    REDUCE_SIZE: { color: '#FFB300', glow: 'rgba(255,179,0,0.3)', label: 'MODIFIED' },
+    VETO: { color: '#FF3B5C', glow: 'rgba(255,59,92,0.3)', label: 'VETOED' },
 };
-
-function timeAgo(iso: string): string {
-    try {
-        const diff = Date.now() - new Date(iso).getTime();
-        const m = Math.floor(diff / 60000);
-        const h = Math.floor(m / 60);
-        if (h > 0) return `${h}h ago`;
-        if (m > 0) return `${m}m ago`;
-        return 'just now';
-    } catch { return '—'; }
-}
 
 function parseReasoning(r: string) {
     const parts = r.split(' | ');
@@ -63,212 +49,222 @@ function parseReasoning(r: string) {
     return { main, leverage, size, support, resistance };
 }
 
-export function AthenaPanel({ athena, perBot = {} }: Props) {
+export function AthenaPanel({ athena }: Props) {
     const enabled = !!athena?.enabled;
     const decisions = (athena?.recent_decisions || []).slice().reverse();
     const hasData = decisions.length > 0;
 
-    // Calculate Bot Summary from perBot data
-    let totalBots = 0;
-    let totalActiveTrades = 0;
-    let totalActivePnl = 0;
-    let totalCapital = 0;
-
-    Object.values(perBot).forEach(botStats => {
-        totalBots++;
-        totalActiveTrades += botStats.activeTrades;
-        totalActivePnl += botStats.activePnl;
-        totalCapital += botStats.capital;
-    });
-
-    const isRunning = hasData || totalActiveTrades > 0;
-
     return (
         <div style={{
-            height: '100%',
-            background: 'rgba(5,10,18,0.90)',
-            backdropFilter: 'blur(20px)',
-            border: '1px solid rgba(0,229,255,0.12)',
-            borderRadius: 16,
+            background: 'linear-gradient(145deg, rgba(8,12,20,0.9) 0%, rgba(5,7,12,0.95) 100%)',
+            backdropFilter: 'blur(30px)',
+            border: '1px solid rgba(0,229,255,0.15)',
+            borderRadius: 20,
             overflow: 'hidden',
-            boxShadow: '0 4px 30px rgba(0,0,0,0.4), 0 0 0 1px rgba(0,229,255,0.04)',
+            boxShadow: '0 8px 32px rgba(0,0,0,0.6), inset 0 0 0 1px rgba(255,255,255,0.02)',
+            display: 'flex',
+            flexDirection: 'column',
+            height: '100%',
         }}>
             {/* ── Header ── */}
             <div style={{
-                padding: '14px 20px',
-                background: 'linear-gradient(135deg, rgba(0,229,255,0.06) 0%, rgba(0,184,204,0.03) 100%)',
-                borderBottom: '1px solid rgba(0,229,255,0.08)',
-                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                padding: '16px 24px',
+                background: 'rgba(0,229,255,0.03)',
+                borderBottom: '1px solid rgba(0,229,255,0.1)',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                position: 'relative'
             }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                    <div>
-                        <div style={{ fontSize: 14, fontWeight: 800, color: '#00E5FF', letterSpacing: '1px', textTransform: 'uppercase' }}>
-                            Athena AI
-                        </div>
-                    </div>
-                </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <span style={{
-                        fontSize: 10, padding: '3px 10px', borderRadius: 20,
-                        background: enabled ? 'rgba(0,255,136,0.10)' : 'rgba(255,59,92,0.10)',
-                        color: enabled ? '#00FF88' : '#FF3B5C',
-                        fontWeight: 700,
-                        border: `1px solid ${enabled ? 'rgba(0,255,136,0.20)' : 'rgba(255,59,92,0.20)'}`,
-                        letterSpacing: '0.5px',
+                {/* Cyberpunk accent line */}
+                <div style={{ position: 'absolute', top: 0, left: 24, right: 24, height: 1, background: 'linear-gradient(90deg, transparent, rgba(0,229,255,0.5), transparent)' }} />
+
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                    <div style={{
+                        width: 36, height: 36, borderRadius: '50%',
+                        background: 'rgba(0,229,255,0.1)',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        boxShadow: '0 0 15px rgba(0,229,255,0.2)'
                     }}>
-                        ○ {enabled ? 'ACTIVE' : 'OFFLINE'}
-                    </span>
-                    <span style={{
-                        fontSize: 10, color: 'var(--color-text-muted)', fontFamily: 'var(--font-mono)',
-                        padding: '2px 7px', borderRadius: 6, background: 'rgba(255,255,255,0.03)',
-                        border: '1px solid rgba(255,255,255,0.05)',
-                    }}>{athena?.model || 'gemini-2.5-flash'}</span>
-                    {(athena.cycle_calls ?? 0) > 0 && (
-                        <span style={{ fontSize: 10, color: 'var(--color-text-muted)', fontFamily: 'var(--font-mono)' }}>
-                            {athena.cycle_calls} calls
+                        <Cpu size={18} color="#00E5FF" />
+                    </div>
+                    <div>
+                        <h2 style={{ margin: 0, fontSize: 18, fontWeight: 800, color: '#E8EDF5', letterSpacing: '1px' }}>
+                            ATHENA A.I.
+                        </h2>
+                        <div style={{ fontSize: 11, color: '#00E5FF', opacity: 0.8, letterSpacing: '2px', textTransform: 'uppercase' }}>
+                            Lead Investment Officer
+                        </div>
+                    </div>
+                </div>
+
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                    <div style={{
+                        display: 'flex', alignItems: 'center', gap: 6,
+                        background: 'rgba(0,0,0,0.3)', padding: '6px 14px',
+                        borderRadius: 30, border: '1px solid rgba(255,255,255,0.05)'
+                    }}>
+                        <div style={{ width: 8, height: 8, borderRadius: '50%', background: enabled ? '#00FF88' : '#FF3B5C', boxShadow: `0 0 10px ${enabled ? '#00FF88' : '#FF3B5C'}` }} />
+                        <span style={{ fontSize: 11, fontWeight: 700, color: '#E8EDF5', letterSpacing: '1px' }}>
+                            {enabled ? 'SYSTEM ONLINE' : 'OFFLINE'}
                         </span>
-                    )}
+                    </div>
+                    <div style={{ fontSize: 11, color: 'var(--color-text-muted)', fontFamily: 'var(--font-mono)' }}>
+                        MODEL: <span style={{ color: '#A78BFA' }}>{athena?.model || 'gemini-2.5-flash'}</span>
+                    </div>
                 </div>
             </div>
 
-            {/* ── Legend: Border color = Athena verdict ── */}
-            <div style={{
-                padding: '5px 16px', borderBottom: '1px solid rgba(255,255,255,0.04)',
-                display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap',
-                background: 'rgba(0,0,0,0.2)',
-            }}>
-                <span style={{ fontSize: 9.5, color: '#4B5563', letterSpacing: '0.3px' }}>BORDER COLOR = ATHENA VERDICT</span>
-                <span style={{ fontSize: 9.5, color: '#00FF88', fontWeight: 700 }}>🟢 EXECUTE — approved &amp; deployed</span>
-                <span style={{ fontSize: 9.5, color: '#FF3B5C', fontWeight: 700 }}>🔴 VETO — blocked by Athena</span>
-                <span style={{ fontSize: 9.5, color: '#4B5563', marginLeft: 'auto' }}>↑↓ direction badge is independent</span>
-            </div>
-
-            {/* ── Decision List ── */}
-            <div style={{ maxHeight: hasData ? 600 : 'auto', overflowY: 'auto', padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: 10 }}>
+            {/* ── Content Area ── */}
+            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', padding: '20px 24px', gap: 20 }}>
+                {/* Animated Empty State */}
                 {!hasData ? (
-                    <div style={{ textAlign: 'center', padding: '36px 20px', color: 'var(--color-text-muted)' }}>
-                        <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text-secondary)' }}>Awaiting eligible coins…</div>
-                        <div style={{ fontSize: 11, color: 'var(--color-text-muted)', marginTop: 4 }}>
-                            Athena analyzes coins passing HMM conviction threshold
+                    <div style={{
+                        height: 300, display: 'flex', flexDirection: 'column',
+                        alignItems: 'center', justifyContent: 'center',
+                        background: 'radial-gradient(circle at center, rgba(0,229,255,0.05) 0%, transparent 70%)'
+                    }}>
+                        <motion.div
+                            animate={{ rotate: 360 }}
+                            transition={{ duration: 10, repeat: Infinity, ease: "linear" }}
+                            style={{ width: 100, height: 100, border: '2px dashed rgba(0,229,255,0.3)', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                        >
+                            <motion.div
+                                animate={{ scale: [1, 1.2, 1], opacity: [0.5, 1, 0.5] }}
+                                transition={{ duration: 2, repeat: Infinity }}
+                                style={{ width: 40, height: 40, background: 'rgba(0,229,255,0.2)', borderRadius: '50%', boxShadow: '0 0 20px rgba(0,229,255,0.4)' }}
+                            />
+                        </motion.div>
+                        <div style={{ marginTop: 24, textAlign: 'center' }}>
+                            <div style={{ fontSize: 16, fontWeight: 700, color: '#00E5FF', letterSpacing: '2px' }}>AWAITING SIGNALS</div>
+                            <div style={{ fontSize: 12, color: 'var(--color-text-muted)', marginTop: 8 }}>Athena is monitoring HMM models for high-conviction opportunities.</div>
                         </div>
                     </div>
-                ) : decisions.map((d, i) => {
-                    const cfg = ACTION_CONFIG[d.action] || ACTION_CONFIG.EXECUTE;
-                    const parsed = parseReasoning(d.reasoning || '');
-                    const confPct = Math.round(d.adjusted_confidence * 100);
-                    const isLong = d.side === 'BUY' || d.side === 'LONG';
-                    const isShort = d.side === 'SELL' || d.side === 'SHORT';
+                ) : (
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(400px, 1fr))', gap: 16 }}>
+                        <AnimatePresence>
+                            {decisions.map((d, i) => {
+                                const theme = ACTION_THEMES[d.action] || ACTION_THEMES.EXECUTE;
+                                const parsed = parseReasoning(d.reasoning || '');
+                                const confPct = Math.round(d.adjusted_confidence * 100);
+                                const isLong = d.side === 'BUY' || d.side === 'LONG';
+                                const isShort = d.side === 'SELL' || d.side === 'SHORT';
 
-                    return (
-                        <div key={`d-${i}`} style={{
-                            background: 'rgba(255,255,255,0.015)',
-                            border: `1px solid ${cfg.border}`,
-                            borderRadius: 12, overflow: 'hidden',
-                        }}>
-                            {/* Decision header row */}
-                            <div style={{
-                                display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 10,
-                                padding: '10px 14px',
-                                borderBottom: `1px solid ${cfg.border}`,
-                                background: `${cfg.badgeBg.replace('0.10', '0.05')}`,
-                            }}>
-                                <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
-                                    {/* Status dot */}
-                                    <div style={{ width: 7, height: 7, borderRadius: '50%', background: cfg.dot, boxShadow: `0 0 6px ${cfg.dot}` }} />
-                                    <span style={{ fontWeight: 800, fontSize: 15, color: '#E8EDF5', letterSpacing: 0 }}>
-                                        {d.symbol?.replace('USDT', '')}
-                                    </span>
-                                    {/* Action badge */}
-                                    <span style={{
-                                        fontSize: 10, fontWeight: 800, color: cfg.badge, letterSpacing: '0.8px',
-                                        padding: '2px 8px', borderRadius: 4, background: cfg.badgeBg,
-                                        border: `1px solid ${cfg.badge}30`,
-                                    }}>{cfg.label}</span>
-                                    {/* Direction */}
-                                    {d.side && (
-                                        <span style={{
-                                            fontSize: 10, fontWeight: 700,
-                                            color: isLong ? '#00FF88' : isShort ? '#FF3B5C' : '#6B7280',
-                                            padding: '2px 7px', borderRadius: 4,
-                                            background: isLong ? 'rgba(0,255,136,0.10)' : isShort ? 'rgba(255,59,92,0.10)' : 'transparent',
-                                        }}>
-                                            {isLong ? '↑ LONG' : isShort ? '↓ SHORT' : d.side}
-                                        </span>
-                                    )}
-                                    {/* Leverage & Size */}
-                                    {parsed.leverage && (
-                                        <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 4, background: 'rgba(0,229,255,0.08)', color: '#00E5FF', border: '1px solid rgba(0,229,255,0.15)' }}>
-                                            {parsed.leverage}
-                                        </span>
-                                    )}
-                                    {parsed.size && (
-                                        <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 4, background: 'rgba(255,179,0,0.08)', color: '#FFB300', border: '1px solid rgba(255,179,0,0.15)' }}>
-                                            {parsed.size}
-                                        </span>
-                                    )}
-                                </div>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                                    {/* Confidence bar */}
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-                                        <div style={{ width: 48, height: 4, borderRadius: 2, background: 'rgba(255,255,255,0.06)', overflow: 'hidden' }}>
-                                            <div style={{ width: `${confPct}%`, height: '100%', borderRadius: 2, background: cfg.badge, transition: 'width 0.5s' }} />
+                                return (
+                                    <motion.div
+                                        key={d.symbol + d.time}
+                                        initial={{ opacity: 0, y: 20, scale: 0.95 }}
+                                        animate={{ opacity: 1, y: 0, scale: 1 }}
+                                        transition={{ duration: 0.4, delay: i * 0.1 }}
+                                        style={{
+                                            background: 'rgba(15,20,30,0.6)',
+                                            border: `1px solid ${theme.glow}`,
+                                            borderRadius: 16,
+                                            padding: 20,
+                                            position: 'relative',
+                                            overflow: 'hidden'
+                                        }}
+                                    >
+                                        {/* Background Glow */}
+                                        <div style={{ position: 'absolute', top: -50, right: -50, width: 100, height: 100, background: theme.color, filter: 'blur(60px)', opacity: 0.15 }} />
+
+                                        {/* Header Row */}
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                                                <div style={{ fontSize: 22, fontWeight: 900, color: '#E8EDF5', letterSpacing: '1px' }}>
+                                                    {d.symbol.replace('USDT', '')}
+                                                </div>
+                                                <div style={{
+                                                    padding: '4px 10px', borderRadius: 6,
+                                                    background: isLong ? 'rgba(0,255,136,0.1)' : isShort ? 'rgba(255,59,92,0.1)' : 'transparent',
+                                                    color: isLong ? '#00FF88' : isShort ? '#FF3B5C' : '#6B7280',
+                                                    fontSize: 12, fontWeight: 800, letterSpacing: '1px'
+                                                }}>
+                                                    {isLong ? 'LONG' : isShort ? 'SHORT' : d.side}
+                                                </div>
+                                            </div>
+                                            <div style={{
+                                                padding: '6px 14px', borderRadius: 8,
+                                                background: `rgba(${parseInt(theme.color.slice(1,3),16)},${parseInt(theme.color.slice(3,5),16)},${parseInt(theme.color.slice(5,7),16)},0.1)`,
+                                                border: `1px solid ${theme.color}40`,
+                                                color: theme.color, fontSize: 13, fontWeight: 800, letterSpacing: '1px',
+                                                boxShadow: `0 0 15px ${theme.glow}`
+                                            }}>
+                                                {theme.label}
+                                            </div>
                                         </div>
-                                        <span style={{ fontSize: 11, fontWeight: 700, color: cfg.badge, fontFamily: 'var(--font-mono)' }}>{confPct}%</span>
-                                    </div>
-                                    <span style={{ fontSize: 10, color: 'var(--color-text-muted)', fontFamily: 'var(--font-mono)' }}>{timeAgo(d.time)}</span>
-                                </div>
-                            </div>
 
-                            {/* Body */}
-                            <div style={{ padding: '10px 14px' }}>
-                                {/* Reasoning */}
-                                <p style={{ fontSize: 12, lineHeight: 1.55, color: '#9CA3AF', margin: '0 0 8px' }}>
-                                    {parsed.main}
-                                </p>
+                                        {/* Stats Row */}
+                                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 16 }}>
+                                            <div style={{ background: 'rgba(0,0,0,0.3)', padding: 12, borderRadius: 10, border: '1px solid rgba(255,255,255,0.03)' }}>
+                                                <div style={{ fontSize: 10, color: 'var(--color-text-muted)', marginBottom: 4, textTransform: 'uppercase' }}>Athena Confidence</div>
+                                                <div style={{ fontSize: 18, fontWeight: 800, color: theme.color }}>{confPct}%</div>
+                                            </div>
+                                            <div style={{ background: 'rgba(0,0,0,0.3)', padding: 12, borderRadius: 10, border: '1px solid rgba(255,255,255,0.03)' }}>
+                                                <div style={{ fontSize: 10, color: 'var(--color-text-muted)', marginBottom: 4, textTransform: 'uppercase' }}>Processing Time</div>
+                                                <div style={{ fontSize: 18, fontWeight: 800, color: '#00E5FF' }}>{d.latency_ms > 0 ? \`\${d.latency_ms}ms\` : 'Cached'}</div>
+                                            </div>
+                                        </div>
 
-                                {/* Metric chips */}
-                                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5, marginBottom: parsed.support || parsed.resistance ? 8 : 0 }}>
-                                    {d.latency_ms > 0 && (
-                                        <span style={{ fontSize: 10, padding: '2px 8px', borderRadius: 4, background: 'rgba(255,255,255,0.04)', color: 'var(--color-text-muted)' }}>
-                                            {(d.latency_ms / 1000).toFixed(1)}s
-                                        </span>
-                                    )}
-                                </div>
+                                        {/* Analysis Text */}
+                                        <div style={{ position: 'relative', marginTop: 12 }}>
+                                            <div style={{ fontSize: 10, color: '#A78BFA', letterSpacing: '2px', textTransform: 'uppercase', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
+                                                <Activity size={12} /> Analytical Synthesis
+                                            </div>
+                                            <p style={{
+                                                fontSize: 13, color: '#9CA3AF', lineHeight: '1.6', margin: 0,
+                                                paddingLeft: 12, borderLeft: '2px solid rgba(167,139,250,0.3)'
+                                            }}>
+                                                {parsed.main}
+                                            </p>
+                                        </div>
 
-                                {/* S/R levels */}
-                                {(parsed.support || parsed.resistance) && (
-                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 6 }}>
-                                        {parsed.support && (
-                                            <div style={{ fontSize: 10, padding: '5px 8px', borderRadius: 6, background: 'rgba(0,255,136,0.04)', border: '1px solid rgba(0,255,136,0.10)' }}>
-                                                <span style={{ color: '#00FF88', fontWeight: 700 }}>▼ Support</span>
-                                                <div style={{ color: '#6B7280', marginTop: 2 }}>{parsed.support}</div>
+                                        {/* Risk Flags */}
+                                        {d.risk_flags && d.risk_flags.length > 0 && (
+                                            <div style={{ marginTop: 16, paddingTop: 16, borderTop: '1px dashed rgba(255,255,255,0.1)' }}>
+                                                <div style={{ fontSize: 10, color: '#FFB300', letterSpacing: '2px', textTransform: 'uppercase', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
+                                                    <ShieldAlert size={12} /> Risk Identifiers
+                                                </div>
+                                                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                                                    {d.risk_flags.map((flag, idx) => (
+                                                        <div key={idx} style={{
+                                                            fontSize: 11, padding: '4px 10px', borderRadius: 4,
+                                                            background: 'rgba(255,179,0,0.1)', color: '#FFB300',
+                                                            border: '1px solid rgba(255,179,0,0.2)'
+                                                        }}>
+                                                            {flag}
+                                                        </div>
+                                                    ))}
+                                                </div>
                                             </div>
                                         )}
-                                        {parsed.resistance && (
-                                            <div style={{ fontSize: 10, padding: '5px 8px', borderRadius: 6, background: 'rgba(255,59,92,0.04)', border: '1px solid rgba(255,59,92,0.10)' }}>
-                                                <span style={{ color: '#FF3B5C', fontWeight: 700 }}>▲ Resistance</span>
-                                                <div style={{ color: '#6B7280', marginTop: 2 }}>{parsed.resistance}</div>
+
+                                        {/* Parameters */}
+                                        {(parsed.leverage || parsed.size) && (
+                                            <div style={{ marginTop: 16, display: 'flex', gap: 12 }}>
+                                                {parsed.leverage && (
+                                                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: '#E8EDF5', background: 'rgba(255,255,255,0.05)', padding: '6px 12px', borderRadius: 6 }}>
+                                                        <Zap size={14} color="#00E5FF" /> Lev: <strong style={{ color: '#00E5FF' }}>{parsed.leverage}</strong>
+                                                    </div>
+                                                )}
+                                                {parsed.size && (
+                                                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: '#E8EDF5', background: 'rgba(255,255,255,0.05)', padding: '6px 12px', borderRadius: 6 }}>
+                                                        <Lock size={14} color="#00FF88" /> Size: <strong style={{ color: '#00FF88' }}>{parsed.size}</strong>
+                                                    </div>
+                                                )}
+                                                {parsed.support && (
+                                                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: '#E8EDF5', background: 'rgba(255,255,255,0.05)', padding: '6px 12px', borderRadius: 6 }}>
+                                                        <Eye size={14} color="#FFB300" /> S/R: <strong style={{ color: '#FFB300' }}>{parsed.support.split(',')[0]}</strong>
+                                                    </div>
+                                                )}
                                             </div>
                                         )}
-                                    </div>
-                                )}
-
-                                {/* Risk flags */}
-                                {d.risk_flags?.length > 0 && (
-                                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
-                                        {d.risk_flags.map((flag, fi) => (
-                                            <span key={fi} style={{
-                                                fontSize: 10, padding: '2px 8px', borderRadius: 4,
-                                                background: 'rgba(255,179,0,0.06)', color: '#D97706',
-                                                border: '1px solid rgba(255,179,0,0.12)',
-                                            }}>⚠ {flag}</span>
-                                        ))}
-                                    </div>
-                                )}
-                            </div>
-                        </div>
-                    );
-                })}
+                                    </motion.div>
+                                );
+                            })}
+                        </AnimatePresence>
+                    </div>
+                )}
             </div>
         </div>
     );

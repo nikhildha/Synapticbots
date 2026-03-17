@@ -596,7 +596,25 @@ export function DashboardClient({ user, stats, bots, recentTrades }: DashboardCl
           </motion.div>
 
 
-          {/* ═══ Row 4: Institutional Segment Heatmap ═══ */}
+          {/* ═══ Row 4: Athena Intelligence ═══ */}
+          {(botState?.athena?.enabled || bots?.some((b: any) => (b.name || '').toLowerCase().includes('athena'))) && (
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.27 }}
+              className="mt-6 mb-8"
+            >
+              <div className="flex flex-col w-full">
+                <AthenaPanel
+                  athena={botState?.athena || { enabled: true, recent_decisions: [], model: 'gemini-2.5-flash' }}
+                  coinStates={multi?.coin_states}
+                  perBot={botState?.perBot || {}}
+                />
+              </div>
+            </motion.div>
+          )}
+
+          {/* ═══ Row 5: Institutional Segment Heatmap ═══ */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -671,24 +689,6 @@ export function DashboardClient({ user, stats, bots, recentTrades }: DashboardCl
               </div>
             )}
           </motion.div>
-
-          {/* ═══ Row 4: Athena Intelligence ═══ */}
-          {(botState?.athena?.enabled || bots?.some((b: any) => (b.name || '').toLowerCase().includes('athena'))) && (
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.27 }}
-              className="mt-6 mb-8"
-            >
-              <div className="flex flex-col w-full">
-                <AthenaPanel
-                  athena={botState?.athena || { enabled: true, recent_decisions: [], model: 'gemini-2.5-flash' }}
-                  coinStates={multi?.coin_states}
-                  perBot={botState?.perBot || {}}
-                />
-              </div>
-            </motion.div>
-          )}
 
 
           {/* ═══ Row 5: Signal Summary Table ═══ */}
