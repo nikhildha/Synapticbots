@@ -127,10 +127,11 @@ def open_trade(symbol, side, leverage, quantity, entry_price, atr,
     """
     book = _load_book()
 
-    # Guard: prevent duplicate ACTIVE trades for the same symbol+profile
+    # Guard: prevent duplicate ACTIVE trades for the same symbol+bot
+    # Use bot_id as the key so different bots can trade the same symbol independently.
     existing = [t for t in book["trades"]
                 if t["symbol"] == symbol
-                and t.get("profile_id", "standard") == profile_id
+                and t.get("bot_id", "") == (bot_id or "")
                 and t["status"] in ("ACTIVE", "OPEN")]
     if existing:
         logger.warning("⚠️ Skipping duplicate trade for %s [%s] — already have ACTIVE trade %s",
