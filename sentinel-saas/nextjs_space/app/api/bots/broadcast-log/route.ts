@@ -1,18 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth-options';
+import { getEngineUrl } from '@/lib/engine-url';
+import { prisma } from '@/lib/prisma';
 
 export const dynamic = 'force-dynamic';
 
-function getEngineUrl() {
-    return process.env.ENGINE_INTERNAL_URL
-        || process.env.NEXT_PUBLIC_ENGINE_URL
-        || '';
-}
-
 /**
- * GET /api/bots/broadcast-log?n=100
- * Proxies /api/broadcast-log from the engine.
+ * GET /api/bots/broadcast-log?n=100&mode=live|paper
+ * Proxies /api/broadcast-log from the correct engine based on user's active bot mode.
  * Returns last N signal broadcast events parsed into structured JSON.
  */
 export async function GET(request: NextRequest) {
@@ -22,9 +18,24 @@ export async function GET(request: NextRequest) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
         }
 
+        const userId = (session.user as any)?.id;
         const { searchParams } = new URL(request.url);
         const n = Math.min(parseInt(searchParams.get('n') || '100'), 500);
-        const engineUrl = getEngineUrl();
+
+        // Determine which engine to query based on caller's active bots
+        let mode: 'live' | 'paper' = searchParams.get('mode') === 'live' ? 'live' : 'paper';
+        if (userId) {
+            const userBots = await prisma.bot.findMany({
+                where: { userId, isActive: true },
+                select: { config: true },
+            });
+            const hasLiveBot = userBots.some(
+                (b: any) => (b.config?.mode || '').toLowerCase().includes('live')
+            );
+            if (hasLiveBot) mode = 'live';
+        }
+
+        const engineUrl = getEngineUrl(mode);
 
         if (!engineUrl) {
             return NextResponse.json({ error: 'Engine URL not configured', lines: [] });
