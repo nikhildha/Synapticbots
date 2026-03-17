@@ -876,23 +876,7 @@ export function SignalSummaryTable({ coinStates, multi, heatmap: heatmapProp }: 
                 );
             })()}
 
-            {/* Coin Filter Dropdown */}
-
-            <div style={{ marginBottom: '12px', position: 'relative' }}>
-                <div onClick={() => setFilterOpen(!filterOpen)} style={{ padding: '8px 14px', borderRadius: '10px', cursor: 'pointer', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', color: selectedCoins.length > 0 ? '#06B6D4' : '#6B7280' }}>
-                    <span>🔍</span>
-                    {selectedCoins.length === 0 ? 'Filter by coin (all shown)' : `Showing ${selectedCoins.length}: ${selectedCoins.map(s => s.replace('USDT', '')).join(', ')}`}
-                    <span style={{ marginLeft: 'auto', fontSize: '10px' }}>{filterOpen ? '▲' : '▼'}</span>
-                </div>
-                {filterOpen && (
-                    <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 50, marginTop: '4px', padding: '10px', background: 'rgba(17,24,39,0.98)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '12px', maxHeight: '200px', overflowY: 'auto', display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
-                        <button onClick={() => setSelectedCoins([])} style={{ padding: '4px 10px', borderRadius: '8px', fontSize: '10px', fontWeight: 700, border: 'none', cursor: 'pointer', background: selectedCoins.length === 0 ? '#06B6D422' : 'rgba(255,255,255,0.05)', color: selectedCoins.length === 0 ? '#06B6D4' : '#6B7280' }}>ALL</button>
-                        {allSymbols.map((sym: string) => (
-                            <button key={sym} onClick={() => toggleCoin(sym)} style={{ padding: '4px 10px', borderRadius: '8px', fontSize: '10px', fontWeight: 700, border: 'none', cursor: 'pointer', background: selectedCoins.includes(sym) ? '#06B6D422' : 'rgba(255,255,255,0.05)', color: selectedCoins.includes(sym) ? '#06B6D4' : '#9CA3AF' }}>{sym.replace('USDT', '')}</button>
-                        ))}
-                    </div>
-                )}
-            </div>
+            {/* Coin Filter Dropdown removed as per user request */}
 
             {/* Table */}
             <div className="card-gradient rounded-xl overflow-hidden">
