@@ -1121,7 +1121,7 @@ def api_force_signal():
         bot_id = (config.ENGINE_ACTIVE_BOTS[0]["bot_id"]
                   if config.ENGINE_ACTIVE_BOTS else config.ENGINE_BOT_ID)
 
-        trade_id = tradebook.open_trade(
+        trade_id = tb.open_trade(
             symbol=symbol,
             side=side,
             leverage=result.get("leverage", leverage),
