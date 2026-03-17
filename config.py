@@ -206,7 +206,7 @@ SIDEWAYS_POSITION_REDUCTION = 0.30  # 30% smaller positions in chop
 
 # ─── Bot Loop ────────────────────────────────────────────────────────────────────
 LOOP_INTERVAL_SECONDS = 10        # 10-second heartbeat (faster trailing SL sync)
-ANALYSIS_INTERVAL_SECONDS = 900   # 15-minute full analysis cycle
+ANALYSIS_INTERVAL_SECONDS = 300   # 5-minute full analysis cycle
 ERROR_RETRY_SECONDS = 60          # Retry after error
 
 # Min HMM conviction to pass to Athena (below this, coin is skipped before Athena call)
@@ -285,7 +285,7 @@ LLM_CACHE_MINUTES           = 10                          # Cache per-coin LLM d
 LLM_TIMEOUT_SECONDS         = 30                          # Includes Google Search grounding time
 LLM_VETO_THRESHOLD          = 0.30                        # Below this → LLM vetoes the trade
 LLM_CONFIDENCE_WEIGHT       = 0.20                        # LLM can adjust conviction by ±20%
-LLM_MAX_CALLS_PER_CYCLE     = 5                           # Rate limit: max N coins per cycle
+LLM_MAX_CALLS_PER_CYCLE     = 10                          # Rate limit: max N Athena calls per cycle (fail-closed when exceeded)
 LLM_LOG_FILE                = os.path.join(DATA_DIR, "athena_decisions.json")
 
 # ─── Coin Tiers (from experiment_3state_calibration.py evaluation) ────────────
