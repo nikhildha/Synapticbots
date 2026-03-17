@@ -34,7 +34,36 @@ export async function GET() {
         // HMM + Athena analysis is shared. Paper vs live is execution-only, not signal-only.
         // Live engine is primary; fall back to paper if live URL not configured.
         const primaryUrl = getEngineUrl('live') || getEngineUrl('paper');
-        const engineData = await fetchEngineData(primaryUrl);
+        const secondaryUrl = getEngineUrl('paper');
+
+        const [engineData, paperDataRaw] = await Promise.all([
+            fetchEngineData(primaryUrl),
+            primaryUrl && secondaryUrl && primaryUrl !== secondaryUrl ? fetchEngineData(secondaryUrl) : Promise.resolve(null)
+        ]);
+        
+        const paperEngineData = (primaryUrl === secondaryUrl) ? engineData : paperDataRaw;
+
+        // Merge Athena decisions from both environments
+        const liveAthena = engineData?.athena?.recent_decisions || [];
+        const paperAthena = paperEngineData?.athena?.recent_decisions || [];
+        const allAthena = [...liveAthena, ...paperAthena];
+        
+        const uniqueAthenaMap = new Map();
+        for (const d of allAthena) {
+            // Deduplicate across engines by symbol + timestamp
+            const key = `${d.symbol}-${d.time}`; 
+            uniqueAthenaMap.set(key, d);
+        }
+        
+        const mergedDecisions = Array.from(uniqueAthenaMap.values()).sort((a: any, b: any) => {
+            return new Date(b.time).getTime() - new Date(a.time).getTime();
+        }).slice(0, 10);
+
+        const mergedAthena = {
+            enabled: engineData?.athena?.enabled || paperEngineData?.athena?.enabled || false,
+            model: engineData?.athena?.model || 'gemini-2.5-flash',
+            recent_decisions: mergedDecisions,
+        };
 
         const multi = engineData?.multi || { coin_states: {}, last_analysis_time: null, deployed_count: 0 };
         const engineState = engineData?.engine || { status: primaryUrl ? 'unknown' : 'not_configured' };
@@ -43,7 +72,6 @@ export async function GET() {
 
         // ── Per-User Trades: each bot syncs from its own engine ──
         // Paper bot → paper engine, live bot → live engine.
-        // Signal display above is decoupled from this — users always see shared signals.
         let trades: any[] = [];
         let userBots: any[] = [];
 
@@ -56,6 +84,8 @@ export async function GET() {
 
             // Cache trades per engine URL to avoid duplicate fetches across bots
             const engineTradeCache: Record<string, any[]> = {};
+            if (primaryUrl && engineData) engineTradeCache[primaryUrl] = engineData.tradebook?.trades || [];
+            if (secondaryUrl && paperEngineData) engineTradeCache[secondaryUrl] = paperEngineData.tradebook?.trades || [];
 
             for (const ub of userBots) {
                 if (!ub.startedAt) continue;
@@ -164,7 +194,7 @@ export async function GET() {
             },
             scanner: { coins: Object.keys(coinStates) },
             heatmap: engineData?.heatmap || null,
-            athena: engineData?.athena || { enabled: true, recent_decisions: [], model: 'gemini-2.5-flash' },
+            athena: mergedAthena,
             perBot,
 
             tradebook: {
