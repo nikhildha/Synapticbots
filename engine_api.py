@@ -838,6 +838,9 @@ def api_set_bot_id():
     bot_name = data.get("bot_name", "")
     segment_filter = data.get("segment_filter", "ALL")
     user_id = data.get("user_id", "")
+    # Per-bot risk settings (stored so each bot uses its own capital, not global)
+    capital_per_trade = data.get("capital_per_trade")
+    max_loss_pct = data.get("max_loss_pct")
 
     if not bot_id:
         return jsonify({"error": "bot_id is required"}), 400
@@ -853,12 +856,26 @@ def api_set_bot_id():
     config.ENGINE_ACTIVE_BOTS = [
         b for b in config.ENGINE_ACTIVE_BOTS if b.get("bot_id") != bot_id
     ]
-    config.ENGINE_ACTIVE_BOTS.append({
+    bot_entry = {
         "bot_id": bot_id,
         "bot_name": bot_name,
         "user_id": user_id or config.ENGINE_USER_ID,
         "segment_filter": segment_filter,
-    })
+    }
+    # Store per-bot capital so the deploy loop uses each bot's own setting
+    if capital_per_trade is not None:
+        try:
+            cap = float(capital_per_trade)
+            if cap > 0:
+                bot_entry["capital_per_trade"] = cap
+        except (TypeError, ValueError):
+            pass
+    if max_loss_pct is not None:
+        try:
+            bot_entry["max_loss_pct"] = float(max_loss_pct)
+        except (TypeError, ValueError):
+            pass
+    config.ENGINE_ACTIVE_BOTS.append(bot_entry)
     _save_active_bots()
 
     logger.info(

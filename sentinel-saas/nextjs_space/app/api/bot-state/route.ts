@@ -125,6 +125,8 @@ export async function GET() {
                                     user_id: ub.userId,
                                     brain_type: ub.config?.brainType || 'adaptive',
                                     segment_filter: ub.config?.segment || 'ALL',
+                                    capital_per_trade: (ub.config as any)?.capitalPerTrade ?? 100,
+                                    max_loss_pct: (ub.config as any)?.maxLossPct ?? -15,
                                 }),
                                 signal: AbortSignal.timeout(5000),
                             });

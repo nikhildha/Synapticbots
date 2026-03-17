@@ -185,6 +185,8 @@ export async function POST(request: Request) {
             user_id: session.user.id,
             brain_type: (bot.config as any)?.brainType || 'adaptive',
             segment_filter: (bot.config as any)?.segment || 'ALL',
+            capital_per_trade: (bot.config as any)?.capitalPerTrade ?? 100,
+            max_loss_pct: (bot.config as any)?.maxLossPct ?? -15,
           }),
           signal: AbortSignal.timeout(5000),
         });

@@ -696,8 +696,8 @@ class RegimeMasterBot:
                     continue
 
                 # ── Build trade dict (replaces _evaluate_for_profile) ─────────────
-                # Inline sizing: capital / price = quantity; leverage from HMM ATR calc
-                capital     = getattr(config, "CAPITAL_PER_TRADE", 100.0)
+                # Use per-bot capital if stored in ENGINE_ACTIVE_BOTS entry, else global config
+                capital     = target.get("capital_per_trade") or getattr(config, "CAPITAL_PER_TRADE", 100.0)
                 lev         = top.get("leverage", 10)
                 qty         = top.get("quantity", (capital * lev) / max(current_price, 0.0001))
                 reason_str  = top.get("reason", f"{top.get('regime_name','')} {int(top['confidence']*100)}%")
