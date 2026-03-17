@@ -519,8 +519,8 @@ class RegimeMasterBot:
         # SOLE SOURCE OF TRUTH: tradebook active count
         tradebook_active = tradebook.get_active_trades()
         tradebook_active_count = len(tradebook_active)
-        # Build set of globally active symbols (to prevent ANY duplicate trades)
-        active_symbols = {t['symbol'] for t in tradebook_active}
+        # Build set of active (bot_id, symbol) to prevent a specific bot from duplicating a trade
+        active_bot_symbols = {(t.get('bot_id', ''), t['symbol']) for t in tradebook_active}
         raw_results = []
 
         # Scan ALL symbols — do NOT skip based on other bots' deployed coins.
@@ -639,13 +639,13 @@ class RegimeMasterBot:
                     )
                     continue
 
-                # Global duplicate check (skip if ANY bot is already trading this coin)
-                if sym in active_symbols:
-                    logger.debug("🔄 [%s] %s already open globally — skip", bot_name, sym)
-                    self._coin_states.setdefault(sym, {})["deploy_status"] = "FILTERED: active trade exists"
+                # Per-bot duplicate check (skip if THIS bot is already trading this coin)
+                if (bot_id, sym) in active_bot_symbols:
+                    logger.debug("🔄 [%s] %s already open for this bot — skip", bot_name, sym)
+                    self._coin_states.setdefault(sym, {})["deploy_status"] = "FILTERED: active trade exists for this bot"
                     _bcast("FILTERED_DUPLICATE", self._cycle_count, bot_name, bot_id, sym,
                            top.get("side", ""), seg_name, top.get("confidence", 0),
-                           "active trade already open globally")
+                           "active trade already open for this bot")
                     continue
 
                 if self.risk.check_kill_switch():
