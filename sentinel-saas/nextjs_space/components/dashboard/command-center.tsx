@@ -624,6 +624,7 @@ interface SignalSummaryProps {
     coinStates: Record<string, any>;
     multi?: any;
     heatmap?: any;
+    botId?: string;
 }
 
 function formatPrice(price: number): string {
@@ -633,7 +634,7 @@ function formatPrice(price: number): string {
     return '$' + price.toFixed(6);
 }
 
-export function SignalSummaryTable({ coinStates, multi, heatmap: heatmapProp }: SignalSummaryProps) {
+export function SignalSummaryTable({ coinStates, multi, heatmap: heatmapProp, botId }: SignalSummaryProps) {
     const [selectedCoins, setSelectedCoins] = useState<string[]>([]);
     const [filterOpen, setFilterOpen] = useState(false);
     const [liveMulti, setLiveMulti] = useState<any>(multi);
@@ -728,10 +729,10 @@ export function SignalSummaryTable({ coinStates, multi, heatmap: heatmapProp }: 
     };
 
     const getReason = (c: any) => {
-        const a = c.action || '', r = c.regime || '';
+        const ds = (botId && c.bot_deploy_statuses?.[botId]) || c.deploy_status || '';
+        const a = ds || c.action || '', r = c.regime || '';
         const pct = c.confidence != null ? (c.confidence <= 1 ? c.confidence * 100 : c.confidence) : 0;
         // If coin was eligible but filtered in deploy phase, show the deploy filter reason
-        const ds = c.deploy_status || '';
         if (ds.startsWith('FILTERED')) return ds.replace('FILTERED: ', '').charAt(0).toUpperCase() + ds.replace('FILTERED: ', '').slice(1);
         if (a.includes('ELIGIBLE_BUY')) return `Bullish @ ${pct.toFixed(0)}% — LONG ready`;
         if (a.includes('ELIGIBLE_SELL')) return `Bearish @ ${pct.toFixed(0)}% — SHORT ready`;
@@ -901,7 +902,7 @@ export function SignalSummaryTable({ coinStates, multi, heatmap: heatmapProp }: 
                                 const activePositions = liveMulti?.active_positions || liveMulti?.positions || {};
                                 const symBase = (c.symbol || '').replace('USDT', '');
                                 const isDeployed = Object.keys(activePositions).some(k => k === symBase || k === c.symbol || k.endsWith(':' + c.symbol) || k.endsWith(':' + symBase));
-                                const deployStatus = c.deploy_status || '';
+                                const deployStatus = (botId && c.bot_deploy_statuses?.[botId]) || c.deploy_status || '';
                                 let dLabel = 'PENDING', dColor = '#6B7280', dBg = 'rgba(107,114,128,0.08)';
                                 if (isDeployed || deployStatus === 'ACTIVE') { dLabel = 'DEPLOYED'; dColor = '#06B6D4'; dBg = 'rgba(6,182,212,0.12)'; }
                                 else if (deployStatus.startsWith('FILTERED')) { dLabel = 'NOT ELIGIBLE'; dColor = '#F59E0B'; dBg = 'rgba(245,158,11,0.08)'; }

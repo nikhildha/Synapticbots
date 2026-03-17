@@ -372,12 +372,6 @@ class RegimeMasterBot:
         """Full analysis cycle — runs every ANALYSIS_INTERVAL_SECONDS."""
         cycle_start = time.time()
         self._cycle_count += 1
-        # Snapshot ALL active bot IDs once per tick (multi-bot support)
-        # Each trade will be recorded for the first active bot, and synced
-        # to all bots via the SaaS bot-state trade sync layer.
-        _tick_active_bots = list(getattr(config, "ENGINE_ACTIVE_BOTS", []))  # snapshot
-        _tick_bot_id = config.ENGINE_BOT_ID
-
         # ── 0. Weekly coin tier re-classification (background) ───
         self._maybe_reclassify_tiers()
 
@@ -521,6 +515,8 @@ class RegimeMasterBot:
         tradebook_active_count = len(tradebook_active)
         # Build set of active (bot_id, symbol) to prevent a specific bot from duplicating a trade
         active_bot_symbols = {(t.get('bot_id', ''), t['symbol']) for t in tradebook_active}
+        # Tracks symbols deployed THIS tick to prevent double-deploying the same coin across bots
+        active_symbols: set = set()
         raw_results = []
 
         # Scan ALL symbols — do NOT skip based on other bots' deployed coins.
@@ -529,8 +525,8 @@ class RegimeMasterBot:
         # BTCUSDT is the macro regime reference for every coin's conviction score.
         # It must be analyzed on EVERY cycle regardless of which batch rotation is active.
         scan_symbols = symbols if "BTCUSDT" in symbols else ["BTCUSDT"] + list(symbols)
-        logger.info("📡 Scanning %d coins | active global symbols: %d",
-                    len(scan_symbols), len(active_symbols))
+        logger.info("📡 Scanning %d coins | active trades in book: %d",
+                    len(scan_symbols), tradebook_active_count)
 
         # ── 4b. Macro Veto Overlay (BTC Flash Crash Detection) ──
         btc_flash_crash = False
@@ -613,15 +609,15 @@ class RegimeMasterBot:
             top_coins = seg_results[:top_n]
 
             if not top_coins:
-                logger.debug("🔍 [%s] No HMM signals for segment %s this cycle", bot_name, bot_segment_filter)
+                logger.info("🔍 [%s] No HMM signals for segment %s this cycle", bot_name, bot_segment_filter)
                 continue
 
             # Explicitly mark non-top eligible coins so the UI doesn't get stuck showing "READY"
             for ignored in seg_results[top_n:]:
                 sym = ignored["symbol"]
-                _st = self._coin_states.get(sym, {}).get("deploy_status", "")
+                _st = self._coin_states.get(sym, {}).get("bot_deploy_statuses", {}).get(bot_id, "")
                 if not _st:
-                    self._coin_states.setdefault(sym, {})["deploy_status"] = "FILTERED: Not top coin in segment"
+                    self._coin_states.setdefault(sym, {}).setdefault("bot_deploy_statuses", {})[bot_id] = "FILTERED: Not top coin in segment"
 
             for top in top_coins:
                 sym      = top["symbol"]
@@ -630,11 +626,11 @@ class RegimeMasterBot:
 
                 # Conviction threshold — skip before Athena call if too low
                 conviction = top.get("conviction", 0)
-                min_conv   = getattr(config, "MIN_CONVICTION_FOR_DEPLOY", 0.60)
+                min_conv   = getattr(config, "MIN_CONVICTION_FOR_DEPLOY", 60)
                 if conviction < min_conv:
                     logger.debug("⛔ [%s] %s conviction %.0f < %.0f threshold — skip",
                                  bot_name, sym, conviction, min_conv)
-                    self._coin_states.setdefault(sym, {})["deploy_status"] = (
+                    self._coin_states.setdefault(sym, {}).setdefault("bot_deploy_statuses", {})[bot_id] = (
                         f"FILTERED: low conviction ({conviction:.0f} < {min_conv:.0f})"
                     )
                     continue
@@ -642,7 +638,7 @@ class RegimeMasterBot:
                 # Per-bot duplicate check (skip if THIS bot is already trading this coin)
                 if (bot_id, sym) in active_bot_symbols:
                     logger.debug("🔄 [%s] %s already open for this bot — skip", bot_name, sym)
-                    self._coin_states.setdefault(sym, {})["deploy_status"] = "FILTERED: active trade exists for this bot"
+                    self._coin_states.setdefault(sym, {}).setdefault("bot_deploy_statuses", {})[bot_id] = "FILTERED: active trade exists for this bot"
                     _bcast("FILTERED_DUPLICATE", self._cycle_count, bot_name, bot_id, sym,
                            top.get("side", ""), seg_name, top.get("confidence", 0),
                            "active trade already open for this bot")
@@ -703,7 +699,7 @@ class RegimeMasterBot:
                 # Athena VETO — coin blocked
                 if athena_decision and athena_decision.action not in ("EXECUTE", "LONG", "SHORT"):
                     logger.info("🚫 ATHENA VETO [%s] %s — action=%s", bot_name, sym, athena_decision.action)
-                    self._coin_states.setdefault(sym, {})["deploy_status"] = f"FILTERED: Athena {athena_decision.action}"
+                    self._coin_states.setdefault(sym, {}).setdefault("bot_deploy_statuses", {})[bot_id] = f"FILTERED: Athena {athena_decision.action}"
                     _bcast("ATHENA_VETO", self._cycle_count, bot_name, bot_id, sym,
                            top["side"], seg_name, top.get("confidence", 0),
                            f"Athena vetoed: {athena_decision.action} — {athena_decision.reasoning[:80]}")
@@ -719,11 +715,11 @@ class RegimeMasterBot:
                        top["side"], seg_name, top["confidence"],
                        f"regime={top.get('regime_name','')} lev={lev}x qty={qty:.4f} athena=APPROVED")
 
-                self._coin_states.setdefault(sym, {})["deploy_status"] = "DEPLOY_QUEUED"
+                self._coin_states.setdefault(sym, {}).setdefault("bot_deploy_statuses", {})[bot_id] = "DEPLOY_QUEUED"
 
                 logger.info(
                     "🔥 DEPLOYING [%s]: %s %s @ %dx | HMM %.0f%% conv | Athena ✅",
-                    bot_name, top["side"], sym, lev, conviction * 100,
+                    bot_name, top["side"], sym, lev, conviction,
                 )
 
                 # Execute
@@ -746,7 +742,7 @@ class RegimeMasterBot:
                     _bcast("EXEC_CRASH", self._cycle_count, bot_name, bot_id, sym,
                            top["side"], seg_name, top["confidence"],
                            f"{type(exec_err).__name__}: {str(exec_err)[:120]}")
-                    self._coin_states.setdefault(sym, {})["deploy_status"] = "FILTERED: execute crash"
+                    self._coin_states.setdefault(sym, {}).setdefault("bot_deploy_statuses", {})[bot_id] = "FILTERED: execute crash"
                     continue
 
                 if result is None and not config.PAPER_TRADE:
@@ -754,7 +750,7 @@ class RegimeMasterBot:
                     _bcast("EXEC_NULL", self._cycle_count, bot_name, bot_id, sym,
                            top["side"], seg_name, top["confidence"],
                            "execute_trade returned None (live mode) — order rejected")
-                    self._coin_states.setdefault(sym, {})["deploy_status"] = "FILTERED: exec returned None"
+                    self._coin_states.setdefault(sym, {}).setdefault("bot_deploy_statuses", {})[bot_id] = "FILTERED: exec returned None"
                     continue
 
                 entry_price  = result.get("entry_price", 0) if result else 0
@@ -767,7 +763,7 @@ class RegimeMasterBot:
                 if entry_price <= 0 and not config.PAPER_TRADE:
                     _bcast("EXEC_ZERO_PRICE", self._cycle_count, bot_name, bot_id, sym,
                            top["side"], seg_name, top["confidence"], "entry_price=0")
-                    self._coin_states.setdefault(sym, {})["deploy_status"] = "FILTERED: zero entry price"
+                    self._coin_states.setdefault(sym, {}).setdefault("bot_deploy_statuses", {})[bot_id] = "FILTERED: zero entry price"
                     continue
 
                 # Each bot in the outer loop owns its own trade record.
