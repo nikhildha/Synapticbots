@@ -110,6 +110,18 @@ export async function GET() {
                             }),
                             signal: AbortSignal.timeout(5000),
                         });
+                        // Also restore risk config — engine restart resets CAPITAL_PER_TRADE
+                        // to the config.py default ($100). Without this, every restart ignores
+                        // the user's configured capitalPerTrade setting.
+                        await fetch(`${reRegUrl}/api/set-config`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                capital_per_trade: (ub.config as any)?.capitalPerTrade ?? 100,
+                                max_loss_pct:      (ub.config as any)?.maxLossPct ?? -15,
+                            }),
+                            signal: AbortSignal.timeout(5000),
+                        });
                     } catch (e) {
                         console.warn(`[bot-state] Re-registration failed for bot ${ub.id}:`, e);
                     }
