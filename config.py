@@ -15,7 +15,10 @@ PAPER_TRADE = os.getenv("PAPER_TRADE", "true").lower() == "true"
 ENGINE_USER_ID = "cmmbvbo2l0000j1xo3rqvkfhz"  # Default user for engine trades (admin)
 ENGINE_BOT_ID  = os.getenv("ENGINE_BOT_ID", "")    # DB Bot.id — set in Railway per deployment
 ENGINE_BOT_NAME = os.getenv("ENGINE_BOT_NAME", "") # Human-readable bot name shown in trades UI
-ENGINE_ACTIVE_BOTS = []  # List of {bot_id, user_id, segment_filter} — bots differ ONLY by segment, not brain type
+ENGINE_ACTIVE_BOTS = []  # List of {bot_id, user_id, segment_filter} — refreshed every cycle from SaaS DB
+# Pull-based bot registry: engine fetches active bots from SaaS API (no push registration needed)
+SAAS_API_URL    = os.getenv("SAAS_API_URL", "")       # e.g. https://your-app.vercel.app
+ENGINE_API_SECRET = os.getenv("ENGINE_API_SECRET", "") # Shared secret for internal API auth
 PAPER_MAX_CAPITAL = 2500       # Total portfolio: 25 slots × $100/trade
 
 # ─── CoinDCX API (used for LIVE trading) ────────────────────────────────────────

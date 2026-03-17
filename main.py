@@ -381,6 +381,16 @@ class RegimeMasterBot:
         # ── 0. Weekly coin tier re-classification (background) ───
         self._maybe_reclassify_tiers()
 
+        # ── 0a. Pull active bots from SaaS DB (every 3 cycles ≈ every 15 min) ───
+        # Engine is the pull side — no push/registration required.
+        # This self-heals after every Railway redeploy without any dashboard visit.
+        if self._cycle_count % 3 == 1:
+            try:
+                from engine_api import pull_active_bots_from_saas
+                pull_active_bots_from_saas()
+            except Exception as _pab_err:
+                logger.warning("⚠️  Bot pull failed: %s", _pab_err)
+
         # ── 0b. Reset Athena rate limiter for this cycle ─────────
         if self._athena:
             self._athena.reset_cycle()

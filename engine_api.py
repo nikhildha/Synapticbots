@@ -210,7 +210,44 @@ def _save_active_bots():
     except Exception as e:
         logger.error("Failed to save active_bots.json: %s", e)
 
-_load_active_bots()
+def pull_active_bots_from_saas():
+    """
+    Pull active bots from SaaS DB via the Next.js internal API.
+    This is the primary source of truth — no push/registration required.
+    Engine mode (paper/live) is determined by PAPER_TRADE env var.
+    Returns True if bots were refreshed, False on failure.
+    """
+    saas_url = config.SAAS_API_URL
+    if not saas_url:
+        return False  # Not configured — rely on push registration fallback
+
+    mode = "paper" if config.PAPER_TRADE else "live"
+    url = f"{saas_url.rstrip('/')}/api/internal/active-bots?mode={mode}"
+    headers = {}
+    if config.ENGINE_API_SECRET:
+        headers["Authorization"] = f"Bearer {config.ENGINE_API_SECRET}"
+
+    try:
+        import urllib.request
+        req = urllib.request.Request(url, headers=headers)
+        with urllib.request.urlopen(req, timeout=8) as resp:
+            data = json.loads(resp.read().decode())
+        bots = data.get("bots", [])
+        if not isinstance(bots, list):
+            return False
+        config.ENGINE_ACTIVE_BOTS = bots
+        if bots:
+            config.ENGINE_BOT_ID = bots[-1].get("bot_id", config.ENGINE_BOT_ID)
+        _save_active_bots()
+        logger.info("✅ Pulled %d active %s bots from SaaS DB", len(bots), mode)
+        return True
+    except Exception as e:
+        logger.warning("⚠️  SaaS bot pull failed (%s) — keeping existing %d bots", e, len(config.ENGINE_ACTIVE_BOTS))
+        return False
+
+# Startup: try SaaS pull first, fall back to disk cache
+if not pull_active_bots_from_saas():
+    _load_active_bots()
 
 # ── Startup diagnostics: verify mode ─────────────────────────────────
 logger.info(
