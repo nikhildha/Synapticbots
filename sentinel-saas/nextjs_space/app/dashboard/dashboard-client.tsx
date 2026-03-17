@@ -665,7 +665,7 @@ export function DashboardClient({ user, stats, bots, recentTrades }: DashboardCl
               transition={{ delay: 0.27 }}
               className="mt-6 mb-8"
             >
-              <div className="flex flex-col h-full min-h-[400px]">
+              <div className="flex flex-col w-full">
                 <AthenaPanel
                   athena={botState?.athena || { enabled: true, recent_decisions: [], model: 'gemini-2.5-flash' }}
                   coinStates={multi?.coin_states}
