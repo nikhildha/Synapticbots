@@ -127,6 +127,7 @@ class AthenaEngine:
         self._cycle_start = 0.0
         self._initialized = False
         self._decision_log = self._load_decision_log()  # Persisted across restarts
+        self._error_log: list = []  # Last 20 errors — surfaced in admin debug panel
 
     def _load_decision_log(self) -> list:
         """Load persisted decision log from disk on startup."""
@@ -192,12 +193,22 @@ class AthenaEngine:
         if not self._ensure_initialized():
             return self._default_execute(symbol, reason="Not initialized")
 
-        # 4. Call Gemini
+        # 4. Call Gemini — fail-closed: log error and re-raise so caller skips the trade
         try:
             return self._call_gemini(symbol, signal_context)
         except Exception as e:
-            logger.warning("🏛️ Athena [%s] API error (fail-open): %s", symbol, e)
-            return self._default_execute(symbol, reason=f"API error: {str(e)[:100]}")
+            err_entry = {
+                "time": datetime.now(timezone.utc).isoformat(),
+                "symbol": symbol,
+                "side": signal_context.get("side", "?"),
+                "error": str(e)[:200],
+                "cycle_call": self._cycle_call_count,
+            }
+            self._error_log.append(err_entry)
+            if len(self._error_log) > 20:
+                self._error_log.pop(0)
+            logger.error("🏛️ Athena [%s] API error — trade will be skipped: %s", symbol, e)
+            raise
 
     def _call_gemini(self, symbol: str, ctx: dict) -> AthenaDecision:
         """Make the actual Gemini API call using REST."""
@@ -480,6 +491,8 @@ Return your analysis as a JSON object (single object, not array)."""
 
     def get_state(self) -> dict:
         """Return current Athena state for dashboard display."""
+        fail_count = len(self._error_log)
+        status = "ok" if fail_count == 0 else ("degraded" if fail_count < 5 else "down")
         return {
             "enabled": config.LLM_REASONING_ENABLED and bool(config.LLM_API_KEY),
             "model": config.LLM_MODEL,
@@ -487,4 +500,7 @@ Return your analysis as a JSON object (single object, not array)."""
             "cycle_calls": self._cycle_call_count,
             "cache_size": len(self._cache),
             "recent_decisions": self._decision_log[-5:],
+            "status": status,
+            "fail_count": fail_count,
+            "recent_errors": self._error_log[-20:],
         }

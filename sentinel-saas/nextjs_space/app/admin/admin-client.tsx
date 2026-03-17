@@ -7,7 +7,7 @@ import {
     Users, Bot, BarChart3, Activity, Shield, Settings,
     ArrowLeft, RefreshCw, TrendingUp, TrendingDown,
     AlertTriangle, CheckCircle2, XCircle,
-    FileText, CreditCard, Heart, LineChart, DollarSign
+    FileText, CreditCard, Heart, LineChart, DollarSign, Brain
 } from 'lucide-react';
 
 // Tab components
@@ -18,6 +18,7 @@ import SystemHealth from './components/system-health';
 import UserAnalytics from './components/user-analytics';
 import RevenueDashboard from './components/revenue-dashboard';
 import UserBotMonitor from './components/user-bot-monitor';
+import AthenaDebug from './components/athena-debug';
 
 interface UserData {
     id: string;
@@ -40,7 +41,7 @@ interface SystemStats {
     revenueEstimate: number;
 }
 
-type TabId = 'overview' | 'users' | 'engine' | 'botMonitor' | 'subscriptions' | 'analytics' | 'revenue' | 'audit' | 'health';
+type TabId = 'overview' | 'users' | 'engine' | 'botMonitor' | 'subscriptions' | 'analytics' | 'revenue' | 'audit' | 'health' | 'athena';
 
 export default function AdminDashboard() {
     const { data: session } = useSession();
@@ -78,6 +79,7 @@ export default function AdminDashboard() {
         { id: 'revenue' as TabId, label: 'Revenue', icon: DollarSign },
         { id: 'audit' as TabId, label: 'Audit', icon: FileText },
         { id: 'health' as TabId, label: 'Health', icon: Heart },
+        { id: 'athena' as TabId, label: 'Athena', icon: Brain },
     ];
 
     return (
@@ -254,6 +256,7 @@ export default function AdminDashboard() {
             {activeTab === 'revenue' && <RevenueDashboard />}
             {activeTab === 'audit' && <AuditLog />}
             {activeTab === 'health' && <SystemHealth />}
+            {activeTab === 'athena' && <AthenaDebug />}
 
             {loading && !stats && (
                 <div className="flex items-center justify-center py-20">
