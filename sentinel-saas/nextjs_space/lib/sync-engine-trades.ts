@@ -174,8 +174,10 @@ export async function syncEngineTrades(
                     t3Price: t.targets?.t3 || null,
                     t1Hit: t.t1_hit || false,
                     t2Hit: t.t2_hit || false,
-                    trailingSl: t.trailing_sl || null,
-                    trailingActive: t.trailing_active || false,
+                    trailingSl: t.trailing_sl ?? null,
+                    trailingActive: t.trailing_active ?? false,
+                    trailSlCount: t.trail_sl_count ?? 0,
+                    steppedLockLevel: t.stepped_lock_level ?? -1,
                     sessionId: activeSession?.id ?? null,
                 },
                 update: {
@@ -197,8 +199,10 @@ export async function syncEngineTrades(
                     slType: t.sl_type || t.slType || 'fixed',
                     t1Hit: t.t1_hit || false,
                     t2Hit: t.t2_hit || false,
-                    trailingSl: t.trailing_sl || null,
-                    trailingActive: t.trailing_active || false,
+                    trailingSl: t.trailing_sl ?? null,
+                    trailingActive: t.trailing_active ?? false,
+                    trailSlCount: t.trail_sl_count ?? 0,
+                    steppedLockLevel: t.stepped_lock_level ?? -1,
                 },
             });
 
