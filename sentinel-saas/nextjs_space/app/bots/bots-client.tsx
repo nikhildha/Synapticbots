@@ -19,6 +19,7 @@ export function BotsClient({ bots: initialBots }: BotsClientProps) {
   const [showDeployModal, setShowDeployModal] = useState(false);
   const [bots, setBots] = useState(initialBots);
   const [loading, setLoading] = useState(false);
+  const [startAllLoading, setStartAllLoading] = useState(false);
   const [stopAllLoading, setStopAllLoading] = useState(false);
   const [deleteAllLoading, setDeleteAllLoading] = useState(false);
   const [deleteAllConfirm, setDeleteAllConfirm] = useState(false);
@@ -157,6 +158,16 @@ export function BotsClient({ bots: initialBots }: BotsClientProps) {
     finally { setStopAllLoading(false); }
   };
 
+  const handleStartAll = async () => {
+    setStartAllLoading(true);
+    try {
+      const res = await fetch('/api/bots/start-all', { method: 'POST' });
+      if (res.ok) window.location.reload();
+      else { const d = await res.json(); alert(d.error || 'Failed to start bots'); }
+    } catch { alert('Failed to start all bots'); }
+    finally { setStartAllLoading(false); }
+  };
+
   const handleDeleteAll = async () => {
     if (!deleteAllConfirm) { setDeleteAllConfirm(true); setTimeout(() => setDeleteAllConfirm(false), 4000); return; }
     setDeleteAllLoading(true);
@@ -170,6 +181,7 @@ export function BotsClient({ bots: initialBots }: BotsClientProps) {
 
   const activeBots = bots.filter((b: any) => b?.status !== 'retired');
   const runningBots = activeBots.filter((b: any) => b?.isActive);
+  const stoppedBots = activeBots.filter((b: any) => !b?.isActive);
   const signFmt = (n: number) => (n >= 0 ? '+' : '') + n.toFixed(2);
 
   // Derived Values
@@ -218,6 +230,11 @@ export function BotsClient({ bots: initialBots }: BotsClientProps) {
                 </p>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                {stoppedBots.length > 0 && (
+                  <button onClick={handleStartAll} disabled={startAllLoading} className="btn-ghost" style={{ fontSize: 'var(--text-sm)', padding: '10px 16px', color: '#22C55E', border: '1px solid rgba(34,197,94,0.3)', opacity: startAllLoading ? 0.6 : 1 }}>
+                    {startAllLoading ? 'Starting…' : '▶ Start All'}
+                  </button>
+                )}
                 {runningBots.length > 0 && (
                   <button onClick={handleStopAll} disabled={stopAllLoading} className="btn-ghost" style={{ fontSize: 'var(--text-sm)', padding: '10px 16px', color: '#F59E0B', border: '1px solid rgba(245,158,11,0.3)', opacity: stopAllLoading ? 0.6 : 1 }}>
                     {stopAllLoading ? 'Stopping…' : '⏹ Stop All'}
