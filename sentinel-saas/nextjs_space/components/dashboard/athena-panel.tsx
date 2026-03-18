@@ -170,7 +170,7 @@ export function AthenaPanel({ athena }: Props) {
 
                                         {/* Header Row */}
                                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-                                            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
                                                 <div style={{ fontSize: 22, fontWeight: 900, color: '#E8EDF5', letterSpacing: '1px' }}>
                                                     {d.symbol.replace('USDT', '')}
                                                 </div>
@@ -182,27 +182,36 @@ export function AthenaPanel({ athena }: Props) {
                                                 }}>
                                                     {isLong ? 'LONG' : isShort ? 'SHORT' : d.side}
                                                 </div>
+                                                {/* Injected Parameters (Lev, Size, Conf, S/R) */}
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginLeft: 4 }}>
+                                                    <div style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, color: '#E8EDF5', background: 'rgba(255,255,255,0.05)', padding: '4px 8px', borderRadius: 4 }}>
+                                                        <span style={{ color: 'var(--color-text-muted)' }}>Conf:</span> <strong style={{ color: theme.color }}>{confPct}%</strong>
+                                                    </div>
+                                                    {parsed.leverage && (
+                                                        <div style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, color: '#E8EDF5', background: 'rgba(255,255,255,0.05)', padding: '4px 8px', borderRadius: 4 }}>
+                                                            <Zap size={10} color="#00E5FF" /> Lev: <strong style={{ color: '#00E5FF' }}>{parsed.leverage}</strong>
+                                                        </div>
+                                                    )}
+                                                    {parsed.size && (
+                                                        <div style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, color: '#E8EDF5', background: 'rgba(255,255,255,0.05)', padding: '4px 8px', borderRadius: 4 }}>
+                                                            <Lock size={10} color="#00FF88" /> Size: <strong style={{ color: '#00FF88' }}>{parsed.size}</strong>
+                                                        </div>
+                                                    )}
+                                                    {parsed.support && (
+                                                        <div style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, color: '#E8EDF5', background: 'rgba(255,255,255,0.05)', padding: '4px 8px', borderRadius: 4 }}>
+                                                            <Eye size={10} color="#FFB300" /> S/R: <strong style={{ color: '#FFB300' }}>{parsed.support.split(',')[0]}</strong>
+                                                        </div>
+                                                    )}
+                                                </div>
                                             </div>
                                             <div style={{
-                                                padding: '6px 14px', borderRadius: 8,
-                                                background: `rgba(${parseInt(theme.color.slice(1,3),16)},${parseInt(theme.color.slice(3,5),16)},${parseInt(theme.color.slice(5,7),16)},0.1)`,
+                                                padding: '4px 10px', borderRadius: 6,
+                                                background: `rgba(${parseInt(theme.color.slice(1,3), 16)},${parseInt(theme.color.slice(3,5), 16)},${parseInt(theme.color.slice(5,7), 16)},0.1)`,
                                                 border: `1px solid ${theme.color}40`,
-                                                color: theme.color, fontSize: 13, fontWeight: 800, letterSpacing: '1px',
-                                                boxShadow: `0 0 15px ${theme.glow}`
+                                                color: theme.color, fontSize: 12, fontWeight: 800, letterSpacing: '1px',
+                                                boxShadow: `0 0 10px ${theme.glow}`
                                             }}>
                                                 {theme.label}
-                                            </div>
-                                        </div>
-
-                                        {/* Stats Row */}
-                                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 16 }}>
-                                            <div style={{ background: 'rgba(0,0,0,0.3)', padding: 12, borderRadius: 10, border: '1px solid rgba(255,255,255,0.03)' }}>
-                                                <div style={{ fontSize: 10, color: 'var(--color-text-muted)', marginBottom: 4, textTransform: 'uppercase' }}>Athena Confidence</div>
-                                                <div style={{ fontSize: 18, fontWeight: 800, color: theme.color }}>{confPct}%</div>
-                                            </div>
-                                            <div style={{ background: 'rgba(0,0,0,0.3)', padding: 12, borderRadius: 10, border: '1px solid rgba(255,255,255,0.03)' }}>
-                                                <div style={{ fontSize: 10, color: 'var(--color-text-muted)', marginBottom: 4, textTransform: 'uppercase' }}>Processing Time</div>
-                                                <div style={{ fontSize: 18, fontWeight: 800, color: '#00E5FF' }}>{d.latency_ms > 0 ? `${d.latency_ms}ms` : 'Cached'}</div>
                                             </div>
                                         </div>
 
@@ -239,26 +248,7 @@ export function AthenaPanel({ athena }: Props) {
                                             </div>
                                         )}
 
-                                        {/* Parameters */}
-                                        {(parsed.leverage || parsed.size) && (
-                                            <div style={{ marginTop: 16, display: 'flex', gap: 12 }}>
-                                                {parsed.leverage && (
-                                                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: '#E8EDF5', background: 'rgba(255,255,255,0.05)', padding: '6px 12px', borderRadius: 6 }}>
-                                                        <Zap size={14} color="#00E5FF" /> Lev: <strong style={{ color: '#00E5FF' }}>{parsed.leverage}</strong>
-                                                    </div>
-                                                )}
-                                                {parsed.size && (
-                                                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: '#E8EDF5', background: 'rgba(255,255,255,0.05)', padding: '6px 12px', borderRadius: 6 }}>
-                                                        <Lock size={14} color="#00FF88" /> Size: <strong style={{ color: '#00FF88' }}>{parsed.size}</strong>
-                                                    </div>
-                                                )}
-                                                {parsed.support && (
-                                                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: '#E8EDF5', background: 'rgba(255,255,255,0.05)', padding: '6px 12px', borderRadius: 6 }}>
-                                                        <Eye size={14} color="#FFB300" /> S/R: <strong style={{ color: '#FFB300' }}>{parsed.support.split(',')[0]}</strong>
-                                                    </div>
-                                                )}
-                                            </div>
-                                        )}
+                                        {/* Parameters moved to Header */}
                                     </motion.div>
                                 );
                             })}
