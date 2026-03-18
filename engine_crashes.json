@@ -1,35 +1,7 @@
 {
   "boots": 23,
-  "total_crashes": 684,
+  "total_crashes": 688,
   "crashes": [
-    {
-      "time": "2026-03-18T10:10:29.491341+00:00",
-      "type": "thread_crash",
-      "error": "can't register atexit after shutdown",
-      "boot": 23,
-      "memory_mb": 107.8
-    },
-    {
-      "time": "2026-03-18T10:10:29.491894+00:00",
-      "type": "permanent_failure",
-      "error": "Exhausted all restart attempts",
-      "boot": 23,
-      "memory_mb": 107.8
-    },
-    {
-      "time": "2026-03-18T10:15:29.513031+00:00",
-      "type": "thread_crash",
-      "error": "can't register atexit after shutdown",
-      "boot": 23,
-      "memory_mb": 107.8
-    },
-    {
-      "time": "2026-03-18T10:15:39.522993+00:00",
-      "type": "thread_crash",
-      "error": "can't register atexit after shutdown",
-      "boot": 23,
-      "memory_mb": 107.8
-    },
     {
       "time": "2026-03-18T10:15:59.533916+00:00",
       "type": "thread_crash",
@@ -139,6 +111,34 @@
       "time": "2026-03-18T10:32:59.845146+00:00",
       "type": "permanent_failure",
       "error": "Exhausted all restart attempts",
+      "boot": 23,
+      "memory_mb": 107.8
+    },
+    {
+      "time": "2026-03-18T10:37:59.871980+00:00",
+      "type": "thread_crash",
+      "error": "invalid syntax (main.py, line 1226)",
+      "boot": 23,
+      "memory_mb": 107.8
+    },
+    {
+      "time": "2026-03-18T10:38:09.888051+00:00",
+      "type": "thread_crash",
+      "error": "invalid syntax (main.py, line 1226)",
+      "boot": 23,
+      "memory_mb": 107.8
+    },
+    {
+      "time": "2026-03-18T10:38:29.905523+00:00",
+      "type": "thread_crash",
+      "error": "invalid syntax (main.py, line 1226)",
+      "boot": 23,
+      "memory_mb": 107.8
+    },
+    {
+      "time": "2026-03-18T10:39:09.923447+00:00",
+      "type": "thread_crash",
+      "error": "invalid syntax (main.py, line 1226)",
       "boot": 23,
       "memory_mb": 107.8
     }
