@@ -190,17 +190,20 @@ export function TradesClient({ trades: initialTrades }: TradesClientProps) {
 
   useEffect(() => { setMounted(true); }, []);
 
-  // Auto-refresh from engine every 15s
+  // Auto-refresh from Prisma (user-scoped) every 15s.
+  // Previously: called /api/bot-state → engine JSON → ALL users' trades (bug).
+  // Now: calls /api/trades → Prisma → only this user's trades, user-isolated.
   const refreshTrades = useCallback(async () => {
     if (clearPauseRef.current) return;
     try {
-      const res = await fetch('/api/bot-state', { cache: 'no-store' });
+      const res = await fetch('/api/trades?limit=200', { cache: 'no-store' });
       if (res.ok) {
         const data = await res.json();
-        setTrades((data?.tradebook?.trades || []).map(mapTrade));
+        setTrades((data?.trades || []).map(mapTrade));
       }
     } catch { /* silent */ }
   }, []);
+
 
   // Live price polling from Binance REST every 3s for active trade symbols
   // Uses Binance /api/v3/ticker/price directly — reliable, no pair-name confusion

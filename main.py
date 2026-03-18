@@ -658,13 +658,27 @@ class RegimeMasterBot:
                     )
                     continue
 
-                # Per-User duplicate check (skip if THIS user already trading this coin across ANY bot)
-                if (user_id, sym) in active_user_symbols:
-                    logger.debug("🔄 [%s] %s already open for user %s — skip", bot_name, sym, user_id)
-                    self._coin_states.setdefault(sym, {}).setdefault("bot_deploy_statuses", {})[bot_id] = "FILTERED: active trade exists for user"
+                # ── DEDUP GUARD 1: Same bot, same coin (direction-agnostic) ──────────
+                # active_bot_symbols was built from tradebook snapshot + updated live this cycle.
+                # Catches: same bot opening same coin twice (SAND×2 bug).
+                if (bot_id, sym) in active_bot_symbols:
+                    logger.info("🔄 [%s] %s already active for THIS bot — skip (dedup guard)", bot_name, sym)
+                    self._coin_states.setdefault(sym, {}).setdefault("bot_deploy_statuses", {})[bot_id] = "FILTERED: this bot already has an active trade for this coin"
                     _bcast("FILTERED_DUPLICATE", self._cycle_count, bot_name, bot_id, sym,
                            top.get("side", ""), seg_name, top.get("confidence", 0),
-                           "active trade already open for this bot")
+                           "same bot already has this coin open — skipping regardless of direction")
+                    continue
+
+                # ── DEDUP GUARD 2: Same user, any bot, same coin (direction-agnostic) ─
+                # Prevents user from holding contradictory positions across multiple bots.
+                # NOTE: only blocks if user_id is non-empty. Legacy trades with blank user_id
+                # are NOT blocked here — they are handled by DEDUP GUARD 1 above.
+                if user_id and (user_id, sym) in active_user_symbols:
+                    logger.info("🔄 [%s] %s already open for user %s (another bot) — skip", bot_name, sym, user_id)
+                    self._coin_states.setdefault(sym, {}).setdefault("bot_deploy_statuses", {})[bot_id] = "FILTERED: another bot for this user already has this coin open"
+                    _bcast("FILTERED_DUPLICATE", self._cycle_count, bot_name, bot_id, sym,
+                           top.get("side", ""), seg_name, top.get("confidence", 0),
+                           "user already trading this coin on another bot — skipping")
                     continue
 
                 # ── C4 Fix: Enforce MAX_OPEN_TRADES cap ──────────────────────────
@@ -876,6 +890,8 @@ class RegimeMasterBot:
                 }
                 active_symbols.add(sym)
                 active_user_symbols.add((user_id, sym))
+                active_bot_symbols.add((bot_id, sym))  # keep live — blocks intra-cycle same-bot dupe
+
                 self._trade_count += 1
                 deployed += 1
 
