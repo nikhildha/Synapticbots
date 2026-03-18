@@ -15,6 +15,7 @@ export function LiveClient() {
     const [prismaActiveCount, setPrismaActiveCount] = useState<number>(0);
     const [pingHistory, setPingHistory] = useState<number[]>([]);
     const [heatmap, setHeatmap] = useState<{ symbol: string; pnl: number }[]>([]);
+    const [positions, setPositions] = useState<any[]>([]);
     const [logs, setLogs] = useState<string[]>([]);
     const [loading, setLoading] = useState(true);
     const [syncing, setSyncing] = useState(false);
@@ -71,6 +72,24 @@ export function LiveClient() {
         const t = setInterval(fetchData, 10000);
         return () => clearInterval(t);
     }, []);
+
+    const fetchPositions = async () => {
+        try {
+            const res = await fetch(`/api/exchange/positions?exchange=${selectedExchange}`);
+            if (res.ok) {
+                const data = await res.json();
+                setPositions(data.positions || []);
+            }
+        } catch (e) {
+            console.error(e);
+        }
+    };
+
+    useEffect(() => {
+        fetchPositions();
+        const t = setInterval(fetchPositions, 10000);
+        return () => clearInterval(t);
+    }, [selectedExchange]);
 
     const handleStopAll = async () => {
         if (!confirm('Are you sure you want to stop all active bots?')) return;
@@ -283,6 +302,65 @@ export function LiveClient() {
                                 }) : (
                                     <div className="flex items-center justify-center h-full text-[var(--color-text-muted)] italic">
                                         {loading ? 'Initializing uplink...' : 'Awaiting signals...'}
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                                      {/* Live Exchange Feed */}
+                        <div style={{
+                            background: 'linear-gradient(145deg, rgba(8,12,20,0.9) 0%, rgba(5,7,12,0.95) 100%)',
+                            border: '1px solid rgba(255,255,255,0.05)',
+                            borderRadius: '20px',
+                            padding: '24px',
+                            boxShadow: 'inset 0 0 0 1px rgba(255,255,255,0.02)'
+                        }}>
+                            <h2 className="text-xl font-bold flex items-center gap-2 text-[#E8EDF5] border-b border-[rgba(255,255,255,0.05)] pb-4 mb-4">
+                                <Activity size={20} color="#00E5FF" /> Live Exchange Feed
+                            </h2>
+                            <div className="flex flex-col gap-3 max-h-[400px] overflow-y-auto pr-2 custom-scrollbar">
+                                {positions.length > 0 ? positions.map((pos, i) => {
+                                    const isLong = pos.side === 'LONG';
+                                    const isWin = pos.unrealizedPnl >= 0;
+                                    const color = isWin ? '#00FF88' : '#FF3B5C';
+                                    const bgGradient = isWin ? 'linear-gradient(90deg, rgba(0,255,136,0.05) 0%, rgba(0,0,0,0) 100%)' : 'linear-gradient(90deg, rgba(255,59,92,0.05) 0%, rgba(0,0,0,0) 100%)';
+                                    
+                                    return (
+                                        <div key={i} className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 rounded-xl border border-[rgba(255,255,255,0.05)] hover:border-[rgba(255,255,255,0.1)] transition-colors" style={{ background: bgGradient }}>
+                                            <div className="flex items-center gap-4 mb-3 sm:mb-0">
+                                                <div className="flex flex-col">
+                                                    <span className="text-lg font-bold text-white tracking-widest">{pos.symbol}</span>
+                                                    <div className="flex items-center gap-2 mt-1">
+                                                        <span className="text-[10px] font-bold px-2 py-0.5 rounded text-black tracking-wider" style={{ background: isLong ? '#00FF88' : '#FF3B5C' }}>
+                                                            {pos.side}
+                                                        </span>
+                                                        <span className="text-xs text-[var(--color-text-muted)] border border-[rgba(255,255,255,0.1)] px-1.5 py-0.5 rounded">
+                                                            {pos.leverage}x
+                                                        </span>
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            <div className="flex items-center gap-6 w-full sm:w-auto justify-between sm:justify-end">
+                                                <div className="flex flex-col text-right">
+                                                    <span className="text-[10px] text-[var(--color-text-muted)] uppercase tracking-wider">Entry</span>
+                                                    <span className="text-sm font-mono text-[#E8EDF5]">${pos.entryPrice.toFixed(4)}</span>
+                                                </div>
+                                                <div className="flex flex-col text-right">
+                                                    <span className="text-[10px] text-[var(--color-text-muted)] uppercase tracking-wider">Mark</span>
+                                                    <span className="text-sm font-mono text-[#E8EDF5]">${pos.markPrice.toFixed(4)}</span>
+                                                </div>
+                                                <div className="flex flex-col text-right min-w-[80px]">
+                                                    <span className="text-[10px] text-[var(--color-text-muted)] uppercase tracking-wider">uPnL</span>
+                                                    <span className="text-base font-mono font-bold" style={{ color: color, textShadow: `0 0 10px ${color}40` }}>
+                                                        {isWin ? '+' : ''}${pos.unrealizedPnl.toFixed(2)}
+                                                    </span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    );
+                                }) : (
+                                    <div className="text-sm text-[var(--color-text-muted)] italic py-8 text-center border border-dashed border-[rgba(255,255,255,0.1)] rounded-xl">
+                                        No active trades detected on {selectedExchange === 'binance' ? 'Binance' : 'CoinDCX'}.
                                     </div>
                                 )}
                             </div>
