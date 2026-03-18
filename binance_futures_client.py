@@ -86,9 +86,22 @@ class BinanceFuturesClient(ExchangeClient):
 
     # ─── Interface Implementation ────────────────────────────────────────────
 
-    def set_leverage(self, symbol: str, leverage: int) -> bool:
-        """Set leverage and isolated margin for a symbol."""
+    def set_leverage(self, symbol: str, leverage: int) -> int:
+        """Set leverage and isolated margin for a symbol. Returns actual leverage set (0 if failed)."""
         try:
+            # Pre-flight check: Max Leverage Alignment
+            try:
+                brackets = self._client.futures_leverage_bracket(symbol=symbol)
+                if brackets and isinstance(brackets, list) and len(brackets) > 0:
+                    symbol_brackets = brackets[0].get("brackets", [])
+                    if symbol_brackets:
+                        max_leverage = int(symbol_brackets[0]["initialLeverage"])
+                        if leverage > max_leverage:
+                            logger.warning("Requested leverage %dx for %s exceeds max %dx. Adjusting.", leverage, symbol, max_leverage)
+                            leverage = max_leverage
+            except Exception as e:
+                logger.warning("Leverage bracket check skipped for %s: %s", symbol, e)
+
             try:
                 self._client.futures_change_margin_type(
                     symbol=symbol, marginType="ISOLATED"
@@ -100,10 +113,10 @@ class BinanceFuturesClient(ExchangeClient):
                 symbol=symbol, leverage=leverage
             )
             logger.info("Set %s leverage to %dx (ISOLATED)", symbol, leverage)
-            return True
+            return leverage
         except Exception as e:
             logger.error("Failed to set leverage for %s: %s", symbol, e)
-            return False
+            return 0
 
     def get_balance(self) -> float:
         """Get available USDT futures balance."""
@@ -162,7 +175,9 @@ class BinanceFuturesClient(ExchangeClient):
         """
         try:
             # 1. Setup
-            self.set_leverage(symbol, leverage)
+            leverage = self.set_leverage(symbol, leverage)
+            if leverage == 0:
+                raise Exception("Failed to set leverage")
             qty = self._round_qty(symbol, quantity)
             sl = self._round_price(symbol, sl_price)
             tp = self._round_price(symbol, tp_price)
