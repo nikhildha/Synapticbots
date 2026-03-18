@@ -531,14 +531,12 @@ class RegimeMasterBot:
 
         # ── 4a-1. Institutional Segment Pre-Filter ──
         # Massively optimizes ML processing by only allowing coins from the Top 2 performing segments
-        from coin_scanner import get_segment_momentum_scores
+        from coin_scanner import get_hottest_segments
         allowed_segment_coins = set()
         allowed_segment_coins.add("BTCUSDT") # Always process BTC for macro context
 
         try:
-            segment_heat_scores = get_segment_momentum_scores()
-            sorted_segments = sorted(segment_heat_scores.items(), key=lambda x: x[1], reverse=True)
-            top_2_segment_names = [s[0] for s in sorted_segments[:2]]
+            top_2_segment_names = get_hottest_segments(2)
             logger.info("🔥 Top 2 Institutional Segments this cycle: %s", top_2_segment_names)
             
             for seg in top_2_segment_names:
