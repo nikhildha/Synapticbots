@@ -1038,11 +1038,10 @@ class RegimeMasterBot:
 
         # Compute features
         df_1h_feat = compute_all_features(df_1h)
-        df_1h_hmm = compute_hmm_features(df_1h)
 
         # Train if needed
         if brain.needs_retrain():
-            brain.train(df_1h_hmm)
+            brain.train(df_1h_feat)
 
         if not brain.is_trained:
             if symbol == "BTCUSDT":
@@ -1074,9 +1073,8 @@ class RegimeMasterBot:
                     df_tf = fetch_klines(symbol, tf, limit=config.MULTI_TF_CANDLE_LIMIT)
                     if df_tf is not None and len(df_tf) >= 60:
                         df_tf_feat = compute_all_features(df_tf)
-                        df_tf_hmm = compute_hmm_features(df_tf)
                         if tf_brain.needs_retrain():
-                            tf_brain.train(df_tf_hmm)
+                            tf_brain.train(df_tf_feat)
                         if tf_brain.is_trained:
                             mtf_brain.set_brain(tf, tf_brain)
                             tf_data[tf] = df_tf_feat
