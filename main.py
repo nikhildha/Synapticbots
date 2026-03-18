@@ -713,15 +713,18 @@ class RegimeMasterBot:
                 atr_val = top.get("atr", 0)
                 athena_decision = None
                 if self._athena and config.LLM_REASONING_ENABLED:
-                    # H4 Fix: enforce per-cycle call cap to prevent rate-limit burst
+                    # H4 Fix: enforce per-cycle call cap to prevent rate-limit burst.
+                    # IMPORTANT: cached calls are FREE (no Gemini API hit) — only count them
+                    # if the result is NOT from cache. Otherwise, with 3 bots × N coins,
+                    # the cap gets hit on cached responses and coins get hard-skipped.
                     llm_cap = getattr(config, "LLM_MAX_CALLS_PER_CYCLE", 10)
                     if athena_calls_this_cycle >= llm_cap:
                         logger.warning(
-                            "⚠️ Athena cap reached (%d/%d) — skipping [%s] %s (fail-closed)",
+                            "⚠️ Athena real-call cap reached (%d/%d) — skipping [%s] %s (fail-closed)",
                             athena_calls_this_cycle, llm_cap, bot_name, sym
                         )
                         self._coin_states.setdefault(sym, {}).setdefault("bot_deploy_statuses", {})[bot_id] = (
-                            f"FILTERED: Athena cap ({llm_cap} calls/cycle) reached"
+                            f"FILTERED: Athena cap ({llm_cap} real calls/cycle) reached"
                         )
                         continue
                     try:
@@ -741,7 +744,10 @@ class RegimeMasterBot:
                             "btc_regime":     self._coin_states.get("BTCUSDT", {}).get("regime", "UNKNOWN"),
                         }
                         athena_decision = self._athena.validate_signal(llm_ctx)
-                        athena_calls_this_cycle += 1  # H4: count successful calls
+                        # Only count REAL Gemini API calls — cached decisions are free.
+                        # decision.cached=True means the result came from Athena's in-process cache.
+                        if not getattr(athena_decision, 'cached', False):
+                            athena_calls_this_cycle += 1  # count only real LLM API hits
                         self._coin_states.setdefault(sym, {})["athena_state"] = {
                             "action":    athena_decision.action,
                             "confidence": athena_decision.adjusted_confidence,

@@ -51,8 +51,18 @@ function parseReasoning(r: string) {
 
 export function AthenaPanel({ athena }: Props) {
     const enabled = !!athena?.enabled;
-    const decisions = (athena?.recent_decisions || []).slice().reverse();
+    // Deduplicate by symbol — keep the latest decision per coin.
+    // Multiple bots processing the same coin each log a decision (including cached ones),
+    // causing SAND/ONDO to appear 2-3× if the user has multiple bots.
+    const rawDecisions = (athena?.recent_decisions || []).slice().reverse(); // newest first
+    const seenSymbols = new Set<string>();
+    const decisions = rawDecisions.filter((d) => {
+        if (seenSymbols.has(d.symbol)) return false;
+        seenSymbols.add(d.symbol);
+        return true;
+    });
     const hasData = decisions.length > 0;
+
 
     return (
         <div style={{
