@@ -10,7 +10,8 @@ ALL_HMM_FEATURES = [
     "log_return", "volatility", "volume_change",
     "vol_zscore", "rel_strength_btc",
     "liquidity_vacuum", "exhaustion_tail",
-    "amihud_illiquidity", "volume_trend_intensity"
+    "amihud_illiquidity", "volume_trend_intensity",
+    "vwap_dist", "bb_width_norm", "rsi"
 ]
 
 # Optimal features identified per individual coin via 15m Permutation Likelihood
@@ -397,8 +398,14 @@ COIN_FEATURES = {
 }
 
 def get_features_for_coin(coin: str) -> list:
-    """Return the optimized feature list for a given coin, fallback to ALL if unknown."""
-    return COIN_FEATURES.get(coin, ALL_HMM_FEATURES)
+    """Return the optimized feature list plus the mandatory structural features."""
+    base = list(COIN_FEATURES.get(coin, ALL_HMM_FEATURES))
+    # Ensure the new structural regime features are dynamically applied to every single coin
+    mandatory = ["vwap_dist", "bb_width_norm", "rel_strength_btc"]
+    for f in mandatory:
+        if f not in base:
+            base.append(f)
+    return base
 
 def get_segment_for_coin(coin: str) -> str:
     """Return the segment name for a giving coin from config.py."""

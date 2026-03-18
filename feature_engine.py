@@ -175,7 +175,11 @@ def compute_indicators(df):
 
     df["rsi"] = compute_rsi(df["close"])
     df["bb_middle"], df["bb_upper"], df["bb_lower"] = compute_bollinger_bands(df["close"])
+    df["bb_width_norm"] = ((df["bb_upper"] - df["bb_lower"]) / df["bb_middle"].replace(0, np.nan)).fillna(0).clip(0, 1)
     df["atr"] = compute_atr(df)
+
+    vwap = compute_vwap(df, window=20)
+    df["vwap_dist"] = ((df["close"] - vwap) / vwap.replace(0, np.nan)).fillna(0).clip(-0.5, 0.5)
 
     return df
 

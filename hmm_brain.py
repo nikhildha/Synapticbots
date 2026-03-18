@@ -9,7 +9,7 @@ which was always 99%+ regardless of actual accuracy — completely uncalibrated)
 import numpy as np
 import logging
 from datetime import datetime
-from hmmlearn.hmm import GaussianHMM
+from hmmlearn.hmm import GaussianHMM, GMMHMM
 
 import config
 
@@ -73,8 +73,9 @@ class HMMBrain:
         self._feat_std[self._feat_std < 1e-10] = 1e-10  # avoid div-by-zero
         features_scaled = (features - self._feat_mean) / self._feat_std
 
-        self.model = GaussianHMM(
+        self.model = GMMHMM(
             n_components=self.n_states,
+            n_mix=3,
             covariance_type=config.HMM_COVARIANCE,
             n_iter=config.HMM_ITERATIONS,
             random_state=42,
