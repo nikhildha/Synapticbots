@@ -214,6 +214,18 @@ class HMMBrain:
             return config.REGIME_CHOP, 0.0
 
         features_scaled = (features - self._feat_mean) / self._feat_std
+        # ── NaN guard ────────────────────────────────────────────────────────
+        # If any feature column is still NaN/inf after scaling (e.g. a zero-std
+        # feature that slipped through training data), replace with 0 rather than
+        # letting NaN poison predict_proba() and produce BEARISH(nan) in UI.
+        if np.isnan(features_scaled).any() or np.isinf(features_scaled).any():
+            nan_cols = np.where(np.isnan(features_scaled[-1]) | np.isinf(features_scaled[-1]))[0]
+            if nan_cols.size > 0:
+                bad_feats = [self.features[i] for i in nan_cols if i < len(self.features)]
+                logger.warning("NaN/inf in scaled features for %s: %s — replacing with 0",
+                               self.symbol, bad_feats)
+            features_scaled = np.nan_to_num(features_scaled, nan=0.0, posinf=0.0, neginf=0.0)
+        # ─────────────────────────────────────────────────────────────────────
 
         raw_state = self.model.predict(features_scaled)[-1]
         probs = self.model.predict_proba(features_scaled)[-1]
@@ -224,6 +236,11 @@ class HMMBrain:
         # Raw max-posterior was always 99%+ regardless of accuracy (uncalibrated).
         # Margin measures decisiveness: 0=uncertain, 1=extremely confident.
         sorted_p = np.sort(probs)[::-1]
+        # Guard: if predict_proba itself returned NaN (numerical instability in GMMHMM),
+        # fall back to 0.0 instead of propagating NaN into the UI.
+        if np.isnan(sorted_p).any():
+            logger.warning("NaN in predict_proba for %s — returning 0.0 confidence", self.symbol)
+            return canonical, 0.0
         confidence = float(sorted_p[0] - sorted_p[1]) if len(sorted_p) >= 2 else float(sorted_p[0])
 
         return canonical, confidence

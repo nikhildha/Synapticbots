@@ -53,7 +53,9 @@ def compute_hmm_features(df, btc_df=None):
     # Absolute close-to-close return divided by the 14-period ATR
     # High values mean price moved through air pockets
     atr_14 = compute_atr(df, 14)
-    df["liquidity_vacuum"] = (df["log_return"].abs() / (atr_14 / df["close"])).fillna(0).clip(0, 5)
+    # Guard: replace zero/NaN ATR to avoid inf in division
+    atr_pct = (atr_14 / df["close"].replace(0, np.nan)).replace(0, np.nan)
+    df["liquidity_vacuum"] = (df["log_return"].abs() / atr_pct).fillna(0).replace([np.inf, -np.inf], 0).clip(0, 5)
     if df["liquidity_vacuum"].std() < 1e-6: df["liquidity_vacuum"] += np.random.normal(0, 1e-6, len(df))
 
     # 7. Exhaustion Tail
@@ -71,8 +73,9 @@ def compute_hmm_features(df, btc_df=None):
     if df["exhaustion_tail"].std() < 1e-6: df["exhaustion_tail"] += np.random.normal(0, 1e-6, len(df))
 
     # 9. Amihud Illiquidity (Price Impact per unit of volume)
-    dollar_volume = df["close"] * (df["volume"].replace(0, np.nan))
-    df["amihud_illiquidity"] = (df["log_return"].abs() / dollar_volume).fillna(0)
+    # Guard: dollar_volume=0 or NaN produces inf — replace before dividing
+    dollar_volume = (df["close"] * df["volume"]).replace(0, np.nan)
+    df["amihud_illiquidity"] = (df["log_return"].abs() / dollar_volume).fillna(0).replace([np.inf, -np.inf], 0)
     df["amihud_illiquidity"] = (df["amihud_illiquidity"] * 1e8).clip(0, 10)
 
     # 10. Volume Trend Intensity
@@ -80,9 +83,9 @@ def compute_hmm_features(df, btc_df=None):
     vol_ema_long = df["volume"].ewm(span=20, adjust=False).mean()
     df["volume_trend_intensity"] = (vol_ema_short / vol_ema_long.replace(0, np.nan)).fillna(1.0).clip(0, 5)
 
-    # 11. Swing High/Low for RM3_Swing (10-candle local structure)
-    df["swing_l"] = df["low"].rolling(10).min()
-    df["swing_h"] = df["high"].rolling(10).max()
+    # swing_l/swing_h: rolling(10) leaves first 9 rows as NaN → back-fill with own row
+    df["swing_l"] = df["low"].rolling(10, min_periods=1).min()
+    df["swing_h"] = df["high"].rolling(10, min_periods=1).max()
 
     return df
 
