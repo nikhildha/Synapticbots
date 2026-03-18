@@ -539,7 +539,7 @@ class RegimeMasterBot:
 
         # ── 4a-1. Institutional Segment Pre-Filter ──
         # Massively optimizes ML processing by only allowing coins from the Top 2 performing segments
-        from sentiment_engine import get_segment_momentum_scores
+        from coin_scanner import get_segment_momentum_scores
         allowed_segment_coins = set()
         allowed_segment_coins.add("BTCUSDT") # Always process BTC for macro context
 
