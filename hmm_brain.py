@@ -90,9 +90,23 @@ class HMMBrain:
         import warnings
         with warnings.catch_warnings():
             warnings.simplefilter("ignore", category=RuntimeWarning)
-            # Suppress specific hmmlearn log spam 
             warnings.filterwarnings("ignore", module="hmmlearn")
-            self.model.fit(features_scaled)
+            try:
+                self.model.fit(features_scaled)
+                # Check for silent NaN injections typical in hmmlearn
+                if np.isnan(self.model.startprob_).any() or np.isnan(self.model.transmat_).any():
+                    raise ValueError("NaNs present in GMMHMM transition matrix.")
+            except Exception as e:
+                # Fallback to computationally stable Single-Gaussian HMM for this specific coin
+                from hmmlearn.hmm import GaussianHMM
+                self.model = GaussianHMM(
+                    n_components=self.n_states,
+                    covariance_type="diag",
+                    n_iter=config.HMM_ITERATIONS,
+                    min_covar=1e-3,
+                    random_state=42
+                )
+                self.model.fit(features_scaled)
 
         self._build_state_map()
         self._last_trained = datetime.utcnow()
