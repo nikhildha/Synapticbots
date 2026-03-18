@@ -88,7 +88,7 @@ class ExecutionEngine:
     # ─── Trade Execution ─────────────────────────────────────────────────────
 
     def execute_trade(self, symbol, side, leverage, quantity, atr,
-                      regime=None, confidence=None, reason="", swing_l=None, swing_h=None, ema_5m_20=None,
+                      regime=None, confidence=None, reason="", swing_l=None, swing_h=None,
                       fallback_leverage=None):
         """
         Execute a futures trade with protective SL/TP.
@@ -149,14 +149,14 @@ class ExecutionEngine:
         exchange = getattr(config, 'EXCHANGE_LIVE', '').lower()
         if exchange == 'binance':
             return self._execute_binance_live(symbol, side, leverage, quantity, atr,
-                                              regime, regime_name, confidence, reason, swing_l, swing_h, ema_5m_20)
+                                              regime, regime_name, confidence, reason, swing_l, swing_h)
         # Default to CoinDCX
         return self._execute_coindcx(symbol, side, leverage, quantity, atr,
-                                     regime, regime_name, confidence, reason, swing_l, swing_h, ema_5m_20,
+                                     regime, regime_name, confidence, reason, swing_l, swing_h,
                                      fallback_leverage)
 
     def _execute_binance_live(self, symbol, side, leverage, quantity, atr,
-                               regime, regime_name, confidence, reason, swing_l=None, swing_h=None, ema_5m_20=None):
+                               regime, regime_name, confidence, reason, swing_l=None, swing_h=None):
         """Execute a live trade on Binance Futures."""
         client = get_exchange_client()
         if not client:
@@ -384,7 +384,7 @@ class ExecutionEngine:
         return confirmed
 
     def _execute_coindcx(self, symbol, side, leverage, quantity, atr,
-                         regime, regime_name, confidence, reason, swing_l=None, swing_h=None, ema_5m_20=None,
+                         regime, regime_name, confidence, reason, swing_l=None, swing_h=None,
                          fallback_leverage=None):
         """Execute a live trade on CoinDCX Futures. Returns a trade log dict or None."""
         import coindcx_client as cdx

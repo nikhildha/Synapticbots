@@ -723,7 +723,6 @@ class RegimeMasterBot:
                             "atr_pct":        (atr_val / max(current_price, 0.0001)) * 100,
                             "trend":          self._coin_states.get(sym, {}).get("context", {}).get("trend_alignment", "UNKNOWN"),
                             "signal_type":    top.get("signal_type", "TREND_FOLLOW"),
-                            "ema_5m_20":     top.get("ema_5m_20"),
                             "tf_agreement":   top.get("tf_agreement", 0),
                             "btc_regime":     self._coin_states.get("BTCUSDT", {}).get("regime", "UNKNOWN"),
                         }
@@ -789,8 +788,7 @@ class RegimeMasterBot:
                         leverage=lev,
                         quantity=qty,
                         atr=atr_val,
-                        ema_5m_20=top.get("ema_5m_20"),
-                        regime=top.get("regime", 0),
+                                                regime=top.get("regime", 0),
                         confidence=final_conf,
                         reason=reason_str,
                         swing_l=top.get("swing_l"),
@@ -1225,8 +1223,7 @@ class RegimeMasterBot:
 
             # Compute ema_5m_20 for ATR pullback limit orders (multi-TF path)
             # Without this, execution_engine always falls back to MARKET orders.
-            _ema_5m_20 = None
-            try:
+            _            try:
                 df_5m_for_ema = fetch_klines(symbol, config.TIMEFRAME_EXECUTION, limit=50)
                 if df_5m_for_ema is not None and len(df_5m_for_ema) >= 20:
                     from feature_engine import compute_ema
@@ -1238,8 +1235,7 @@ class RegimeMasterBot:
                 "symbol": symbol,
                 "side": side,
                 "atr": current_atr,
-                "ema_5m_20": _ema_5m_20,
-                "regime": regime,
+                                "regime": regime,
                 "regime_name": regime_name,
                 "confidence": conf,
                 "conviction": conviction,
@@ -1460,15 +1456,13 @@ class RegimeMasterBot:
         # 3. 5m momentum filter + order flow (fetch df_5m once for both)
         df_5m = None
         orderflow_score = None
-        ema_5m_20 = None
-        try:
+                try:
             df_5m = fetch_klines(symbol, config.TIMEFRAME_EXECUTION, limit=50)
             if df_5m is not None and len(df_5m) >= 5:
                 df_5m_feat = compute_all_features(df_5m)
                 price_now   = float(df_5m_feat["close"].iloc[-1])
                 price_5_ago = float(df_5m_feat["close"].iloc[-5])
-                ema_5m_20  = float(compute_ema(df_5m_feat["close"], 20).iloc[-1])
-                pass
+                                pass
         except Exception:
             pass
 
@@ -1548,8 +1542,7 @@ class RegimeMasterBot:
             "symbol": symbol,
             "side": side,
             "atr": current_atr,
-            "ema_5m_20": ema_5m_20,
-            "swing_l": current_swing_l,
+                        "swing_l": current_swing_l,
             "swing_h": current_swing_h,
             "regime": regime,
             "regime_name": regime_name,
