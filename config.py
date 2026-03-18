@@ -40,15 +40,15 @@ SECONDARY_SYMBOLS = ["ETHUSDT"]
 
 # ─── Excluded Coins ─────────────────────────────────────────────────────────────
 # Coins placed here are completely ignored by the engine, scanner, and scanners.
-EXCLUDED_COINS = ["AKTUSDT", "FETUSDT", "WIFUSDT", "FILUSDT"]
+EXCLUDED_COINS = ["AKTUSDT", "WIFUSDT", "FILUSDT"]
 
 # ─── Crypto Segments (for Segment-Level Analysis) ───────────────────────────────
 CRYPTO_SEGMENTS = {
-    "L1": ["BTCUSDT", "ETHUSDT", "SOLUSDT", "BNBUSDT", "AVAXUSDT", "SUIUSDT"],
-    "L2": ["ARBUSDT", "OPUSDT", "POLUSDT", "MNTUSDT", "STRKUSDT", "IMXUSDT", "RONINUSDT"],
-    "DeFi": ["UNIUSDT", "AAVEUSDT", "CRVUSDT", "JUPUSDT", "RUNEUSDT", "PENDLEUSDT", "LINKUSDT"],
-    "AI": ["TAOUSDT", "FETUSDT", "INJUSDT", "WLDUSDT", "AKTUSDT"],
-    "Meme": ["DOGEUSDT", "SHIBUSDT", "PEPEUSDT", "WIFUSDT", "BONKUSDT"],
+    "L1": ["BTCUSDT", "ETHUSDT", "SOLUSDT", "BNBUSDT", "AVAXUSDT", "SUIUSDT", "XRPUSDT", "APTUSDT", "ETCUSDT"],
+    "L2": ["ARBUSDT", "OPUSDT", "POLUSDT", "MNTUSDT", "STRKUSDT", "IMXUSDT", "RONINUSDT", "ZKUSDT"],
+    "DeFi": ["UNIUSDT", "AAVEUSDT", "CRVUSDT", "JUPUSDT", "RUNEUSDT", "PENDLEUSDT", "LINKUSDT", "LDOUSDT", "GMXUSDT", "ENAUSDT"],
+    "AI": ["TAOUSDT", "FETUSDT", "INJUSDT", "WLDUSDT", "AKTUSDT", "RENDERUSDT"],
+    "Meme": ["DOGEUSDT", "SHIBUSDT", "PEPEUSDT", "WIFUSDT", "BONKUSDT", "1000PEPEUSDT", "1000SHIBUSDT"],
     "RWA": ["ONDOUSDT", "POLYXUSDT", "TRUUSDT"],
     "Gaming": ["AXSUSDT", "SANDUSDT", "PIXELUSDT", "IOTXUSDT"],
     "DePIN": ["FILUSDT", "ARUSDT", "HNTUSDT"],

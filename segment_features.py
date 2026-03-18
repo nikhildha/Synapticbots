@@ -824,6 +824,17 @@ COIN_FEATURES = {
         "rel_strength_btc"
     ],
 
+    "ENAUSDT": [
+        "vol_zscore",
+        "amihud_illiquidity",
+        "liquidity_vacuum",
+        "log_return",
+        "volume_trend_intensity",
+        "exhaustion_tail",
+        "vwap_dist",
+        "bb_width_norm",
+        "rel_strength_btc"
+    ],
 }
 
 def get_features_for_coin(coin: str) -> list:
