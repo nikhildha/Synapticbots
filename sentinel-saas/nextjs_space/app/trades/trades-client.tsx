@@ -21,6 +21,11 @@ interface Trade {
   botName?: string;
   botId?: string | null;
   sessionId?: string | null;
+  // Trailing SL fields
+  trailingSl?: number | null;          // current live SL (advances as price moves)
+  steppedLockLevel?: number;           // which step is active (-1=none, 0=step1…9=step10)
+  trailSlCount?: number;               // how many times SL was ratcheted up
+  trailingActive?: boolean;            // whether trailing has kicked in
 }
 
 /* ═══ Utilities ═══ */
@@ -139,6 +144,11 @@ function mapTrade(t: any): Trade {
     })(),
     botName: t.bot_name || t.botName || 'Unknown Bot',
     botId: t.bot_id || t.botId || null,
+    // Trailing SL — use trailingSl (from API) or fall back to raw trailing_sl field
+    trailingSl: t.trailingSl ?? t.trailing_sl ?? null,
+    steppedLockLevel: t.steppedLockLevel ?? t.stepped_lock_level ?? -1,
+    trailSlCount: t.trailSlCount ?? t.trail_sl_count ?? 0,
+    trailingActive: t.trailingActive ?? t.trailing_active ?? false,
   };
 }
 
@@ -611,7 +621,7 @@ export function TradesClient({ trades: initialTrades }: TradesClientProps) {
                   <table style={{ width: '100%', minWidth: '1300px', borderCollapse: 'collapse', fontSize: '17px' }}>
                     <thead>
                       <tr style={{ borderBottom: '2px solid rgba(255,255,255,0.08)' }}>
-                        {['Bot', 'Coin', 'Position', 'Leverage', 'Capital', 'Entry', 'LTP', 'Stop Loss', 'Target Price', 'PnL', 'Fee', 'Net PnL', 'Exit', 'Action'].map(h => (
+                        {['Bot', 'Coin', 'Position', 'Leverage', 'Capital', 'Entry', 'LTP', 'Stop Loss', 'SL Step', 'Target Price', 'PnL', 'Fee', 'Net PnL', 'Exit', 'Action'].map(h => (
                           <th key={h} style={{
                             padding: '10px 10px', textAlign: h === 'Bot' || h === 'Coin' ? 'left' : 'center',
                             fontSize: '11px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.8px',
@@ -676,7 +686,52 @@ export function TradesClient({ trades: initialTrades }: TradesClientProps) {
                                 </span>
                               ) : <span style={{ color: '#6B7280' }}>—</span>}
                             </td>
-                            <td style={{ padding: '10px', textAlign: 'center', color: '#EF4444', fontFamily: 'monospace', fontSize: '12px' }}>{fmtPrice(t.stopLoss)}</td>
+                            {/* Stop Loss — shows trailing_sl for active trades (updates live as SL ratchets up) */}
+                            <td style={{ padding: '10px', textAlign: 'center', fontFamily: 'monospace', fontSize: '12px' }}>
+                              {(() => {
+                                const liveSl = isActive && (t.trailingSl ?? 0) > 0 ? t.trailingSl! : t.stopLoss;
+                                const isTrailing = isActive && t.trailingActive;
+                                return (
+                                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px' }}>
+                                    <span style={{ color: isTrailing ? '#F59E0B' : '#EF4444' }}>
+                                      {isTrailing && <span style={{ marginRight: '3px' }}>🔒</span>}
+                                      {fmtPrice(liveSl)}
+                                    </span>
+                                    {isTrailing && t.stopLoss !== liveSl && (
+                                      <span style={{ fontSize: '9px', color: '#6B7280' }}>orig: {fmtPrice(t.stopLoss)}</span>
+                                    )}
+                                  </div>
+                                );
+                              })()}
+                            </td>
+                            {/* SL Step — shows which trailing step is active */}
+                            <td style={{ padding: '10px', textAlign: 'center' }}>
+                              {isActive ? (() => {
+                                const lvl = t.steppedLockLevel ?? -1;
+                                const count = t.trailSlCount ?? 0;
+                                // Step labels matching TRAILING_SL_STEPS in config.py
+                                const stepLabels = [
+                                  'Breakeven', '+5%', '+10%', '+15%', '+20%',
+                                  '+25%', '+30%', '+35%', '+40%', '+45%',
+                                ];
+                                if (lvl < 0) {
+                                  return <span style={{ fontSize: '10px', color: '#4B5563' }}>—</span>;
+                                }
+                                return (
+                                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px' }}>
+                                    <span style={{
+                                      fontSize: '10px', fontWeight: 700,
+                                      background: 'rgba(245,158,11,0.15)', color: '#F59E0B',
+                                      border: '1px solid rgba(245,158,11,0.3)',
+                                      borderRadius: '6px', padding: '2px 7px',
+                                    }}>
+                                      Step {lvl + 1} · {stepLabels[lvl] ?? `+${(lvl + 1) * 5}%`}
+                                    </span>
+                                    <span style={{ fontSize: '9px', color: '#6B7280' }}>{count}× moved</span>
+                                  </div>
+                                );
+                              })() : <span style={{ fontSize: '10px', color: '#4B5563' }}>—</span>}
+                            </td>
                             <td style={{ padding: '10px', textAlign: 'center', color: '#22C55E', fontFamily: 'monospace', fontSize: '12px' }}>{fmtPrice(t.takeProfit)}</td>
 
                             <td style={{ padding: '10px', textAlign: 'center', fontWeight: 700, color: pnlColor(pnl) }}>
