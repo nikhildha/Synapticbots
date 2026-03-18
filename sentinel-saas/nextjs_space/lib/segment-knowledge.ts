@@ -210,5 +210,52 @@ export const SEGMENT_KNOWLEDGE: SegmentIntel[] = [
         description: 'A decentralized, open-source wireless network architecture utilizing IoT tokens to reward hotspot operators.',
       }
     ]
+  },
+  {
+    id: 'Modular',
+    name: 'Modular Blockchains',
+    icon: '🧩',
+    tagline: 'Data Availability · Sovereign Rollups',
+    description: 'Modular blockchains separate the four core blockchain functions—execution, settlement, consensus, and data availability—into specialized layers. This architecture allows rollups to pick best-in-class infrastructure for each function, dramatically improving scalability.',
+    coins: [
+      {
+        symbol: 'TIAUSDT',
+        name: 'Celestia',
+        description: 'The first modular data availability network, enabling anyone to deploy their own blockchain with minimal overhead by outsourcing consensus and data availability.',
+        links: [{ label: 'Website', url: 'https://celestia.org' }]
+      },
+      {
+        symbol: 'DYMUSDT',
+        name: 'Dymension',
+        description: 'A network of modular rollups called RollApps, built and settled on the Dymension Hub with native interoperability.',
+        links: [{ label: 'Website', url: 'https://dymension.xyz' }]
+      }
+    ]
+  },
+  {
+    id: 'Oracles',
+    name: 'Oracles & Data Feeds',
+    icon: '🔮',
+    tagline: 'On-Chain Truth · Price Feeds',
+    description: 'Oracle networks act as the critical middleware between blockchains and the real world. They provide tamper-proof, decentralized price feeds and off-chain data that power the entire DeFi ecosystem—from lending protocols to derivatives markets.',
+    coins: [
+      {
+        symbol: 'PYTHUSDT',
+        name: 'Pyth Network',
+        description: 'A high-fidelity oracle network delivering real-time market data from first-party sources (exchanges, trading firms) directly on-chain.',
+        links: [{ label: 'Website', url: 'https://pyth.network' }]
+      },
+      {
+        symbol: 'TRBUSDT',
+        name: 'Tellor',
+        description: 'A decentralized oracle protocol that incentivizes an open, permissionless network of data reporting and validation.',
+      },
+      {
+        symbol: 'API3USDT',
+        name: 'API3',
+        description: 'A first-party oracle solution that connects traditional APIs directly to smart contracts, eliminating the intermediary node operator layer.',
+        links: [{ label: 'Website', url: 'https://api3.org' }]
+      }
+    ]
   }
 ];
