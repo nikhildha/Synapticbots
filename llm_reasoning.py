@@ -492,7 +492,7 @@ Return your analysis as a JSON object (single object, not array)."""
             "initialized": self._initialized,
             "cycle_calls": self._cycle_call_count,
             "cache_size": len(self._cache),
-            "recent_decisions": self._decision_log[-5:],
+            "recent_decisions": self._decision_log[-50:],
             "status": status,
             "fail_count": fail_count,
             "recent_errors": self._error_log[-20:],
