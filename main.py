@@ -759,18 +759,26 @@ class RegimeMasterBot:
                 # ── Build trade dict ──────────────────────────────────────────────
                 capital     = target.get("capital_per_trade") or getattr(config, "CAPITAL_PER_TRADE", 100.0)
                 qty         = (capital * lev) / max(current_price, 0.0001)
+                
+                # Base math reason
                 reason_str  = top.get("reason", f"{top.get('regime_name','')} {int(top['confidence']*100)}%")
+                final_conf  = top["confidence"]
+
+                # Apply Athena's outputs to the trade payload (only if real LLM decision)
+                if athena_decision and not athena_decision.reasoning.startswith("Auto-approve"):
+                    reason_str = f"Athena ✅ ({int(athena_decision.adjusted_confidence*100)}%): {athena_decision.reasoning[:200]}"
+                    final_conf = athena_decision.adjusted_confidence
 
                 # SIGNAL_DISPATCH broadcast
                 _bcast("SIGNAL_DISPATCH", self._cycle_count, bot_name, bot_id, sym,
-                       top["side"], seg_name, top["confidence"],
+                       top["side"], seg_name, final_conf,
                        f"regime={top.get('regime_name','')} lev={lev}x qty={qty:.4f} athena=APPROVED")
 
                 self._coin_states.setdefault(sym, {}).setdefault("bot_deploy_statuses", {})[bot_id] = "DEPLOY_QUEUED"
 
                 logger.info(
-                    "🔥 DEPLOYING [%s]: %s %s @ %dx | HMM %.0f%% conv | Athena ✅",
-                    bot_name, top["side"], sym, lev, conviction,
+                    "🔥 DEPLOYING [%s]: %s %s @ %dx | HMM %.0f%% conv | Athena ✅ %.0f%%",
+                    bot_name, top["side"], sym, lev, conviction, final_conf * 100,
                 )
 
                 # Execute
@@ -783,7 +791,7 @@ class RegimeMasterBot:
                         atr=atr_val,
                         ema_15m_20=top.get("ema_15m_20"),
                         regime=top.get("regime", 0),
-                        confidence=top["confidence"],
+                        confidence=final_conf,
                         reason=reason_str,
                         swing_l=top.get("swing_l"),
                         swing_h=top.get("swing_h"),

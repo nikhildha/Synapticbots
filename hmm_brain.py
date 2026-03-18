@@ -61,7 +61,7 @@ class HMMBrain:
         -------
         self
         """
-        features = df[self.features].dropna().values
+        features = df[self.features].replace([np.inf, -np.inf], np.nan).dropna().values
 
         if len(features) < 50:
             logger.warning("Insufficient data for HMM training (%d rows). Need ≥50.", len(features))
@@ -195,7 +195,7 @@ class HMMBrain:
             logger.warning("HMM not trained yet. Returning CHOP with 0 confidence.")
             return config.REGIME_CHOP, 0.0
 
-        features = df[self.features].dropna().values
+        features = df[self.features].replace([np.inf, -np.inf], np.nan).dropna().values
         if len(features) == 0:
             return config.REGIME_CHOP, 0.0
 
@@ -225,7 +225,7 @@ class HMMBrain:
         if not self._is_trained:
             return np.full(len(df), config.REGIME_CHOP)
 
-        features = df[self.features].dropna().values
+        features = df[self.features].replace([np.inf, -np.inf], np.nan).dropna().values
         features_scaled = (features - self._feat_mean) / self._feat_std
         raw_states = self.model.predict(features_scaled)
 
@@ -244,7 +244,7 @@ class HMMBrain:
         if not self._is_trained:
             return np.zeros((len(df), self.n_states))
 
-        features = df[self.features].dropna().values
+        features = df[self.features].replace([np.inf, -np.inf], np.nan).dropna().values
         features_scaled = (features - self._feat_mean) / self._feat_std
         return self.model.predict_proba(features_scaled)
 
