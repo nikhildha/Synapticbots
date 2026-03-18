@@ -1042,7 +1042,7 @@ class RegimeMasterBot:
         # Get or create brain for this coin (1h)
         brain = self._coin_brains.get(symbol)
         if brain is None:
-            brain = HMMBrain()
+            brain = HMMBrain(symbol=symbol)
             self._coin_brains[symbol] = brain
 
         # Compute features
@@ -1076,7 +1076,7 @@ class RegimeMasterBot:
                 tf_key = f"{symbol}_{tf}"
                 tf_brain = self._coin_brains.get(tf_key)
                 if tf_brain is None:
-                    tf_brain = HMMBrain()
+                    tf_brain = HMMBrain(symbol=symbol)
                     self._coin_brains[tf_key] = tf_brain
 
                 try:
