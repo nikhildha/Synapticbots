@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { Activity, ShieldAlert, Radio, RefreshCw, PowerOff, ShieldX, TerminalSquare } from 'lucide-react';
 import { motion } from 'framer-motion';
+import { Header } from '@/components/header';
 
 export function LiveClient() {
     const [selectedExchange, setSelectedExchange] = useState<'binance' | 'coindcx'>('binance');
@@ -72,9 +73,12 @@ export function LiveClient() {
     };
 
     const engineOnline = engineState?.engine?.status === 'running';
+    const isConnected = selectedExchange === 'binance' ? balance?.binanceConnected : balance?.coindcxConnected;
+    const marginAmount = selectedExchange === 'binance' ? balance?.binance : balance?.coindcx;
 
     return (
         <div className="min-h-screen bg-[var(--color-background)] pt-24 pb-12">
+            <Header />
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-6">
                 
                 {/* ── Page Header ── */}
@@ -147,15 +151,15 @@ export function LiveClient() {
                                     
                                     <div className="mt-2 text-[11px] text-[var(--color-text-muted)] uppercase tracking-wider mb-1">Available Margin</div>
                                     <div className="text-2xl font-mono text-[#00E5FF]">
-                                        {balance?.[`${selectedExchange}Connected`] 
-                                            ? `$${balance?.[selectedExchange]?.toFixed(2) || '0.00'}` 
+                                        {isConnected 
+                                            ? `$${marginAmount?.toFixed(2) || '0.00'}` 
                                             : 'Not Connected'}
                                     </div>
                                 </div>
 
                                 <div className="p-4 rounded-xl" style={{ background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.05)' }}>
                                     <div className="text-[11px] text-[var(--color-text-muted)] uppercase tracking-wider mb-1">Status</div>
-                                    {balance?.[`${selectedExchange}Connected`] ? (
+                                    {isConnected ? (
                                         <div className="text-sm text-[#00FF88] flex items-center gap-2 mt-2">
                                             <ShieldAlert size={14} color="#00FF88" /> Credentials Validated
                                         </div>
