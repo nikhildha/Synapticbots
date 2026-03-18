@@ -1,147 +1,147 @@
 {
-  "boots": 23,
-  "total_crashes": 688,
+  "boots": 26,
+  "total_crashes": 888,
   "crashes": [
     {
-      "time": "2026-03-18T10:15:59.533916+00:00",
+      "time": "2026-03-18T14:25:32.586162+00:00",
       "type": "thread_crash",
       "error": "can't register atexit after shutdown",
-      "boot": 23,
+      "boot": 26,
       "memory_mb": 107.8
     },
     {
-      "time": "2026-03-18T10:16:39.546557+00:00",
-      "type": "thread_crash",
-      "error": "can't register atexit after shutdown",
-      "boot": 23,
-      "memory_mb": 107.8
-    },
-    {
-      "time": "2026-03-18T10:17:59.562909+00:00",
-      "type": "thread_crash",
-      "error": "can't register atexit after shutdown",
-      "boot": 23,
-      "memory_mb": 107.8
-    },
-    {
-      "time": "2026-03-18T10:17:59.563656+00:00",
+      "time": "2026-03-18T14:25:32.586923+00:00",
       "type": "permanent_failure",
       "error": "Exhausted all restart attempts",
-      "boot": 23,
+      "boot": 26,
       "memory_mb": 107.8
     },
     {
-      "time": "2026-03-18T10:22:59.584252+00:00",
+      "time": "2026-03-18T14:30:32.614404+00:00",
       "type": "thread_crash",
       "error": "can't register atexit after shutdown",
-      "boot": 23,
+      "boot": 26,
       "memory_mb": 107.8
     },
     {
-      "time": "2026-03-18T10:23:09.593709+00:00",
+      "time": "2026-03-18T14:30:42.622800+00:00",
       "type": "thread_crash",
       "error": "can't register atexit after shutdown",
-      "boot": 23,
+      "boot": 26,
       "memory_mb": 107.8
     },
     {
-      "time": "2026-03-18T10:23:29.607770+00:00",
+      "time": "2026-03-18T14:31:02.633507+00:00",
       "type": "thread_crash",
       "error": "can't register atexit after shutdown",
-      "boot": 23,
+      "boot": 26,
       "memory_mb": 107.8
     },
     {
-      "time": "2026-03-18T10:24:09.624145+00:00",
+      "time": "2026-03-18T14:31:42.648958+00:00",
       "type": "thread_crash",
       "error": "can't register atexit after shutdown",
-      "boot": 23,
+      "boot": 26,
       "memory_mb": 107.8
     },
     {
-      "time": "2026-03-18T10:25:29.710988+00:00",
+      "time": "2026-03-18T14:33:02.669916+00:00",
       "type": "thread_crash",
       "error": "can't register atexit after shutdown",
-      "boot": 23,
+      "boot": 26,
       "memory_mb": 107.8
     },
     {
-      "time": "2026-03-18T10:25:29.728191+00:00",
+      "time": "2026-03-18T14:33:02.670794+00:00",
       "type": "permanent_failure",
       "error": "Exhausted all restart attempts",
-      "boot": 23,
+      "boot": 26,
       "memory_mb": 107.8
     },
     {
-      "time": "2026-03-18T10:30:29.779754+00:00",
+      "time": "2026-03-18T14:38:02.694340+00:00",
       "type": "thread_crash",
       "error": "can't register atexit after shutdown",
-      "boot": 23,
+      "boot": 26,
       "memory_mb": 107.8
     },
     {
-      "time": "2026-03-18T10:30:39.792068+00:00",
+      "time": "2026-03-18T14:38:12.705632+00:00",
       "type": "thread_crash",
       "error": "can't register atexit after shutdown",
-      "boot": 23,
+      "boot": 26,
       "memory_mb": 107.8
     },
     {
-      "time": "2026-03-18T10:30:59.806540+00:00",
+      "time": "2026-03-18T14:38:32.722829+00:00",
       "type": "thread_crash",
       "error": "can't register atexit after shutdown",
-      "boot": 23,
+      "boot": 26,
       "memory_mb": 107.8
     },
     {
-      "time": "2026-03-18T10:31:39.830860+00:00",
+      "time": "2026-03-18T14:39:12.738612+00:00",
       "type": "thread_crash",
       "error": "can't register atexit after shutdown",
-      "boot": 23,
+      "boot": 26,
       "memory_mb": 107.8
     },
     {
-      "time": "2026-03-18T10:32:59.844599+00:00",
+      "time": "2026-03-18T14:40:32.767768+00:00",
       "type": "thread_crash",
       "error": "can't register atexit after shutdown",
-      "boot": 23,
+      "boot": 26,
       "memory_mb": 107.8
     },
     {
-      "time": "2026-03-18T10:32:59.845146+00:00",
+      "time": "2026-03-18T14:40:32.768643+00:00",
       "type": "permanent_failure",
       "error": "Exhausted all restart attempts",
-      "boot": 23,
+      "boot": 26,
       "memory_mb": 107.8
     },
     {
-      "time": "2026-03-18T10:37:59.871980+00:00",
+      "time": "2026-03-18T14:45:32.790573+00:00",
       "type": "thread_crash",
-      "error": "invalid syntax (main.py, line 1226)",
-      "boot": 23,
+      "error": "can't register atexit after shutdown",
+      "boot": 26,
       "memory_mb": 107.8
     },
     {
-      "time": "2026-03-18T10:38:09.888051+00:00",
+      "time": "2026-03-18T14:45:42.804894+00:00",
       "type": "thread_crash",
-      "error": "invalid syntax (main.py, line 1226)",
-      "boot": 23,
+      "error": "can't register atexit after shutdown",
+      "boot": 26,
       "memory_mb": 107.8
     },
     {
-      "time": "2026-03-18T10:38:29.905523+00:00",
+      "time": "2026-03-18T14:46:02.831846+00:00",
       "type": "thread_crash",
-      "error": "invalid syntax (main.py, line 1226)",
-      "boot": 23,
+      "error": "can't register atexit after shutdown",
+      "boot": 26,
       "memory_mb": 107.8
     },
     {
-      "time": "2026-03-18T10:39:09.923447+00:00",
+      "time": "2026-03-18T14:46:42.855374+00:00",
       "type": "thread_crash",
-      "error": "invalid syntax (main.py, line 1226)",
-      "boot": 23,
+      "error": "can't register atexit after shutdown",
+      "boot": 26,
+      "memory_mb": 107.8
+    },
+    {
+      "time": "2026-03-18T14:48:02.874422+00:00",
+      "type": "thread_crash",
+      "error": "can't register atexit after shutdown",
+      "boot": 26,
+      "memory_mb": 107.8
+    },
+    {
+      "time": "2026-03-18T14:48:02.875924+00:00",
+      "type": "permanent_failure",
+      "error": "Exhausted all restart attempts",
+      "boot": 26,
       "memory_mb": 107.8
     }
   ],
-  "last_boot": "2026-03-17T20:28:30.310863+00:00"
+  "last_boot": "2026-03-18T11:08:37.047568+00:00"
 }

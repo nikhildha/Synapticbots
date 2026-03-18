@@ -1,6 +1,6 @@
 # Synaptic — Master Architecture & Developer Reference
 
-**Version:** Production v4 — March 2026 (Multi-TF HMM + Athena LLM)
+**Version:** Production v5 — March 2026 (GMMHMM 3-mix, 5m/1H/1D MTF, Athena LLM)
 **Deployment:** Railway (Docker, PostgreSQL)
 **Exchanges:** CoinDCX (live), Binance (paper/testnet data source)
 
@@ -211,7 +211,7 @@ The `_parse_klines_df()` function normalizes raw kline arrays to a clean OHLCV D
 
 #### `HMMBrain` — Single coin, single timeframe
 
-**Model:** `GaussianHMM` from hmmlearn. `n_components=3` (HMM_N_STATES), `covariance_type="full"`, 100 iterations.
+**Model:** `GMMHMM` (Gaussian Mixture Model HMM) from hmmlearn. `n_components=3` (HMM_N_STATES), `n_mix=3`, `covariance_type="diag"`, 100 iterations. Falls back to `GaussianHMM` (covariance="diag") on numerical instability.
 
 **Training (`train(df)`):**
 1. Extracts coin's specific feature list from `segment_features.py`
@@ -235,12 +235,12 @@ The `_parse_klines_df()` function normalizes raw kline arrays to a clean OHLCV D
 
 #### `MultiTFHMMBrain` — Multi-timeframe aggregator
 
-Manages 3 separate `HMMBrain` instances per coin (1d, 1h, 15m).
+Manages 3 separate `HMMBrain` instances per coin (1d, 1h, 5m).
 
 **Conviction computation (`get_conviction()`):**
 
 ```
-Timeframe weights: 1d=40%, 1h=35%, 15m=25%
+Timeframe weights: 1d=20%, 1h=50%, 5m=30%
 
 For each TF with a non-CHOP prediction:
   Direction vote: BULL→BUY, BEAR→SELL, CHOP→no vote
@@ -263,7 +263,7 @@ conviction = sum(w × tier_multiplier), clipped 0–100
 
 Minimum agreement required: 2 of 3 TFs (`MULTI_TF_MIN_AGREEMENT`).
 
-**Regime summary format** (used in dashboard): `"1d=BULLISH(0.45) | 1h=BULLISH(0.32) | 15m=SIDEWAYS/CHOP(0.08)"`
+**Regime summary format** (used in dashboard): `"1d=BULLISH(0.45) | 1h=BULLISH(0.32) | 5m=SIDEWAYS/CHOP(0.08)"`
 
 ---
 
@@ -366,16 +366,16 @@ Two paths:
 
 | Factor | Weight | Source |
 |--------|--------|--------|
-| HMM Confidence (margin tier) | 71 | `_score_hmm()` |
-| BTC Macro Regime alignment | 7 | `_score_btc_macro()` |
-| Funding Rate carry signal | 11 | `_score_funding()` |
-| Open Interest Change | 11 | `_score_oi()` |
-| Order Flow | 0 (disabled) | — |
+| HMM Confidence (margin tier) | 60 | `_score_hmm()` |
+| Funding Rate carry signal | 15 | `_score_funding()` |
+| Order Flow (L2/L/S ratio) | 15 | `_score_orderflow()` |
+| Open Interest Change | 10 | `_score_oi()` |
+| BTC Macro Regime alignment | 0 (informational only) | `_score_btc_macro()` |
 | SR + VWAP | 0 (removed) | — |
 | Sentiment | 0 (removed) | — |
-| Volatility quality | 0 (removed) | — |
+| Volatility quality | 0 (filter only) | — |
 
-Minimum conviction to proceed to Athena: 60 (`MIN_CONVICTION_FOR_DEPLOY`)
+Minimum conviction to proceed to Athena: 65 (`MIN_CONVICTION_FOR_DEPLOY`)
 
 #### Kill Switch
 
@@ -621,7 +621,7 @@ Every 15 minutes:
 
 2. FOR EACH COIN IN BATCH:
    a. fetch_klines(symbol, "1h", 250)            [1h data for legacy brain]
-   b. For each TF in ["1d", "1h", "15m"]:
+   b. For each TF in ["1d", "1h", "5m"]:
       - fetch_klines(symbol, tf, 300)
       - compute_all_features(df_tf)
       - HMMBrain.train(df_tf)  [if needs_retrain()]
@@ -638,7 +638,7 @@ Every 15 minutes:
 
    g. Conviction threshold: if conviction < 60: skip
 
-   h. Fetch 15m data for ema_15m_20 (limit order target)
+   h. Fetch 5m data for ema_5m_20 (limit order target)
 
    i. Return raw_result dict: {symbol, side, conviction, confidence, atr, ema_15m_20, ...}
 
@@ -688,8 +688,8 @@ All exits except MAX_LOSS are handled in `tradebook.update_unrealized()` (called
 
 | Conviction Score | Leverage |
 |-----------------|---------|
-| < 60 | 0 (no trade) |
-| 60–69 | 15x |
+| < 65 | 0 (no trade) |
+| 65–69 | 15x |
 | 70–94 | 25x |
 | ≥ 95 | 35x |
 
@@ -736,18 +736,18 @@ def get_atr_multipliers(leverage):
 
 | Segment | Coins | Risk Manager |
 |---------|-------|-------------|
-| L1 | BTCUSDT, ETHUSDT, SOLUSDT, BNBUSDT, AVAXUSDT, SUIUSDT | RM2_ATR |
-| L2 | ARBUSDT, OPUSDT, POLUSDT, MNTUSDT, STRKUSDT, IMXUSDT, RONINUSDT | RM3_Swing |
-| DeFi | UNIUSDT, AAVEUSDT, CRVUSDT, JUPUSDT, RUNEUSDT, PENDLEUSDT, LINKUSDT | RM3_Swing |
-| AI | TAOUSDT, INJUSDT, WLDUSDT | RM3_Swing |
-| Meme | DOGEUSDT, SHIBUSDT, PEPEUSDT, BONKUSDT | RM3_Swing |
+| L1 | BTCUSDT, ETHUSDT, SOLUSDT, BNBUSDT, AVAXUSDT, SUIUSDT, XRPUSDT, APTUSDT, ETCUSDT | RM2_ATR |
+| L2 | ARBUSDT, OPUSDT, POLUSDT, MNTUSDT, STRKUSDT, IMXUSDT, RONINUSDT, ZKUSDT | RM3_Swing |
+| DeFi | UNIUSDT, AAVEUSDT, CRVUSDT, JUPUSDT, RUNEUSDT, PENDLEUSDT, LINKUSDT, LDOUSDT, GMXUSDT, ENAUSDT | RM3_Swing |
+| AI | TAOUSDT, FETUSDT, INJUSDT, WLDUSDT, AKTUSDT, RENDERUSDT | RM3_Swing |
+| Meme | DOGEUSDT, SHIBUSDT, PEPEUSDT, WIFUSDT, BONKUSDT, 1000PEPEUSDT, 1000SHIBUSDT | RM3_Swing |
 | RWA | ONDOUSDT, POLYXUSDT, TRUUSDT | RM3_Swing |
 | Gaming | AXSUSDT, SANDUSDT, PIXELUSDT, IOTXUSDT | RM3_Swing |
 | DePIN | ARUSDT, HNTUSDT | RM3_Swing |
 | Modular | TIAUSDT, DYMUSDT | RM3_Swing |
 | Oracles | PYTHUSDT, TRBUSDT, API3USDT | RM3_Swing |
 
-**Excluded globally:** `AKTUSDT, FETUSDT, WIFUSDT, FILUSDT` — removed from all segment lists at import time.
+**Excluded globally:** `AKTUSDT, WIFUSDT, FILUSDT` — removed from all segment lists at import time. Note: AKTUSDT and WIFUSDT remain in segment definitions above but are filtered at runtime.
 
 **Static exchange exclusions** (scanner level): `EURUSDT, WBTCUSDT, USDCUSDT, TUSDUSDT, BUSDUSDT, USTUSDT, DAIUSDT, FDUSDUSDT, CVCUSDT, USD1USDT`
 
@@ -1052,9 +1052,9 @@ Key parameters from `config.py` and their effect:
 | Parameter | Default | Effect |
 |-----------|---------|--------|
 | `MULTI_TF_ENABLED` | True | Use 3-TF aggregation (disable for legacy 1H-only) |
-| `MULTI_TF_TIMEFRAMES` | ["1d","1h","15m"] | Timeframes per coin |
-| `MULTI_TF_CANDLE_LIMIT` | 300 | Candles fetched per TF |
-| `MULTI_TF_WEIGHTS` | {1d:40, 1h:35, 15m:25} | Conviction weighting |
+| `MULTI_TF_TIMEFRAMES` | ["1d","1h","5m"] | Timeframes per coin — Daily (macro), Hourly (swing), 5m (momentum) |
+| `MULTI_TF_CANDLE_LIMIT` | 1000 | Candles fetched per TF |
+| `MULTI_TF_WEIGHTS` | {1d:20, 1h:50, 5m:30} | Conviction weighting (1H dominant — best swing signal) |
 | `MULTI_TF_MIN_AGREEMENT` | 2 | Minimum TFs agreeing to produce signal |
 | `HMM_N_STATES` | 3 | Bull/Bear/Chop (4-state CRASH removed — merged into BEAR) |
 | `HMM_RETRAIN_HOURS` | 24 | Model retraining frequency |
@@ -1072,12 +1072,12 @@ Key parameters from `config.py` and their effect:
 
 | Parameter | Default | Effect |
 |-----------|---------|--------|
-| `MIN_CONVICTION_FOR_DEPLOY` | 60 | Gate before Athena call |
+| `MIN_CONVICTION_FOR_DEPLOY` | 65 | Gate before Athena call |
 | `TOP_COINS_PER_SEGMENT` | 1 | Athena evaluates top N per segment per bot |
-| `CONVICTION_WEIGHT_HMM` | 71 | HMM factor weight (out of 100) |
-| `CONVICTION_WEIGHT_FUNDING` | 11 | Funding rate factor weight |
-| `CONVICTION_WEIGHT_OI` | 11 | OI change factor weight |
-| `CONVICTION_WEIGHT_BTC_MACRO` | 7 | BTC macro alignment factor |
+| `CONVICTION_WEIGHT_HMM` | 60 | HMM factor weight (out of 100) |
+| `CONVICTION_WEIGHT_FUNDING` | 15 | Funding rate factor weight |
+| `CONVICTION_WEIGHT_ORDERFLOW` | 15 | Order flow / L2 depth factor |
+| `CONVICTION_WEIGHT_OI` | 10 | OI change factor weight |
 
 #### Athena
 
