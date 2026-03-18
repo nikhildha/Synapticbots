@@ -74,7 +74,7 @@ MULTI_TF_MIN_AGREEMENT = 2            # Minimum TFs agreeing on direction (2 of 
 MULTI_TF_MIN_MODELS = 2               # Minimum trained models required
 
 # ─── Macro Overlay Settings ───────────
-MACRO_VETO_BTC_DROP_PCT = 1.5           # Veto longs if BTC drops > 1.5% in 15m (flash crash)
+MACRO_VETO_BTC_DROP_PCT = 3.0           # Veto longs if BTC drops > 3.0% in 15m (flash crash)
 
 # ─── Optimal Risk Managers per Segment ──────────────────────────────────────────
 OPTIMAL_RISK_MANAGERS = {

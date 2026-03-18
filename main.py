@@ -534,8 +534,27 @@ class RegimeMasterBot:
         # BTCUSDT is the macro regime reference for every coin's conviction score.
         # It must be analyzed on EVERY cycle regardless of which batch rotation is active.
         scan_symbols = symbols if "BTCUSDT" in symbols else ["BTCUSDT"] + list(symbols)
-        logger.info("📡 Scanning %d coins | active trades in book: %d",
+        logger.info("📡 Initial Scan list: %d coins | active trades in book: %d",
                     len(scan_symbols), tradebook_active_count)
+
+        # ── 4a-1. Institutional Segment Pre-Filter ──
+        # Massively optimizes ML processing by only allowing coins from the Top 2 performing segments
+        from sentiment_engine import get_segment_momentum_scores
+        allowed_segment_coins = set()
+        allowed_segment_coins.add("BTCUSDT") # Always process BTC for macro context
+
+        try:
+            segment_heat_scores = get_segment_momentum_scores()
+            sorted_segments = sorted(segment_heat_scores.items(), key=lambda x: x[1], reverse=True)
+            top_2_segment_names = [s[0] for s in sorted_segments[:2]]
+            logger.info("🔥 Top 2 Institutional Segments this cycle: %s", top_2_segment_names)
+            
+            for seg in top_2_segment_names:
+                allowed_segment_coins.update(config.CRYPTO_SEGMENTS.get(seg, []))
+        except Exception as e:
+            logger.error("Failed to fetch Segment Heatmap: %s. Defaulting to all segments.", e)
+            for seg, coins in getattr(config, "CRYPTO_SEGMENTS", {}).items():
+                allowed_segment_coins.update(coins)
 
         # ── 4b. Macro Veto Overlay (BTC Flash Crash Detection) ──
         btc_flash_crash = False
@@ -554,6 +573,10 @@ class RegimeMasterBot:
             logger.debug("Failed to fetch BTC macro context: %s", e)
 
         for symbol in scan_symbols:
+            if symbol not in allowed_segment_coins:
+                logger.debug("🚫 Skipping %s (Not in Top 2 Segments)", symbol)
+                continue
+            
             if symbol in config.EXCLUDED_COINS:
                 logger.info("🚫 Skipping %s (Exclusion List)", symbol)
                 continue
