@@ -5,7 +5,11 @@ import { Activity, ShieldAlert, Radio, RefreshCw, PowerOff, ShieldX, TerminalSqu
 import { motion } from 'framer-motion';
 
 export function LiveClient() {
-    const [balance, setBalance] = useState<{ binance: number | null, binanceConnected: boolean } | null>(null);
+    const [selectedExchange, setSelectedExchange] = useState<'binance' | 'coindcx'>('binance');
+    const [balance, setBalance] = useState<{ 
+        binance: number | null, binanceConnected: boolean,
+        coindcx: number | null, coindcxConnected: boolean 
+    } | null>(null);
     const [engineState, setEngineState] = useState<any>(null);
     const [logs, setLogs] = useState<string[]>([]);
     const [loading, setLoading] = useState(true);
@@ -131,25 +135,32 @@ export function LiveClient() {
 
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                 <div className="p-4 rounded-xl" style={{ background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.05)' }}>
-                                    <div className="text-[11px] text-[var(--color-text-muted)] uppercase tracking-wider mb-1">Exchange</div>
-                                    <div className="flex items-center gap-2">
-                                        <div className="w-2 h-2 rounded-full" style={{ background: balance?.binanceConnected ? '#00FF88' : '#FF3B5C' }} />
-                                        <span className="text-lg font-bold text-[#E8EDF5]">Binance Futures</span>
-                                    </div>
-                                    <div className="mt-4 text-[11px] text-[var(--color-text-muted)] uppercase tracking-wider mb-1">Available Margin</div>
+                                    <div className="text-[11px] text-[var(--color-text-muted)] uppercase tracking-wider mb-2">Select Exchange</div>
+                                    <select 
+                                        value={selectedExchange}
+                                        onChange={(e) => setSelectedExchange(e.target.value as 'binance' | 'coindcx')}
+                                        className="w-full bg-black/40 border border-[rgba(255,255,255,0.1)] rounded-lg px-3 py-2 text-sm text-[#E8EDF5] focus:outline-none focus:border-[#00E5FF] mb-4 transition-colors font-medium"
+                                    >
+                                        <option value="binance">Binance Futures</option>
+                                        <option value="coindcx">CoinDCX Futures</option>
+                                    </select>
+                                    
+                                    <div className="mt-2 text-[11px] text-[var(--color-text-muted)] uppercase tracking-wider mb-1">Available Margin</div>
                                     <div className="text-2xl font-mono text-[#00E5FF]">
-                                        {balance?.binanceConnected ? `$${balance?.binance?.toFixed(2) || '0.00'}` : 'Not Connected'}
+                                        {balance?.[`${selectedExchange}Connected`] 
+                                            ? `$${balance?.[selectedExchange]?.toFixed(2) || '0.00'}` 
+                                            : 'Not Connected'}
                                     </div>
                                 </div>
 
                                 <div className="p-4 rounded-xl" style={{ background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.05)' }}>
                                     <div className="text-[11px] text-[var(--color-text-muted)] uppercase tracking-wider mb-1">Status</div>
-                                    {balance?.binanceConnected ? (
-                                        <div className="text-sm text-[#00FF88] flex items-center gap-2">
+                                    {balance?.[`${selectedExchange}Connected`] ? (
+                                        <div className="text-sm text-[#00FF88] flex items-center gap-2 mt-2">
                                             <ShieldAlert size={14} color="#00FF88" /> Credentials Validated
                                         </div>
                                     ) : (
-                                        <div className="text-sm text-[#FF3B5C] flex items-center gap-2">
+                                        <div className="text-sm text-[#FF3B5C] flex items-center gap-2 mt-2">
                                             <ShieldX size={14} color="#FF3B5C" /> Disconnected
                                         </div>
                                     )}
