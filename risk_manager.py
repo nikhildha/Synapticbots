@@ -326,21 +326,7 @@ class RiskManager:
             return w * 0.40
         return 0.0  # below minimum confidence — no contribution
 
-    @staticmethod
-    def _score_btc_macro(btc_regime, regime: int, side: str) -> float:
-        """Factor 2: BTC macro regime alignment (max pts).
-        Penalises trading against macro trend."""
-        w = config.CONVICTION_WEIGHT_BTC_MACRO
-        if btc_regime is None:
-            return w * 0.50  # no BTC data — neutral half
-        # NOTE: With HMM_N_STATES=3, CRASH is merged into BEAR — no separate crash penalty
-        if (side == "BUY"  and btc_regime == config.REGIME_BULL) or \
-           (side == "SELL" and btc_regime == config.REGIME_BEAR):
-            return w           # aligned with macro
-        if (side == "BUY"  and btc_regime == config.REGIME_BEAR) or \
-           (side == "SELL" and btc_regime == config.REGIME_BULL):
-            return -config.CONVICTION_MACRO_FIGHT_PENALTY
-        return w * 0.35        # chop / unknown — small boost
+
 
     @staticmethod
     def _score_funding(funding_rate, side: str) -> float:
@@ -348,7 +334,7 @@ class RiskManager:
         Negative funding favours longs; positive funding favours shorts."""
         w = config.CONVICTION_WEIGHT_FUNDING
         if funding_rate is None:
-            return w * 0.55  # no data — mild positive
+            return w * 0.50  # Missing data neutrality
         if side == "BUY":
             if funding_rate < config.FUNDING_NEG_STRONG:
                 return w       # longs paid — full score
@@ -392,7 +378,7 @@ class RiskManager:
         Aligned taker flow confirms direction; opposing flow penalises."""
         w = config.CONVICTION_WEIGHT_ORDERFLOW
         if orderflow_score is None:
-            return 0.0
+            return w * 0.50  # Missing data neutrality
         # Map to trade-aligned direction: positive = aligned with our side
         aligned = orderflow_score if side == "BUY" else -orderflow_score
         if aligned > 0.5:
@@ -410,13 +396,8 @@ class RiskManager:
         confidence: float,
         regime: int,
         side: str,
-        btc_regime=None,
         funding_rate=None,
-        sr_position=None,
-        vwap_position=None,
         oi_change=None,
-        volatility=None,
-        sentiment_score=None,
         orderflow_score=None,
     ) -> float:
         """
@@ -424,20 +405,18 @@ class RiskManager:
 
         Active Factors
         ──────────────
-        1. HMM Confidence       (61 pts) — core signal quality
-        2. BTC Macro Regime      (7 pts) — macro alignment
-        3. Funding Rate         (11 pts) — perpetual swap carry signal
-        4. Open Interest Change (11 pts) — smart-money positioning
-        5. Order Flow           (10 pts) — L2 depth + taker flow + cumDelta
+        1. HMM Confidence       (60 pts) — core signal quality (already includes BTC Macro)
+        2. Order Flow           (15 pts) — L2 depth + taker flow + cumDelta
+        3. Funding Rate         (15 pts) — perpetual swap carry signal
+        4. Open Interest Change (10 pts) — smart-money positioning
 
-        REMOVED: Sentiment (0 pts), S/R + VWAP (0 pts), Volatility (0 pts)
+        REMOVED: BTC Macro (Handled via ML), Sentiment (0 pts), S/R + VWAP (0 pts), Volatility (0 pts)
 
         Total max = 100 pts.
         Conviction → leverage via get_conviction_leverage().
         """
         score = (
             RiskManager._score_hmm(confidence)
-            + RiskManager._score_btc_macro(btc_regime, regime, side)
             + RiskManager._score_funding(funding_rate, side)
             + RiskManager._score_oi(oi_change, side)
             + RiskManager._score_orderflow(orderflow_score, side)

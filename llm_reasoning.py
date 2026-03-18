@@ -167,7 +167,7 @@ class AthenaEngine:
         signal_context : dict
             Contains: ticker, side, hmm_regime, hmm_confidence, conviction,
             brain_id, current_price, atr, tf_agreement, btc_regime, btc_margin,
-            vol_percentile, sentiment (optional dict)
+            vol_percentile
 
         Returns
         -------
@@ -380,13 +380,6 @@ class AthenaEngine:
 
     def _build_prompt(self, ctx: dict) -> str:
         """Build the user prompt with all signal context."""
-        sentiment_str = "Not available"
-        if ctx.get("sentiment"):
-            s = ctx["sentiment"]
-            if hasattr(s, "score"):
-                sentiment_str = f"score={s.score:.2f}, alert={s.alert}, articles={getattr(s, 'article_count', 0)}"
-            elif isinstance(s, dict):
-                sentiment_str = f"score={s.get('score', 'N/A')}, alert={s.get('alert', False)}"
 
         return f"""The following crypto asset has passed our HMM-Score threshold. Perform your full analysis.
 

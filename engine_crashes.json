@@ -1,6 +1,147 @@
 {
-  "boots": 17,
-  "total_crashes": 0,
-  "crashes": [],
-  "last_boot": "2026-03-17T20:07:35.990300+00:00"
+  "boots": 23,
+  "total_crashes": 627,
+  "crashes": [
+    {
+      "time": "2026-03-18T09:00:38.517917+00:00",
+      "type": "thread_crash",
+      "error": "can't register atexit after shutdown",
+      "boot": 23,
+      "memory_mb": 107.8
+    },
+    {
+      "time": "2026-03-18T09:00:58.538482+00:00",
+      "type": "thread_crash",
+      "error": "can't register atexit after shutdown",
+      "boot": 23,
+      "memory_mb": 107.8
+    },
+    {
+      "time": "2026-03-18T09:01:38.556851+00:00",
+      "type": "thread_crash",
+      "error": "can't register atexit after shutdown",
+      "boot": 23,
+      "memory_mb": 107.8
+    },
+    {
+      "time": "2026-03-18T09:02:58.578996+00:00",
+      "type": "thread_crash",
+      "error": "can't register atexit after shutdown",
+      "boot": 23,
+      "memory_mb": 107.8
+    },
+    {
+      "time": "2026-03-18T09:02:58.580098+00:00",
+      "type": "permanent_failure",
+      "error": "Exhausted all restart attempts",
+      "boot": 23,
+      "memory_mb": 107.8
+    },
+    {
+      "time": "2026-03-18T09:07:58.604020+00:00",
+      "type": "thread_crash",
+      "error": "can't register atexit after shutdown",
+      "boot": 23,
+      "memory_mb": 107.8
+    },
+    {
+      "time": "2026-03-18T09:08:08.619582+00:00",
+      "type": "thread_crash",
+      "error": "can't register atexit after shutdown",
+      "boot": 23,
+      "memory_mb": 107.8
+    },
+    {
+      "time": "2026-03-18T09:08:28.635280+00:00",
+      "type": "thread_crash",
+      "error": "can't register atexit after shutdown",
+      "boot": 23,
+      "memory_mb": 107.8
+    },
+    {
+      "time": "2026-03-18T09:09:08.656850+00:00",
+      "type": "thread_crash",
+      "error": "can't register atexit after shutdown",
+      "boot": 23,
+      "memory_mb": 107.8
+    },
+    {
+      "time": "2026-03-18T09:10:28.671305+00:00",
+      "type": "thread_crash",
+      "error": "can't register atexit after shutdown",
+      "boot": 23,
+      "memory_mb": 107.8
+    },
+    {
+      "time": "2026-03-18T09:10:28.671997+00:00",
+      "type": "permanent_failure",
+      "error": "Exhausted all restart attempts",
+      "boot": 23,
+      "memory_mb": 107.8
+    },
+    {
+      "time": "2026-03-18T09:15:28.702159+00:00",
+      "type": "thread_crash",
+      "error": "can't register atexit after shutdown",
+      "boot": 23,
+      "memory_mb": 107.8
+    },
+    {
+      "time": "2026-03-18T09:15:38.709610+00:00",
+      "type": "thread_crash",
+      "error": "can't register atexit after shutdown",
+      "boot": 23,
+      "memory_mb": 107.8
+    },
+    {
+      "time": "2026-03-18T09:15:58.737421+00:00",
+      "type": "thread_crash",
+      "error": "can't register atexit after shutdown",
+      "boot": 23,
+      "memory_mb": 107.8
+    },
+    {
+      "time": "2026-03-18T09:16:38.759219+00:00",
+      "type": "thread_crash",
+      "error": "can't register atexit after shutdown",
+      "boot": 23,
+      "memory_mb": 107.8
+    },
+    {
+      "time": "2026-03-18T09:17:58.777879+00:00",
+      "type": "thread_crash",
+      "error": "can't register atexit after shutdown",
+      "boot": 23,
+      "memory_mb": 107.8
+    },
+    {
+      "time": "2026-03-18T09:17:58.779906+00:00",
+      "type": "permanent_failure",
+      "error": "Exhausted all restart attempts",
+      "boot": 23,
+      "memory_mb": 107.8
+    },
+    {
+      "time": "2026-03-18T09:22:58.824306+00:00",
+      "type": "thread_crash",
+      "error": "can't register atexit after shutdown",
+      "boot": 23,
+      "memory_mb": 107.8
+    },
+    {
+      "time": "2026-03-18T09:23:08.839584+00:00",
+      "type": "thread_crash",
+      "error": "can't register atexit after shutdown",
+      "boot": 23,
+      "memory_mb": 107.8
+    },
+    {
+      "time": "2026-03-18T09:23:28.849518+00:00",
+      "type": "thread_crash",
+      "error": "can't register atexit after shutdown",
+      "boot": 23,
+      "memory_mb": 107.8
+    }
+  ],
+  "last_boot": "2026-03-17T20:28:30.310863+00:00"
 }

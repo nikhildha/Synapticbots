@@ -330,7 +330,7 @@ model AuditLog {
   actorRole String   @default("system")
   action    String
   category  String   @default("system")
-  details   String   @db.Text
+  details   String
   ipAddress String?
   severity  String   @default("info")
   createdAt DateTime @default(now())

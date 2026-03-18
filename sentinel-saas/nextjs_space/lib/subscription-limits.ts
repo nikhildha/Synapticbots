@@ -7,7 +7,6 @@ export interface TierLimits {
     maxBots: number;
     coinScans: number;
     exportCSV: boolean;
-    intelligencePage: boolean;
     manualClose: boolean;
     apiAccess: boolean;
     customBots: boolean;
@@ -19,7 +18,6 @@ export const TIER_LIMITS: Record<TierName, TierLimits> = {
         maxBots: 1,
         coinScans: 5,
         exportCSV: false,
-        intelligencePage: false,
         manualClose: false,
         apiAccess: false,
         customBots: false,
@@ -29,7 +27,6 @@ export const TIER_LIMITS: Record<TierName, TierLimits> = {
         maxBots: 3,
         coinScans: 15,
         exportCSV: true,
-        intelligencePage: true,
         manualClose: true,
         apiAccess: false,
         customBots: false,
@@ -39,7 +36,6 @@ export const TIER_LIMITS: Record<TierName, TierLimits> = {
         maxBots: 10,
         coinScans: 50,
         exportCSV: true,
-        intelligencePage: true,
         manualClose: true,
         apiAccess: true,
         customBots: true,

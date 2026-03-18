@@ -69,7 +69,7 @@ TIMEFRAME_MACRO = "4h"        # Macro regime (legacy — replaced by Multi-TF HM
 MULTI_TF_ENABLED = True               # Use 3 separate HMM brains per coin
 MULTI_TF_TIMEFRAMES = ["1d", "1h", "15m"]   # Daily (macro), Hourly (swing), 15min (momentum)
 MULTI_TF_CANDLE_LIMIT = 300           # Candles per TF (300d daily / 300h hourly / 75h 15min)
-MULTI_TF_WEIGHTS = {"1d": 40, "1h": 35, "15m": 25}  # Conviction weights (sum=100)
+MULTI_TF_WEIGHTS = {"1d": 20, "1h": 50, "15m": 30}  # Conviction weights (sum=100)
 MULTI_TF_MIN_AGREEMENT = 2            # Minimum TFs agreeing on direction (2 of 3)
 MULTI_TF_MIN_MODELS = 2               # Minimum trained models required
 
@@ -210,7 +210,7 @@ ANALYSIS_INTERVAL_SECONDS = 900   # 15-minute full analysis cycle
 ERROR_RETRY_SECONDS = 60          # Retry after error
 
 # Min HMM conviction to pass to Athena (below this, coin is skipped before Athena call)
-MIN_CONVICTION_FOR_DEPLOY = 60    # 60 out of 100 — matches MultiTFHMMBrain conviction scale (0-100)
+MIN_CONVICTION_FOR_DEPLOY = 65    # 65 out of 100 — matches MultiTFHMMBrain conviction scale (0-100)
 TOP_COINS_PER_SEGMENT = 1         # Athena evaluates the single highest-HMM coin per segment
 
 # ─── Multi-Coin Trading ──────────────────────────────────────────────────────────
@@ -256,25 +256,6 @@ SENTIMENT_VETO_THRESHOLD    = -0.65    # Hard veto gate (fast path before convic
 SENTIMENT_STRONG_POS        = 0.45     # Threshold for "strongly positive" label
 SENTIMENT_USE_FINBERT       = False    # DISABLED — FinBERT loads ~400MB transformer model (OOM on Railway)
 SENTIMENT_VADER_WEIGHT      = 0.4      # VADER contribution when blending with FinBERT
-SENTIMENT_FINBERT_WEIGHT    = 0.6      # FinBERT contribution when blending with VADER
-SENTIMENT_DEDUPE_URL_LIMIT  = 5000     # Max tracked URLs before trimming seen-url set
-SENTIMENT_DEDUPE_URL_TRIM   = 2000     # Keep last N URLs when trimming
-SENTIMENT_CONFIDENCE_N_SCALE = 20      # N articles = 70% of confidence score
-SENTIMENT_SOURCE_DIV_SCALE   = 3       # N unique sources = 30% of confidence score
-SENTIMENT_RATE_LIMIT_SLEEP  = 1.2      # Seconds between paginated API requests (sources)
-CRYPTOPANIC_API_KEY      = os.getenv("CRYPTOPANIC_API_KEY", "")
-REDDIT_CLIENT_ID         = os.getenv("REDDIT_CLIENT_ID", "")
-REDDIT_CLIENT_SECRET     = os.getenv("REDDIT_CLIENT_SECRET", "")
-REDDIT_USER_AGENT        = "RegimeMaster/1.0"
-SENTIMENT_RSS_FEEDS      = [
-    "https://cointelegraph.com/rss",
-    "https://decrypt.co/feed",
-    "https://www.coindesk.com/arc/outboundfeeds/rss/",
-    "https://theblock.co/rss.xml",
-    "https://bitcoinmagazine.com/.rss/full/",
-]
-SENTIMENT_LOG_FILE       = os.path.join(DATA_DIR, "sentiment_log.csv")
-
 # ─── Athena — LLM Reasoning Layer (Gemini) ────────────────────────────────────
 # Strategic AI brain that validates HMM signals using contextual reasoning.
 # Acts as a "risk committee" — can EXECUTE, REDUCE_SIZE, or VETO trades.
@@ -304,29 +285,20 @@ ORDERFLOW_LARGE_ORDER_USD  = 50_000    # USD threshold to flag a single order as
 
 # ─── Conviction Score Weights (must sum to 100) ───────────────────────────────
 # EXP 4 IC-guided weight optimization (300 trials) — Sharpe +0.2442 improvement
-CONVICTION_WEIGHT_HMM       = 71   # HMM regime confidence       (61 + 10 reclaimed from orderflow)
-CONVICTION_WEIGHT_BTC_MACRO = 7    # BTC macro regime alignment
-CONVICTION_WEIGHT_FUNDING   = 11   # Funding rate (contrarian signal)
-CONVICTION_WEIGHT_SR_VWAP   = 0    # REMOVED — S/R + VWAP (was weak, noise)
-CONVICTION_WEIGHT_OI        = 11   # Open Interest change
-CONVICTION_WEIGHT_VOL       = 0    # REMOVED — Volatility quality (noise)
-CONVICTION_WEIGHT_SENTIMENT = 0    # REMOVED — Sentiment (unreliable)
-CONVICTION_WEIGHT_ORDERFLOW = 0    # DISABLED — Order flow engine off
-# Total: 61+7+11+0+11+0+0+10 = 100
+CONVICTION_WEIGHT_HMM       = 60   # HMM regime confidence 
+CONVICTION_WEIGHT_FUNDING   = 15   # Funding rate (contrarian signal)
+CONVICTION_WEIGHT_OI        = 10   # Open Interest change
+CONVICTION_WEIGHT_ORDERFLOW = 15   # Live L2 / Limit Liquidity Tracker
+CONVICTION_WEIGHT_ORDERFLOW = 15   # Live L2 / Limit Liquidity Tracker
 
 # ─── Conviction Score: Leverage Bands ────────────────────────────────────────
-CONVICTION_MIN_TRADE   = 60   # Below this → no trade (leverage = 0)
-CONVICTION_BAND_LOW    = 70   # 60–69  → 15x leverage
-CONVICTION_BAND_MED    = 95   # 70–94  → 25x leverage; 95+ → 35x leverage
+CONVICTION_MIN_TRADE   = 65   # Below this → no trade (leverage = 0)
+CONVICTION_BAND_LOW    = 75   # 65–74  → 15x leverage
+CONVICTION_BAND_MED    = 95   # 75–94  → 25x leverage; 95+ → 35x leverage
 
 # ─── Conviction Score: Penalties ─────────────────────────────────────────────
-CONVICTION_CRASH_PENALTY           = 10   # Macro crash regime hard penalty
-CONVICTION_MACRO_FIGHT_PENALTY     = 8    # Trading against macro direction
 CONVICTION_FUNDING_PENALTY         = 4    # Crowded funding rate penalty
 CONVICTION_OI_PENALTY              = 3    # Adverse OI move penalty
-CONVICTION_SENTIMENT_STRONG_PENALTY = 12  # Strong negative news penalty
-CONVICTION_SENTIMENT_MILD_PENALTY  = 4    # Mild negative sentiment penalty
-CONVICTION_SENTIMENT_NEG_THRESHOLD = -0.20  # Score below this = mild negative
 CONVICTION_FLOW_MILD_PENALTY       = 3    # Mild opposing order flow
 CONVICTION_FLOW_STRONG_PENALTY     = 7    # Strong opposing order flow
 

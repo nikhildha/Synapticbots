@@ -110,18 +110,7 @@ const steps = [
         ],
         link: null,
     },
-    {
-        title: 'Market Intelligence',
-        icon: <Brain className="w-5 h-5" />,
-        color: '#0891B2',
-        description: 'The Intelligence page gives institutional-grade market analysis: sentiment scores, order flow, funding rates, and regime drivers for all tracked coins.',
-        tips: [
-            'Sentiment Bias uses VADER NLP across crypto news sources',
-            'Funding Rates identify overleveraged positions (contrarian signals)',
-            'Regime Drivers Heatmap shows HMM features (volatility, RSI, log return)',
-        ],
-        link: { href: '/intelligence', label: 'Intelligence' },
-    },
+
     {
         title: 'Upgrade Your Plan',
         icon: <DollarSign className="w-5 h-5" />,

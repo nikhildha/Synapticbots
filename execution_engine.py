@@ -88,7 +88,8 @@ class ExecutionEngine:
     # ─── Trade Execution ─────────────────────────────────────────────────────
 
     def execute_trade(self, symbol, side, leverage, quantity, atr,
-                      regime=None, confidence=None, reason="", swing_l=None, swing_h=None, ema_15m_20=None):
+                      regime=None, confidence=None, reason="", swing_l=None, swing_h=None, ema_15m_20=None,
+                      fallback_leverage=None):
         """
         Execute a futures trade with protective SL/TP.
 
@@ -151,7 +152,8 @@ class ExecutionEngine:
                                               regime, regime_name, confidence, reason, swing_l, swing_h, ema_15m_20)
         # Default to CoinDCX
         return self._execute_coindcx(symbol, side, leverage, quantity, atr,
-                                     regime, regime_name, confidence, reason, swing_l, swing_h, ema_15m_20)
+                                     regime, regime_name, confidence, reason, swing_l, swing_h, ema_15m_20,
+                                     fallback_leverage)
 
     def _execute_binance_live(self, symbol, side, leverage, quantity, atr,
                                regime, regime_name, confidence, reason, swing_l=None, swing_h=None, ema_15m_20=None):
@@ -256,7 +258,7 @@ class ExecutionEngine:
         from coindcx_exchange_client import CoinDCXExchangeClient
         return CoinDCXExchangeClient._price_round(p)
 
-    def _validate_and_size_cdx_order(self, symbol, pair, quantity, leverage, cdx):
+    def _validate_and_size_cdx_order(self, symbol, pair, quantity, leverage, cdx, fallback_leverage=None):
         """Fetch price, enforce min notional, check wallet margin, set leverage.
 
         Returns (price, sized_quantity, final_leverage, wallet_balance) on success,
@@ -300,8 +302,12 @@ class ExecutionEngine:
             m = _re.search(r"Max allowed leverage.*?=\s*([\d.]+)", err_msg)
             if m:
                 max_lev = int(float(m.group(1)))
-                logger.warning("%s max leverage %dx (requested %dx) — clamping.", symbol, max_lev, leverage)
-                leverage = max_lev
+                if fallback_leverage is not None and max_lev >= fallback_leverage:
+                    logger.warning("%s max leverage %dx (requested %dx) — applying user fallback %dx.", symbol, max_lev, leverage, fallback_leverage)
+                    leverage = fallback_leverage
+                else:
+                    logger.warning("%s max leverage %dx (requested %dx) — clamping to max %dx.", symbol, max_lev, leverage, max_lev)
+                    leverage = max_lev
                 cdx.update_leverage(pair, leverage)
                 margin_needed = notional / leverage
                 if margin_needed > wallet:
@@ -378,13 +384,14 @@ class ExecutionEngine:
         return confirmed
 
     def _execute_coindcx(self, symbol, side, leverage, quantity, atr,
-                         regime, regime_name, confidence, reason, swing_l=None, swing_h=None, ema_15m_20=None):
+                         regime, regime_name, confidence, reason, swing_l=None, swing_h=None, ema_15m_20=None,
+                         fallback_leverage=None):
         """Execute a live trade on CoinDCX Futures. Returns a trade log dict or None."""
         import coindcx_client as cdx
 
         pair = cdx.to_coindcx_pair(symbol)
         try:
-            validated = self._validate_and_size_cdx_order(symbol, pair, quantity, leverage, cdx)
+            validated = self._validate_and_size_cdx_order(symbol, pair, quantity, leverage, cdx, fallback_leverage)
             if validated is None:
                 return None
             price, quantity, leverage, wallet = validated

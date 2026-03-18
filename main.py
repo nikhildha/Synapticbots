@@ -17,14 +17,14 @@ IST = timezone(timedelta(hours=5, minutes=30))
 import config
 from hmm_brain import HMMBrain, MultiTFHMMBrain
 from data_pipeline import fetch_klines, get_multi_timeframe_data, _get_binance_client
-from feature_engine import compute_all_features, compute_hmm_features, compute_trend, compute_support_resistance, compute_sr_position, compute_ema
+from feature_engine import compute_all_features, compute_hmm_features, compute_trend, compute_ema
 from execution_engine import ExecutionEngine
 from risk_manager import RiskManager
 from coin_scanner import get_top_coins_by_volume, get_active_bot_segment_pool, reload_coin_tiers
 from tools.weekly_reclassify import needs_reclassify, run_reclassify
 import tradebook
 import telegram as tg
-import sentiment_engine as _sent_mod
+
 import orderflow_engine as _of_mod
 import coindcx_client as cdx
 from llm_reasoning import AthenaEngine
@@ -158,15 +158,7 @@ class RegimeMasterBot:
         except Exception as e:
             logger.error("⚠️ Failed to load positions from tradebook on startup: %s", e)
 
-        # ── Sentiment Engine (lazy singleton) ─────────────────────────
-        self._sentiment = None
-        if config.SENTIMENT_ENABLED:
-            try:
-                self._sentiment = _sent_mod.get_engine()
-                logger.info("📰 Sentiment Engine ready (VADER%s)",
-                            " + FinBERT" if config.SENTIMENT_USE_FINBERT else " only")
-            except Exception as e:
-                logger.warning("⚠️  Sentiment Engine failed to load: %s", e)
+
 
         # ── Order Flow Engine (lazy singleton) ────────────────────────
         self._orderflow = None
@@ -694,15 +686,15 @@ class RegimeMasterBot:
                     return
 
                 # ── Conviction-based leverage ─────────────────────────────────────
-                # H2 Fix: 4-tier scale — borderline signals (60–69) get reduced leverage
+                # H2 Fix: 4-tier scale — borderline signals (65–69) get reduced leverage
                 if conviction >= 95:
-                    lev = 20
+                    lev, fallback_lev = 25, 10
                 elif conviction >= 80:
-                    lev = 15
+                    lev, fallback_lev = 20, 10
                 elif conviction >= 70:
-                    lev = 10
+                    lev, fallback_lev = 15, 5
                 else:
-                    lev = 5   # 60–69: passed threshold but weak signal
+                    lev, fallback_lev = 10, 5
 
                 # ── Athena: FINAL CALL (gates deployment) ────────────────────────
                 current_price = self._coin_states.get(sym, {}).get("price", 0)
@@ -797,6 +789,7 @@ class RegimeMasterBot:
                         reason=reason_str,
                         swing_l=top.get("swing_l"),
                         swing_h=top.get("swing_h"),
+                        fallback_leverage=fallback_lev,
                     )
                 except Exception as exec_err:
                     logger.error("🚨 EXECUTE CRASH [%s] %s: %s", bot_name, sym, exec_err, exc_info=True)
@@ -1256,8 +1249,6 @@ class RegimeMasterBot:
 
         # ── Legacy single-TF path (when MULTI_TF_ENABLED=False) ──
         macro_regime_name = None
-        sr_pos_4h = None
-        vwap_pos_4h = None
 
         # Update coin state for dashboard
         current_price = float(df_1h_feat["close"].iloc[-1])
@@ -1321,14 +1312,10 @@ class RegimeMasterBot:
             atr_1h = float(df_1h_feat["atr"].iloc[-1]) if "atr" in df_1h_feat.columns else None
             ema20_1h = float(compute_ema(df_1h_feat["close"], 20).iloc[-1])
             ema50_1h = float(compute_ema(df_1h_feat["close"], 50).iloc[-1])
-            sr_1h = compute_support_resistance(df_1h_feat)
             ta_multi["1h"] = {
                 "rsi": round(rsi_1h, 2) if rsi_1h else None,
                 "atr": round(atr_1h, 4) if atr_1h else None,
                 "trend": compute_trend(df_1h_feat),
-                "support": sr_1h["support"],
-                "resistance": sr_1h["resistance"],
-                "bb_pos": sr_1h["bb_pos"],
             }
             ta_multi["ema_20_1h"] = round(ema20_1h, 4)
             ta_multi["ema_50_1h"] = round(ema50_1h, 4)
@@ -1338,14 +1325,10 @@ class RegimeMasterBot:
                 df_15m_ta = fetch_klines(symbol, "15m", limit=100)
                 if df_15m_ta is not None and len(df_15m_ta) >= 30:
                     df_15m_ta = compute_all_features(df_15m_ta)
-                    sr_15m = compute_support_resistance(df_15m_ta)
                     ta_multi["15m"] = {
                         "rsi": round(float(df_15m_ta["rsi"].iloc[-1]), 2) if "rsi" in df_15m_ta.columns else None,
                         "atr": round(float(df_15m_ta["atr"].iloc[-1]), 4) if "atr" in df_15m_ta.columns else None,
                         "trend": compute_trend(df_15m_ta),
-                        "support": sr_15m["support"],
-                        "resistance": sr_15m["resistance"],
-                        "bb_pos": sr_15m["bb_pos"],
                     }
             except Exception as e:
                 logger.debug("15m TA failed for %s: %s", symbol, e)
@@ -1355,14 +1338,10 @@ class RegimeMasterBot:
                 df_5m_ta = fetch_klines(symbol, "5m", limit=100)
                 if df_5m_ta is not None and len(df_5m_ta) >= 30:
                     df_5m_ta = compute_all_features(df_5m_ta)
-                    sr_5m = compute_support_resistance(df_5m_ta)
                     ta_multi["5m"] = {
                         "rsi": round(float(df_5m_ta["rsi"].iloc[-1]), 2) if "rsi" in df_5m_ta.columns else None,
                         "atr": round(float(df_5m_ta["atr"].iloc[-1]), 4) if "atr" in df_5m_ta.columns else None,
                         "trend": compute_trend(df_5m_ta),
-                        "support": sr_5m["support"],
-                        "resistance": sr_5m["resistance"],
-                        "bb_pos": sr_5m["bb_pos"],
                     }
             except Exception as e:
                 logger.debug("5m TA failed for %s: %s", symbol, e)
@@ -1474,27 +1453,7 @@ class RegimeMasterBot:
                 self._coin_states[symbol]["action"] = "VOL_TOO_HIGH"
                 return None
 
-        # 3. Sentiment (fast veto before conviction compute)
-        sentiment_score = None
-        coin_sym = symbol.replace("USDT", "").replace("BUSD", "")
-        if self._sentiment:
-            try:
-                s_sig = self._sentiment.get_coin_sentiment(coin_sym)
-                if s_sig is not None:
-                    # Store news for dashboard
-                    self._coin_states[symbol]["news"] = s_sig.top_articles
-                    
-                    if s_sig.alert:
-                        self._coin_states[symbol]["action"] = f"SENTIMENT_ALERT:{s_sig.alert_reason}"
-                        return None
-                    sentiment_score = s_sig.effective_score
-                    if sentiment_score <= config.SENTIMENT_VETO_THRESHOLD:
-                        self._coin_states[symbol]["action"] = "SENTIMENT_VETO"
-                        return None
-            except Exception as _se:
-                logger.debug("Sentiment fetch failed for %s: %s", symbol, _se)
-
-        # 4. 15m momentum filter + order flow (fetch df_15m once for both)
+        # 3. 15m momentum filter + order flow (fetch df_15m once for both)
         df_15m = None
         orderflow_score = None
         ema_15m_20 = None
@@ -1558,24 +1517,16 @@ class RegimeMasterBot:
             except Exception:
                 pass
 
-        # 5. Full 8-factor conviction score
-        _regime_name_to_int = {v: k for k, v in config.REGIME_NAMES.items()}
-        btc_proxy   = _regime_name_to_int.get(macro_regime_name) if macro_regime_name else None
+        # 5. Full 4-factor conviction score
         funding     = df_1h_feat["funding_rate"].iloc[-1] if "funding_rate" in df_1h_feat.columns else None
         oi_chg      = df_1h_feat["oi_change"].iloc[-1]    if "oi_change"    in df_1h_feat.columns else None
-        volatility  = (current_atr / current_price)       if current_atr > 0 else None
 
         conviction = self.risk.compute_conviction_score(
             confidence=conf,
             regime=regime,
             side=side,
-            btc_regime=btc_proxy,
             funding_rate=funding,
             oi_change=oi_chg,
-            volatility=volatility,
-            sr_position=sr_pos_4h,
-            vwap_position=vwap_pos_4h,
-            sentiment_score=sentiment_score,
             orderflow_score=orderflow_score,
         )
         # Basic conviction floor — no profile will deploy below 40
@@ -1584,12 +1535,10 @@ class RegimeMasterBot:
             return None
 
         of_note = f" | OF={orderflow_score:+.2f}" if orderflow_score is not None else ""
-        sn_note = f" | sent={sentiment_score:+.2f}" if sentiment_score is not None else ""
         self._coin_states[symbol]["action"] = f"ELIGIBLE_{side}"
         self._coin_states[symbol].update({
             "conviction": round(conviction, 1),
             "orderflow":  round(orderflow_score, 3) if orderflow_score is not None else None,
-            "sentiment":  round(sentiment_score, 3) if sentiment_score is not None else None,
         })
         return {
             "symbol": symbol,
@@ -1602,7 +1551,7 @@ class RegimeMasterBot:
             "regime_name": regime_name,
             "confidence": conf,
             "conviction": conviction,
-            "reason": f"Trend {regime_name} | conf={conf:.0%} | conv={conviction:.1f}{sn_note}{of_note}",
+            "reason": f"Trend {regime_name} | conf={conf:.0%} | conv={conviction:.1f}{of_note}",
         }
 
     # ─── Profile Evaluation ──────────────────────────────────────────────────
@@ -1955,7 +1904,6 @@ class RegimeMasterBot:
             "active_positions": self._active_positions,
             "max_concurrent_positions": config.MAX_CONCURRENT_POSITIONS,
             "coin_states":      self._coin_states,
-            "source_stats":     self._sentiment.get_source_stats() if self._sentiment else {},
             "orderflow_stats":  self._get_orderflow_stats(),
             "paper_mode":       config.PAPER_TRADE,
             "cycle_execution_time_seconds": getattr(self, '_last_cycle_duration', 0),
