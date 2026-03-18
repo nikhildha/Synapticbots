@@ -73,11 +73,17 @@ class HMMBrain:
         self._feat_std[self._feat_std < 1e-10] = 1e-10  # avoid div-by-zero
         features_scaled = (features - self._feat_mean) / self._feat_std
 
+        # GMMHMM: use "diag" covariance — "full" is numerically unstable
+        # with many features (12) and multiple mixture components (n_mix=3).
+        # min_covar regularises near-zero variances to prevent degenerate states.
+        # Initialize here on every train to ensure hmmlearn's internal n_features shape
+        # natively matches the dataframe columns unconditionally instead of caching the old size.
         self.model = GMMHMM(
             n_components=self.n_states,
             n_mix=3,
-            covariance_type=config.HMM_COVARIANCE,
+            covariance_type="diag",
             n_iter=config.HMM_ITERATIONS,
+            min_covar=1e-3,
             random_state=42,
         )
 
@@ -86,10 +92,17 @@ class HMMBrain:
         self._last_trained = datetime.utcnow()
         self._is_trained = True
 
+        # Build per-state mean log-return for logging (handle both GaussianHMM and GMMHMM)
+        raw_means = self.model.means_
+        if raw_means.ndim == 3:
+            w = self.model.weights_
+            state_means_log = np.einsum("ij,ijk->ik", w, raw_means)[:, 0]
+        else:
+            state_means_log = raw_means[:, 0]
         logger.info(
             "HMM trained on %d samples. State means (log-ret): %s",
             len(features),
-            {config.REGIME_NAMES[v]: f"{self.model.means_[k][0]:.6f}"
+            {config.REGIME_NAMES[v]: f"{float(state_means_log[k]):.6f}"
              for k, v in self._state_map.items()},
         )
         return self
@@ -98,19 +111,32 @@ class HMMBrain:
         """
         Map raw HMM states → canonical regime labels by sorting on mean log-return.
         Highest return → BULL, then CHOP (near zero), then BEAR, then CRASH (most negative).
+
+        Handles both GaussianHMM (means_ 2D) and GMMHMM (means_ 3D — mixture-weighted average).
         """
         try:
             ret_idx = self.features.index("log_return")
         except ValueError:
             ret_idx = 0
-            
+
         try:
             vol_idx = self.features.index("volatility")
         except ValueError:
             vol_idx = 1
-            
-        means = self.model.means_[:, ret_idx]   # log-return means per raw state
-        vols  = self.model.means_[:, vol_idx]    # volatility means per raw state
+
+        raw_means = self.model.means_
+        if raw_means.ndim == 3:
+            # GMMHMM: means_ shape (n_components, n_mix, n_features)
+            # weights_ shape (n_components, n_mix) — mixture weights per state
+            w = self.model.weights_          # (n_components, n_mix)
+            # Weighted average across mixture components → (n_components, n_features)
+            state_means = np.einsum("ij,ijk->ik", w, raw_means)
+        else:
+            # GaussianHMM: means_ shape (n_components, n_features)
+            state_means = raw_means
+
+        means = state_means[:, ret_idx]   # log-return means per raw state
+        vols  = state_means[:, vol_idx]   # volatility means per raw state
 
         # Sort states: highest mean first → lowest
         sorted_indices = np.argsort(means)[::-1]
