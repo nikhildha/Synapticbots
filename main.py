@@ -522,6 +522,8 @@ class RegimeMasterBot:
         tradebook_active_count = len(tradebook_active)
         # Build set of active (bot_id, symbol) to prevent a specific bot from duplicating a trade
         active_bot_symbols = {(t.get('bot_id', ''), t['symbol']) for t in tradebook_active}
+        # Build set of active (user_id, symbol) to prevent a USER from duplicating a trade across multi bots
+        active_user_symbols = {(t.get('user_id', ''), t['symbol']) for t in tradebook_active}
         # Tracks symbols deployed THIS tick to prevent double-deploying the same coin across bots
         active_symbols: set = set()
         raw_results = []
@@ -643,10 +645,10 @@ class RegimeMasterBot:
                     )
                     continue
 
-                # Per-bot duplicate check (skip if THIS bot is already trading this coin)
-                if (bot_id, sym) in active_bot_symbols:
-                    logger.debug("🔄 [%s] %s already open for this bot — skip", bot_name, sym)
-                    self._coin_states.setdefault(sym, {}).setdefault("bot_deploy_statuses", {})[bot_id] = "FILTERED: active trade exists for this bot"
+                # Per-User duplicate check (skip if THIS user already trading this coin across ANY bot)
+                if (user_id, sym) in active_user_symbols:
+                    logger.debug("🔄 [%s] %s already open for user %s — skip", bot_name, sym, user_id)
+                    self._coin_states.setdefault(sym, {}).setdefault("bot_deploy_statuses", {})[bot_id] = "FILTERED: active trade exists for user"
                     _bcast("FILTERED_DUPLICATE", self._cycle_count, bot_name, bot_id, sym,
                            top.get("side", ""), seg_name, top.get("confidence", 0),
                            "active trade already open for this bot")
@@ -853,6 +855,7 @@ class RegimeMasterBot:
                     "quantity": fill_qty,
                 }
                 active_symbols.add(sym)
+                active_user_symbols.add((user_id, sym))
                 self._trade_count += 1
                 deployed += 1
 
