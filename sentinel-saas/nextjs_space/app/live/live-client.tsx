@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Activity, ShieldAlert, Radio, RefreshCw, PowerOff, ShieldX, TerminalSquare, Zap, AlertTriangle } from 'lucide-react';
+import { Activity, ShieldAlert, Radio, RefreshCw, PowerOff, ShieldX, TerminalSquare, Zap, AlertTriangle, PauseCircle, PlayCircle } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { Header } from '@/components/header';
 
@@ -19,6 +19,7 @@ export function LiveClient() {
     const [syncing, setSyncing] = useState(false);
     const [stoppingAll, setStoppingAll] = useState(false);
     const [exitingAll, setExitingAll] = useState(false);
+    const [pausing, setPausing] = useState(false);
 
     const fetchData = async () => {
         const startTime = Date.now();
@@ -97,7 +98,24 @@ export function LiveClient() {
         }
     };
 
-    const engineOnline = engineState?.engine?.status === 'running';
+    const isEnginePaused = engineState?.engine?.status === 'paused';
+
+    const handlePauseToggle = async () => {
+        if (!confirm(`Are you sure you want to ${isEnginePaused ? 'RESUME' : 'PAUSE'} the engine?`)) return;
+        setPausing(true);
+        try {
+            await fetch('/api/bots/toggle-pause', { 
+                method: 'POST',
+                body: JSON.stringify({ action: isEnginePaused ? 'resume' : 'pause' }),
+                headers: { 'Content-Type': 'application/json' }
+            });
+            await fetchData();
+        } finally {
+            setPausing(false);
+        }
+    };
+
+    const engineOnline = ['running', 'paused'].includes(engineState?.engine?.status);
     const isConnected = selectedExchange === 'binance' ? balance?.binanceConnected : balance?.coindcxConnected;
     const marginAmount = selectedExchange === 'binance' ? balance?.binance : balance?.coindcx;
     
@@ -129,16 +147,16 @@ export function LiveClient() {
                         <div className="px-4 py-2 rounded-lg" style={{ background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.05)' }}>
                             <div className="flex items-center gap-2">
                                 <motion.div 
-                                    animate={engineOnline ? { opacity: [0.4, 1, 0.4] } : { opacity: 1 }}
+                                    animate={engineOnline && !isEnginePaused ? { opacity: [0.4, 1, 0.4] } : { opacity: 1 }}
                                     transition={{ duration: 2, repeat: Infinity }}
                                     className="w-2.5 h-2.5 rounded-full" 
                                     style={{ 
-                                        background: engineOnline ? '#00FF88' : '#FF3B5C', 
-                                        boxShadow: `0 0 10px ${engineOnline ? '#00FF88' : '#FF3B5C'}` 
+                                        background: isEnginePaused ? '#FBBF24' : (engineOnline ? '#00FF88' : '#FF3B5C'), 
+                                        boxShadow: `0 0 10px ${isEnginePaused ? '#FBBF24' : (engineOnline ? '#00FF88' : '#FF3B5C')}` 
                                     }} 
                                 />
-                                <span className="text-xs font-bold tracking-widest" style={{ color: engineOnline ? '#00FF88' : '#FF3B5C' }}>
-                                    {engineOnline ? 'ENGINE ONLINE' : 'ENGINE OFFLINE'}
+                                <span className="text-xs font-bold tracking-widest" style={{ color: isEnginePaused ? '#FBBF24' : (engineOnline ? '#00FF88' : '#FF3B5C') }}>
+                                    {isEnginePaused ? 'ENGINE PAUSED' : (engineOnline ? 'ENGINE ONLINE' : 'ENGINE OFFLINE')}
                                 </span>
                             </div>
                         </div>
@@ -331,16 +349,35 @@ export function LiveClient() {
                             <div className="space-y-4">
                                 <div>
                                     <button 
+                                        onClick={handlePauseToggle}
+                                        disabled={pausing}
+                                        className="w-full flex items-center justify-center gap-2 py-3 px-4 rounded-lg font-bold transition-all disabled:opacity-50 text-[13px]"
+                                        style={{ 
+                                            background: isEnginePaused ? 'rgba(0, 255, 136, 0.1)' : 'rgba(251, 191, 36, 0.1)', 
+                                            border: `1px solid ${isEnginePaused ? '#00FF88' : '#FBBF24'}`, 
+                                            color: isEnginePaused ? '#00FF88' : '#FBBF24' 
+                                        }}
+                                    >
+                                        {isEnginePaused ? <PlayCircle size={18} /> : <PauseCircle size={18} />}
+                                        {pausing ? 'TOGGLING...' : (isEnginePaused ? 'RESUME DEPLOYMENTS' : 'PAUSE NEW TRADES')}
+                                    </button>
+                                    <p className="text-xs text-[var(--color-text-muted)] mt-2 text-center">
+                                        {isEnginePaused ? 'Engine will resume HMM signals.' : 'Stops new entries. Existing trades will still manage TP/SL.'}
+                                    </p>
+                                </div>
+
+                                <div className="pt-4 border-t border-[rgba(255,255,255,0.05)]">
+                                    <button 
                                         onClick={handleStopAll}
                                         disabled={stoppingAll}
-                                        className="w-full flex items-center justify-center gap-2 py-3 px-4 rounded-lg font-bold text-white transition-all disabled:opacity-50"
+                                        className="w-full flex items-center justify-center gap-2 py-3 px-4 rounded-lg font-bold text-white transition-all disabled:opacity-50 text-[13px]"
                                         style={{ background: 'linear-gradient(135deg, #FF3B5C 0%, #D92B48 100%)', textShadow: '0 1px 2px rgba(0,0,0,0.5)' }}
                                     >
                                         <PowerOff size={18} />
                                         {stoppingAll ? 'STOPPING...' : 'STOP ALL BOTS'}
                                     </button>
                                     <p className="text-xs text-[var(--color-text-muted)] mt-2 text-center">
-                                        Halts all scanning. Leaves positions open.
+                                        Halts all scanning completely. Leaves positions open.
                                     </p>
                                 </div>
 

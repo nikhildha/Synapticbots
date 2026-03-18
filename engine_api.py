@@ -1079,6 +1079,31 @@ def start_engine():
     _engine_start_time = time.time()
 
 
+@app.route("/api/pause", methods=["POST"])
+def api_pause():
+    """Pause the engine from deploying new trades."""
+    auth_err = _check_auth()
+    if auth_err:
+        return auth_err
+    try:
+        data = request.get_json() or {}
+        halt_until = data.get("halt_until")
+        state_path = os.path.join(config.DATA_DIR, "engine_state.json")
+        pause_state = {
+            "status": "paused",
+            "halt_until": halt_until,
+            "paused_by": "api_pause",
+            "resumed_at": None,
+        }
+        with open(state_path, "w") as f:
+            json.dump(pause_state, f, indent=2)
+            
+        logger.info("⏸️  Engine PAUSED via /api/pause")
+        return jsonify({"status": "paused", "message": "Engine paused — will not deploy new trades"})
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+
 @app.route("/api/resume", methods=["POST"])
 def api_resume():
     """Clear any paused/halted engine_state so the engine resumes analysis."""
