@@ -22,10 +22,11 @@ export async function POST(request: Request) {
       );
     }
 
-    const { name, exchange, mode, maxTrades, capitalPerTrade, brainType, segment } = await request.json();
+    const { name, exchange, mode, maxTrades, capitalPerTrade, deployments } = await request.json();
 
-    if (!name || !exchange) {
-      return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
+    // Determine basic validation
+    if (!exchange || !deployments || !Array.isArray(deployments) || deployments.length === 0) {
+      return NextResponse.json({ error: 'Missing required fields or empty deployments list.' }, { status: 400 });
     }
 
     // Check bot count limits for the user's tier
@@ -36,64 +37,73 @@ export async function POST(request: Request) {
 
     const limits = TIER_LIMITS[subStatus.tier];
     const maxBots = limits.maxBots;
+    const incomingCount = deployments.length;
 
-    if (user && user.bots.length >= maxBots) {
+    if (user && (user.bots.length + incomingCount) > maxBots) {
       return NextResponse.json(
-        { error: `Bot limit reached (${maxBots}). Upgrade your plan for more bots.` },
+        { error: `Bot limit exceeded. You have ${user.bots.length}/${maxBots} bots. Cannot add ${incomingCount} more.` },
         { status: 403 }
       );
     }
 
     // Determine coin scan limit from subscription
-    const coinScansLimit = user?.subscription?.coinScans || 5; // free trial = 5
+    const coinScansLimit = user?.subscription?.coinScans || 5;
 
-    // Use deploy modal values or defaults
     const botMode = mode || 'paper';
     const botMaxTrades = maxTrades || 25;
     const botCapitalPerTrade = capitalPerTrade || 100;
-    const botBrainType = brainType || 'adaptive';
-    const botSegment = segment || 'ALL';
 
-    // Create bot with config from deploy modal
-    const bot = await prisma.bot.create({
-      data: {
-        userId: session.user.id,
-        name,
-        exchange,
-        status: 'stopped',
-        isActive: false,
-        config: {
-          create: {
-            mode: botMode,
-            capitalPerTrade: botCapitalPerTrade,
-            maxOpenTrades: botMaxTrades,
-            slMultiplier: 0.8,
-            tpMultiplier: 1.0,
-            maxLossPct: -15,
-            multiTargetEnabled: true,
-            t1Multiplier: 0.5,
-            t2Multiplier: 1.0,
-            t3Multiplier: 1.5,
-            t1BookPct: 0.25,
-            t2BookPct: 0.50,
-            brainType: botBrainType,
-            segment: botSegment,
-            coinList: ['BTCUSDT', 'ETHUSDT', 'BNBUSDT', 'SOLUSDT', 'DOGEUSDT'].slice(0, coinScansLimit),
-          },
-        },
-        state: {
-          create: {
-            engineStatus: 'idle',
-          },
-        },
-      },
-      include: {
-        config: true,
-        state: true,
-      },
-    });
+    // Use Prisma transaction to create all requested bots safely
+    const createdBots = await prisma.$transaction(
+      deployments.map((dep: any) => {
+        // Enforce the coin scans limit if a custom list is provided, otherwise default to top 5
+        const defaultCoins = ['BTCUSDT', 'ETHUSDT', 'BNBUSDT', 'SOLUSDT', 'DOGEUSDT'];
+        const _coins = dep.coinList && Array.isArray(dep.coinList) && dep.coinList.length > 0
+          ? dep.coinList
+          : defaultCoins;
+        const finalizedCoins = _coins.slice(0, coinScansLimit);
 
-    return NextResponse.json({ success: true, bot });
+        return prisma.bot.create({
+          data: {
+            userId: session.user.id,
+            name: dep.name || name || `Bot - ${dep.segment}`,
+            exchange,
+            status: 'stopped',
+            isActive: false,
+            config: {
+              create: {
+                mode: botMode,
+                capitalPerTrade: botCapitalPerTrade,
+                maxOpenTrades: botMaxTrades,
+                slMultiplier: 0.8,
+                tpMultiplier: 1.0,
+                maxLossPct: -15,
+                multiTargetEnabled: true,
+                t1Multiplier: 0.5,
+                t2Multiplier: 1.0,
+                t3Multiplier: 1.5,
+                t1BookPct: 0.25,
+                t2BookPct: 0.50,
+                brainType: dep.segment === 'ALL' ? 'adaptive' : 'specialist',
+                segment: dep.segment || 'ALL',
+                coinList: finalizedCoins,
+              },
+            },
+            state: {
+              create: {
+                engineStatus: 'idle',
+              },
+            },
+          },
+          include: {
+            config: true,
+            state: true,
+          },
+        });
+      })
+    );
+
+    return NextResponse.json({ success: true, count: createdBots.length, bots: createdBots });
   } catch (error: any) {
     console.error('Bot creation error:', error);
     return NextResponse.json({ error: 'Failed to create bot' }, { status: 500 });

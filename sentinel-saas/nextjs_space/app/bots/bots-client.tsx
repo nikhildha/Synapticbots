@@ -1,156 +1,48 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { Header } from '@/components/header';
 import { BotCard } from '@/components/bot-card';
 import {
-  Plus, Trash2, Shield, TrendingUp, FlaskConical, Play, Rocket,
-  ChevronDown, ChevronUp, Activity, Archive, Zap
+  Rocket, X, Info, Search, CheckCircle2, ChevronDown, ChevronRight, Activity, BookOpen
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useSession } from 'next-auth/react';
 
-/* ═══ Bot Model Definitions — 11 Segment Bots ═══ */
-const BOT_MODELS = [
-  {
-    id: 'adaptive',
-    segment: 'ALL',
-    name: 'Synaptic Adaptive — ALL',
-    color: '#22C55E',
-    icon: '🧠',
-    tagline: 'All Segments · Heatmap Router · Auto-Regime',
-    description: 'Dynamically picks the top 2 hottest market segments each cycle using Institutional 3-Pillar scoring. Best for users who want full market coverage.',
-    coins: ['BTC', 'ETH', 'SOL', 'DOGE', 'UNI', 'FET', '...'],
-  },
-  {
-    id: 'adaptive',
-    segment: 'L1',
-    name: 'L1 Specialist',
-    color: '#3B82F6',
-    icon: '🔵',
-    tagline: 'Layer-1 · BTC · ETH · SOL · SUI',
-    description: 'Focused on the largest Layer-1 chains. Stable, high-liquidity assets with deep market structure.',
-    coins: ['BTC', 'ETH', 'SOL', 'BNB', 'AVAX', 'SUI'],
-  },
-  {
-    id: 'adaptive',
-    segment: 'L2',
-    name: 'L2 Specialist',
-    color: '#8B5CF6',
-    icon: '🟣',
-    tagline: 'Layer-2 · ARB · OP · POL · STRK',
-    description: 'Targets Ethereum scaling solutions — high beta to ETH with independent catalysts.',
-    coins: ['ARB', 'OP', 'POL', 'MNT', 'STRK'],
-  },
-  {
-    id: 'adaptive',
-    segment: 'DeFi',
-    name: 'DeFi Specialist',
-    color: '#10B981',
-    icon: '🌊',
-    tagline: 'DeFi · UNI · AAVE · CRV · RUNE',
-    description: 'Decentralized Finance protocols. Highly reactive to DEX volume and TVL shifts.',
-    coins: ['UNI', 'AAVE', 'CRV', 'JUP', 'RUNE'],
-  },
-  {
-    id: 'adaptive',
-    segment: 'AI',
-    name: 'AI Specialist',
-    color: '#06B6D4',
-    icon: '🤖',
-    tagline: 'AI Tokens · TAO · FET · WLD · AKT',
-    description: 'AI/ML narrative tokens. Strong trend-following behavior during AI hype cycles.',
-    coins: ['TAO', 'FET', 'INJ', 'WLD', 'AKT'],
-  },
-  {
-    id: 'adaptive',
-    segment: 'Meme',
-    name: 'Meme Specialist',
-    color: '#F97316',
-    icon: '🐸',
-    tagline: 'Meme · DOGE · PEPE · WIF · BONK',
-    description: 'High-volatility meme tokens. Explosive moves — sized conservatively with tight stops.',
-    coins: ['DOGE', 'SHIB', 'PEPE', 'WIF', 'BONK'],
-  },
-  {
-    id: 'adaptive',
-    segment: 'RWA',
-    name: 'RWA Specialist',
-    color: '#EAB308',
-    icon: '🏦',
-    tagline: 'Real World Assets · ONDO · LINK · PENDLE',
-    description: 'Real World Asset tokens tracking tokenized bonds, credit, and yield protocols.',
-    coins: ['ONDO', 'PENDLE', 'LINK', 'POLYX', 'TRU'],
-  },
-  {
-    id: 'adaptive',
-    segment: 'Gaming',
-    name: 'Gaming Specialist',
-    color: '#EC4899',
-    icon: '🎮',
-    tagline: 'Gaming/Metaverse · IMX · AXS · SAND',
-    description: 'GameFi and metaverse tokens. Trend with gaming narrative cycles and NFT market activity.',
-    coins: ['IMX', 'AXS', 'SAND', 'RONIN', 'PIXEL'],
-  },
-  {
-    id: 'adaptive',
-    segment: 'DePIN',
-    name: 'DePIN Specialist',
-    color: '#14B8A6',
-    icon: '📡',
-    tagline: 'DePIN · FIL · AR · HNT · IOTX',
-    description: 'Decentralized Physical Infrastructure Networks — data storage, wireless, IoT.',
-    coins: ['FIL', 'AR', 'HNT', 'IOTX'],
-  },
-  {
-    id: 'adaptive',
-    segment: 'Modular',
-    name: 'Modular Specialist',
-    color: '#6366F1',
-    icon: '🧩',
-    tagline: 'Modular · TIA · DYM',
-    description: 'Modular blockchain infrastructure — data availability layers with high growth potential.',
-    coins: ['TIA', 'DYM'],
-  },
-  {
-    id: 'adaptive',
-    segment: 'Oracles',
-    name: 'Oracles Specialist',
-    color: '#F43F5E',
-    icon: '🔮',
-    tagline: 'Oracles · PYTH · TRB · API3',
-    description: 'Oracle networks supplying on-chain data feeds. Reactive to DeFi adoption and cross-chain activity.',
-    coins: ['PYTH', 'TRB', 'API3'],
-  },
-];
+import { SEGMENT_KNOWLEDGE } from '@/lib/segment-knowledge';
 
 interface BotsClientProps { bots: any[]; sessions?: any[]; perfSummary?: any; }
 
 export function BotsClient({ bots: initialBots }: BotsClientProps) {
   const { data: session } = useSession();
-  const isAdmin = (session?.user as any)?.role === 'admin';
   const [mounted, setMounted] = useState(false);
   const [showDeployModal, setShowDeployModal] = useState(false);
   const [bots, setBots] = useState(initialBots);
   const [loading, setLoading] = useState(false);
-
-  /* ── Deploy modal state ── */
-  const [deployModel, setDeployModel] = useState('adaptive');
-  const [deploySegment, setDeploySegment] = useState('ALL');
-  const [deployExchange, setDeployExchange] = useState('binance');
-  const [deployMode, setDeployMode] = useState('paper');
-  const [deployMaxTrades, setDeployMaxTrades] = useState(25);
-  const [deployCapitalPerTrade, setDeployCapitalPerTrade] = useState(100);
-  const [deployLeverage, setDeployLeverage] = useState(20); // for quickscalper
-  const [verifying, setVerifying] = useState(false);
-  const [verifyStatus, setVerifyStatus] = useState<'idle' | 'ok' | 'fail'>('idle');
-  const [verifyBalance, setVerifyBalance] = useState<number | null>(null);
 
   /* ── Live state ── */
   const [liveTradeCount, setLiveTradeCount] = useState(0);
   const [liveTrades, setLiveTrades] = useState<any[]>([]);
   const [allSessions, setAllSessions] = useState<any[]>([]);
   const [perfSummary, setPerfSummary] = useState<any>({ allTimePnl: 0, allTimeRoi: 0, totalSessions: 0 });
+
+  /* ── Deploy Wizard State ── */
+  const [deployType, setDeployType] = useState<'adaptive' | 'segments' | 'coins'>('segments');
+  const [selectedSegments, setSelectedSegments] = useState<string[]>([]);
+  const [selectedCoins, setSelectedCoins] = useState<string[]>([]);
+  
+  const [deployExchange, setDeployExchange] = useState('binance');
+  const [deployMode, setDeployMode] = useState('paper');
+  const [deployMaxTrades, setDeployMaxTrades] = useState(10);
+  const [deployCapitalPerTrade, setDeployCapitalPerTrade] = useState(100);
+  
+  const [verifying, setVerifying] = useState(false);
+  const [verifyStatus, setVerifyStatus] = useState<'idle' | 'ok' | 'fail'>('idle');
+  const [verifyBalance, setVerifyBalance] = useState<number | null>(null);
+
+  /* ── Intel Drawer State ── */
+  const [intelSegmentId, setIntelSegmentId] = useState<string | null>(null);
+  const [expandedCoins, setExpandedCoins] = useState<Record<string, boolean>>({});
 
   useEffect(() => { setMounted(true); }, []);
 
@@ -205,22 +97,44 @@ export function BotsClient({ bots: initialBots }: BotsClientProps) {
     finally { setVerifying(false); }
   };
 
-  const handleDeployBot = async () => {
+  const handleDeployBots = async () => {
     setLoading(true);
     try {
-      const selectedModel = BOT_MODELS.find(m => m.id === deployModel && (m as any).segment === deploySegment);
+      let deployments: any[] = [];
+      
+      if (deployType === 'adaptive') {
+        deployments.push({ name: 'Synaptic Adaptive — ALL', segment: 'ALL', coinList: [] });
+      } else if (deployType === 'segments') {
+        if (selectedSegments.length === 0) { alert('Please select at least one segment.'); return; }
+        selectedSegments.forEach(segId => {
+          const segData = SEGMENT_KNOWLEDGE.find(s => s.id === segId);
+          deployments.push({ 
+            name: `${segData?.name || segId} Specialist`, 
+            segment: segId, 
+            coinList: [] 
+          });
+        });
+      } else if (deployType === 'coins') {
+        if (selectedCoins.length === 0) { alert('Please select at least one coin.'); return; }
+        deployments.push({
+          name: 'Custom Portfolio',
+          segment: 'CUSTOM',
+          coinList: selectedCoins
+        });
+      }
+
       const res = await fetch('/api/bots/create', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          name: selectedModel?.name || 'Synaptic Adaptive — ALL',
-          exchange: deployExchange, mode: deployMode,
-          maxTrades: deployMaxTrades, capitalPerTrade: deployCapitalPerTrade,
-          brainType: deployModel,
-          segment: deploySegment,
+          exchange: deployExchange, 
+          mode: deployMode,
+          maxTrades: deployMaxTrades, 
+          capitalPerTrade: deployCapitalPerTrade,
+          deployments
         }),
       });
       if (res.ok) { setShowDeployModal(false); window.location.reload(); }
-      else { const data = await res.json(); alert(data.error || 'Failed to deploy bot'); }
+      else { const data = await res.json(); alert(data.error || 'Failed to deploy bots'); }
     } catch (error) { console.error('Error deploying bot:', error); }
     finally { setLoading(false); }
   };
@@ -243,6 +157,21 @@ export function BotsClient({ bots: initialBots }: BotsClientProps) {
   const runningBots = activeBots.filter((b: any) => b?.isActive);
   const signFmt = (n: number) => (n >= 0 ? '+' : '') + n.toFixed(2);
 
+  // Derived Values
+  const botMultiplier = deployType === 'adaptive' || deployType === 'coins' ? 1 : Math.max(1, selectedSegments.length);
+  const totalMaxExposure = botMultiplier * deployMaxTrades * deployCapitalPerTrade;
+
+  // Flatten coins for custom UI
+  const ALL_COINS = useMemo(() => {
+    const coinMap = new Map();
+    SEGMENT_KNOWLEDGE.forEach(seg => {
+      seg.coins.forEach(c => { if (!coinMap.has(c.symbol)) coinMap.set(c.symbol, { ...c, segmentId: seg.id }); });
+    });
+    return Array.from(coinMap.values()).filter(c => c.symbol !== 'BTCUSDT'); // Filter BTC from custom picking for safety
+  }, []);
+
+  const intelData = useMemo(() => SEGMENT_KNOWLEDGE.find(s => s.id === intelSegmentId), [intelSegmentId]);
+
   if (!mounted) return null;
 
   return (
@@ -252,10 +181,7 @@ export function BotsClient({ bots: initialBots }: BotsClientProps) {
         <div style={{ maxWidth: 1200, margin: '0 auto' }}>
 
           {/* ════ BOTS HEADER ════ */}
-          <motion.div initial={{ opacity: 0, y: -12 }} animate={{ opacity: 1, y: 0 }}
-            style={{ marginBottom: 28 }}
-          >
-            {/* Engine status bar */}
+          <motion.div initial={{ opacity: 0, y: -12 }} animate={{ opacity: 1, y: 0 }} style={{ marginBottom: 28 }}>
             <div style={{
               display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16,
               padding: '10px 18px', borderRadius: 'var(--radius-lg)',
@@ -274,17 +200,8 @@ export function BotsClient({ bots: initialBots }: BotsClientProps) {
               <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-secondary)' }}>
                 <strong style={{ color: 'var(--color-info)', fontFamily: 'monospace' }}>{liveTradeCount}</strong> open positions
               </span>
-              {perfSummary.allTimePnl !== 0 && (
-                <>
-                  <span style={{ width: 1, height: 14, background: 'var(--color-border)' }} />
-                  <span style={{ fontSize: 'var(--text-xs)', fontFamily: 'monospace', fontWeight: 700, color: perfSummary.allTimePnl >= 0 ? 'var(--color-success)' : 'var(--color-danger)' }}>
-                    {signFmt(perfSummary.allTimePnl)} USDT all-time
-                  </span>
-                </>
-              )}
             </div>
 
-            {/* Title row */}
             <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 16 }}>
               <div>
                 <h1 style={{ fontSize: 'var(--text-3xl)', fontWeight: 800, margin: 0, letterSpacing: '-0.03em' }}>
@@ -294,13 +211,8 @@ export function BotsClient({ bots: initialBots }: BotsClientProps) {
                   Deploy, monitor &amp; manage your automated trading bots
                 </p>
               </div>
-              <button
-                onClick={() => setShowDeployModal(true)}
-                className="btn-success"
-                style={{ fontSize: 'var(--text-base)', padding: '11px 22px' }}
-              >
-                <Rocket style={{ width: 16, height: 16 }} />
-                Deploy Bot
+              <button onClick={() => setShowDeployModal(true)} className="btn-success" style={{ fontSize: 'var(--text-base)', padding: '11px 22px' }}>
+                <Rocket style={{ width: 16, height: 16 }} /> Deploy Launchpad
               </button>
             </div>
           </motion.div>
@@ -310,31 +222,18 @@ export function BotsClient({ bots: initialBots }: BotsClientProps) {
             <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }}
               style={{
                 background: 'linear-gradient(135deg, rgba(17,24,39,0.7), rgba(30,41,59,0.5))',
-                backdropFilter: 'blur(12px)',
-                border: '1px solid rgba(34,197,94,0.2)',
+                backdropFilter: 'blur(12px)', border: '1px solid rgba(34,197,94,0.2)',
                 borderRadius: 'var(--radius-xl)', padding: 48, textAlign: 'center',
                 marginBottom: 32, boxShadow: 'var(--shadow-card)',
               }}>
               <div style={{
                 width: 64, height: 64, borderRadius: 18, margin: '0 auto 20px',
-                background: 'linear-gradient(135deg, rgba(34,197,94,0.2), rgba(16,185,129,0.08))',
-                border: '1px solid rgba(34,197,94,0.25)',
+                background: 'linear-gradient(135deg, rgba(34,197,94,0.2), rgba(16,185,129,0.08))', border: '1px solid rgba(34,197,94,0.25)',
                 display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 28,
               }}>🧠</div>
-              <h3 style={{ fontSize: 'var(--text-xl)', fontWeight: 700, margin: '0 0 8px', color: 'var(--color-text)' }}>
-                No bots deployed yet
-              </h3>
-              <p style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-secondary)', margin: '0 0 8px' }}>
-                HMM-Powered Crypto Trading Engine
-              </p>
-              <div style={{ display: 'flex', justifyContent: 'center', gap: 24, margin: '20px 0 28px', flexWrap: 'wrap' }}>
-                {['Auto regime detection', 'Multi-timeframe HMM', 'Smart risk management'].map(f => (
-                  <div key={f} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 'var(--text-sm)', color: 'var(--color-text-secondary)' }}>
-                    <span style={{ color: 'var(--color-success)', fontSize: 12 }}>✓</span> {f}
-                  </div>
-                ))}
-              </div>
-              <button onClick={() => setShowDeployModal(true)} className="btn-success">
+              <h3 style={{ fontSize: 'var(--text-xl)', fontWeight: 700, margin: '0 0 8px', color: 'var(--color-text)' }}>No bots deployed yet</h3>
+              <p style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-secondary)', margin: '0 0 8px' }}>HMM-Powered Crypto Trading Engine</p>
+              <button onClick={() => setShowDeployModal(true)} className="btn-success mt-4">
                 <Rocket style={{ width: 15, height: 15 }} /> Deploy Your First Bot
               </button>
             </motion.div>
@@ -345,21 +244,11 @@ export function BotsClient({ bots: initialBots }: BotsClientProps) {
             <div style={{ display: 'flex', flexDirection: 'column', gap: 14, marginBottom: 40 }}>
               {activeBots.map((bot, i) => {
                 const botSessions = allSessions.filter((s: any) => s.botId === bot?.id);
-                const botTrades = liveTrades.filter((t: any) =>
-                  (t.bot_id && bot?.id && t.bot_id === bot.id) ||
-                  (t.botId && bot?.id && t.botId === bot.id)
-                );
+                const botTrades = liveTrades.filter((t: any) => (t.bot_id && bot?.id && t.bot_id === bot.id) || (t.botId && bot?.id && t.botId === bot.id));
                 const displayTrades = botTrades.length > 0 ? botTrades : (activeBots.length === 1 ? liveTrades : []);
                 return (
                   <motion.div key={bot?.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.06 }}>
-                    <BotCard
-                      bot={bot}
-                      onToggle={handleBotToggle}
-                      onDelete={handleDeleteBot}
-                      liveTradeCount={liveTradeCount}
-                      trades={displayTrades}
-                      sessions={botSessions}
-                    />
+                    <BotCard bot={bot} onToggle={handleBotToggle} onDelete={handleDeleteBot} liveTradeCount={liveTradeCount} trades={displayTrades} sessions={botSessions} />
                   </motion.div>
                 );
               })}
@@ -369,292 +258,312 @@ export function BotsClient({ bots: initialBots }: BotsClientProps) {
         </div>
       </main>
 
-      {/* ════ DEPLOY BOT MODAL ════ */}
+      {/* ════ DEPLOY BOT MODAL (LAUNCHPAD) ════ */}
       <AnimatePresence>
         {showDeployModal && (
           <div
             style={{
               position: 'fixed', inset: 0, zIndex: 50,
-              background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(4px)',
+              background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(8px)',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               padding: '24px 16px',
             }}
-            onClick={(e) => { if (e.target === e.currentTarget) setShowDeployModal(false); }}
           >
             <motion.div
-              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              initial={{ opacity: 0, scale: 0.98, y: 10 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              exit={{ opacity: 0, scale: 0.98, y: 10 }}
               transition={{ type: 'spring', stiffness: 300, damping: 28 }}
               style={{
                 background: 'linear-gradient(145deg, #0D1420 0%, #111827 100%)',
-                border: '1px solid var(--color-border)',
-                borderRadius: 'var(--radius-xl)',
-                boxShadow: '0 24px 64px rgba(0,0,0,0.6), 0 0 0 1px rgba(255,255,255,0.04)',
-                maxWidth: 520, width: '100%',
+                border: '1px solid var(--color-border)', borderRadius: 'var(--radius-xl)',
+                boxShadow: '0 24px 64px rgba(0,0,0,0.8), 0 0 0 1px rgba(255,255,255,0.04)',
+                maxWidth: 900, width: '100%',
                 maxHeight: 'calc(100vh - 48px)',
-                display: 'flex', flexDirection: 'column',
+                display: 'flex', overflow: 'hidden'
               }}
             >
-              {/* Modal Header */}
-              <div style={{
-                display: 'flex', alignItems: 'center', gap: 14,
-                padding: '20px 24px 18px',
-                borderBottom: '1px solid var(--color-border)',
-              }}>
+              
+              {/* Left Side: Configuration Wizard */}
+              <div style={{ flex: 1, display: 'flex', flexDirection: 'column', position: 'relative' }}>
+                
+                {/* Modal Header */}
                 <div style={{
-                  width: 42, height: 42, borderRadius: 'var(--radius-md)', flexShrink: 0,
-                  background: 'linear-gradient(135deg, rgba(34,197,94,0.2), rgba(16,185,129,0.08))',
-                  border: '1px solid rgba(34,197,94,0.25)',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  display: 'flex', alignItems: 'center', gap: 14, padding: '20px 24px', borderBottom: '1px solid var(--color-border)',
                 }}>
-                  <Rocket style={{ width: 20, height: 20, color: '#22C55E' }} />
-                </div>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <h2 style={{ fontSize: 'var(--text-lg)', fontWeight: 700, color: 'var(--color-text)', margin: 0 }}>
-                    Deploy Synaptic Bot
-                  </h2>
-                  <p style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)', margin: '2px 0 0' }}>
-                    Configure your trading engine
-                  </p>
-                </div>
-                <button
-                  onClick={() => setShowDeployModal(false)}
-                  style={{
-                    width: 32, height: 32, border: 'none', borderRadius: 'var(--radius-sm)',
-                    background: 'rgba(255,255,255,0.06)', color: 'var(--color-text-secondary)',
-                    fontSize: 18, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    transition: 'background 0.2s',
-                  }}
-                >✕</button>
-              </div>
-
-              {/* Scrollable content */}
-              <div style={{ overflowY: 'auto', padding: '20px 24px', flex: 1 }}>
-
-                {/* ── Bot Model Selector — 11 Segment Bots ── */}
-                <div style={{ marginBottom: 20 }}>
-                  <div className="section-title" style={{ marginBottom: 10 }}>Select Bot Type</div>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxHeight: 320, overflowY: 'auto', paddingRight: 4 }}>
-                    {BOT_MODELS.map(model => {
-                      const selected = deployModel === model.id && deploySegment === (model as any).segment;
-                      return (
-                        <button key={`${model.id}-${(model as any).segment}`}
-                          onClick={() => { setDeployModel(model.id); setDeploySegment((model as any).segment); }}
-                          style={{
-                            padding: '12px 14px', borderRadius: 'var(--radius-md)', cursor: 'pointer',
-                            background: selected ? `${model.color}12` : 'rgba(255,255,255,0.03)',
-                            border: `2px solid ${selected ? model.color : 'var(--color-border)'}`,
-                            transition: 'all 0.2s', textAlign: 'left',
-                            boxShadow: selected ? `0 0 14px ${model.color}22` : 'none',
-                          }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                            <span style={{ fontSize: 20, flexShrink: 0 }}>{model.icon}</span>
-                            <div style={{ flex: 1, minWidth: 0 }}>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                                <span style={{ fontSize: 'var(--text-sm)', fontWeight: 700, color: selected ? model.color : 'var(--color-text)' }}>
-                                  {model.name}
-                                </span>
-                                {/* Coin tags */}
-                                <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
-                                  {((model as any).coins || []).map((coin: string) => (
-                                    <span key={coin} style={{
-                                      fontSize: 10, fontWeight: 700, padding: '1px 6px',
-                                      borderRadius: 20, fontFamily: 'monospace',
-                                      background: selected ? `${model.color}20` : 'rgba(255,255,255,0.06)',
-                                      color: selected ? model.color : 'var(--color-text-muted)',
-                                      border: `1px solid ${selected ? model.color + '40' : 'var(--color-border)'}`,
-                                    }}>{coin}</span>
-                                  ))}
-                                </div>
-                              </div>
-                              <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)', marginTop: 2 }}>
-                                {model.tagline}
-                              </div>
-                            </div>
-                            {selected && (
-                              <span style={{ fontSize: 16, color: model.color, flexShrink: 0 }}>✓</span>
-                            )}
-                          </div>
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-
-                {/* ── Exchange + Mode (inline 2-col) ── */}
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 20 }}>
-                  {/* Exchange */}
-                  <div>
-                    <div className="section-title" style={{ marginBottom: 10 }}>Exchange</div>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
-                      {[
-                        { id: 'binance', name: 'Binance', icon: '🔶', sub: 'Global · Largest' },
-                        { id: 'coindcx', name: 'CoinDCX', icon: '🇮🇳', sub: 'India · INR' },
-                      ].map(ex => {
-                        const sel = deployExchange === ex.id;
-                        return (
-                          <button key={ex.id} onClick={() => setDeployExchange(ex.id)} style={{
-                            display: 'flex', alignItems: 'center', gap: 10,
-                            padding: '10px 12px', borderRadius: 'var(--radius-md)', cursor: 'pointer',
-                            background: sel ? 'rgba(14,165,233,0.1)' : 'rgba(255,255,255,0.03)',
-                            border: `1.5px solid ${sel ? '#0EA5E9' : 'var(--color-border)'}`,
-                            transition: 'all 0.2s', textAlign: 'left',
-                          }}>
-                            <span style={{ fontSize: 16 }}>{ex.icon}</span>
-                            <div>
-                              <div style={{ fontSize: 'var(--text-sm)', fontWeight: 700, color: sel ? '#0EA5E9' : 'var(--color-text)' }}>{ex.name}</div>
-                              <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)' }}>{ex.sub}</div>
-                            </div>
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-
-                  {/* Mode */}
-                  <div>
-                    <div className="section-title" style={{ marginBottom: 10 }}>Trading Mode</div>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
-                      {[
-                        { id: 'paper', name: 'Paper', icon: '📝', sub: 'Simulated · No risk', color: '#0EA5E9' },
-                        { id: 'live', name: 'Live', icon: '⚡', sub: 'Real capital · Live P&L', color: '#EF4444' },
-                      ].map(mode => {
-                        const sel = deployMode === mode.id;
-                        return (
-                          <button key={mode.id} onClick={() => setDeployMode(mode.id)} style={{
-                            display: 'flex', alignItems: 'center', gap: 10,
-                            padding: '10px 12px', borderRadius: 'var(--radius-md)', cursor: 'pointer',
-                            background: sel ? `${mode.color}10` : 'rgba(255,255,255,0.03)',
-                            border: `1.5px solid ${sel ? mode.color : 'var(--color-border)'}`,
-                            transition: 'all 0.2s', textAlign: 'left',
-                          }}>
-                            <span style={{ fontSize: 16 }}>{mode.icon}</span>
-                            <div>
-                              <div style={{ fontSize: 'var(--text-sm)', fontWeight: 700, color: sel ? mode.color : 'var(--color-text)' }}>{mode.name}</div>
-                              <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)' }}>{mode.sub}</div>
-                            </div>
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-                </div>
-
-                {/* ── Live mode warnings ── */}
-                {deployMode === 'live' && (
-                  <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }}
-                    style={{ marginBottom: 20, overflow: 'hidden' }}>
-                    <div style={{
-                      padding: '10px 14px', borderRadius: 'var(--radius-md)',
-                      background: 'var(--color-danger-bg)', border: '1px solid rgba(239,68,68,0.25)',
-                      fontSize: 'var(--text-xs)', color: '#F87171', lineHeight: 1.5, marginBottom: 8,
-                    }}>
-                      ⚠️ Live trading uses real capital. Ensure your API keys are set in Settings and risk parameters are configured.
-                    </div>
-                    <button onClick={handleVerifyConnection} disabled={verifying} style={{
-                      width: '100%', padding: '9px 0', borderRadius: 'var(--radius-md)',
-                      border: `1px solid ${verifyStatus === 'ok' ? 'rgba(16,185,129,0.4)' : verifyStatus === 'fail' ? 'rgba(239,68,68,0.4)' : 'var(--color-border)'}`,
-                      background: verifyStatus === 'ok' ? 'var(--color-success-bg)' : verifyStatus === 'fail' ? 'var(--color-danger-bg)' : 'rgba(255,255,255,0.04)',
-                      color: verifyStatus === 'ok' ? 'var(--color-success)' : verifyStatus === 'fail' ? 'var(--color-danger)' : 'var(--color-text-secondary)',
-                      fontSize: 'var(--text-sm)', fontWeight: 700, cursor: verifying ? 'wait' : 'pointer',
-                      transition: 'all 0.2s', opacity: verifying ? 0.7 : 1,
-                    }}>
-                      {verifying ? '⏳ Checking connection…' :
-                        verifyStatus === 'ok' ? `✓ ${deployExchange === 'coindcx' ? 'CoinDCX' : 'Binance'} Connected${verifyBalance != null ? ` · $${verifyBalance.toFixed(2)} USDT` : ''}` :
-                          verifyStatus === 'fail' ? '✗ Connection failed — check API keys' :
-                            `Verify ${deployExchange === 'coindcx' ? 'CoinDCX' : 'Binance'} Connection`}
-                    </button>
-                  </motion.div>
-                )}
-
-                {/* ── Segment-specific info strip ── */}
-                {deploySegment !== 'ALL' && (
-                  <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }}
-                    style={{ marginBottom: 20, overflow: 'hidden' }}>
-                    <div style={{
-                      padding: '10px 14px', borderRadius: 'var(--radius-md)',
-                      background: 'rgba(34,197,94,0.06)', border: '1px solid rgba(34,197,94,0.2)',
-                      fontSize: 'var(--text-xs)', color: '#86EFAC', lineHeight: 1.5,
-                    }}>
-                      🎯 <strong>{deploySegment} Specialist</strong> will only scan coins in the {deploySegment} segment,
-                      using per-coin optimized HMM features from Likelihood Permutation analysis.
-                      Correlation control limits to 1 open position per segment.
-                    </div>
-                  </motion.div>
-                )}
-
-
-                {/* ── Capital Settings ── */}
-                <div style={{ marginBottom: 4 }}>
-                  <div className="section-title" style={{ marginBottom: 10 }}>Capital Settings</div>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-                    <div>
-                      <label style={{ display: 'block', fontSize: 'var(--text-xs)', color: 'var(--color-text-secondary)', marginBottom: 5, fontWeight: 600 }}>
-                        Max Concurrent Trades
-                      </label>
-                      <input type="number" min={1} max={100} value={deployMaxTrades}
-                        onChange={(e) => setDeployMaxTrades(Math.max(1, parseInt(e.target.value) || 1))}
-                        className="input-field"
-                        style={{ fontFamily: 'monospace' }}
-                      />
-                    </div>
-                    <div>
-                      <label style={{ display: 'block', fontSize: 'var(--text-xs)', color: 'var(--color-text-secondary)', marginBottom: 5, fontWeight: 600 }}>
-                        Capital Per Trade ($)
-                      </label>
-                      <input type="number" min={10} max={10000} step={10} value={deployCapitalPerTrade}
-                        onChange={(e) => setDeployCapitalPerTrade(Math.max(10, parseInt(e.target.value) || 10))}
-                        className="input-field"
-                        style={{ fontFamily: 'monospace' }}
-                      />
-                    </div>
-                  </div>
-                  {/* Max exposure strip */}
                   <div style={{
-                    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                    marginTop: 10, padding: '8px 14px', borderRadius: 'var(--radius-md)',
-                    background: 'var(--color-info-bg)', border: '1px solid rgba(6,182,212,0.2)',
-                    fontSize: 'var(--text-xs)', color: 'var(--color-info)',
+                    width: 42, height: 42, borderRadius: 'var(--radius-md)', flexShrink: 0,
+                    background: 'linear-gradient(135deg, rgba(34,197,94,0.2), rgba(16,185,129,0.08))',
+                    border: '1px solid rgba(34,197,94,0.25)', display: 'flex', alignItems: 'center', justifyContent: 'center',
                   }}>
-                    <span>Max capital exposure</span>
-                    <span style={{ fontFamily: 'monospace', fontWeight: 800, fontSize: 'var(--text-sm)' }}>
-                      ${(deployMaxTrades * deployCapitalPerTrade).toLocaleString()}
-                      <span style={{ fontWeight: 400, color: 'var(--color-text-muted)', marginLeft: 4 }}>
-                        ({deployMaxTrades} × ${deployCapitalPerTrade})
-                      </span>
-                    </span>
+                    <Rocket style={{ width: 20, height: 20, color: '#22C55E' }} />
                   </div>
+                  <div style={{ flex: 1 }}>
+                    <h2 style={{ fontSize: 'var(--text-lg)', fontWeight: 700, color: 'var(--color-text)', margin: 0 }}>Deploy Launchpad</h2>
+                    <p style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)', margin: '2px 0 0' }}>Configure multi-model deployment</p>
+                  </div>
+                  <button onClick={() => setShowDeployModal(false)} className="btn-ghost" style={{ padding: 6 }}><X size={20} /></button>
+                </div>
+
+                <div style={{ overflowY: 'auto', padding: '20px 24px', flex: 1 }}>
+                  
+                  {/* Tab Selector */}
+                  <div style={{ display: 'flex', background: 'rgba(0,0,0,0.3)', borderRadius: 'var(--radius-md)', padding: 4, marginBottom: 24, border: '1px solid var(--color-border)' }}>
+                    {[{id: 'adaptive', label: 'Adaptive All-Market'}, {id: 'segments', label: 'By Segments'}, {id: 'coins', label: 'Custom Coins'}].map(tab => (
+                      <button key={tab.id} onClick={() => setDeployType(tab.id as any)} style={{
+                        flex: 1, padding: '10px 0', fontSize: 'var(--text-xs)', fontWeight: 700, borderRadius: 'calc(var(--radius-md) - 2px)',
+                        background: deployType === tab.id ? 'rgba(34,197,94,0.15)' : 'transparent',
+                        color: deployType === tab.id ? '#4ADE80' : 'var(--color-text-secondary)',
+                        border: deployType === tab.id ? '1px solid rgba(34,197,94,0.3)' : '1px solid transparent',
+                        transition: 'all 0.2s'
+                      }}>{tab.label}</button>
+                    ))}
+                  </div>
+
+                  {/* Tab Contents */}
+                  <div style={{ minHeight: 180, marginBottom: 32 }}>
+
+                    {/* ADAPTIVE TYPE */}
+                    {deployType === 'adaptive' && (
+                      <div style={{
+                        padding: 24, borderRadius: 'var(--radius-lg)', background: 'linear-gradient(145deg, rgba(34,197,94,0.08) 0%, rgba(16,185,129,0.02) 100%)',
+                        border: '1px solid rgba(34,197,94,0.2)'
+                      }}>
+                        <div style={{ display: 'flex', gap: 16 }}>
+                          <div style={{ fontSize: 32 }}>🧠</div>
+                          <div>
+                            <h3 style={{ fontSize: 'var(--text-base)', fontWeight: 700, color: '#4ADE80', margin: '0 0 6px 0' }}>Synaptic Adaptive Protocol</h3>
+                            <p style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-secondary)', lineHeight: 1.5, margin: 0 }}>
+                              Deploys one master bot. It intelligently scans the entire market every cycle, computes the Institutional Segment Heatmap, and dynamically allocates its risk <i>only</i> to the Top 2 hottest segments on the market.
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* SEGMENTS TYPE */}
+                    {deployType === 'segments' && (
+                      <div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                          <span className="section-title" style={{ margin: 0 }}>Select target segments</span>
+                          <button onClick={() => setSelectedSegments(SEGMENT_KNOWLEDGE.filter(s => s.id !== 'ALL').map(s => s.id))} className="text-btn" style={{ fontSize: 12 }}>Select All</button>
+                        </div>
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 12 }}>
+                          {SEGMENT_KNOWLEDGE.filter(s => s.id !== 'ALL').map(seg => {
+                            const active = selectedSegments.includes(seg.id);
+                            return (
+                              <div key={seg.id} style={{
+                                display: 'flex', alignItems: 'center', gap: 12, padding: '12px 14px', borderRadius: 'var(--radius-md)', cursor: 'pointer',
+                                background: active ? 'rgba(34,197,94,0.1)' : 'rgba(255,255,255,0.03)',
+                                border: `1px solid ${active ? 'var(--color-success)' : 'var(--color-border)'}`, transition: 'all 0.2s', position: 'relative'
+                              }} onClick={() => setSelectedSegments(prev => active ? prev.filter(id => id !== seg.id) : [...prev, seg.id])}>
+                                <div style={{ fontSize: 20 }}>{seg.icon}</div>
+                                <div style={{ flex: 1, minWidth: 0 }}>
+                                  <div style={{ fontSize: 'var(--text-sm)', fontWeight: 700, color: active ? 'var(--color-success)' : 'var(--color-text)' }}>{seg.name}</div>
+                                  <div style={{ fontSize: 10, color: 'var(--color-text-muted)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{seg.coins.length} coins tracked</div>
+                                </div>
+                                
+                                {/* Intel Trigger */}
+                                <button 
+                                  onClick={(e) => { e.stopPropagation(); setIntelSegmentId(seg.id); }}
+                                  style={{
+                                    background: 'transparent', border: 'none', color: 'var(--color-info)', cursor: 'pointer', padding: 4, opacity: 0.7
+                                  }}
+                                  title="Learn about this segment"
+                                >
+                                  <Info size={16} />
+                                </button>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* CUSTOM COINS TYPE */}
+                    {deployType === 'coins' && (
+                      <div>
+                        <div className="section-title" style={{ marginBottom: 12 }}>Build Custom Portfolio</div>
+                        <div style={{
+                          display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: 8, maxHeight: 200, overflowY: 'auto'
+                        }}>
+                          {ALL_COINS.map(coin => {
+                            const active = selectedCoins.includes(coin.symbol);
+                            return (
+                              <div key={coin.symbol} onClick={() => setSelectedCoins(prev => active ? prev.filter(c => c !== coin.symbol) : [...prev, coin.symbol])}
+                                style={{
+                                  padding: '8px 12px', borderRadius: 'var(--radius-sm)', border: `1px solid ${active ? '#3B82F6' : 'var(--color-border)'}`,
+                                  background: active ? 'rgba(59,130,246,0.15)' : 'rgba(255,255,255,0.02)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8
+                                }}
+                              >
+                                {active ? <CheckCircle2 size={14} color="#3B82F6" /> : <div style={{ width: 14, height: 14, borderRadius: '50%', border: '1px solid var(--color-border)' }} />}
+                                <span style={{ fontSize: 'var(--text-xs)', fontWeight: 700, color: active ? '#3B82F6' : 'var(--color-text)' }}>{coin.symbol}</span>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  <hr style={{ border: 'none', borderTop: '1px solid var(--color-border)', margin: '0 0 24px 0' }} />
+
+                  {/* Unified Configuration Strip */}
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24 }}>
+                    <div>
+                      <div className="section-title" style={{ marginBottom: 10 }}>Exchange</div>
+                      <div style={{ display: 'flex', gap: 8 }}>
+                        {[{ id: 'binance', name: 'Binance', icon: '🔶' }, { id: 'coindcx', name: 'CoinDCX', icon: '🇮🇳' }].map(ex => (
+                          <button key={ex.id} onClick={() => setDeployExchange(ex.id)} style={{
+                            flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                            padding: '10px 0', borderRadius: 'var(--radius-md)', cursor: 'pointer',
+                            background: deployExchange === ex.id ? 'rgba(14,165,233,0.1)' : 'rgba(255,255,255,0.03)',
+                            border: `1.5px solid ${deployExchange === ex.id ? '#0EA5E9' : 'var(--color-border)'}`,
+                            fontSize: 'var(--text-xs)', fontWeight: 700, color: deployExchange === ex.id ? '#0EA5E9' : 'var(--color-text-secondary)', transition: 'all 0.2s'
+                          }}>
+                            {ex.icon} {ex.name}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                    <div>
+                      <div className="section-title" style={{ marginBottom: 10 }}>Trading Mode</div>
+                      <div style={{ display: 'flex', gap: 8 }}>
+                        {[{ id: 'paper', name: 'Paper', icon: '📝', color: '#0EA5E9' }, { id: 'live', name: 'Live', icon: '⚡', color: '#EF4444' }].map(m => (
+                          <button key={m.id} onClick={() => setDeployMode(m.id)} style={{
+                            flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                            padding: '10px 0', borderRadius: 'var(--radius-md)', cursor: 'pointer',
+                            background: deployMode === m.id ? `${m.color}15` : 'rgba(255,255,255,0.03)',
+                            border: `1.5px solid ${deployMode === m.id ? m.color : 'var(--color-border)'}`,
+                            fontSize: 'var(--text-xs)', fontWeight: 700, color: deployMode === m.id ? m.color : 'var(--color-text-secondary)', transition: 'all 0.2s'
+                          }}>
+                            {m.icon} {m.name}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Capital Limits */}
+                  <div style={{ marginTop: 24, padding: 20, borderRadius: 'var(--radius-lg)', background: 'rgba(0,0,0,0.2)', border: '1px solid var(--color-border)' }}>
+                    <div className="section-title" style={{ marginBottom: 16 }}>Risk & Capital Parameters</div>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+                      <div>
+                        <label style={{ display: 'block', fontSize: 'var(--text-xs)', color: 'var(--color-text-secondary)', marginBottom: 6 }}>Trades Per Bot</label>
+                        <input type="number" min={1} max={100} value={deployMaxTrades} onChange={(e) => setDeployMaxTrades(Math.max(1, parseInt(e.target.value) || 1))} className="input-field" style={{ fontFamily: 'monospace' }} />
+                      </div>
+                      <div>
+                        <label style={{ display: 'block', fontSize: 'var(--text-xs)', color: 'var(--color-text-secondary)', marginBottom: 6 }}>Capital Per Trade ($)</label>
+                        <input type="number" min={10} max={10000} step={10} value={deployCapitalPerTrade} onChange={(e) => setDeployCapitalPerTrade(Math.max(10, parseInt(e.target.value) || 10))} className="input-field" style={{ fontFamily: 'monospace' }} />
+                      </div>
+                    </div>
+
+                    <div style={{
+                      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                      marginTop: 16, paddingTop: 16, borderTop: '1px dashed var(--color-border)',
+                      fontSize: 'var(--text-sm)', color: 'var(--color-text)',
+                    }}>
+                      <span style={{ color: 'var(--color-text-secondary)' }}>Maximum Total Exposure</span>
+                      <div style={{ textAlign: 'right' }}>
+                        <span style={{ fontFamily: 'monospace', fontWeight: 800, color: 'var(--color-info)', fontSize: 18 }}>${totalMaxExposure.toLocaleString()}</span>
+                        <div style={{ fontSize: 10, color: 'var(--color-text-muted)', marginTop: 2 }}>{botMultiplier} Bots × {deployMaxTrades} Trades × ${deployCapitalPerTrade}</div>
+                      </div>
+                    </div>
+                  </div>
+
+                </div>
+
+                {/* Footer Controls */}
+                <div style={{ display: 'flex', gap: 12, padding: '16px 24px 20px', borderTop: '1px solid var(--color-border)', background: 'rgba(13,20,32,0.8)' }}>
+                  <button onClick={() => setShowDeployModal(false)} className="btn-ghost" style={{ flex: 1, padding: '12px 0' }}>Cancel</button>
+                  <button onClick={handleDeployBots} disabled={loading} className="btn-success" style={{ flex: 2, padding: '12px 0', fontSize: 15, opacity: loading ? 0.7 : 1 }}>
+                    <Rocket style={{ width: 16, height: 16 }} /> {loading ? 'Launching Matrix...' : `Deploy ${botMultiplier} Bot${botMultiplier !== 1? 's':''}`}
+                  </button>
                 </div>
               </div>
 
-              {/* Modal Footer */}
-              <div style={{
-                display: 'flex', gap: 10,
-                padding: '16px 24px 20px',
-                borderTop: '1px solid var(--color-border)',
-              }}>
-                <button onClick={() => setShowDeployModal(false)} className="btn-ghost" style={{ flex: 1, padding: '11px 0' }}>
-                  Cancel
-                </button>
-                <button
-                  onClick={handleDeployBot}
-                  disabled={loading}
-                  className="btn-success"
-                  style={{ flex: 1, padding: '11px 0', opacity: loading ? 0.7 : 1, cursor: loading ? 'wait' : 'pointer' }}
-                >
-                  <Rocket style={{ width: 15, height: 15 }} />
-                  {loading ? 'Launching…' : 'Launch Bot'}
-                </button>
-              </div>
+              {/* Right Side: Intel Drawer (Sliding Panel) */}
+              <AnimatePresence>
+                {intelData && (
+                  <motion.div
+                    initial={{ width: 0, opacity: 0 }}
+                    animate={{ width: 340, opacity: 1 }}
+                    exit={{ width: 0, opacity: 0 }}
+                    transition={{ type: 'spring', stiffness: 300, damping: 30 }}
+                    style={{ borderLeft: '1px solid var(--color-border)', background: '#141D2C', display: 'flex', flexDirection: 'column' }}
+                  >
+                    <div style={{ padding: '24px 20px', flex: 1, overflowY: 'auto' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                          <span style={{ fontSize: 24 }}>{intelData.icon}</span>
+                          <div>
+                            <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700 }}>{intelData.name}</h3>
+                            <span style={{ fontSize: 10, color: 'var(--color-info)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5 }}>Intel Briefing</span>
+                          </div>
+                        </div>
+                        <button onClick={() => setIntelSegmentId(null)} className="btn-ghost" style={{ padding: 4 }}><X size={16} /></button>
+                      </div>
+
+                      <p style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-secondary)', lineHeight: 1.6, marginBottom: 24 }}>
+                        {intelData.description}
+                      </p>
+
+                      <div className="section-title" style={{ marginBottom: 12, fontSize: 11, color: 'var(--color-text-muted)', display: 'flex', alignItems: 'center', gap: 6 }}><BookOpen size={12}/> Tracked Assets ({intelData.coins.length})</div>
+                      
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                        {intelData.coins.map(coin => {
+                          const isExpanded = expandedCoins[coin.symbol];
+                          return (
+                            <div key={coin.symbol} style={{ background: 'rgba(0,0,0,0.2)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-sm)', overflow: 'hidden' }}>
+                              <button onClick={() => setExpandedCoins(prev => ({...prev, [coin.symbol]: !prev[coin.symbol]}))}
+                                style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 12px', background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--color-text)' }}>
+                                <span style={{ fontFamily: 'monospace', fontWeight: 700, fontSize: 13, color: '#3B82F6' }}>{coin.symbol}</span>
+                                {isExpanded ? <ChevronDown size={14} color="var(--color-text-secondary)"/> : <ChevronRight size={14} color="var(--color-text-secondary)"/>}
+                              </button>
+                              
+                              <AnimatePresence>
+                                {isExpanded && (
+                                  <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} style={{ overflow: 'hidden' }}>
+                                    <div style={{ padding: '0 12px 12px 12px', fontSize: 12, color: 'var(--color-text-secondary)', lineHeight: 1.5 }}>
+                                      <div style={{ color: 'var(--color-text)', fontWeight: 600, marginBottom: 4 }}>{coin.name}</div>
+                                      {coin.description}
+                                      
+                                      {coin.people && coin.people.length > 0 && (
+                                        <div style={{ marginTop: 10, padding: 8, background: 'rgba(255,255,255,0.03)', borderRadius: 4 }}>
+                                          <div style={{ fontSize: 10, color: 'var(--color-text-muted)', marginBottom: 4, textTransform: 'uppercase' }}>Key Figures</div>
+                                          {coin.people.map(p => (
+                                            <div key={p.name} style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                              <span style={{ color: 'var(--color-text)' }}>{p.name} <span style={{ color: 'var(--color-text-muted)', fontSize: 10 }}>({p.role})</span></span>
+                                              {p.link && <a href={p.link} target="_blank" rel="noreferrer" style={{ color: 'var(--color-info)' }}>Link</a>}
+                                            </div>
+                                          ))}
+                                        </div>
+                                      )}
+                                      
+                                      {coin.links && coin.links.length > 0 && (
+                                        <div style={{ marginTop: 8, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                                          {coin.links.map(l => (
+                                            <a key={l.url} href={l.url} target="_blank" rel="noreferrer" style={{ color: '#3B82F6', textDecoration: 'underline' }}>{l.label}</a>
+                                          ))}
+                                        </div>
+                                      )}
+                                    </div>
+                                  </motion.div>
+                                )}
+                              </AnimatePresence>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
             </motion.div>
           </div>
         )}
       </AnimatePresence>
-
-      <style jsx>{`
-        @keyframes spin { to { transform: rotate(360deg); } }
-      `}</style>
     </div>
   );
 }
