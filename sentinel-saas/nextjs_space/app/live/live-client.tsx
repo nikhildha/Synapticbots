@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Activity, ShieldAlert, Radio, RefreshCw, PowerOff, ShieldX, TerminalSquare } from 'lucide-react';
+import { Activity, ShieldAlert, Radio, RefreshCw, PowerOff, ShieldX, TerminalSquare, Zap, AlertTriangle } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { Header } from '@/components/header';
 
@@ -12,19 +12,27 @@ export function LiveClient() {
         coindcx: number | null, coindcxConnected: boolean 
     } | null>(null);
     const [engineState, setEngineState] = useState<any>(null);
+    const [prismaActiveCount, setPrismaActiveCount] = useState<number>(0);
+    const [pingHistory, setPingHistory] = useState<number[]>([]);
     const [logs, setLogs] = useState<string[]>([]);
     const [loading, setLoading] = useState(true);
+    const [syncing, setSyncing] = useState(false);
     const [stoppingAll, setStoppingAll] = useState(false);
     const [exitingAll, setExitingAll] = useState(false);
 
     const fetchData = async () => {
+        const startTime = Date.now();
         try {
-            const [balRes, stateRes, logsRes] = await Promise.all([
+            const [balRes, stateRes, logsRes, tradesRes] = await Promise.all([
                 fetch('/api/wallet-balance'),
                 fetch('/api/bot-state?mode=live'),
-                fetch('/api/engine-logs?mode=live&n=50')
+                fetch('/api/engine-logs?mode=live&n=50'),
+                fetch('/api/trades')
             ]);
             
+            const elapsed = Date.now() - startTime;
+            setPingHistory(prev => [...prev.slice(-19), elapsed]);
+
             if (balRes.ok) {
                 const bal = await balRes.json();
                 setBalance(bal);
@@ -36,6 +44,13 @@ export function LiveClient() {
             if (logsRes.ok) {
                 const data = await logsRes.json();
                 if (data.lines) setLogs(data.lines);
+            }
+            if (tradesRes.ok) {
+                const data = await tradesRes.json();
+                if (data.trades) {
+                    const activeDb = data.trades.filter((t: any) => t.status === 'ACTIVE').length;
+                    setPrismaActiveCount(activeDb);
+                }
             }
         } catch (e) {
             console.error(e);
@@ -72,9 +87,26 @@ export function LiveClient() {
         }
     };
 
+    const handleForceSync = async () => {
+        setSyncing(true);
+        try {
+            await fetch('/api/trades/sync', { method: 'POST' });
+            await fetchData();
+        } finally {
+            setSyncing(false);
+        }
+    };
+
     const engineOnline = engineState?.engine?.status === 'running';
     const isConnected = selectedExchange === 'binance' ? balance?.binanceConnected : balance?.coindcxConnected;
     const marginAmount = selectedExchange === 'binance' ? balance?.binance : balance?.coindcx;
+    
+    // Drift calculation: compare Prisma ACTIVE trades vs Engine JSON active trades.
+    // Sometimes engine JSON treats 'filtered' or others internally differently, but active_trades is accurate.
+    const engineActiveCount = typeof engineState?.tradebook?.active_trades === 'object' 
+        ? Object.keys(engineState.tradebook.active_trades).length 
+        : 0;
+    const hasDrift = engineOnline && (engineActiveCount !== prismaActiveCount);
 
     return (
         <div className="min-h-screen bg-[var(--color-background)] pt-24 pb-12">
@@ -227,6 +259,63 @@ export function LiveClient() {
                     {/* Sidebar Area (1/3 width) */}
                     <div className="space-y-6">
                         
+                        {/* Position Intelligence */}
+                        <div style={{
+                            background: 'linear-gradient(145deg, rgba(8,12,20,0.9) 0%, rgba(5,7,12,0.95) 100%)',
+                            border: '1px solid rgba(255,255,255,0.05)',
+                            borderRadius: '20px',
+                            padding: '24px',
+                            boxShadow: 'inset 0 0 0 1px rgba(255,255,255,0.02)'
+                        }}>
+                            <h2 className="text-xl font-bold flex items-center gap-2 text-[#E8EDF5] border-b border-[rgba(255,255,255,0.05)] pb-4 mb-4">
+                                <Zap size={20} color="#FBBF24" /> Intelligence
+                            </h2>
+                            
+                            <div className="space-y-5">
+                                <div>
+                                    <div className="flex justify-between text-[11px] text-[var(--color-text-muted)] uppercase tracking-wider mb-2">
+                                        <span>Ping Latency</span>
+                                        <span>{pingHistory.length > 0 ? `${pingHistory[pingHistory.length - 1]}ms` : '--'}</span>
+                                    </div>
+                                    <div className="flex items-end gap-[2px] h-8 bg-black/40 rounded-lg p-2 border border-[rgba(255,255,255,0.05)] overflow-hidden">
+                                        {pingHistory.map((ping, i) => {
+                                            const height = Math.min(100, Math.max(10, (ping / 1000) * 100)); // Cap at 1s for visuals
+                                            const color = ping > 800 ? '#FF3B5C' : ping > 400 ? '#FBBF24' : '#00E5FF';
+                                            return (
+                                                <div 
+                                                    key={i} 
+                                                    className="w-full rounded-t-sm"
+                                                    style={{ height: `${height}%`, background: color }}
+                                                />
+                                            );
+                                        })}
+                                        {pingHistory.length === 0 && <div className="text-xs text-[var(--color-text-muted)] w-full text-center">Awaiting...</div>}
+                                    </div>
+                                </div>
+
+                                {hasDrift && (
+                                    <div className="p-3 bg-[rgba(251,191,36,0.1)] border border-[rgba(251,191,36,0.3)] rounded-lg">
+                                        <div className="text-sm text-[#FBBF24] flex items-center gap-2 font-bold mb-1">
+                                            <AlertTriangle size={16} /> Drift Detected
+                                        </div>
+                                        <div className="text-xs text-[var(--color-text-muted)]">
+                                            Engine reports {engineActiveCount} positions, but {prismaActiveCount} active in DB. Re-sync required.
+                                        </div>
+                                    </div>
+                                )}
+
+                                <button 
+                                    onClick={handleForceSync}
+                                    disabled={syncing}
+                                    className="w-full flex items-center justify-center gap-2 py-3 px-4 rounded-lg font-bold transition-all disabled:opacity-50"
+                                    style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: '#E8EDF5' }}
+                                >
+                                    <RefreshCw size={16} className={syncing ? 'animate-spin' : ''} />
+                                    {syncing ? 'SYNCING...' : 'FORCE RE-SYNC'}
+                                </button>
+                            </div>
+                        </div>
+
                         {/* Emergency Controls */}
                         <div style={{
                             background: 'rgba(239, 68, 68, 0.05)',
