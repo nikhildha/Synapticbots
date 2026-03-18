@@ -30,9 +30,8 @@ export function BotsClient({ bots: initialBots }: BotsClientProps) {
   const [perfSummary, setPerfSummary] = useState<any>({ allTimePnl: 0, allTimeRoi: 0, totalSessions: 0 });
 
   /* ── Deploy Wizard State ── */
-  const [deployType, setDeployType] = useState<'adaptive' | 'segments' | 'coins'>('segments');
+  const [deployType, setDeployType] = useState<'adaptive' | 'segments'>('segments');
   const [selectedSegments, setSelectedSegments] = useState<string[]>([]);
-  const [selectedCoins, setSelectedCoins] = useState<string[]>([]);
   
   const [deployExchange, setDeployExchange] = useState('binance');
   const [deployMode, setDeployMode] = useState('paper');
@@ -116,13 +115,6 @@ export function BotsClient({ bots: initialBots }: BotsClientProps) {
             coinList: [] 
           });
         });
-      } else if (deployType === 'coins') {
-        if (selectedCoins.length === 0) { alert('Please select at least one coin.'); return; }
-        deployments.push({
-          name: 'Custom',
-          segment: 'CUSTOM',
-          coinList: selectedCoins
-        });
       }
 
       const res = await fetch('/api/bots/create', {
@@ -181,17 +173,8 @@ export function BotsClient({ bots: initialBots }: BotsClientProps) {
   const signFmt = (n: number) => (n >= 0 ? '+' : '') + n.toFixed(2);
 
   // Derived Values
-  const botMultiplier = deployType === 'adaptive' || deployType === 'coins' ? 1 : Math.max(1, selectedSegments.length);
+  const botMultiplier = deployType === 'adaptive' ? 1 : Math.max(1, selectedSegments.length);
   const totalMaxExposure = botMultiplier * deployMaxTrades * deployCapitalPerTrade;
-
-  // Flatten coins for custom UI
-  const ALL_COINS = useMemo(() => {
-    const coinMap = new Map();
-    SEGMENT_KNOWLEDGE.forEach(seg => {
-      seg.coins.forEach(c => { if (!coinMap.has(c.symbol)) coinMap.set(c.symbol, { ...c, segmentId: seg.id }); });
-    });
-    return Array.from(coinMap.values()).filter(c => c.symbol !== 'BTCUSDT'); // Filter BTC from custom picking for safety
-  }, []);
 
   const intelData = useMemo(() => SEGMENT_KNOWLEDGE.find(s => s.id === intelSegmentId), [intelSegmentId]);
 
@@ -344,7 +327,7 @@ export function BotsClient({ bots: initialBots }: BotsClientProps) {
                   
                   {/* Tab Selector */}
                   <div style={{ display: 'flex', background: 'rgba(0,0,0,0.3)', borderRadius: 'var(--radius-md)', padding: 4, marginBottom: 24, border: '1px solid var(--color-border)' }}>
-                    {[{id: 'adaptive', label: 'Adaptive All-Market'}, {id: 'segments', label: 'By Segments'}, {id: 'coins', label: 'Custom Coins'}].map(tab => (
+                    {[{id: 'adaptive', label: 'Adaptive All-Market'}, {id: 'segments', label: 'By Segments'}].map(tab => (
                       <button key={tab.id} onClick={() => setDeployType(tab.id as any)} style={{
                         flex: 1, padding: '10px 0', fontSize: 'var(--text-xs)', fontWeight: 700, borderRadius: 'calc(var(--radius-md) - 2px)',
                         background: deployType === tab.id ? 'rgba(34,197,94,0.15)' : 'transparent',
@@ -415,30 +398,7 @@ export function BotsClient({ bots: initialBots }: BotsClientProps) {
                       </div>
                     )}
 
-                    {/* CUSTOM COINS TYPE */}
-                    {deployType === 'coins' && (
-                      <div>
-                        <div className="section-title" style={{ marginBottom: 12 }}>Build Custom Portfolio</div>
-                        <div style={{
-                          display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: 8, maxHeight: 200, overflowY: 'auto'
-                        }}>
-                          {ALL_COINS.map(coin => {
-                            const active = selectedCoins.includes(coin.symbol);
-                            return (
-                              <div key={coin.symbol} onClick={() => setSelectedCoins(prev => active ? prev.filter(c => c !== coin.symbol) : [...prev, coin.symbol])}
-                                style={{
-                                  padding: '8px 12px', borderRadius: 'var(--radius-sm)', border: `1px solid ${active ? '#3B82F6' : 'var(--color-border)'}`,
-                                  background: active ? 'rgba(59,130,246,0.15)' : 'rgba(255,255,255,0.02)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8
-                                }}
-                              >
-                                {active ? <CheckCircle2 size={14} color="#3B82F6" /> : <div style={{ width: 14, height: 14, borderRadius: '50%', border: '1px solid var(--color-border)' }} />}
-                                <span style={{ fontSize: 'var(--text-xs)', fontWeight: 700, color: active ? '#3B82F6' : 'var(--color-text)' }}>{coin.symbol}</span>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    )}
+
                   </div>
 
                   <hr style={{ border: 'none', borderTop: '1px solid var(--color-border)', margin: '0 0 24px 0' }} />
