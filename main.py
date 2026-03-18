@@ -549,16 +549,16 @@ class RegimeMasterBot:
         # ── 4b. Macro Veto Overlay (BTC Flash Crash Detection) ──
         btc_flash_crash = False
         try:
-            btc_df = fetch_klines("BTCUSDT", "15m", limit=3)
+            btc_df = fetch_klines("BTCUSDT", config.TIMEFRAME_EXECUTION, limit=3)
             if btc_df is not None and len(btc_df) >= 2:
                 btc_latest = float(btc_df["close"].iloc[-1])
                 btc_prev = float(btc_df["close"].iloc[-2])
-                btc_15m_return = (btc_latest - btc_prev) / btc_prev
+                btc_5m_return = (btc_latest - btc_prev) / btc_prev
                 # Block LONGS if BTC dropped more than configured threshold in the last 15m candle
                 threshold_pct = getattr(config, "MACRO_VETO_BTC_DROP_PCT", 1.5) / 100.0
-                if btc_15m_return < -threshold_pct:
+                if btc_5m_return < -threshold_pct:
                     btc_flash_crash = True
-                    logger.warning("🚨 MACRO VETO: BTCUSDT Flash Crash! (15m return: %.2f%%) — Blocking all long setups.", btc_15m_return * 100)
+                    logger.warning("🚨 MACRO VETO: BTCUSDT Flash Crash! (5m return: %.2f%%) — Blocking all long setups.", btc_5m_return * 100)
         except Exception as e:
             logger.debug("Failed to fetch BTC macro context: %s", e)
 
@@ -723,7 +723,7 @@ class RegimeMasterBot:
                             "atr_pct":        (atr_val / max(current_price, 0.0001)) * 100,
                             "trend":          self._coin_states.get(sym, {}).get("context", {}).get("trend_alignment", "UNKNOWN"),
                             "signal_type":    top.get("signal_type", "TREND_FOLLOW"),
-                            "ema_15m_20":     top.get("ema_15m_20"),
+                            "ema_5m_20":     top.get("ema_5m_20"),
                             "tf_agreement":   top.get("tf_agreement", 0),
                             "btc_regime":     self._coin_states.get("BTCUSDT", {}).get("regime", "UNKNOWN"),
                         }
@@ -789,7 +789,7 @@ class RegimeMasterBot:
                         leverage=lev,
                         quantity=qty,
                         atr=atr_val,
-                        ema_15m_20=top.get("ema_15m_20"),
+                        ema_5m_20=top.get("ema_5m_20"),
                         regime=top.get("regime", 0),
                         confidence=final_conf,
                         reason=reason_str,
@@ -1223,14 +1223,14 @@ class RegimeMasterBot:
                 "athena": athena_action,
             }
 
-            # Compute ema_15m_20 for ATR pullback limit orders (multi-TF path)
+            # Compute ema_5m_20 for ATR pullback limit orders (multi-TF path)
             # Without this, execution_engine always falls back to MARKET orders.
-            _ema_15m_20 = None
+            _ema_5m_20 = None
             try:
-                df_15m_for_ema = fetch_klines(symbol, "15m", limit=50)
-                if df_15m_for_ema is not None and len(df_15m_for_ema) >= 20:
+                df_5m_for_ema = fetch_klines(symbol, config.TIMEFRAME_EXECUTION, limit=50)
+                if df_5m_for_ema is not None and len(df_5m_for_ema) >= 20:
                     from feature_engine import compute_ema
-                    _ema_15m_20 = float(compute_ema(compute_all_features(df_15m_for_ema)["close"], 20).iloc[-1])
+                    _ema_5m_20 = float(compute_ema(compute_all_features(df_5m_for_ema)["close"], 20).iloc[-1])
             except Exception:
                 pass
 
@@ -1238,7 +1238,7 @@ class RegimeMasterBot:
                 "symbol": symbol,
                 "side": side,
                 "atr": current_atr,
-                "ema_15m_20": _ema_15m_20,
+                "ema_5m_20": _ema_5m_20,
                 "regime": regime,
                 "regime_name": regime_name,
                 "confidence": conf,
@@ -1324,18 +1324,18 @@ class RegimeMasterBot:
             ta_multi["ema_20_1h"] = round(ema20_1h, 4)
             ta_multi["ema_50_1h"] = round(ema50_1h, 4)
 
-            # 15m
+            # 5m
             try:
-                df_15m_ta = fetch_klines(symbol, "15m", limit=100)
-                if df_15m_ta is not None and len(df_15m_ta) >= 30:
-                    df_15m_ta = compute_all_features(df_15m_ta)
-                    ta_multi["15m"] = {
-                        "rsi": round(float(df_15m_ta["rsi"].iloc[-1]), 2) if "rsi" in df_15m_ta.columns else None,
-                        "atr": round(float(df_15m_ta["atr"].iloc[-1]), 4) if "atr" in df_15m_ta.columns else None,
-                        "trend": compute_trend(df_15m_ta),
+                df_5m_ta = fetch_klines(symbol, config.TIMEFRAME_EXECUTION, limit=100)
+                if df_5m_ta is not None and len(df_5m_ta) >= 30:
+                    df_5m_ta = compute_all_features(df_5m_ta)
+                    ta_multi["5m"] = {
+                        "rsi": round(float(df_5m_ta["rsi"].iloc[-1]), 2) if "rsi" in df_5m_ta.columns else None,
+                        "atr": round(float(df_5m_ta["atr"].iloc[-1]), 4) if "atr" in df_5m_ta.columns else None,
+                        "trend": compute_trend(df_5m_ta),
                     }
             except Exception as e:
-                logger.debug("15m TA failed for %s: %s", symbol, e)
+                logger.debug("5m TA failed for %s: %s", symbol, e)
 
             # 5m
             try:
@@ -1358,14 +1358,14 @@ class RegimeMasterBot:
 
         # ── Multi-TF Tiered Signal Logic ─────────────────────────────────────────
         # Tier 1 (full consensus): 1H and 4H agree → normal full-conviction flow
-        # Tier 2 (reversal setup): 15m flips vs 1H/4H → gate entry on ATR pullback
-        #                          to 15m EMA20 before allowing through at reduced size
-        # Tier 3 (true noise):     1H vs 4H conflict (not just 15m) → hard block
+        # Tier 2 (reversal setup): 5m flips vs 1H/4H → gate entry on ATR pullback
+        #                          to 5m EMA20 before allowing through at reduced size
+        # Tier 3 (true noise):     1H vs 4H conflict (not just 5m) → hard block
         _is_reversal_tier2 = False
         if macro_regime_name:
             # Hard block: 1H and 4H directly contradict each other (true noise)
-            # Note: macro_regime_name = 4H regime, regime_name = 15m regime (primary scan TF)
-            # 15m BULL + 4H BEAR = potential reversal, NOT noise → Tier 2
+            # Note: macro_regime_name = 4H regime, regime_name = 5m regime (primary scan TF)
+            # 5m BULL + 4H BEAR = potential reversal, NOT noise → Tier 2
             # We check 1H vs 4H conflict separately via tf_agreement being 1 (only one agrees)
             one_h_predictions = (mtf_brain._predictions if mtf_brain else {})
             regime_1h = one_h_predictions.get("1h", (None, 0))[0]
@@ -1382,9 +1382,9 @@ class RegimeMasterBot:
                 self._coin_states[symbol]["action"] = "MTF_CONFLICT"
                 return None
 
-            # [DISABLED] Tier 2: 15m flipped but higher TFs haven't confirmed yet
-            # 15m says BUY but 1H/4H still BEAR (or vice versa) → reversal setup
-            primary_regime = regime  # 15m HMM
+            # [DISABLED] Tier 2: 5m flipped but higher TFs haven't confirmed yet
+            # 5m says BUY but 1H/4H still BEAR (or vice versa) → reversal setup
+            primary_regime = regime  # 5m HMM
             higher_tf_regimes = [r for r in [regime_1h, regime_4h] if r is not None]
             higher_tf_bear = all(r == config.REGIME_BEAR for r in higher_tf_regimes)
             higher_tf_bull = all(r == config.REGIME_BULL for r in higher_tf_regimes)
@@ -1406,7 +1406,7 @@ class RegimeMasterBot:
 
 
         # ── Tier 2B: 15m+4H agree, 1H lagging — gate on 1H EMA20 pullback ──────
-        # Cases 24 & 25: 15m=BULL + 4H=BULL + 1H=BEAR (or inverse SHORT version)
+        # Cases 24 & 25: 5m=BULL + 4H=BULL + 1H=BEAR (or inverse SHORT version)
         _is_tier2b = False
         if regime_1h is not None and regime_4h is not None:
             macro_direction_bull = (regime_4h == config.REGIME_BULL and regime == config.REGIME_BULL)
@@ -1415,7 +1415,7 @@ class RegimeMasterBot:
             one_h_lagging_bull   = (regime_1h == config.REGIME_BULL and macro_direction_bear)
 
             if one_h_lagging_bear or one_h_lagging_bull:
-                # 15m and 4H agree; 1H is lagging opposite → Tier 2B
+                # 5m and 4H agree; 1H is lagging opposite → Tier 2B
                 _is_tier2b = True
                 
                 # USER OVERRIDE: Tier 2B 1H EMA20 pullback logic disabled.
@@ -1457,24 +1457,24 @@ class RegimeMasterBot:
                 self._coin_states[symbol]["action"] = "VOL_TOO_HIGH"
                 return None
 
-        # 3. 15m momentum filter + order flow (fetch df_15m once for both)
-        df_15m = None
+        # 3. 5m momentum filter + order flow (fetch df_5m once for both)
+        df_5m = None
         orderflow_score = None
-        ema_15m_20 = None
+        ema_5m_20 = None
         try:
-            df_15m = fetch_klines(symbol, config.TIMEFRAME_EXECUTION, limit=50)
-            if df_15m is not None and len(df_15m) >= 5:
-                df_15m_feat = compute_all_features(df_15m)
-                price_now   = float(df_15m_feat["close"].iloc[-1])
-                price_5_ago = float(df_15m_feat["close"].iloc[-5])
-                ema_15m_20  = float(compute_ema(df_15m_feat["close"], 20).iloc[-1])
+            df_5m = fetch_klines(symbol, config.TIMEFRAME_EXECUTION, limit=50)
+            if df_5m is not None and len(df_5m) >= 5:
+                df_5m_feat = compute_all_features(df_5m)
+                price_now   = float(df_5m_feat["close"].iloc[-1])
+                price_5_ago = float(df_5m_feat["close"].iloc[-5])
+                ema_5m_20  = float(compute_ema(df_5m_feat["close"], 20).iloc[-1])
                 pass
         except Exception:
             pass
 
         if self._orderflow:
             try:
-                of_sig = self._orderflow.get_signal(symbol, df_15m)
+                of_sig = self._orderflow.get_signal(symbol, df_5m)
                 if of_sig is not None:
                     orderflow_score = of_sig.score
                     # Export detailed metrics for dashboard (v2 — multi-exchange + OB)
@@ -1508,15 +1508,15 @@ class RegimeMasterBot:
                 logger.debug("OrderFlow fetch failed for %s: %s", symbol, _oe)
 
         # ─── Post-OrderFlow Momentum Filter ───
-        if df_15m is not None and len(df_15m) >= 5:
+        if df_5m is not None and len(df_5m) >= 5:
             try:
-                price_now   = float(df_15m_feat["close"].iloc[-1])
-                price_5_ago = float(df_15m_feat["close"].iloc[-5])
+                price_now   = float(df_5m_feat["close"].iloc[-1])
+                price_5_ago = float(df_5m_feat["close"].iloc[-5])
                 if side == "BUY"  and price_now <= price_5_ago:
-                    self._coin_states[symbol]["action"] = "15M_FILTER_SKIP"
+                    self._coin_states[symbol]["action"] = "5M_FILTER_SKIP"
                     return None
                 if side == "SELL" and price_now >= price_5_ago:
-                    self._coin_states[symbol]["action"] = "15M_FILTER_SKIP"
+                    self._coin_states[symbol]["action"] = "5M_FILTER_SKIP"
                     return None
             except Exception:
                 pass
@@ -1548,7 +1548,7 @@ class RegimeMasterBot:
             "symbol": symbol,
             "side": side,
             "atr": current_atr,
-            "ema_15m_20": ema_15m_20,
+            "ema_5m_20": ema_5m_20,
             "swing_l": current_swing_l,
             "swing_h": current_swing_h,
             "regime": regime,

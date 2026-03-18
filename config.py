@@ -61,15 +61,15 @@ for _seg in list(CRYPTO_SEGMENTS.keys()):
     CRYPTO_SEGMENTS[_seg] = [c for c in CRYPTO_SEGMENTS[_seg] if c not in EXCLUDED_COINS]
 
 # ─── Timeframes ─────────────────────────────────────────────────────────────────
-TIMEFRAME_EXECUTION = "15m"   # Entry / exit timing (optimized from 5m)
+TIMEFRAME_EXECUTION = "5m"    # Entry / exit timing
 TIMEFRAME_CONFIRMATION = "1h" # Trend confirmation
 TIMEFRAME_MACRO = "4h"        # Macro regime (legacy — replaced by Multi-TF HMM)
 
 # ─── Multi-Timeframe HMM (backtest-proven: +$2,421 PnL, PF 1.49) ────────────
 MULTI_TF_ENABLED = True               # Use 3 separate HMM brains per coin
-MULTI_TF_TIMEFRAMES = ["1d", "1h", "15m"]   # Daily (macro), Hourly (swing), 15min (momentum)
-MULTI_TF_CANDLE_LIMIT = 300           # Candles per TF (300d daily / 300h hourly / 75h 15min)
-MULTI_TF_WEIGHTS = {"1d": 20, "1h": 50, "15m": 30}  # Conviction weights (sum=100)
+MULTI_TF_TIMEFRAMES = ["1d", "1h", "5m"]   # Daily (macro), Hourly (swing), 5min (momentum)
+MULTI_TF_CANDLE_LIMIT = 300           # Candles per TF (300d daily / 300h hourly / 300 x 5min)
+MULTI_TF_WEIGHTS = {"1d": 20, "1h": 50, "5m": 30}  # Conviction weights (sum=100)
 MULTI_TF_MIN_AGREEMENT = 2            # Minimum TFs agreeing on direction (2 of 3)
 MULTI_TF_MIN_MODELS = 2               # Minimum trained models required
 
