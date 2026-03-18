@@ -8,8 +8,8 @@ import { Header } from '@/components/header';
 export function LiveClient() {
     const [selectedExchange, setSelectedExchange] = useState<'binance' | 'coindcx'>('binance');
     const [balance, setBalance] = useState<{ 
-        binance: number | null, binanceConnected: boolean,
-        coindcx: number | null, coindcxConnected: boolean 
+        binance: number | null, binanceConnected: boolean, binanceLabel: string | null,
+        coindcx: number | null, coindcxConnected: boolean, coindcxLabel: string | null 
     } | null>(null);
     const [engineState, setEngineState] = useState<any>(null);
     const [prismaActiveCount, setPrismaActiveCount] = useState<number>(0);
@@ -124,6 +124,7 @@ export function LiveClient() {
     const engineOnline = ['running', 'paused'].includes(engineState?.engine?.status);
     const isConnected = selectedExchange === 'binance' ? balance?.binanceConnected : balance?.coindcxConnected;
     const marginAmount = selectedExchange === 'binance' ? balance?.binance : balance?.coindcx;
+    const apiLabel = selectedExchange === 'binance' ? balance?.binanceLabel : balance?.coindcxLabel;
     
     // Drift calculation: compare Prisma ACTIVE trades vs Engine JSON active trades.
     // Sometimes engine JSON treats 'filtered' or others internally differently, but active_trades is accurate.
@@ -211,6 +212,15 @@ export function LiveClient() {
                                             ? `$${marginAmount?.toFixed(2) || '0.00'}` 
                                             : 'Not Connected'}
                                     </div>
+
+                                    {apiLabel && (
+                                        <div className="mt-4 pt-4 border-t border-[rgba(255,255,255,0.05)]">
+                                            <div className="text-[10px] text-[var(--color-text-muted)] uppercase tracking-wider mb-2">Sub-Account Profile</div>
+                                            <div className="text-xs font-bold text-[#E8EDF5] bg-black/40 inline-block px-3 py-1.5 rounded-md border border-[#00E5FF] shadow-[0_0_10px_rgba(0,229,255,0.1)]">
+                                                {apiLabel}
+                                            </div>
+                                        </div>
+                                    )}
                                 </div>
 
                                 <div className="p-4 rounded-xl" style={{ background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.05)' }}>

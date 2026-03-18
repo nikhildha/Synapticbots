@@ -161,10 +161,11 @@ function ExchangeBlock({ exchange, label, accentColor, placeholder }: {
   exchange: 'binance' | 'coindcx';
   label: string;
   accentColor: string;
-  placeholder: { key: string; secret: string };
+  placeholder: { key: string; secret: string; label: string };
 }) {
   const [apiKey, setApiKey] = useState('');
   const [apiSecret, setApiSecret] = useState('');
+  const [apiLabel, setApiLabel] = useState('');
   const [testing, setTesting] = useState(false);
   const [saving, setSaving] = useState(false);
   const [testResult, setTestResult] = useState<TestResult>(null);
@@ -180,6 +181,8 @@ function ExchangeBlock({ exchange, label, accentColor, placeholder }: {
         if (!d) { setSavedBalance(null); return; }
         const bal = exchange === 'binance' ? d.binance : d.coindcx;
         const connected = exchange === 'binance' ? d.binanceConnected : d.coindcxConnected;
+        const loadedLabel = exchange === 'binance' ? d.binanceLabel : d.coindcxLabel;
+        if (loadedLabel) setApiLabel(loadedLabel);
         setSavedBalance(bal);
         setSavedConnected(connected);
       })
@@ -223,7 +226,7 @@ function ExchangeBlock({ exchange, label, accentColor, placeholder }: {
       const res = await fetch('/api/settings/api-keys', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ exchange, apiKey, apiSecret }),
+        body: JSON.stringify({ exchange, apiKey, apiSecret, label: apiLabel }),
       });
       if (res.ok) {
         setSaveMsg({ ok: true, text: 'Saved! Balance updating…' });
@@ -237,6 +240,8 @@ function ExchangeBlock({ exchange, label, accentColor, placeholder }: {
             if (!d) { setSavedBalance(null); return; }
             const bal = exchange === 'binance' ? d.binance : d.coindcx;
             const connected = exchange === 'binance' ? d.binanceConnected : d.coindcxConnected;
+            const loadedLabel = exchange === 'binance' ? d.binanceLabel : d.coindcxLabel;
+            if (loadedLabel) setApiLabel(loadedLabel);
             setSavedBalance(bal);
             setSavedConnected(connected);
           })
@@ -320,6 +325,12 @@ function ExchangeBlock({ exchange, label, accentColor, placeholder }: {
             style={inputStyle} placeholder={placeholder.secret} />
         </Field>
       </Row2>
+      <div style={{ marginTop: '4px', marginBottom: '16px' }}>
+        <Field label="Sub-Account Label (Optional)" sub="(e.g. 'Main Trading', 'Hedge Fund Wallet')">
+          <input type="text" value={apiLabel} onChange={e => setApiLabel(e.target.value)}
+            style={inputStyle} placeholder={placeholder.label} />
+        </Field>
+      </div>
 
       {/* Action buttons */}
       <div style={{ display: 'flex', gap: '10px', alignItems: 'center', marginTop: '4px' }}>
@@ -415,13 +426,13 @@ export function SettingsClient() {
               exchange="binance"
               label="🔶 Binance Futures"
               accentColor="#F59E0B"
-              placeholder={{ key: 'Enter Binance API key', secret: 'Enter Binance API secret' }}
+              placeholder={{ key: 'Enter Binance API key', secret: 'Enter Binance API secret', label: 'Main Account' }}
             />
             <ExchangeBlock
               exchange="coindcx"
               label="🇮🇳 CoinDCX"
               accentColor="#0EA5E9"
-              placeholder={{ key: 'Enter CoinDCX API key', secret: 'Enter CoinDCX API secret' }}
+              placeholder={{ key: 'Enter CoinDCX API key', secret: 'Enter CoinDCX API secret', label: 'Secondary Wallet' }}
             />
             <div style={{ fontSize: '11px', color: '#6B7280', marginTop: '4px' }}>
               🔒 Keys are encrypted with AES-256-GCM before storage. Balances appear on your dashboard after saving.

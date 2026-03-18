@@ -118,7 +118,7 @@ export async function GET() {
         // Fetch stored exchange API keys for this user
         const keys = await prisma.exchangeApiKey.findMany({
             where: { userId, isActive: true },
-            select: { exchange: true, apiKey: true, apiSecret: true, encryptionIv: true },
+            select: { exchange: true, apiKey: true, apiSecret: true, encryptionIv: true, label: true } as any,
         });
 
         const binanceKey = keys.find(k => k.exchange === 'binance');
@@ -162,6 +162,8 @@ export async function GET() {
             coindcx: coindcxBalance,      // null = not connected
             binanceConnected: !!(binanceKey || binanceBalance !== null),
             coindcxConnected: !!(coindcxKey || coindcxBalance !== null),
+            binanceLabel: binanceKey?.label || null,
+            coindcxLabel: coindcxKey?.label || null
         });
     } catch (err) {
         console.error('[wallet-balance]', err);
