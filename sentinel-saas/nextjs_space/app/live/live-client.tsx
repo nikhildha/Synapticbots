@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Activity, ShieldAlert, Radio, RefreshCw, PowerOff, ShieldX, TerminalSquare, Zap, AlertTriangle, PauseCircle, PlayCircle } from 'lucide-react';
+import { Activity, ShieldAlert, Radio, RefreshCw, PowerOff, ShieldX, TerminalSquare, Zap, AlertTriangle, PauseCircle, PlayCircle, BarChart2 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { Header } from '@/components/header';
 
@@ -14,6 +14,7 @@ export function LiveClient() {
     const [engineState, setEngineState] = useState<any>(null);
     const [prismaActiveCount, setPrismaActiveCount] = useState<number>(0);
     const [pingHistory, setPingHistory] = useState<number[]>([]);
+    const [heatmap, setHeatmap] = useState<{ symbol: string; pnl: number }[]>([]);
     const [logs, setLogs] = useState<string[]>([]);
     const [loading, setLoading] = useState(true);
     const [syncing, setSyncing] = useState(false);
@@ -24,11 +25,12 @@ export function LiveClient() {
     const fetchData = async () => {
         const startTime = Date.now();
         try {
-            const [balRes, stateRes, logsRes, tradesRes] = await Promise.all([
+            const [balRes, stateRes, logsRes, tradesRes, heatRes] = await Promise.all([
                 fetch('/api/wallet-balance'),
                 fetch('/api/bot-state?mode=live'),
                 fetch('/api/engine-logs?mode=live&n=50'),
-                fetch('/api/trades')
+                fetch('/api/trades'),
+                fetch('/api/trades/heatmap')
             ]);
             
             const elapsed = Date.now() - startTime;
@@ -52,6 +54,10 @@ export function LiveClient() {
                     const activeDb = data.trades.filter((t: any) => t.status === 'ACTIVE').length;
                     setPrismaActiveCount(activeDb);
                 }
+            }
+            if (heatRes.ok) {
+                const data = await heatRes.json();
+                if (data.heatmap) setHeatmap(data.heatmap);
             }
         } catch (e) {
             console.error(e);
@@ -267,6 +273,46 @@ export function LiveClient() {
                                 }) : (
                                     <div className="flex items-center justify-center h-full text-[var(--color-text-muted)] italic">
                                         {loading ? 'Initializing uplink...' : 'Awaiting signals...'}
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+
+                        {/* 24h PnL Heatmap */}
+                        <div style={{
+                            background: 'linear-gradient(145deg, rgba(8,12,20,0.9) 0%, rgba(5,7,12,0.95) 100%)',
+                            backdropFilter: 'blur(30px)',
+                            border: '1px solid rgba(0,229,255,0.15)',
+                            borderRadius: '20px',
+                            padding: '24px',
+                            boxShadow: 'inset 0 0 0 1px rgba(255,255,255,0.02)'
+                        }}>
+                            <h2 className="text-xl font-bold flex items-center gap-2 text-[#E8EDF5] border-b border-[rgba(0,229,255,0.1)] pb-4 mb-4">
+                                <BarChart2 size={20} color="#00E5FF" /> 24h Realized PnL Heatmap
+                            </h2>
+                            <div className="flex flex-wrap gap-2">
+                                {heatmap.length > 0 ? heatmap.map((entry, i) => {
+                                    const isWin = entry.pnl > 0;
+                                    const intensity = Math.min(1, Math.abs(entry.pnl) / 50); // scales color intensity up to $50
+                                    // Base color
+                                    const color = isWin ? `rgba(0, 255, 136, ${0.2 + (intensity * 0.8)})` : `rgba(255, 59, 92, ${0.2 + (intensity * 0.8)})`;
+                                    const border = isWin ? '#00FF88' : '#FF3B5C';
+                                    
+                                    return (
+                                        <div 
+                                            key={i} 
+                                            className="px-3 py-2 rounded-lg border text-center min-w-[80px]"
+                                            style={{ backgroundColor: color, borderColor: border }}
+                                        >
+                                            <div className="text-[10px] font-bold text-white uppercase tracking-wider mb-1">{entry.symbol.replace('USDT', '')}</div>
+                                            <div className="text-sm font-mono text-white text-shadow-sm font-bold">
+                                                {isWin ? '+' : ''}${entry.pnl.toFixed(2)}
+                                            </div>
+                                        </div>
+                                    );
+                                }) : (
+                                    <div className="text-sm text-[var(--color-text-muted)] italic py-4">
+                                        No closed trades in the last 24 hours. Awaiting opportunities...
                                     </div>
                                 )}
                             </div>
