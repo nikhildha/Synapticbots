@@ -166,12 +166,16 @@ class ExecutionEngine:
         from data_pipeline import get_current_price
         current_price = get_current_price(symbol) or 0
         
+        # Max Slippage Guard
+        max_slippage = getattr(config, 'MAX_SLIPPAGE_PCT', 0.5) / 100.0
+        limit_price = current_price * (1 + max_slippage) if side.upper() == 'BUY' else current_price * (1 - max_slippage)
+        
         sl, tp, rm_id = self.risk.calculate_optimal_stops(symbol, current_price, atr, side, leverage, swing_l, swing_h)
 
         result = client.open_position(
             symbol=symbol, side=side, quantity=quantity,
             leverage=leverage, sl_price=sl, tp_price=tp,
-            order_type="MARKET", limit_price=None
+            order_type="LIMIT", limit_price=limit_price
         )
 
         if result.get("status") in ("FILLED", "OPEN"):
@@ -196,8 +200,8 @@ class ExecutionEngine:
                 "mode":         "LIVE-BINANCE",
                 "exchange":     "binance",
                 "order_id":     result.get("order_id"),
-                "order_type":   "MARKET",
-                "status":       "FILLED",
+                "order_type":   "LIMIT",
+                "status":       result.get("status", "OPEN"),
                 "created_at":   time.time(),
             }
             self._log_trade(log_entry)
@@ -400,9 +404,14 @@ class ExecutionEngine:
             sl = self._cdx_price_round(sl)
             tp = self._cdx_price_round(tp)
 
+            # Max Slippage Guard
+            max_slippage = getattr(config, 'MAX_SLIPPAGE_PCT', 0.5) / 100.0
+            limit_price = price * (1 + max_slippage) if side.upper() == 'BUY' else price * (1 - max_slippage)
+            limit_price = self._cdx_price_round(limit_price)
+
             result = self._place_cdx_order_with_retry(
                 symbol, pair, side, quantity, leverage, price, sl, tp, wallet, cdx,
-                order_type="market_order", limit_price=None
+                order_type="limit_order", limit_price=limit_price
             )
             if result is None:
                 return None
@@ -442,7 +451,7 @@ class ExecutionEngine:
                 "pair":         pair,
                 "position_id":  confirmed.get("position_id"),
                 "order_result": str(result),
-                "order_type":   "MARKET",
+                "order_type":   "LIMIT",
                 "status":       "FILLED",
                 "created_at":   time.time(),
             }
