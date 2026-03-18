@@ -103,13 +103,12 @@ export function BotsClient({ bots: initialBots }: BotsClientProps) {
       let deployments: any[] = [];
       
       if (deployType === 'adaptive') {
-        deployments.push({ name: 'Synaptic Adaptive — ALL', segment: 'ALL', coinList: [] });
+        deployments.push({ name: 'ALL', segment: 'ALL', coinList: [] });
       } else if (deployType === 'segments') {
         if (selectedSegments.length === 0) { alert('Please select at least one segment.'); return; }
         selectedSegments.forEach(segId => {
-          const segData = SEGMENT_KNOWLEDGE.find(s => s.id === segId);
           deployments.push({ 
-            name: `${segData?.name || segId} Specialist`, 
+            name: segId,
             segment: segId, 
             coinList: [] 
           });
@@ -117,7 +116,7 @@ export function BotsClient({ bots: initialBots }: BotsClientProps) {
       } else if (deployType === 'coins') {
         if (selectedCoins.length === 0) { alert('Please select at least one coin.'); return; }
         deployments.push({
-          name: 'Custom Portfolio',
+          name: 'Custom',
           segment: 'CUSTOM',
           coinList: selectedCoins
         });
