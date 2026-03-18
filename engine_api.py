@@ -1219,9 +1219,15 @@ def api_force_signal():
 
 @app.route("/api/broadcast-log", methods=["GET"])
 def api_broadcast_log():
-    """Return last N lines of signal_broadcast.log as structured JSON."""
+    """Return last N lines of signal_broadcast.log as structured JSON.
+    Supports optional ?bot_ids=id1,id2,... to filter to specific bots only (user-scoping).
+    """
     try:
         n = min(int(request.args.get("n", 100)), 500)
+        # Optional comma-separated bot ID filter for user scoping
+        bot_ids_raw = request.args.get("bot_ids", "")
+        allowed_bot_ids = set(bid.strip() for bid in bot_ids_raw.split(",") if bid.strip()) if bot_ids_raw else None
+
         log_path = os.path.join(config.DATA_DIR, "signal_broadcast.log")
         if not os.path.exists(log_path):
             return jsonify({"lines": [], "total": 0, "message": "No broadcast log yet — engine hasn't completed a cycle"})
@@ -1229,46 +1235,54 @@ def api_broadcast_log():
         with open(log_path, "r", encoding="utf-8") as f:
             raw_lines = f.readlines()
 
-        # Take last N lines
-        tail = raw_lines[-n:] if len(raw_lines) > n else raw_lines
+        # Take last N*3 lines to have enough candidate lines before filtering
+        candidate_count = n * 3 if allowed_bot_ids else n
+        tail = raw_lines[-candidate_count:] if len(raw_lines) > candidate_count else raw_lines
+
+        def _val(parts, prefix):
+            for p in parts:
+                if p.strip().startswith(prefix):
+                    return p.strip()[len(prefix):].strip()
+            return ""
+
         parsed = []
         for line in tail:
             line = line.strip()
             if not line:
                 continue
-            # Try to parse the structured format:
-            # "2026-03-14T08:00:00 | cycle=1    | SIGNAL_DISPATCH       | bot=... | ..."
             entry = {"raw": line}
             try:
                 parts = [p.strip() for p in line.split("|")]
                 if len(parts) >= 7:
                     entry["timestamp"] = parts[0].strip()
-                    def _val(s, prefix):
-                        for p in parts:
-                            if p.startswith(prefix):
-                                return p[len(prefix):].strip()
-                        return ""
-                    entry["cycle"]   = _val(line.split("|"), "cycle=").split()[0] if "cycle=" in line else ""
+                    entry["cycle"]   = _val(parts, "cycle=").split()[0] if "cycle=" in line else ""
                     entry["event"]   = parts[2].strip() if len(parts) > 2 else ""
-                    entry["bot"]     = _val(line.split("|"), "bot=")
-                    entry["bot_id"]  = _val(line.split("|"), "id=")
-                    entry["symbol"]  = _val(line.split("|"), "sym=")
-                    entry["side"]    = _val(line.split("|"), "side=")
-                    entry["segment"] = _val(line.split("|"), "seg=")
-                    entry["conf"]    = _val(line.split("|"), "conf=")
-                    # Last pipe-separated part is "detail"
+                    entry["bot"]     = _val(parts, "bot=")
+                    entry["bot_id"]  = _val(parts, "id=")
+                    entry["symbol"]  = _val(parts, "sym=")
+                    entry["side"]    = _val(parts, "side=")
+                    entry["segment"] = _val(parts, "seg=")
+                    entry["conf"]    = _val(parts, "conf=")
                     entry["detail"]  = parts[-1].strip()
+
+                    # Apply bot_id filter — skip lines that don't match allowed bots
+                    if allowed_bot_ids and entry["bot_id"] and entry["bot_id"] not in allowed_bot_ids:
+                        continue
             except Exception:
                 pass
             parsed.append(entry)
+            if len(parsed) >= n:
+                break
 
         return jsonify({
             "lines": list(reversed(parsed)),  # newest first
             "total": len(raw_lines),
             "showing": len(parsed),
+            "filtered_by_bots": len(allowed_bot_ids) if allowed_bot_ids else None,
         })
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
 
 
 @app.route("/api/restart", methods=["POST"])

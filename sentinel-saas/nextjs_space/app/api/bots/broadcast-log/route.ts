@@ -8,8 +8,8 @@ export const dynamic = 'force-dynamic';
 
 /**
  * GET /api/bots/broadcast-log?n=100&mode=live|paper
- * Proxies /api/broadcast-log from the correct engine based on user's active bot mode.
- * Returns last N signal broadcast events parsed into structured JSON.
+ * Proxies /api/broadcast-log from the correct engine, filtered to this user's bot IDs only.
+ * Prevents cross-user Athena cards from appearing on other users' dashboards.
  */
 export async function GET(request: NextRequest) {
     try {
@@ -22,21 +22,23 @@ export async function GET(request: NextRequest) {
         const { searchParams } = new URL(request.url);
         const n = Math.min(parseInt(searchParams.get('n') || '100'), 500);
 
-        // Determine which engine to query based on caller's active bots
+        // Fetch user's bot IDs and determine mode
         let mode: 'live' | 'paper' = searchParams.get('mode') === 'live' ? 'live' : 'paper';
+        let botIds: string[] = [];
+
         if (userId) {
             const userBots = await prisma.bot.findMany({
-                where: { userId, isActive: true },
-                select: { config: true },
+                where: { userId },
+                select: { id: true, isActive: true, config: true },
             });
+            botIds = userBots.map((b: any) => b.id);
             const hasLiveBot = userBots.some(
-                (b: any) => (b.config?.mode || '').toLowerCase().includes('live')
+                (b: any) => b.isActive && (b.config?.mode || '').toLowerCase().includes('live')
             );
             if (hasLiveBot) mode = 'live';
         }
 
         const engineUrl = getEngineUrl(mode);
-
         if (!engineUrl) {
             return NextResponse.json({ error: 'Engine URL not configured', lines: [] });
         }
@@ -45,7 +47,9 @@ export async function GET(request: NextRequest) {
         const headers: Record<string, string> = { 'Content-Type': 'application/json' };
         if (secret) headers['Authorization'] = `Bearer ${secret}`;
 
-        const res = await fetch(`${engineUrl}/api/broadcast-log?n=${n}`, {
+        // Pass bot_ids as comma-separated filter — engine only returns events for these bots
+        const botIdsParam = botIds.length > 0 ? `&bot_ids=${encodeURIComponent(botIds.join(','))}` : '';
+        const res = await fetch(`${engineUrl}/api/broadcast-log?n=${n}${botIdsParam}`, {
             headers,
             signal: AbortSignal.timeout(5000),
         });

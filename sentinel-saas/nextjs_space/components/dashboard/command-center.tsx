@@ -739,14 +739,16 @@ export function SignalSummaryTable({ coinStates, multi, heatmap: heatmapProp, bo
         if (a.includes('ELIGIBLE')) return `${r} @ ${pct.toFixed(0)}% — trade ready`;
         if (a.includes('CRASH_SKIP') || a.includes('MACRO_CRASH')) return 'Crash regime — safety skip';
         if (a.includes('WEEKEND') || a.includes('WEEK_SKIP')) return 'Weekend — skipped';
-        if (a.includes('MTF_CONFLICT')) return 'Volatile (Multi-TF)';
+        if (a.includes('MTF_CONFLICT') || a.includes('MTF_NO_CONSENSUS') || a.includes('NO_CONSENSUS')) return 'No HMM consensus across timeframes';
         if (a.includes('15M_FILTER')) return '15m momentum opposes direction';
         if (a.includes('SENTIMENT_VETO') || a.includes('SENTIMENT_ALERT')) return 'Sentiment filter — vetoed';
         if (a.includes('CHOP_NO_SIGNAL')) return 'Sideways — no mean-rev signal';
         if (a.includes('MEAN_REV')) return 'Mean-reversion in choppy market';
-        if (a.includes('LOW_CONVICTION')) return 'Conviction too low';
+        if (a.includes('LOW_CONVICTION') || (pct === 0 && !a)) return 'Conviction too low';
         if (a.includes('VOL_TOO_HIGH')) return 'ATR too high — risky';
         if (a.includes('VOL_TOO_LOW')) return 'ATR too low — no opportunity';
+        // 0.0% confidence with no known code → HMM model couldn't converge on a state
+        if (pct === 0) return 'No HMM consensus across timeframes';
         // Fallback: show the raw action code so users can see the actual engine reason
         return a ? a.replace(/_/g, ' ').toLowerCase().replace(/\b\w/g, (c: string) => c.toUpperCase()) : 'Analyzing market conditions...';
     };
@@ -758,7 +760,7 @@ export function SignalSummaryTable({ coinStates, multi, heatmap: heatmapProp, bo
             {/* Header */}
             <div style={{ marginBottom: '16px' }}>
                 <h2 style={{ fontSize: 20, fontWeight: 800, color: '#00E5FF', margin: 0, textShadow: '0 0 12px rgba(0,229,255,0.3)' }}>Bot Scan Summary <span style={{ fontSize: 13, fontWeight: 600, color: 'rgba(0,229,255,0.4)', fontFamily: 'var(--font-mono, monospace)' }}>· Cycle #{liveMulti?.cycle || 0}</span></h2>
-                <p style={{ fontSize: 12, color: 'rgba(0,229,255,0.25)', marginTop: 4, fontFamily: 'var(--font-mono, monospace)' }}>Synaptic Adaptive · Auto-refreshes every {Math.round(refreshMs / 1000)}s</p>
+                <p style={{ fontSize: 12, color: 'rgba(0,229,255,0.25)', marginTop: 4, fontFamily: 'var(--font-mono, monospace)' }}>Synaptic Adaptive · Auto-refreshes every {Math.round(refreshMs / 1000)}s · <span style={{ color: 'rgba(255,255,255,0.2)' }}>showing current batch slice</span></p>
             </div>
 
             {/* Stats Bar */}
