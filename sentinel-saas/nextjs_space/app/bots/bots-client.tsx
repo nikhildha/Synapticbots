@@ -19,6 +19,9 @@ export function BotsClient({ bots: initialBots }: BotsClientProps) {
   const [showDeployModal, setShowDeployModal] = useState(false);
   const [bots, setBots] = useState(initialBots);
   const [loading, setLoading] = useState(false);
+  const [stopAllLoading, setStopAllLoading] = useState(false);
+  const [deleteAllLoading, setDeleteAllLoading] = useState(false);
+  const [deleteAllConfirm, setDeleteAllConfirm] = useState(false);
 
   /* ── Live state ── */
   const [liveTradeCount, setLiveTradeCount] = useState(0);
@@ -152,6 +155,27 @@ export function BotsClient({ bots: initialBots }: BotsClientProps) {
     } catch { alert('Failed to delete bot. Please try again.'); }
   };
 
+  const handleStopAll = async () => {
+    setStopAllLoading(true);
+    try {
+      const res = await fetch('/api/bots/stop-all', { method: 'POST' });
+      if (res.ok) window.location.reload();
+      else { const d = await res.json(); alert(d.error || 'Failed to stop bots'); }
+    } catch { alert('Failed to stop all bots'); }
+    finally { setStopAllLoading(false); }
+  };
+
+  const handleDeleteAll = async () => {
+    if (!deleteAllConfirm) { setDeleteAllConfirm(true); setTimeout(() => setDeleteAllConfirm(false), 4000); return; }
+    setDeleteAllLoading(true);
+    try {
+      const res = await fetch('/api/bots/delete-all', { method: 'POST' });
+      if (res.ok) { setDeleteAllConfirm(false); window.location.reload(); }
+      else { const d = await res.json(); alert(d.error || 'Failed to delete bots'); }
+    } catch { alert('Failed to delete all bots'); }
+    finally { setDeleteAllLoading(false); setDeleteAllConfirm(false); }
+  };
+
   const activeBots = bots.filter((b: any) => b?.status !== 'retired');
   const runningBots = activeBots.filter((b: any) => b?.isActive);
   const signFmt = (n: number) => (n >= 0 ? '+' : '') + n.toFixed(2);
@@ -210,9 +234,21 @@ export function BotsClient({ bots: initialBots }: BotsClientProps) {
                   Deploy, monitor &amp; manage your automated trading bots
                 </p>
               </div>
-              <button onClick={() => setShowDeployModal(true)} className="btn-success" style={{ fontSize: 'var(--text-base)', padding: '11px 22px' }}>
-                <Rocket style={{ width: 16, height: 16 }} /> Deploy Launchpad
-              </button>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                {runningBots.length > 0 && (
+                  <button onClick={handleStopAll} disabled={stopAllLoading} className="btn-ghost" style={{ fontSize: 'var(--text-sm)', padding: '10px 16px', color: '#F59E0B', border: '1px solid rgba(245,158,11,0.3)', opacity: stopAllLoading ? 0.6 : 1 }}>
+                    {stopAllLoading ? 'Stopping…' : '⏹ Stop All'}
+                  </button>
+                )}
+                {activeBots.length > 0 && (
+                  <button onClick={handleDeleteAll} disabled={deleteAllLoading} className="btn-ghost" style={{ fontSize: 'var(--text-sm)', padding: '10px 16px', color: deleteAllConfirm ? '#F87171' : '#EF4444', border: `1px solid ${deleteAllConfirm ? 'rgba(248,113,113,0.5)' : 'rgba(239,68,68,0.25)'}`, opacity: deleteAllLoading ? 0.6 : 1, transition: 'all 0.2s' }}>
+                    {deleteAllLoading ? 'Deleting…' : deleteAllConfirm ? '⚠️ Confirm Delete All' : '🗑 Delete All'}
+                  </button>
+                )}
+                <button onClick={() => setShowDeployModal(true)} className="btn-success" style={{ fontSize: 'var(--text-base)', padding: '11px 22px' }}>
+                  <Rocket style={{ width: 16, height: 16 }} /> Deploy Launchpad
+                </button>
+              </div>
             </div>
           </motion.div>
 
