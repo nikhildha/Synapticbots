@@ -701,8 +701,8 @@ export function SignalSummaryTable({ coinStates, multi, heatmap: heatmapProp, bo
         const ae = (a.action || '').includes('ELIGIBLE') ? 1 : 0;
         const be = (b.action || '').includes('ELIGIBLE') ? 1 : 0;
         if (ae !== be) return be - ae;
-        const ac = a.confidence != null ? (a.confidence <= 1 ? a.confidence * 100 : a.confidence) : 0;
-        const bc = b.confidence != null ? (b.confidence <= 1 ? b.confidence * 100 : b.confidence) : 0;
+        const ac = a.conviction != null ? Number(a.conviction) : (a.confidence != null ? (a.confidence <= 1 ? a.confidence * 100 : a.confidence) : 0);
+        const bc = b.conviction != null ? Number(b.conviction) : (b.confidence != null ? (b.confidence <= 1 ? b.confidence * 100 : b.confidence) : 0);
         return bc - ac;
     });
 
@@ -731,12 +731,13 @@ export function SignalSummaryTable({ coinStates, multi, heatmap: heatmapProp, bo
     const getReason = (c: any) => {
         const ds = (botId && c.bot_deploy_statuses?.[botId]) || c.deploy_status || '';
         const a = ds || c.action || '', r = c.regime || '';
-        const pct = c.confidence != null ? (c.confidence <= 1 ? c.confidence * 100 : c.confidence) : 0;
+        // Use conviction (post 8-factor score, 0-100) if available, fallback to raw HMM confidence
+        const pct = c.conviction != null ? Number(c.conviction) : (c.confidence != null ? (c.confidence <= 1 ? c.confidence * 100 : c.confidence) : 0);
         // If coin was eligible but filtered in deploy phase, show the deploy filter reason
         if (ds.startsWith('FILTERED')) return ds.replace('FILTERED: ', '').charAt(0).toUpperCase() + ds.replace('FILTERED: ', '').slice(1);
-        if (a.includes('ELIGIBLE_BUY')) return `Bullish @ ${pct.toFixed(0)}% — LONG ready`;
-        if (a.includes('ELIGIBLE_SELL')) return `Bearish @ ${pct.toFixed(0)}% — SHORT ready`;
-        if (a.includes('ELIGIBLE')) return `${r} @ ${pct.toFixed(0)}% — trade ready`;
+        if (a.includes('ELIGIBLE_BUY')) return `Bullish @ ${pct.toFixed(0)} conv — LONG ready`;
+        if (a.includes('ELIGIBLE_SELL')) return `Bearish @ ${pct.toFixed(0)} conv — SHORT ready`;
+        if (a.includes('ELIGIBLE')) return `${r} @ ${pct.toFixed(0)} conv — trade ready`;
         if (a.includes('CRASH_SKIP') || a.includes('MACRO_CRASH')) return 'Crash regime — safety skip';
         if (a.includes('WEEKEND') || a.includes('WEEK_SKIP')) return 'Weekend — skipped';
         if (a.includes('MTF_CONFLICT') || a.includes('MTF_NO_CONSENSUS') || a.includes('NO_CONSENSUS')) return 'No HMM consensus across timeframes';
@@ -887,7 +888,7 @@ export function SignalSummaryTable({ coinStates, multi, heatmap: heatmapProp, bo
                     <table style={{ width: '100%', minWidth: '900px', borderCollapse: 'collapse', fontSize: '14px' }}>
                         <thead>
                             <tr style={{ borderBottom: '2px solid rgba(255,255,255,0.08)' }}>
-                                {['#', 'Coin', 'Segment', 'Regime', 'Conf %', 'Deploy', 'Reason', 'Cycle #', 'Scan Time'].map(h => (
+                                {['#', 'Coin', 'Segment', 'Regime', 'Conv %', 'Deploy', 'Reason', 'Cycle #', 'Scan Time'].map(h => (
                                     <th key={h} style={{ padding: '10px 8px', textAlign: h === '#' || h === 'Coin' || h === 'Reason' ? 'left' : 'center', fontSize: '9px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '1px', color: '#4B5563', position: 'sticky' as const, top: 0, background: 'var(--color-surface, rgba(17,24,39,0.98))' }}>{h}</th>
                                 ))}
                             </tr>
@@ -895,7 +896,7 @@ export function SignalSummaryTable({ coinStates, multi, heatmap: heatmapProp, bo
                         <tbody>
                             {sorted.map((c: any, idx: number) => {
                                 const regime = c.regime || 'WAITING';
-                                const conf = c.confidence != null ? (c.confidence <= 1 ? c.confidence * 100 : c.confidence) : 0;
+                                const conf = c.conviction != null ? Number(c.conviction) : (c.confidence != null ? (c.confidence <= 1 ? c.confidence * 100 : c.confidence) : 0);
                                 const action = (c.action || '').replace(/_/g, ' ');
                                 const as = actStyle(action);
                                 const isE = action.includes('ELIGIBLE');
