@@ -269,10 +269,7 @@ LLM_CONFIDENCE_WEIGHT       = 0.20                        # LLM can adjust convi
 LLM_MAX_CALLS_PER_CYCLE     = 10                          # Rate limit: max N Athena calls per cycle (fail-closed when exceeded)
 LLM_LOG_FILE                = os.path.join(DATA_DIR, "athena_decisions.json")
 
-# ─── Coin Tiers (from experiment_3state_calibration.py evaluation) ────────────
-COIN_TIER_FILE = os.path.join(DATA_DIR, "coin_tiers.csv")  # Tier A/B/C classification
-TIER_RECLASSIFY_DAYS = 7                                    # Re-run calibration every N days
-TIER_RECLASSIFY_STATE_FILE = os.path.join(DATA_DIR, "tier_reclassify_state.json")
+
 
 # ─── Order Flow Engine ────────────────────────────────────────────────────────
 ORDERFLOW_ENABLED          = False     # DISABLED — reduces memory + API calls

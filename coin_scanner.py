@@ -82,49 +82,6 @@ def get_all_exclusions() -> set:
     return COIN_EXCLUDE | _dynamic_exclusions
 
 
-# ─── Coin tier cache (loaded once from data/coin_tiers.csv) ──────────────────
-_coin_tiers: dict = {}   # symbol → {"tier": "A"|"B"|"C", "pattern": str}
-
-def _load_coin_tiers():
-    """Load coin tier classifications from disk (Tier A/B/C from calibration experiment)."""
-    global _coin_tiers
-    if _coin_tiers or not os.path.exists(config.COIN_TIER_FILE):
-        return
-    try:
-        df = pd.read_csv(config.COIN_TIER_FILE)
-        for _, row in df.iterrows():
-            _coin_tiers[row["symbol"]] = {
-                "tier":    row.get("tier", "B"),
-                "pattern": row.get("pattern", "RANDOM"),
-            }
-        logger.info("Loaded coin tiers: %d Tier A, %d Tier B, %d Tier C.",
-                    sum(1 for v in _coin_tiers.values() if v["tier"] == "A"),
-                    sum(1 for v in _coin_tiers.values() if v["tier"] == "B"),
-                    sum(1 for v in _coin_tiers.values() if v["tier"] == "C"))
-    except Exception as e:
-        logger.warning("Could not load coin tiers from %s: %s", config.COIN_TIER_FILE, e)
-
-
-def reload_coin_tiers():
-    """Force-reload coin tiers from disk (clears cache first). Called after weekly reclassify."""
-    global _coin_tiers
-    _coin_tiers = {}
-    _load_coin_tiers()
-    logger.info("Coin tiers reloaded from disk.")
-
-
-def get_tier_a_whitelist() -> list:
-    """Return list of Tier A symbols (stable forward Sharpe ≥ 1.0)."""
-    _load_coin_tiers()
-    return [sym for sym, info in _coin_tiers.items() if info["tier"] == "A"]
-
-
-def get_coin_tier(symbol: str) -> str:
-    """Return 'A', 'B', or 'C' tier for a symbol. Returns 'B' if unknown."""
-    _load_coin_tiers()
-    return _coin_tiers.get(symbol, {}).get("tier", "B")
-
-
 ROTATION_STATE_FILE = os.path.join(config.DATA_DIR, "segment_rotation.json")
 
 def _load_rotation_state():
@@ -378,7 +335,6 @@ def _get_segment_coins_coindcx(segment_coins, limit=5):
     return [sym for sym, vol in scored[:limit]]
 
 def update_hourly_shortlist(limit=2):
-    _load_coin_tiers()
     logger.info("🔄 Running hourly master shortlist for all segments...")
     master_shortlist = {}
     
@@ -388,16 +344,6 @@ def update_hourly_shortlist(limit=2):
         else:
             selected_coins = _get_segment_coins_coindcx(candidate_coins, limit=limit * 2)
             
-        if _coin_tiers:
-            tier_c = {s for s, info in _coin_tiers.items() if info["tier"] == "C"}
-            selected_coins = [s for s in selected_coins if s not in tier_c]
-            
-            tier_a = {s for s, info in _coin_tiers.items() if info["tier"] == "A"}
-            selected_coins = (
-                [s for s in selected_coins if s in tier_a] +
-                [s for s in selected_coins if s not in tier_a]
-            )
-
         selected_coins = selected_coins[:limit]
         if not selected_coins:
             logger.warning("No valid coins found for segment %s.", segment)
@@ -503,7 +449,6 @@ def scan_all_regimes(symbols=None, limit=None, timeframe="1h", kline_limit=500):
                 "confidence": round(conf, 4),
                 "price":      round(float(df["close"].iloc[-1]), 4),
                 "volume_24h": round(float(df["volume"].sum()), 2),
-                "tier":       get_coin_tier(symbol),
                 "timestamp":  datetime.utcnow().isoformat(),
             })
 
