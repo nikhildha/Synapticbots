@@ -29,6 +29,7 @@ import orderflow_engine as _of_mod
 import coindcx_client as cdx
 from llm_reasoning import AthenaEngine
 from price_stream import get_price_stream, shutdown_price_stream
+from segment_features import get_segment_for_coin  # promoted from inline import — needed at line ~1350
 # ─── Logging Setup ───────────────────────────────────────────────────────────────
 logging.basicConfig(
     level=logging.INFO,
@@ -1339,14 +1340,15 @@ class RegimeMasterBot:
                 pass
 
         self._coin_states[symbol] = {
-            "symbol": symbol,
-            "regime": regime_name,
-            "confidence": round(conf, 4),
-            "price": current_price,
-            "action": "ANALYZING",
+            "symbol":       symbol,
+            "regime":       regime_name,
+            "confidence":   round(conf, 4),
+            "price":        current_price,
+            "action":       "ANALYZING",
             "macro_regime": macro_regime_name,
-            "features": _features,
-            "volume_24h": _volume_24h,
+            "features":     _features,
+            "volume_24h":   _volume_24h,
+            "segment":      get_segment_for_coin(symbol),   # ← was missing: shortlist card shows '—' without this
         }
 
         # ── Multi-Timeframe TA (1h / 15m / 5m) ──
