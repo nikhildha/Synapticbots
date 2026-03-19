@@ -196,6 +196,115 @@ def get_hottest_segments(segment_limit=2):
         
     return [seg["segment"] for seg in segment_data[:segment_limit]]
 
+
+def get_segment_pools_for_regime(short_n=None, long_n=None):
+    """
+    3-Mode Macro-Regime-Aware Segment Selection.
+
+    Detects the current market mode from the segment heatmap and returns
+    two directional coin pools:
+
+      BEARISH mode (deep negative breadth):
+        short_pool = worst N segments (highest bearish momentum)
+        long_pool  = [] (no LONG candidates — avoid fighting the trend)
+
+      BULLISH mode (strong positive breadth):
+        short_pool = [] (no SHORT candidates)
+        long_pool  = best N segments (highest bullish momentum)
+
+      MIXED mode (pullbacks, rotation, choppy transitions):
+        short_pool = worst N segments
+        long_pool  = best N segments  (both directions eligible)
+
+    Returns
+    -------
+    market_mode : str          — "BEARISH", "BULLISH", or "MIXED"
+    short_pool  : list[str]    — segment names for SHORT candidates
+    long_pool   : list[str]    — segment names for LONG candidates
+    """
+    short_n = short_n or getattr(config, "SEGMENT_SHORT_POOL_SIZE", 2)
+    long_n  = long_n  or getattr(config, "SEGMENT_LONG_POOL_SIZE",  2)
+    bearish_threshold = getattr(config, "SEGMENT_BEARISH_THRESHOLD", -2.0)
+    bullish_threshold = getattr(config, "SEGMENT_BULLISH_THRESHOLD",  1.0)
+
+    # ── Fetch tickers (single API call, shared with get_hottest_segments) ──
+    try:
+        client = _get_binance_client()
+        tickers = client.get_ticker()
+        ticker_map = {t["symbol"]: t for t in tickers}
+    except Exception as e:
+        logger.error("Segment pool fetch failed: %s — defaulting to MIXED mode (all segs)", e)
+        all_segs = list(config.CRYPTO_SEGMENTS.keys())
+        return "MIXED", all_segs[:short_n], all_segs[-long_n:]
+
+    btc_return = 0.0
+    if "BTCUSDT" in ticker_map:
+        try:
+            btc_return = float(ticker_map["BTCUSDT"]["priceChangePercent"])
+        except Exception:
+            pass
+
+    segment_data = []
+    for segment, coins in config.CRYPTO_SEGMENTS.items():
+        valid_coins = []
+        for symbol in coins:
+            t = ticker_map.get(symbol)
+            if t:
+                try:
+                    change = float(t["priceChangePercent"])
+                    volume = float(t.get("quoteVolume", 0))
+                    valid_coins.append({"symbol": symbol, "change": change, "volume": volume})
+                except (ValueError, TypeError):
+                    pass
+        if not valid_coins:
+            continue
+        total_vol = sum(c["volume"] for c in valid_coins)
+        vw_rr = sum(c["change"] * (c["volume"] / total_vol) for c in valid_coins) if total_vol > 0 else 0.0
+        if vw_rr >= 0:
+            participating = sum(1 for c in valid_coins if c["change"] > 0)
+        else:
+            participating = sum(1 for c in valid_coins if c["change"] < 0)
+        breadth_pct = (participating / len(valid_coins)) * 100 if valid_coins else 0.0
+        composite_score = vw_rr * (breadth_pct / 100.0)
+        segment_data.append({
+            "segment": segment,
+            "composite_score": composite_score,
+        })
+
+    if not segment_data:
+        all_segs = list(config.CRYPTO_SEGMENTS.keys())
+        return "MIXED", all_segs[:short_n], all_segs[-long_n:]
+
+    # ── Market mode detection ──────────────────────────────────────────────
+    scores = [s["composite_score"] for s in segment_data]
+    avg_score = sum(scores) / len(scores)
+    positive_count = sum(1 for s in scores if s > 0)
+    bullish_breadth = positive_count / len(scores)  # fraction of green segments
+
+    if avg_score < bearish_threshold and bullish_breadth < 0.25:
+        market_mode = "BEARISH"
+    elif avg_score > bullish_threshold and bullish_breadth > 0.75:
+        market_mode = "BULLISH"
+    else:
+        market_mode = "MIXED"
+
+    # ── Build directional pools ────────────────────────────────────────────
+    sorted_asc  = sorted(segment_data, key=lambda s: s["composite_score"])        # worst first
+    sorted_desc = sorted(segment_data, key=lambda s: s["composite_score"], reverse=True)  # best first
+
+    short_pool = [s["segment"] for s in sorted_asc[:short_n]]  if market_mode != "BULLISH" else []
+    long_pool  = [s["segment"] for s in sorted_desc[:long_n]]  if market_mode != "BEARISH" else []
+
+    logger.info(
+        "📊 Market Mode: %s (avg_score=%.2f, green_breadth=%.0f%%) | "
+        "SHORT pool: %s | LONG pool: %s",
+        market_mode, avg_score, bullish_breadth * 100,
+        short_pool or "none", long_pool or "none",
+    )
+    return market_mode, short_pool, long_pool
+
+
+
 def get_active_bot_segment_pool(active_bots):
     """
     Builds the coin scan pool based on the segment_filter of all active bots.

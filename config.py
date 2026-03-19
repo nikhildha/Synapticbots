@@ -224,7 +224,17 @@ MULTI_COIN_MODE = True          # Enable multi-coin scanning
 # ─── Dynamic Segment Scanner ─────────────────────────────────────────────────────
 SCANNER_SEGMENT_ROTATION = True     # Rotate market segments every hour
 SCANNER_COINS_PER_SEGMENT = 5       # Scan top 5 highest-volume coins within the active segment
-SEGMENT_SCAN_LIMIT = 2              # Focus on the Top 2 hottest segments
+SEGMENT_SCAN_LIMIT = 2              # Legacy: kept for get_hottest_segments() backwards compat
+
+# ── 3-Mode Macro-Regime-Aware Segment Selection ──────────────────────────────
+# The engine detects market mode each cycle and picks segment pools accordingly:
+#   BEARISH: avg segment score < BEARISH_THRESHOLD and < 25% segments green → SHORT pool only
+#   BULLISH: avg segment score > BULLISH_THRESHOLD and > 75% segments green  → LONG pool only
+#   MIXED:   everything in between (pullbacks, rotation, chop)                → both pools
+SEGMENT_BEARISH_THRESHOLD = -2.0    # avg composite score below this → BEARISH mode
+SEGMENT_BULLISH_THRESHOLD =  1.0    # avg composite score above this → BULLISH mode
+SEGMENT_SHORT_POOL_SIZE   = 2       # N worst segments used in BEARISH / MIXED mode
+SEGMENT_LONG_POOL_SIZE    = 2       # N best segments used in BULLISH / MIXED mode
 MAX_ACTIVE_PER_SEGMENT = 1          # Correlation control: max 1 trade per segment
 
 

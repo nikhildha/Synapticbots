@@ -523,22 +523,32 @@ class RegimeMasterBot:
         logger.info("📡 Initial Scan list: %d coins | active trades in book: %d",
                     len(scan_symbols), tradebook_active_count)
 
-        # ── 4a-1. Institutional Segment Pre-Filter ──
-        # Massively optimizes ML processing by only allowing coins from the Top 2 performing segments
-        from coin_scanner import get_hottest_segments
+        # ── 4a-1. 3-Mode Macro-Regime-Aware Segment Pre-Filter ──────────────
+        # BEARISH mode (deep bear): worst N segments → SHORT candidates only
+        # BULLISH mode (strong bull): best N segments → LONG candidates only
+        # MIXED mode (pullback/chop/rotation): both pools active simultaneously
+        from coin_scanner import get_segment_pools_for_regime
         allowed_segment_coins = set()
-        allowed_segment_coins.add("BTCUSDT") # Always process BTC for macro context
+        allowed_segment_coins.add("BTCUSDT")  # Always process BTC for macro context
+
+        _market_mode  = "MIXED"   # safe fallback
+        _short_pool_coins: set = set()
+        _long_pool_coins:  set = set()
 
         try:
-            top_2_segment_names = get_hottest_segments(2)
-            logger.info("🔥 Top 2 Institutional Segments this cycle: %s", top_2_segment_names)
-            
-            for seg in top_2_segment_names:
-                allowed_segment_coins.update(config.CRYPTO_SEGMENTS.get(seg, []))
+            _market_mode, _short_pool_segs, _long_pool_segs = get_segment_pools_for_regime()
+            for seg in _short_pool_segs:
+                _short_pool_coins.update(config.CRYPTO_SEGMENTS.get(seg, []))
+            for seg in _long_pool_segs:
+                _long_pool_coins.update(config.CRYPTO_SEGMENTS.get(seg, []))
+            allowed_segment_coins.update(_short_pool_coins)
+            allowed_segment_coins.update(_long_pool_coins)
         except Exception as e:
-            logger.error("Failed to fetch Segment Heatmap: %s. Defaulting to all segments.", e)
+            logger.error("Segment pool fetch failed: %s — scanning all segments.", e)
             for seg, coins in getattr(config, "CRYPTO_SEGMENTS", {}).items():
                 allowed_segment_coins.update(coins)
+                _short_pool_coins.update(coins)
+                _long_pool_coins.update(coins)
 
         # ── 4b. Macro Veto Overlay (BTC Flash Crash Detection) ──
         btc_flash_crash = False
@@ -558,14 +568,27 @@ class RegimeMasterBot:
 
         for symbol in scan_symbols:
             if symbol not in allowed_segment_coins:
-                logger.debug("🚫 Skipping %s (Not in Top 2 Segments)", symbol)
+                logger.debug("🚫 Skipping %s (not in %s segment pools)", symbol, _market_mode)
                 continue
-            
+
             if symbol in config.EXCLUDED_COINS:
                 logger.info("🚫 Skipping %s (Exclusion List)", symbol)
                 continue
             try:
                 result = self._analyze_coin(symbol, balance, btc_flash_crash=btc_flash_crash)
+                if result and symbol != "BTCUSDT":
+                    side = result.get("side")
+                    # ── Direction gate: HMM signal must align with pool direction ──
+                    # Prevents LONG signals from bearish segments (and vice-versa)
+                    # in directional markets, avoiding gain neutralization.
+                    if side == "BUY" and symbol not in _long_pool_coins:
+                        logger.debug("🚫 %s LONG signal but seg not in LONG pool (%s mode) — skip",
+                                     symbol, _market_mode)
+                        continue
+                    if side == "SELL" and symbol not in _short_pool_coins:
+                        logger.debug("🚫 %s SHORT signal but seg not in SHORT pool (%s mode) — skip",
+                                     symbol, _market_mode)
+                        continue
                 if result:
                     raw_results.append(result)
             except Exception as e:
