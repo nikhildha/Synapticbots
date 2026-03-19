@@ -28,6 +28,7 @@ import telegram as tg
 import orderflow_engine as _of_mod
 import coindcx_client as cdx
 from llm_reasoning import AthenaEngine
+from price_stream import get_price_stream, shutdown_price_stream
 # ─── Logging Setup ───────────────────────────────────────────────────────────────
 logging.basicConfig(
     level=logging.INFO,
@@ -178,6 +179,16 @@ class RegimeMasterBot:
             except Exception as e:
                 logger.warning("⚠️  Athena failed to load: %s", e)
 
+        # ── Real-Time Price Stream (WebSocket bookTicker → ~100ms updates) ──
+        # Replaces 10s REST polling for max-loss / trailing SL checks.
+        # Falls back to REST automatically if WS connection is not yet ready.
+        try:
+            self._price_stream = get_price_stream()
+            logger.info("⚡ PriceStream: WebSocket price cache ready")
+        except Exception as e:
+            logger.warning("⚠️ PriceStream failed to start: %s — will fall back to REST", e)
+            self._price_stream = None
+
     # ─── Main Loop ───────────────────────────────────────────────────────────
 
     def run(self):
@@ -272,7 +283,29 @@ class RegimeMasterBot:
                         funding_rates[sym] = fr
                 except Exception:
                     pass
-            tradebook.update_unrealized(funding_rates=funding_rates)
+
+            # ── WebSocket price feed: ensure active symbols are subscribed ──
+            # Provides ~100ms price updates (vs 10s REST), eliminating gap-through risk.
+            ws_prices = {}
+            if self._price_stream is not None:
+                try:
+                    active_trades = tradebook.get_active_trades()
+                    active_syms = list({t['symbol'] for t in active_trades if t.get('symbol')})
+                    if active_syms:
+                        self._price_stream.ensure_subscribed(active_syms)
+                    # Only use WS prices for symbols with a fresh reading (< 30s old)
+                    for sym in active_syms:
+                        if self._price_stream.is_fresh(sym, max_age_seconds=30.0):
+                            price = self._price_stream.get_price(sym)
+                            if price:
+                                ws_prices[sym] = price
+                    if ws_prices:
+                        logger.debug("⚡ PriceStream: using WS prices for %d symbols", len(ws_prices))
+                except Exception as e:
+                    logger.debug("PriceStream subscription error: %s", e)
+
+            # Pass WS prices when available — tradebook falls back to REST for any missing symbols
+            tradebook.update_unrealized(funding_rates=funding_rates, prices=ws_prices or None)
         except Exception as e:
             logger.debug("Tradebook unrealized update error: %s", e)
 

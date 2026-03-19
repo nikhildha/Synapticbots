@@ -3,7 +3,7 @@ import { getActiveBotSession } from '@/lib/bot-session';
 
 // D1 FIX: Throttle sync to prevent DB hammering (max once per 30s per bot)
 const _lastSyncTime: Record<string, number> = {};
-const SYNC_THROTTLE_MS = 30_000;
+const SYNC_THROTTLE_MS = 5_000;   // 5s throttle — safe at 25+ users (200 bots). 1s would cause ~200 upserts/sec on Railway.
 
 /**
  * Sync engine trades into Prisma, scoped to a specific bot.
@@ -133,6 +133,11 @@ export async function syncEngineTrades(
                 }
             }
 
+            // trailing_sl: always use raw engine value — never apply sanity recalc.
+            // The engine sets this at runtime as price moves (breakeven, locked profit, etc.)
+            // It may equal the entry price for profitable stepped trades — that is intentional.
+            const rawTrailingSl: number | null = t.trailing_sl ?? null;
+
             // Upsert: create if not exists, update PNL/status if exists
             await prisma.trade.upsert({
                 where: {
@@ -174,7 +179,7 @@ export async function syncEngineTrades(
                     t3Price: t.targets?.t3 || null,
                     t1Hit: t.t1_hit || false,
                     t2Hit: t.t2_hit || false,
-                    trailingSl: t.trailing_sl ?? null,
+                    trailingSl: rawTrailingSl,
                     trailingActive: t.trailing_active ?? false,
                     trailSlCount: t.trail_sl_count ?? 0,
                     steppedLockLevel: t.stepped_lock_level ?? -1,
@@ -199,7 +204,7 @@ export async function syncEngineTrades(
                     slType: t.sl_type || t.slType || 'fixed',
                     t1Hit: t.t1_hit || false,
                     t2Hit: t.t2_hit || false,
-                    trailingSl: t.trailing_sl ?? null,
+                    trailingSl: rawTrailingSl,
                     trailingActive: t.trailing_active ?? false,
                     trailSlCount: t.trail_sl_count ?? 0,
                     steppedLockLevel: t.stepped_lock_level ?? -1,

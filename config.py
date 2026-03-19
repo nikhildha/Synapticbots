@@ -136,7 +136,7 @@ CAPITAL_PER_TRADE = 100        # $100 per trade, fixed
 # ─── Risk Management ────────────────────────────────────────────────────────────
 RISK_PER_TRADE = 0.04
 KILL_SWITCH_DRAWDOWN = 0.10   # Pause bot if 10% drawdown in 24h
-MAX_LOSS_PER_TRADE_PCT = -35     # Hard max-loss per trade (widened so ATR stops catch before margin call)
+MAX_LOSS_PER_TRADE_PCT = -20     # Hard max-loss per trade: -20% of capital (e.g. 20x lev → 1% price move)
 MIN_LEVERAGE_FLOOR = 5           # Skip trade if leverage must drop below this
 MIN_HOLD_MINUTES = 30         # Minimum hold time before regime-change exits
 DEFAULT_QUANTITY = 0.002      # BTC quantity (overridden by position sizer)

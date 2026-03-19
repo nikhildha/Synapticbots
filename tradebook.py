@@ -891,6 +891,30 @@ def update_unrealized(prices=None, funding_rates=None):
                     changed = True
                     continue
 
+        # ── TP OVERSHOOT SAFETY NET (paper only) ──────────────────────────
+        # Fires when price GAPS THROUGH the TP level between heartbeats.
+        # Checks PnL% directly — independent of price-based TP checks.
+        # If the trade's current PnL% has exceeded what TP would give by ≥2%,
+        # the trade must have passed its TP and should be closed.
+        # Example: BTC SHORT TP gives +73% at leverage, actual PnL is +99% → fire.
+        if not is_live:
+            eff_tp = trade.get("trailing_tp", trade.get("take_profit", 0))
+            lev_overshoot = trade.get("leverage", 1)
+            if eff_tp and eff_tp > 0 and entry and entry > 0 and lev_overshoot > 0:
+                # Expected PnL% at TP level (leveraged)
+                price_move_to_tp = abs(eff_tp - entry) / entry
+                expected_tp_pnl_pct = round(price_move_to_tp * lev_overshoot * 100, 2)
+                # If actual PnL% exceeds expected TP PnL% by ≥2% buffer → overshoot
+                if expected_tp_pnl_pct > 0 and pnl_pct >= expected_tp_pnl_pct + 2.0:
+                    logger.warning(
+                        "🎯 TP OVERSHOOT on %s: actual PnL %.1f%% > TP target %.1f%% — "
+                        "price gapped through TP (%.6f). Closing trade.",
+                        trade["trade_id"], pnl_pct, expected_tp_pnl_pct, eff_tp,
+                    )
+                    _close_trade_inline(trade, current, "TP_OVERSHOOT")
+                    changed = True
+                    continue
+
         changed = True
 
     if changed:

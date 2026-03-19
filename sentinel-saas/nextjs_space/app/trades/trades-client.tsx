@@ -185,6 +185,8 @@ export function TradesClient({ trades: initialTrades }: TradesClientProps) {
   const [closingTradeId, setClosingTradeId] = useState<string | null>(null);
   const [confirmingTradeId, setConfirmingTradeId] = useState<string | null>(null);
   const [confirmingClear, setConfirmingClear] = useState(false);
+  const [deletingTradeId, setDeletingTradeId] = useState<string | null>(null);
+  const [confirmingDeleteId, setConfirmingDeleteId] = useState<string | null>(null);
 
   const [livePrices, setLivePrices] = useState<Record<string, number>>({});
   const [posFilter, setPosFilter] = useState<string>('all');
@@ -791,6 +793,50 @@ export function TradesClient({ trades: initialTrades }: TradesClientProps) {
                                   }}
                                 >
                                   {closingTradeId === t.id ? '...' : confirmingTradeId === t.id ? '⚡ Confirm?' : pnl >= 0 ? '💰 Book Profit' : '✕ Close'}
+                                </button>
+                              )}
+                              {/* Delete button — closed trades only */}
+                              {!isActive && (
+                                <button
+                                  disabled={deletingTradeId === t.id}
+                                  onClick={async () => {
+                                    if (confirmingDeleteId !== t.id) {
+                                      setConfirmingDeleteId(t.id);
+                                      setTimeout(() => setConfirmingDeleteId(prev => prev === t.id ? null : prev), 3000);
+                                      return;
+                                    }
+                                    setConfirmingDeleteId(null);
+                                    setDeletingTradeId(t.id);
+                                    try {
+                                      const res = await fetch('/api/trades/delete', {
+                                        method: 'POST',
+                                        headers: { 'Content-Type': 'application/json' },
+                                        body: JSON.stringify({ tradeId: t.id }),
+                                      });
+                                      if (res.ok) {
+                                        setTrades(prev => prev.filter(tr => tr.id !== t.id));
+                                      } else {
+                                        const err = await res.json();
+                                        showMsg(`❌ ${err.error || 'Failed to delete'}`);
+                                      }
+                                    } catch {
+                                      showMsg('❌ Network error');
+                                    } finally {
+                                      setDeletingTradeId(null);
+                                    }
+                                  }}
+                                  title="Delete this trade from DB"
+                                  style={{
+                                    padding: '4px 8px', borderRadius: '6px',
+                                    border: confirmingDeleteId === t.id ? '1px solid #EF4444' : '1px solid rgba(255,255,255,0.08)',
+                                    fontSize: '10px', fontWeight: 700, cursor: 'pointer',
+                                    background: confirmingDeleteId === t.id ? 'rgba(239,68,68,0.25)' : 'rgba(255,255,255,0.04)',
+                                    color: confirmingDeleteId === t.id ? '#EF4444' : '#6B7280',
+                                    transition: 'all 0.2s',
+                                    opacity: deletingTradeId === t.id ? 0.4 : 1,
+                                  }}
+                                >
+                                  {deletingTradeId === t.id ? '...' : confirmingDeleteId === t.id ? '⚠️ Sure?' : '🗑'}
                                 </button>
                               )}
                             </td>
