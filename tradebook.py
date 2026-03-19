@@ -127,16 +127,43 @@ def open_trade(symbol, side, leverage, quantity, entry_price, atr,
     """
     book = _load_book()
 
-    # Guard: prevent duplicate ACTIVE trades for the same symbol+user
-    # Use user_id as the key so the same user doesn't double-deploy a coin across different bots.
-    existing = [t for t in book["trades"]
-                if t["symbol"] == symbol
-                and t.get("user_id", "") == (user_id or "")
-                and t["status"] in ("ACTIVE", "OPEN")]
-    if existing:
-        logger.warning("⚠️ Skipping duplicate trade for %s [%s] — already have ACTIVE trade %s",
-                       symbol, bot_name, existing[0]["trade_id"])
-        return existing[0]["trade_id"]
+    # Guard 1: same BOT already has this symbol active — block regardless of direction.
+    # This is the tightest check and catches same-bot duplicates (e.g. two AR LONGs).
+    if bot_id:
+        bot_existing = [t for t in book["trades"]
+                        if t["symbol"] == symbol
+                        and t.get("bot_id", "") == bot_id
+                        and t["status"] in ("ACTIVE", "OPEN")]
+        if bot_existing:
+            logger.warning(
+                "⚠️ Skipping trade for %s [bot=%s] — this bot already has ACTIVE trade %s",
+                symbol, bot_id, bot_existing[0]["trade_id"]
+            )
+            return bot_existing[0]["trade_id"]
+
+    # Guard 2: same USER has this symbol active on ANY bot — block to prevent cross-bot hedging.
+    # (e.g. L1 LONG + DePIN SHORT on BTC with same user_id)
+    if user_id:
+        user_existing = [t for t in book["trades"]
+                         if t["symbol"] == symbol
+                         and t.get("user_id", "") == user_id
+                         and t["status"] in ("ACTIVE", "OPEN")]
+        if user_existing:
+            logger.warning(
+                "⚠️ Skipping trade for %s [user=%s] — another bot already has ACTIVE trade %s",
+                symbol, user_id, user_existing[0]["trade_id"]
+            )
+            return user_existing[0]["trade_id"]
+
+    # Legacy fallback: if both bot_id and user_id are empty, block by symbol alone
+    if not bot_id and not user_id:
+        existing = [t for t in book["trades"]
+                    if t["symbol"] == symbol
+                    and t["status"] in ("ACTIVE", "OPEN")]
+        if existing:
+            logger.warning("⚠️ Skipping duplicate trade for %s — already have ACTIVE trade %s",
+                           symbol, existing[0]["trade_id"])
+            return existing[0]["trade_id"]
 
     trade_id = _next_id(book)
     position = "LONG" if side == "BUY" else "SHORT"
