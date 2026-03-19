@@ -36,6 +36,7 @@ _engine_start_time = None
 _engine_bot = None
 _engine_crash_count = 0
 _engine_last_crash = None
+_engine_start_lock = threading.Lock()  # Prevents duplicate engine threads on startup
 
 logger = logging.getLogger("EngineAPI")
 
@@ -1067,16 +1068,23 @@ def _setup_sigterm_handler():
 
 
 def start_engine():
-    """Start the engine in a background thread."""
+    """Start the engine in a background thread.
+    
+    Lock-guarded to prevent duplicate threads when Flask's reloader or
+    the watchdog calls this concurrently with the module-scope startup call.
+    Without the lock, both the werkzeug parent and reloader child processes
+    each see _engine_thread=None and both start an engine instance.
+    """
     global _engine_thread, _engine_start_time, _engine_crash_count
-    if _engine_thread and _engine_thread.is_alive():
-        logger.info("Engine already running")
-        return
-    _engine_crash_count = 0
-    logger.info("🚀 Starting engine thread...")
-    _engine_thread = threading.Thread(target=_run_engine, daemon=False, name="EngineThread")
-    _engine_thread.start()
-    _engine_start_time = time.time()
+    with _engine_start_lock:
+        if _engine_thread and _engine_thread.is_alive():
+            logger.info("Engine already running — skipping duplicate start")
+            return
+        _engine_crash_count = 0
+        logger.info("🚀 Starting engine thread...")
+        _engine_thread = threading.Thread(target=_run_engine, daemon=False, name="EngineThread")
+        _engine_thread.start()
+        _engine_start_time = time.time()
 
 
 
