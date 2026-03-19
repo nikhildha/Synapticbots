@@ -838,12 +838,20 @@ COIN_FEATURES = {
 }
 
 def get_features_for_coin(coin: str) -> list:
-    """Return the optimized feature list plus the mandatory structural features."""
+    """Return the optimized feature list plus the mandatory structural features.
+
+    NOTE: rel_strength_btc is skipped for BTCUSDT — for BTC itself this feature
+    is always ~0 (BTC vs BTC = noise, raw_std≈1e-6), which causes GMMHMM's
+    log-likelihood to diverge to -inf → NaN in predict_proba → 0% confidence.
+    """
     base = list(COIN_FEATURES.get(coin, ALL_HMM_FEATURES))
-    # Ensure the new structural regime features are dynamically applied to every single coin
+    # Ensure the new structural regime features are dynamically applied to every coin
     mandatory = ["vwap_dist", "bb_width_norm", "rel_strength_btc"]
     for f in mandatory:
         if f not in base:
+            # rel_strength_btc is meaningless for BTCUSDT itself (zero variance → NaN)
+            if f == "rel_strength_btc" and coin == "BTCUSDT":
+                continue
             base.append(f)
     return base
 

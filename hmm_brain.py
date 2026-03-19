@@ -76,7 +76,14 @@ class HMMBrain:
         import warnings
 
         def _try_fit(model, data):
-            """Fit + validate. Returns True if model is clean, False if degenerate."""
+            """Fit + validate. Returns True if model is clean, False if degenerate.
+
+            Validates:
+            1. NaN in startprob_ / transmat_ / means_ / weights_
+            2. predict_proba returns valid probabilities on a sample.
+               (Covariances can collapse to 0 without showing NaN in params, but
+               predict_proba then returns NaN because log-likelihood hits -inf.)
+            """
             with warnings.catch_warnings():
                 warnings.simplefilter("ignore", category=RuntimeWarning)
                 warnings.filterwarnings("ignore", module="hmmlearn")
@@ -89,7 +96,20 @@ class HMMBrain:
             # GMMHMM-specific: NaN weights_ → "divide by zero in log"
             if hasattr(model, "weights_") and np.isnan(model.weights_).any():
                 return False
+            # ── Final gate: run predict_proba on a sample ────────────────────
+            # Covariances can collapse to 0 without surfacing as NaN in params,
+            # but predict_proba returns NaN because log-likelihood → -inf.
+            try:
+                with warnings.catch_warnings():
+                    warnings.simplefilter("ignore")
+                    sample = data[-50:] if len(data) > 50 else data
+                    proba = model.predict_proba(sample)
+                if np.isnan(proba).any():
+                    return False
+            except Exception:
+                return False
             return True
+
 
         fitted = False
 
