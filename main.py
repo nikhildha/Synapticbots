@@ -550,6 +550,11 @@ class RegimeMasterBot:
                 _long_pool_coins.update(config.CRYPTO_SEGMENTS.get(seg, []))
             allowed_segment_coins.update(_short_pool_coins)
             allowed_segment_coins.update(_long_pool_coins)
+            logger.info("🔒 Segment gate: %s mode | SHORT=%s LONG=%s | allowed=%d coins",
+                _market_mode,
+                list(_short_pool_segs),
+                list(_long_pool_segs),
+                len(allowed_segment_coins))
         except Exception as e:
             logger.error("Segment pool fetch failed: %s — scanning all segments.", e)
             for seg, coins in getattr(config, "CRYPTO_SEGMENTS", {}).items():
@@ -588,7 +593,9 @@ class RegimeMasterBot:
                     "reason":  f"Not in {_market_mode} pool",
                     "pool_desc": _pool_desc,
                 }
-                logger.debug("🚫 Skipping %s (not in %s segment pools)", symbol, _market_mode)
+                logger.info("🚫 [POOL SKIP] %s (%s) → not in %s pool %s",
+                    symbol, _gsfc(symbol), _market_mode,
+                    list(_short_pool_segs) if _short_pool_segs else list(_long_pool_segs))
                 continue
 
             if symbol in config.EXCLUDED_COINS:
