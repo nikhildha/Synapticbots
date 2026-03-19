@@ -260,6 +260,8 @@ export async function getUserTrades(userId: string, statusFilter?: string, botId
         t2Hit: t.t2Hit,
         trailing_sl: t.trailingSl,
         trailing_active: t.trailingActive,
+        trail_sl_count: t.trailSlCount,        // ← was missing: step count for SL Step column
+        stepped_lock_level: t.steppedLockLevel, // ← was missing: which step index is active
         status: t.status.toUpperCase(),
         unrealized_pnl: t.activePnl,
         unrealized_pnl_pct: t.activePnlPercent,
