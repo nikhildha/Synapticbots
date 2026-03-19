@@ -668,32 +668,44 @@ class RegimeMasterBot:
             else:
                 seg_results = list(raw_results)
 
-            # Pick top N coins by HMM conviction
-            top_n = getattr(config, "TOP_COINS_PER_SEGMENT", 1)
-            top_coins = seg_results[:top_n]
+            # ── Waterfall: evaluate candidates in conviction order ─────────────────
+            # ATHENA_WATERFALL_DEPTH = how many coins per bot we'll send to Athena.
+            # If coin #1 is VETO'd → coin #2 gets evaluated, then #3, etc.
+            # One successful EXECUTE stops the waterfall for this bot.
+            waterfall_depth = getattr(config, "ATHENA_WATERFALL_DEPTH", 4)
+            waterfall_candidates = seg_results[:waterfall_depth]
 
-            if not top_coins:
+            if not waterfall_candidates:
                 logger.info("🔍 [%s] No HMM signals for segment %s this cycle", bot_name, bot_segment_filter)
                 continue
 
-            # Explicitly mark non-top eligible coins so the UI doesn't get stuck showing "READY"
-            for ignored in seg_results[top_n:]:
+            # Mark coins beyond the waterfall window as excluded (never evaluated)
+            for ignored in seg_results[waterfall_depth:]:
                 sym = ignored["symbol"]
-                _st = self._coin_states.get(sym, {}).get("bot_deploy_statuses", {}).get(bot_id, "")
-                if not _st:
-                    self._coin_states.setdefault(sym, {}).setdefault("bot_deploy_statuses", {})[bot_id] = "FILTERED: Not top coin in segment"
+                self._coin_states.setdefault(sym, {}).setdefault("bot_deploy_statuses", {})[bot_id] = "FILTERED: Not top coin in segment"
 
-            for top in top_coins:
+            deployed_this_bot = False  # waterfall stops on first deploy
+
+            for _wf_idx, top in enumerate(waterfall_candidates):
+                if deployed_this_bot:
+                    break  # already deployed one trade this cycle for this bot
+
                 sym      = top["symbol"]
                 pos_key  = f"{bot_id}:{sym}"
                 seg_name = get_segment_for_coin(sym)
+
+                if _wf_idx > 0:
+                    logger.info("⬇️  WATERFALL [%s] candidate #%d: %s (prev vetoed/skipped)",
+                                bot_name, _wf_idx + 1, sym)
 
                 # Conviction threshold — skip before Athena call if too low
                 conviction = top.get("conviction", 0)
                 min_conv   = getattr(config, "MIN_CONVICTION_FOR_DEPLOY", 60)
                 if conviction < min_conv:
-                    logger.debug("⛔ [%s] %s conviction %.0f < %.0f threshold — skip",
+                    logger.info("⛔ [%s] %s conviction %.0f < %.0f — waterfall exhausted (remaining candidates also low)",
                                  bot_name, sym, conviction, min_conv)
+                    # All remaining candidates will also fail — break out
+                    break
                     self._coin_states.setdefault(sym, {}).setdefault("bot_deploy_statuses", {})[bot_id] = (
                         f"FILTERED: low conviction ({conviction:.0f} < {min_conv:.0f})"
                     )
@@ -953,6 +965,8 @@ class RegimeMasterBot:
                     "symbol": sym, # Add symbol for batch notification filtering
                     "side": top["side"], # Add side for batch notification
                 })
+
+                deployed_this_bot = True  # waterfall: stop after first successful deploy
 
         # ── Batch Telegram notification for all deployed trades ──
         if deployed_trades:
