@@ -87,6 +87,28 @@ def compute_hmm_features(df, btc_df=None):
     df["swing_l"] = df["low"].rolling(10, min_periods=1).min()
     df["swing_h"] = df["high"].rolling(10, min_periods=1).max()
 
+    # ── vwap_dist & bb_width_norm ──────────────────────────────────────────────
+    # These are required by segment_features.get_features_for_coin() for every coin.
+    # They MUST be computed here (not only in compute_indicators) so that the HMM
+    # training path — which calls compute_hmm_features() directly — always has them.
+    # Previously missing here caused "[vwap_dist, bb_width_norm] not in index" →
+    # HMM training failure → 0% confidence for all coins.
+
+    # VWAP distance: how far close is from 20-period VWAP (clipped ±50%)
+    vwap_typical = (df["high"] + df["low"] + df["close"]) / 3
+    vwap_rolling = (vwap_typical * df["volume"]).rolling(20).sum() / \
+                   df["volume"].rolling(20).sum().replace(0, np.nan)
+    df["vwap_dist"] = ((df["close"] - vwap_rolling) / vwap_rolling.replace(0, np.nan)
+                       ).fillna(0).clip(-0.5, 0.5)
+
+    # Bollinger Band width (normalised by mid-band): proxy for volatility regime
+    bb_mid   = df["close"].rolling(20).mean()
+    bb_std   = df["close"].rolling(20).std()
+    bb_upper = bb_mid + 2 * bb_std
+    bb_lower = bb_mid - 2 * bb_std
+    df["bb_width_norm"] = ((bb_upper - bb_lower) / bb_mid.replace(0, np.nan)
+                           ).fillna(0).clip(0, 1)
+
     return df
 
 
