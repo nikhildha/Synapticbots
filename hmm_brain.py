@@ -79,15 +79,32 @@ class HMMBrain:
             """Fit + validate. Returns True if model is clean, False if degenerate.
 
             Validates:
-            1. NaN in startprob_ / transmat_ / means_ / weights_
-            2. predict_proba returns valid probabilities on a sample.
+            1. Input data: no NaN/Inf, no constant-variance features
+               (constant features → 0-variance covariance → 0/0 divide)
+            2. NaN in startprob_ / transmat_ / means_ / weights_
+            3. predict_proba returns valid probabilities on a sample.
                (Covariances can collapse to 0 without showing NaN in params, but
                predict_proba then returns NaN because log-likelihood hits -inf.)
             """
+            # ── Pre-flight: reject data guaranteed to cause 0/0 divide ───────
+            # hmmlearn hmm.py:809 RuntimeWarning fires when a feature column has
+            # near-zero variance (all values identical after scaling), forcing
+            # 0/0 in the E-step normalization.  Detect here before fitting.
+            if np.isnan(data).any() or np.isinf(data).any():
+                return False
+            if (np.var(data, axis=0) < 1e-8).any():
+                return False  # constant/near-constant feature → degenerate model
+
+            # ── Fit: suppress Python AND NumPy-layer warnings ─────────────────
+            # warnings.catch_warnings only handles Python-level warnings.
+            # hmmlearn calls NumPy C-extensions which emit at the seterr level,
+            # so np.errstate is also required to silence them completely.
             with warnings.catch_warnings():
                 warnings.simplefilter("ignore", category=RuntimeWarning)
                 warnings.filterwarnings("ignore", module="hmmlearn")
-                model.fit(data)
+                with np.errstate(divide="ignore", invalid="ignore"):
+                    model.fit(data)
+
             # NaN in startprob or transmat → degenerate
             if np.isnan(model.startprob_).any() or np.isnan(model.transmat_).any():
                 return False
@@ -96,14 +113,16 @@ class HMMBrain:
             # GMMHMM-specific: NaN weights_ → "divide by zero in log"
             if hasattr(model, "weights_") and np.isnan(model.weights_).any():
                 return False
-            # ── Final gate: run predict_proba on a sample ────────────────────
+
+            # ── Final gate: run predict_proba on a sample ─────────────────────
             # Covariances can collapse to 0 without surfacing as NaN in params,
             # but predict_proba returns NaN because log-likelihood → -inf.
             try:
                 with warnings.catch_warnings():
                     warnings.simplefilter("ignore")
-                    sample = data[-50:] if len(data) > 50 else data
-                    proba = model.predict_proba(sample)
+                    with np.errstate(divide="ignore", invalid="ignore"):
+                        sample = data[-50:] if len(data) > 50 else data
+                        proba = model.predict_proba(sample)
                 if np.isnan(proba).any():
                     return False
             except Exception:
