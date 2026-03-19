@@ -120,8 +120,22 @@ class ExecutionEngine:
 
         # ── Paper Trade Mode ────────────────────────────────────────
         if config.PAPER_TRADE:
-            from data_pipeline import get_current_price
-            current_price = get_current_price(symbol) or 0
+            # Use Binance WebSocket price (sub-100ms) — falls back to REST if WS not ready yet
+            try:
+                from price_stream import get_price_stream
+                ps = get_price_stream()
+                ws_price = ps.get_price(symbol)
+            except Exception:
+                ws_price = None
+
+            if ws_price and ws_price > 0:
+                current_price = ws_price
+                logger.debug("📡 PAPER using WS price %s = %.6f", symbol, current_price)
+            else:
+                from data_pipeline import get_current_price
+                current_price = get_current_price(symbol) or 0
+                logger.debug("📡 PAPER WS not ready for %s — using REST price %.6f", symbol, current_price)
+
             sl, tp, rm_id = self.risk.calculate_optimal_stops(symbol, current_price, atr, side, leverage, swing_l, swing_h)
             log_entry = {
                 "timestamp":   datetime.utcnow().isoformat(),
@@ -138,11 +152,12 @@ class ExecutionEngine:
                 "reason":      reason,
                 "rm_id":       rm_id,
                 "mode":        "PAPER",
+                "exchange":    "binance_ws",
                 "order_type":  "MARKET",
                 "status":      "FILLED",
             }
             self._log_trade(log_entry)
-            logger.info("PAPER MARKET %s %s @ %.2f | %dx | SL=%.2f TP=%.2f | %s", side, symbol, current_price, leverage, sl, tp, regime_name)
+            logger.info("PAPER MARKET %s %s @ %.4f | %dx | SL=%.4f TP=%.4f | %s", side, symbol, current_price, leverage, sl, tp, regime_name)
             return log_entry
 
         # ── Live Trade (Market Order) ────────────────────────────────
