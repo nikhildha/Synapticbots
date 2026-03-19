@@ -649,6 +649,13 @@ class RegimeMasterBot:
             user_id  = target.get("user_id", config.ENGINE_USER_ID)
             bot_segment_filter = target.get("segment_filter") or _infer_segment_from_name(bot_name)
 
+            # ── Clear stale deploy statuses from last cycle for this bot ──────────
+            # Without this, coins that were #1 last cycle (e.g. RONIN with "Conviction too low")
+            # keep their old reason even when they drop to runner-up position this cycle,
+            # causing contradictory display (lower-conviction coin shows a different reason than higher ones). 
+            for _cs in self._coin_states.values():
+                _cs.get("bot_deploy_statuses", {}).pop(bot_id, None)
+
             # Build allowed-coin set for this bot's segment
             if bot_segment_filter == "ALL":
                 bot_allowed_coins = None  # no restriction
