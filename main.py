@@ -568,6 +568,17 @@ class RegimeMasterBot:
 
         for symbol in scan_symbols:
             if symbol not in allowed_segment_coins:
+                # Write state so dashboard shows the correct reason (not stale from prev cycle)
+                _pool_desc = f"{_market_mode}: {', '.join(list(_short_pool_coins)[:3] or _long_pool_coins or ['none'])} only"
+                self._coin_states[symbol] = {
+                    "symbol":  symbol,
+                    "action":  f"SEGMENT_POOL_SKIP",
+                    "regime":  self._coin_states.get(symbol, {}).get("regime", "N/A"),
+                    "confidence": 0,
+                    "conviction": 0,
+                    "reason":  f"Not in {_market_mode} pool",
+                    "pool_desc": _pool_desc,
+                }
                 logger.debug("🚫 Skipping %s (not in %s segment pools)", symbol, _market_mode)
                 continue
 
@@ -584,10 +595,14 @@ class RegimeMasterBot:
                     if side == "BUY" and symbol not in _long_pool_coins:
                         logger.debug("🚫 %s LONG signal but seg not in LONG pool (%s mode) — skip",
                                      symbol, _market_mode)
+                        self._coin_states[symbol]["action"] = "DIRECTION_GATE_SKIP"
+                        self._coin_states[symbol]["reason"] = f"LONG signal but {_market_mode} mode — SHORT pool only"
                         continue
                     if side == "SELL" and symbol not in _short_pool_coins:
                         logger.debug("🚫 %s SHORT signal but seg not in SHORT pool (%s mode) — skip",
                                      symbol, _market_mode)
+                        self._coin_states[symbol]["action"] = "DIRECTION_GATE_SKIP"
+                        self._coin_states[symbol]["reason"] = f"SHORT signal but {_market_mode} mode — LONG pool only"
                         continue
                 if result:
                     raw_results.append(result)

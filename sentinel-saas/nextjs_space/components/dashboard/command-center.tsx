@@ -715,6 +715,7 @@ export function SignalSummaryTable({ coinStates, multi, heatmap: heatmapProp, bo
     const actStyle = (action: string) => {
         if (action.includes('ELIGIBLE')) return { bg: 'rgba(34,197,94,0.12)', color: '#22C55E', icon: '✓' };
         if (action.includes('CRASH')) return { bg: 'rgba(220,38,38,0.12)', color: '#DC2626', icon: '✕' };
+        if (action.includes('SEGMENT POOL SKIP') || action.includes('DIRECTION GATE SKIP')) return { bg: 'rgba(245,158,11,0.12)', color: '#F59E0B', icon: '⊘' };
         if (action.includes('SKIP') || action.includes('VETO') || action.includes('CONFLICT')) return { bg: 'rgba(239,68,68,0.12)', color: '#EF4444', icon: '✕' };
         if (action.includes('CHOP') || action.includes('MEAN_REV')) return { bg: 'rgba(245,158,11,0.12)', color: '#F59E0B', icon: '~' };
         return { bg: 'rgba(107,114,128,0.08)', color: '#6B7280', icon: '•' };
@@ -735,6 +736,14 @@ export function SignalSummaryTable({ coinStates, multi, heatmap: heatmapProp, bo
         const pct = c.conviction != null ? Number(c.conviction) : (c.confidence != null ? (c.confidence <= 1 ? c.confidence * 100 : c.confidence) : 0);
         // If coin was eligible but filtered in deploy phase, show the deploy filter reason
         if (ds.startsWith('FILTERED')) return ds.replace('FILTERED: ', '').charAt(0).toUpperCase() + ds.replace('FILTERED: ', '').slice(1);
+        // Segment pool skip — use the pre-built reason from engine (includes mode + pools)
+        if (a.includes('SEGMENT_POOL_SKIP') || a.includes('SEGMENT POOL SKIP')) {
+            return c.reason || c.pool_desc || 'Not in current segment pool';
+        }
+        // Direction gate skip — HMM signal direction opposed to pool
+        if (a.includes('DIRECTION_GATE_SKIP') || a.includes('DIRECTION GATE SKIP')) {
+            return c.reason || 'Signal direction ≠ regime pool';
+        }
         if (a.includes('ELIGIBLE_BUY')) return `Bullish @ ${pct.toFixed(0)} conv — LONG ready`;
         if (a.includes('ELIGIBLE_SELL')) return `Bearish @ ${pct.toFixed(0)} conv — SHORT ready`;
         if (a.includes('ELIGIBLE')) return `${r} @ ${pct.toFixed(0)} conv — trade ready`;
@@ -909,6 +918,7 @@ export function SignalSummaryTable({ coinStates, multi, heatmap: heatmapProp, bo
                                 let dLabel = 'PENDING', dColor = '#6B7280', dBg = 'rgba(107,114,128,0.08)';
                                 if (isDeployed || deployStatus === 'ACTIVE') { dLabel = 'DEPLOYED'; dColor = '#06B6D4'; dBg = 'rgba(6,182,212,0.12)'; }
                                 else if (deployStatus.startsWith('FILTERED')) { dLabel = 'NOT ELIGIBLE'; dColor = '#F59E0B'; dBg = 'rgba(245,158,11,0.08)'; }
+                                else if (action.includes('SEGMENT POOL SKIP') || action.includes('DIRECTION GATE SKIP')) { dLabel = 'OUT OF POOL'; dColor = '#F59E0B'; dBg = 'rgba(245,158,11,0.08)'; }
                                 else if (isE) { dLabel = 'READY'; dColor = '#22C55E'; dBg = 'rgba(34,197,94,0.12)'; }
                                 else if (action.includes('SKIP') || action.includes('VETO') || action.includes('CONFLICT') || action.includes('CRASH')) { dLabel = 'NOT ELIGIBLE'; dColor = '#EF4444'; dBg = 'rgba(239,68,68,0.08)'; }
 
