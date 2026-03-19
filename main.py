@@ -577,10 +577,12 @@ class RegimeMasterBot:
             if symbol not in allowed_segment_coins:
                 # Write state so dashboard shows the correct reason (not stale from prev cycle)
                 _pool_desc = f"{_market_mode}: {', '.join(list(_short_pool_coins)[:3] or _long_pool_coins or ['none'])} only"
+                from segment_features import get_segment_for_coin as _gsfc
                 self._coin_states[symbol] = {
                     "symbol":  symbol,
-                    "action":  f"SEGMENT_POOL_SKIP",
+                    "action":  "SEGMENT_POOL_SKIP",
                     "regime":  self._coin_states.get(symbol, {}).get("regime", "N/A"),
+                    "segment": _gsfc(symbol),      # ← fix: was missing → showed '-' in dashboard
                     "confidence": 0,
                     "conviction": 0,
                     "reason":  f"Not in {_market_mode} pool",
