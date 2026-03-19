@@ -73,49 +73,78 @@ class HMMBrain:
         self._feat_std[self._feat_std < 1e-10] = 1e-10  # avoid div-by-zero
         features_scaled = (features - self._feat_mean) / self._feat_std
 
-        # GMMHMM: use "diag" covariance — "full" is numerically unstable
-        # with many features (12) and multiple mixture components (n_mix=3).
-        # min_covar regularises near-zero variances to prevent degenerate states.
-        # Initialize here on every train to ensure hmmlearn's internal n_features shape
-        # natively matches the dataframe columns unconditionally instead of caching the old size.
-        self.model = GMMHMM(
-            n_components=self.n_states,
-            n_mix=3,
-            covariance_type="diag",
-            n_iter=config.HMM_ITERATIONS,
-            min_covar=1e-3,
+        import warnings
+
+        def _try_fit(model, data):
+            """Fit + validate. Returns True if model is clean, False if degenerate."""
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore", category=RuntimeWarning)
+                warnings.filterwarnings("ignore", module="hmmlearn")
+                model.fit(data)
+            # NaN in startprob or transmat → degenerate
+            if np.isnan(model.startprob_).any() or np.isnan(model.transmat_).any():
+                return False
+            if np.isnan(model.means_).any():
+                return False
+            # GMMHMM-specific: NaN weights_ → "divide by zero in log"
+            if hasattr(model, "weights_") and np.isnan(model.weights_).any():
+                return False
+            return True
+
+        fitted = False
+
+        # Tier 1: GMMHMM n_mix=3 (most expressive — needs clean data)
+        m1 = GMMHMM(
+            n_components=self.n_states, n_mix=3,
+            covariance_type="diag", n_iter=config.HMM_ITERATIONS,
+            min_covar=1e-2,   # raised from 1e-3 — prevents zero-variance collapse
             random_state=42,
         )
+        try:
+            if _try_fit(m1, features_scaled):
+                self.model = m1
+                fitted = True
+        except Exception:
+            pass
 
-        import warnings
-        with warnings.catch_warnings():
-            warnings.simplefilter("ignore", category=RuntimeWarning)
-            warnings.filterwarnings("ignore", module="hmmlearn")
+        # Tier 2: GMMHMM n_mix=2 (fewer components — more stable for liquid coins)
+        if not fitted:
+            m2 = GMMHMM(
+                n_components=self.n_states, n_mix=2,
+                covariance_type="diag", n_iter=config.HMM_ITERATIONS,
+                min_covar=1e-2,
+                random_state=42,
+            )
             try:
-                self.model.fit(features_scaled)
-                # Check for silent NaN injections typical in hmmlearn
-                if np.isnan(self.model.startprob_).any() or np.isnan(self.model.transmat_).any():
-                    raise ValueError("NaNs present in GMMHMM transition matrix.")
-            except Exception as e:
-                # Fallback to computationally stable Single-Gaussian HMM for this specific coin
-                from hmmlearn.hmm import GaussianHMM
-                self.model = GaussianHMM(
-                    n_components=self.n_states,
-                    covariance_type="diag",
-                    n_iter=config.HMM_ITERATIONS,
-                    min_covar=1e-3,
-                    random_state=42
-                )
-                self.model.fit(features_scaled)
-                # Validate the fallback model too
-                if (np.isnan(self.model.startprob_).any() or
-                        np.isnan(self.model.transmat_).any() or
-                        np.isnan(self.model.means_).any()):
-                    logger.warning(
-                        "GaussianHMM fallback also degenerate for %s — skipping training.",
-                        self.symbol
-                    )
-                    return self  # Leave _is_trained = False
+                if _try_fit(m2, features_scaled):
+                    self.model = m2
+                    fitted = True
+                    logger.debug("GMMHMM n_mix=2 fallback used for %s", self.symbol)
+            except Exception:
+                pass
+
+        # Tier 3: Single-Gaussian HMM (most stable — always valid)
+        if not fitted:
+            m3 = GaussianHMM(
+                n_components=self.n_states,
+                covariance_type="diag", n_iter=config.HMM_ITERATIONS,
+                min_covar=1e-2,
+                random_state=42,
+            )
+            try:
+                if _try_fit(m3, features_scaled):
+                    self.model = m3
+                    fitted = True
+                    logger.debug("GaussianHMM fallback used for %s", self.symbol)
+            except Exception:
+                pass
+
+        if not fitted:
+            logger.warning(
+                "All HMM tiers degenerate for %s — skipping (coin gets CHOP/0 confidence).",
+                self.symbol,
+            )
+            return self  # _is_trained stays False
 
         self._build_state_map()
         self._last_trained = datetime.utcnow()
