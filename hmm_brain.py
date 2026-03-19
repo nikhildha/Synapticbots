@@ -107,6 +107,15 @@ class HMMBrain:
                     random_state=42
                 )
                 self.model.fit(features_scaled)
+                # Validate the fallback model too
+                if (np.isnan(self.model.startprob_).any() or
+                        np.isnan(self.model.transmat_).any() or
+                        np.isnan(self.model.means_).any()):
+                    logger.warning(
+                        "GaussianHMM fallback also degenerate for %s — skipping training.",
+                        self.symbol
+                    )
+                    return self  # Leave _is_trained = False
 
         self._build_state_map()
         self._last_trained = datetime.utcnow()
@@ -149,6 +158,9 @@ class HMMBrain:
             # GMMHMM: means_ shape (n_components, n_mix, n_features)
             # weights_ shape (n_components, n_mix) — mixture weights per state
             w = self.model.weights_          # (n_components, n_mix)
+            # Guard: NaN weights mean degenerate GMMHMM — fall back to uniform
+            if np.isnan(w).any():
+                w = np.ones_like(w) / w.shape[1]
             # Weighted average across mixture components → (n_components, n_features)
             state_means = np.einsum("ij,ijk->ik", w, raw_means)
         else:
