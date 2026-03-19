@@ -361,6 +361,13 @@ class RegimeMasterBot:
         cycle_start = time.time()
         self._cycle_count += 1
 
+        # ── Clear stale coin states from previous cycle ───────────────────────
+        # Keep only coins that have an active trade so live position data is
+        # preserved. Everything else gets a fresh state this cycle — no stale
+        # reasons, actions, or confidence scores bleeding through.
+        _active_syms = set(self._active_positions.keys()) if hasattr(self, "_active_positions") else set()
+        self._coin_states = {s: v for s, v in self._coin_states.items() if s in _active_syms}
+
         # ── 0a. Pull active bots from SaaS DB (every cycle) ───
         # Engine is the pull side — no push/registration required.
         # This self-heals after every Railway redeploy without any dashboard visit.
