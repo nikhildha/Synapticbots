@@ -39,6 +39,13 @@ logging.basicConfig(
         logging.FileHandler(os.path.join(config.DATA_DIR, "bot.log"), encoding="utf-8"),
     ]
 )
+# Suppress Binance library's internal WS error spam.
+# When a connection drops, binance.ws.threaded_stream fires 100s of identical
+# "Read loop has been closed" errors — one per stream thread.
+# Our watchdog in price_stream.py already handles reconnection; the spam adds
+# no diagnostic value and hits Railway's log rate limit.
+logging.getLogger("binance.ws.threaded_stream").setLevel(logging.CRITICAL)
+logging.getLogger("binance").setLevel(logging.WARNING)
 logger = logging.getLogger("RegimeMaster")
 
 # ─── Signal Broadcast Audit Logger ───────────────────────────────────────────
