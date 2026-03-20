@@ -235,7 +235,7 @@ class AthenaEngine:
         payload = {
             "contents": [{"parts": [{"text": prompt}]}],
             "systemInstruction": {"parts": [{"text": ATHENA_SYSTEM_PROMPT}]},
-            "tools": [{"google_search_retrieval": {}}],
+            "tools": [{"google_search": {}}],
             "generationConfig": {
                 "temperature": 0.3,
                 "maxOutputTokens": 4096,
@@ -245,6 +245,11 @@ class AthenaEngine:
         start = time.time()
         try:
             resp = requests.post(url, json=payload, headers={"Content-Type": "application/json"}, timeout=30)
+            if resp.status_code == 400:
+                # Model may not support grounding — retry without the search tool
+                logger.warning("🏛️ Athena [%s] 400 with google_search tool — retrying without grounding", symbol)
+                payload_no_search = {k: v for k, v in payload.items() if k != "tools"}
+                resp = requests.post(url, json=payload_no_search, headers={"Content-Type": "application/json"}, timeout=30)
             resp.raise_for_status()
             resp_data = resp.json()
         except Exception as e:
