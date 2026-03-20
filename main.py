@@ -530,44 +530,10 @@ class RegimeMasterBot:
         logger.info("📡 Initial Scan list: %d coins | active trades in book: %d",
                     len(scan_symbols), tradebook_active_count)
 
-        # ── 4a-1. Segment Pre-Filter (controlled by config.USE_SEGMENT_FILTER) ──
-        # When USE_SEGMENT_FILTER=True: 3-mode macro-regime gate (BEARISH/BULLISH/MIXED pools)
-        # When USE_SEGMENT_FILTER=False: scan ALL coins, no segment restriction
-        from coin_scanner import get_segment_pools_for_regime
-        _market_mode  = "MIXED"   # safe fallback
-        _short_pool_segs: set = set()
-        _long_pool_segs:  set = set()
-
-        if getattr(config, "USE_SEGMENT_FILTER", True):
-            allowed_segment_coins: set = {"BTCUSDT"}
-            _short_pool_coins: set = set()
-            _long_pool_coins:  set = set()
-            try:
-                _market_mode, _short_pool_segs, _long_pool_segs = get_segment_pools_for_regime()
-                for seg in _short_pool_segs:
-                    _short_pool_coins.update(config.CRYPTO_SEGMENTS.get(seg, []))
-                for seg in _long_pool_segs:
-                    _long_pool_coins.update(config.CRYPTO_SEGMENTS.get(seg, []))
-                allowed_segment_coins.update(_short_pool_coins)
-                allowed_segment_coins.update(_long_pool_coins)
-                logger.info("🔒 Segment gate: %s mode | SHORT=%s LONG=%s | allowed=%d coins",
-                    _market_mode,
-                    list(_short_pool_segs),
-                    list(_long_pool_segs),
-                    len(allowed_segment_coins))
-            except Exception as e:
-                logger.error("Segment pool fetch failed: %s — scanning all segments.", e)
-                for seg, coins in getattr(config, "CRYPTO_SEGMENTS", {}).items():
-                    allowed_segment_coins.update(coins)
-                    _short_pool_coins.update(coins)
-                    _long_pool_coins.update(coins)
-        else:
-            # Segment filter disabled — allow every coin in the scan list
-            allowed_segment_coins = set(scan_symbols)
-            allowed_segment_coins.add("BTCUSDT")
-            _short_pool_coins = set(scan_symbols)
-            _long_pool_coins  = set(scan_symbols)
-            logger.info("🔓 Segment filter DISABLED — scanning all %d coins", len(scan_symbols))
+        # ── 4a-1. Segment pool already shortlists coins (top-4 segments) ──
+        # No direction gate: HMM per-coin decides BULLISH/BEARISH/SIDEWAYS.
+        # All coins that made it into the scan pool go straight to analysis.
+        logger.info("📡 Segment pool locked — %d coins routed to HMM", len(scan_symbols))
 
 
         # ── 4b. Macro Veto Overlay (BTC Flash Crash Detection) ──
@@ -587,54 +553,19 @@ class RegimeMasterBot:
             logger.debug("Failed to fetch BTC macro context: %s", e)
 
         for symbol in scan_symbols:
-            if symbol not in allowed_segment_coins:
-                # Write state so dashboard shows the correct reason (not stale from prev cycle)
-                _pool_desc = f"{_market_mode}: {', '.join(list(_short_pool_coins)[:3] or _long_pool_coins or ['none'])} only"
-                from segment_features import get_segment_for_coin as _gsfc
-                self._coin_states[symbol] = {
-                    "symbol":  symbol,
-                    "action":  "SEGMENT_POOL_SKIP",
-                    "regime":  self._coin_states.get(symbol, {}).get("regime", "N/A"),
-                    "segment": _gsfc(symbol),      # ← fix: was missing → showed '-' in dashboard
-                    "confidence": 0,
-                    "conviction": 0,
-                    "reason":  f"Not in {_market_mode} pool",
-                    "pool_desc": _pool_desc,
-                }
-                logger.info("🚫 [POOL SKIP] %s (%s) → not in %s pool %s",
-                    symbol, _gsfc(symbol), _market_mode,
-                    list(_short_pool_segs) if _short_pool_segs else list(_long_pool_segs))
-                continue
-
             if symbol in config.EXCLUDED_COINS:
                 logger.info("🚫 Skipping %s (Exclusion List)", symbol)
                 continue
             try:
                 result = self._analyze_coin(symbol, balance, btc_flash_crash=btc_flash_crash)
-                if result and symbol != "BTCUSDT":
-                    side = result.get("side")
-                    # ── Direction gate: only active when USE_SEGMENT_FILTER is on ──
-                    if getattr(config, "USE_SEGMENT_FILTER", True):
-                        if side == "BUY" and symbol not in _long_pool_coins:
-                            logger.debug("🚫 %s LONG signal but seg not in LONG pool (%s mode) — skip",
-                                         symbol, _market_mode)
-                            self._coin_states[symbol]["action"] = "DIRECTION_GATE_SKIP"
-                            self._coin_states[symbol]["reason"] = f"LONG signal but {_market_mode} mode — SHORT pool only"
-                            continue
-                        if side == "SELL" and symbol not in _short_pool_coins:
-                            logger.debug("🚫 %s SHORT signal but seg not in SHORT pool (%s mode) — skip",
-                                         symbol, _market_mode)
-                            self._coin_states[symbol]["action"] = "DIRECTION_GATE_SKIP"
-                            self._coin_states[symbol]["reason"] = f"SHORT signal but {_market_mode} mode — LONG pool only"
-                            continue
                 if result:
                     raw_results.append(result)
             except Exception as e:
                 if symbol == "BTCUSDT":
                     logger.error("🚨 BTC analysis failed: %s", e, exc_info=True)
                 else:
-                    logger.warning("⚠️ Analysis failed for %s: %s", symbol, e)  # H3 Fix: visible in prod logs
-                
+                    logger.warning("⚠️ Analysis failed for %s: %s", symbol, e)
+
             # Aggressive GC: Clear memory physically bounded by MTF array instantiations immediately
             # so the baseline RAM never scales to n_coins during a single heartbeat cycle.
             self._evict_brain_cache()
