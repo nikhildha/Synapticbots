@@ -75,7 +75,6 @@ Your job is to make the FINAL DECISION: LONG, SHORT, or SKIP.
 | TF Breakdown | Per-timeframe regime + margin |
 | Signal Type | TREND_FOLLOW or REVERSAL |
 | TF Agreement | How many timeframes agree (1–3) |
-| ATR % | Average True Range as % of price — volatility proxy |
 | BTC Regime / Margin | Current macro environment |
 | **PDH / PDL** | **Previous Day High / Low** — key daily S/R zones |
 | **PWH / PWL** | **Previous Week High / Low** — major structural levels |
@@ -83,7 +82,7 @@ Your job is to make the FINAL DECISION: LONG, SHORT, or SKIP.
 | **Dist from VWAP %** | Price vs VWAP — positive=above, negative=below |
 | **Swing High 3/5** | Most recent fractal swing high (3-bar and 5-bar lookback) |
 | **Swing Low 3/5** | Most recent fractal swing low (3-bar and 5-bar lookback) |
-| **ATH 7D / ATL 7D** | 7-day all-time high / low rage |
+| **ATH 7D / ATL 7D** | 7-day all-time high / low range |
 
 ## Your Analysis Workflow
 
@@ -100,7 +99,9 @@ Your job is to make the FINAL DECISION: LONG, SHORT, or SKIP.
 
 4. **Give 40% weight to HMM** — the quantitative model's signal + conviction carry 40% of your final decision. Your fundamental/technical analysis is 60%.
 
-5. **Output your decision** as clean JSON.
+5. **Embed risk identifiers inside your reasoning paragraph** — do NOT list them separately. Naturally state risks as part of your analytical synthesis (e.g. "...however price is approaching PWH resistance at $X which caps upside risk" or "...note: approaching a key supply zone.").
+
+6. **Output your decision** as clean JSON.
 
 ## Output Format
 
@@ -112,10 +113,9 @@ Return ONLY a valid JSON object — no markdown, no backticks, no extra text:
   "adjusted_confidence": 0.0-1.0,
   "leverage_recommendation": "5x",
   "size_recommendation": "50%",
-  "reasoning": "2-3 sentence specific analysis citing price levels and news.",
-  "risk_flags": ["flag1", "flag2"],
-  "key_support": "$X.XX, $X.XX (PDL=$X, VWAP=$X)",
-  "key_resistance": "$X.XX, $X.XX (PDH=$X, PWH=$X)"
+  "reasoning": "3-4 sentences: analytical synthesis + embedded risk identifiers citing specific price levels, structure (VWAP/PDH/PWH/swings), news, and BTC context.",
+  "key_support": "$X.XX (PDL=$X, VWAP=$X)",
+  "key_resistance": "$X.XX (PDH=$X, PWH=$X)"
 }"""
 
 
@@ -441,9 +441,8 @@ class AthenaEngine:
 ### ── Per-Timeframe Breakdown ──
 {tf_str}
 
-### ── Price & Volatility ──
+### ── Price & Market Structure ──
 - Current Price    : {_p(ctx.get('current_price'), 4)}
-- ATR (hourly)     : {_p(ctx.get('atr'), 4)}  ({ctx.get('atr_pct', 0):.2f}% of price)
 - Trend Alignment  : {ctx.get('trend', 'N/A')}
 
 ### ── BTC Macro Context ──
@@ -472,8 +471,9 @@ class AthenaEngine:
 3. Check VWAP positioning — above = bullish context, below = bearish context
 4. Verify swing structure — are we making higher highs or lower lows?
 5. Confirm BTC macro regime alignment
-6. Give FINAL CONVICTION: LONG, SHORT, or SKIP
-7. Recommend LEVERAGE and POSITION SIZE based on structure quality
+6. **Write your reasoning as a complete analytical synthesis** — embed any risk identifiers (approaching resistance, BTC macro conflict, news overhang, low conviction) naturally INSIDE the reasoning paragraph
+7. Give FINAL CONVICTION: LONG, SHORT, or SKIP
+8. Recommend LEVERAGE and POSITION SIZE based on structure quality
 
 Return your analysis as a single JSON object."""
 
