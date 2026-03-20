@@ -89,22 +89,20 @@ Your job is to make the FINAL DECISION: LONG, SHORT, or SKIP.
 
 ## Your Analysis Workflow
 
-1. **Use Google Search** to find any breaking news, token events, listings, or regulatory actions for this coin RIGHT NOW. If news is decisively negative → SKIP regardless of HMM.
-
-2. **Read the Structure Levels:**
+1. **Read the Structure Levels:**
    - Is price ABOVE or BELOW VWAP? (bullish bias = above VWAP)
    - Is price approaching PDH/PWH (resistance)? → Be cautious on LONG
    - Is price approaching PDL/PWL (support)? → Be cautious on SHORT
    - Are recent swing highs being broken (higher high)? → Bullish
    - Are recent swing lows breaking down (lower low)? → Bearish
 
-3. **Check BTC Macro Alignment** — if BTC is BEARISH and we're asked to LONG an altcoin, require much stronger conviction.
+2. **Check BTC Macro Alignment** — if BTC is BEARISH and we're asked to LONG an altcoin, require much stronger conviction.
 
-4. **Give 40% weight to HMM** — the quantitative model's signal + conviction carry 40% of your final decision. Your fundamental/technical analysis is 60%.
+3. **Give 40% weight to HMM** — the quantitative model's signal + conviction carry 40% of your final decision. Your fundamental/technical analysis is 60%.
 
-5. **Embed risk identifiers inside your reasoning paragraph** — do NOT list them separately. Naturally state risks as part of your analytical synthesis (e.g. "...however price is approaching PWH resistance at $X which caps upside risk" or "...note: approaching a key supply zone.").
+4. **Embed risk identifiers inside your reasoning paragraph** — do NOT list them separately. Naturally state risks as part of your analytical synthesis (e.g. "...however price is approaching PWH resistance at $X which caps upside risk" or "...note: approaching a key supply zone.").
 
-6. **Output your decision** as clean JSON.
+5. **Output your decision** as clean JSON.
 
 ## Output Format
 
@@ -235,21 +233,15 @@ class AthenaEngine:
         payload = {
             "contents": [{"parts": [{"text": prompt}]}],
             "systemInstruction": {"parts": [{"text": ATHENA_SYSTEM_PROMPT}]},
-            "tools": [{"google_search": {}}],
             "generationConfig": {
                 "temperature": 0.3,
-                "maxOutputTokens": 4096,
+                "maxOutputTokens": 2048,
             }
         }
 
         start = time.time()
         try:
             resp = requests.post(url, json=payload, headers={"Content-Type": "application/json"}, timeout=30)
-            if resp.status_code == 400:
-                # Model may not support grounding — retry without the search tool
-                logger.warning("🏛️ Athena [%s] 400 with google_search tool — retrying without grounding", symbol)
-                payload_no_search = {k: v for k, v in payload.items() if k != "tools"}
-                resp = requests.post(url, json=payload_no_search, headers={"Content-Type": "application/json"}, timeout=30)
             resp.raise_for_status()
             resp_data = resp.json()
         except Exception as e:

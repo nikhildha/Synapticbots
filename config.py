@@ -168,20 +168,8 @@ def get_atr_multipliers(leverage=1):
 # Each step: (trigger_pnl_pct, lock_pnl_pct)
 #   When leveraged P&L >= trigger → move SL to lock that % profit
 #   lock 0% = breakeven (entry price)
-TRAILING_SL_ENABLED = True       # Enabled to lock in profit before reversion
-TRAILING_SL_STEPS = [
-    (5.0,   0.0),   # At +5%  leveraged P&L → SL to Breakeven
-    (10.0,  5.0),   # At +10% leveraged P&L → Lock +5% profit
-    (15.0, 10.0),   # At +15% leveraged P&L → Lock +10% profit
-    (20.0, 15.0),   # At +20% leveraged P&L → Lock +15% profit
-    (25.0, 20.0),   # At +25% leveraged P&L → Lock +20% profit
-    (30.0, 25.0),   # At +30% leveraged P&L → Lock +25% profit
-    (35.0, 30.0),   # At +35% leveraged P&L → Lock +30% profit
-    (40.0, 35.0),   # At +40% leveraged P&L → Lock +35% profit
-    (45.0, 40.0),   # At +45% leveraged P&L → Lock +40% profit
-    (50.0, 45.0),   # At +50% leveraged P&L → Lock +45% profit
-]
-# Legacy ATR trailing (kept for test compat — superseded by TRAILING_SL_STEPS)
+# Legacy ATR trailing (kept for test compat — superseded by TRAILING_SL_STEPS at line 265)
+
 TRAILING_SL_ACTIVATION_ATR = 1.0
 TRAILING_TP_MAX_EXTENSIONS = 3
 
@@ -310,7 +298,7 @@ SENTIMENT_VADER_WEIGHT      = 0.4      # VADER contribution when blending with F
 # Acts as a "risk committee" — can EXECUTE, REDUCE_SIZE, or VETO trades.
 LLM_REASONING_ENABLED       = True
 LLM_API_KEY                 = os.getenv("GEMINI_API_KEY", "")
-LLM_MODEL                   = "gemini-2.0-flash"          # Latest stable flash model (2.5-flash not yet public)
+LLM_MODEL                   = "gemini-1.5-flash"          # Stable REST API — 2.0-flash/2.5-flash 404 on generateContent
 LLM_CACHE_MINUTES           = 10                          # Cache per-coin LLM decisions
 LLM_TIMEOUT_SECONDS         = 30                          # Includes Google Search grounding time
 LLM_VETO_THRESHOLD          = 0.30                        # Below this → LLM vetoes the trade

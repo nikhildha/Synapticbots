@@ -736,48 +736,68 @@ def update_unrealized(prices=None, funding_rates=None):
             lev = trade["leverage"]
             steps = getattr(config, 'TRAILING_SL_STEPS', [])
 
-            for step_idx, (trigger_pnl, lock_pnl) in enumerate(steps):
-                # Only process steps we haven't activated yet
-                if step_idx <= trade["stepped_lock_level"]:
-                    continue
-                if pnl_pct >= trigger_pnl:
-                    # Calculate the lock price from lock_pnl percentage
-                    # lock_pnl is in leveraged %, convert to price move
-                    lock_price_move = (lock_pnl / 100) / lev
-                    if is_long:
-                        new_sl = round(entry * (1 + lock_price_move), 6)
-                    else:
-                        new_sl = round(entry * (1 - lock_price_move), 6)
-
-                    # Only tighten, never loosen
-                    sl_improved = (is_long and new_sl > trade["trailing_sl"]) or \
-                                  (not is_long and new_sl < trade["trailing_sl"])
-                    if sl_improved:
-                        old_sl = trade["trailing_sl"]
-                        trade["trailing_sl"] = new_sl
-                        trade["trailing_active"] = True
-                        trade["stepped_lock_level"] = step_idx
-                        trade["trail_sl_count"] = trade.get("trail_sl_count", 0) + 1
-
-                        if lock_pnl == 0:
-                            lock_label = "BREAKEVEN"
+            # Safety: skip if entry is zero/missing (prevents garbage SL values)
+            if entry <= 0 or lev <= 0:
+                logger.warning("⚠️ SL trail skipped for %s — entry=%.6f lev=%s",
+                               trade.get("trade_id"), entry, lev)
+            else:
+                for step_idx, (trigger_pnl, lock_pnl) in enumerate(steps):
+                    # Only process steps we haven't activated yet
+                    if step_idx <= trade["stepped_lock_level"]:
+                        continue
+                    if pnl_pct >= trigger_pnl:
+                        # lock_pnl is a leveraged P&L %. Convert to a price move fraction.
+                        # e.g. lock_pnl=5.0, lev=20 → price_move = 5/100/20 = 0.0025 (0.25%)
+                        lock_price_move = (lock_pnl / 100.0) / lev
+                        if is_long:
+                            new_sl = round(entry * (1.0 + lock_price_move), 8)
                         else:
-                            lock_label = f"+{lock_pnl:.0f}% profit"
+                            new_sl = round(entry * (1.0 - lock_price_move), 8)
 
-                        logger.info(
-                            "🔒 Stepped SL for %s: P&L %.1f%% ≥ %.0f%% trigger → SL %.6f → %.6f (%s)",
-                            trade["trade_id"], pnl_pct, trigger_pnl, old_sl, new_sl, lock_label,
-                        )
+                        # Sanity check: new_sl must be on the correct side of entry
+                        sl_sane = (is_long and new_sl <= entry * 1.01) or \
+                                  (not is_long and new_sl >= entry * 0.99)
+                        if not sl_sane:
+                            logger.error(
+                                "❌ SL trail sanity fail for %s [step %d]: entry=%.6f lock_pnl=%.1f "
+                                "lock_price_move=%.6f new_sl=%.6f — SKIPPING",
+                                trade.get("trade_id"), step_idx+1, entry, lock_pnl,
+                                lock_price_move, new_sl,
+                            )
+                            break
 
-                        # For LIVE trades: modify exchange SL order
-                        is_live = trade.get("mode") == "LIVE"
-                        if is_live:
-                            try:
-                                from execution_engine import ExecutionEngine
-                                ExecutionEngine.modify_sl_live(symbol, new_sl)
-                                logger.info("🔒 Live SL modified on exchange for %s → %.6f", symbol, new_sl)
-                            except Exception as e:
-                                logger.error("❌ Failed to modify live SL for %s: %s", symbol, e)
+                        # Only tighten, never loosen
+                        sl_improved = (is_long and new_sl > trade["trailing_sl"]) or \
+                                      (not is_long and new_sl < trade["trailing_sl"])
+
+                        if sl_improved or trade["stepped_lock_level"] < 0:
+                            old_sl = trade["trailing_sl"]
+                            trade["trailing_sl"] = new_sl
+                            trade["trailing_active"] = True
+                            trade["stepped_lock_level"] = step_idx
+                            trade["trail_sl_count"] = trade.get("trail_sl_count", 0) + 1
+
+                            lock_label = "BREAKEVEN" if lock_pnl == 0 else f"+{lock_pnl:.0f}% profit"
+                            logger.info(
+                                "🔒 SL Step %d for %s: pnl=%.2f%% ≥ trigger=%.0f%% | "
+                                "entry=%.6f lock_move=%.6f | SL %.6f→%.6f [%s]",
+                                step_idx + 1, trade.get("trade_id"), pnl_pct, trigger_pnl,
+                                entry, lock_price_move, old_sl, new_sl, lock_label,
+                            )
+
+                            # For LIVE trades: modify exchange SL order
+                            is_live_trail = trade.get("mode") == "LIVE"
+                            if is_live_trail:
+                                try:
+                                    from execution_engine import ExecutionEngine
+                                    ExecutionEngine.modify_sl_live(symbol, new_sl)
+                                    logger.info("🔒 Live SL modified on exchange for %s → %.6f", symbol, new_sl)
+                                except Exception as e:
+                                    logger.error("❌ Failed to modify live SL for %s: %s", symbol, e)
+
+                            # Only advance ONE step per cycle — prevents
+                            # multi-step runaway when pnl jumps are large
+                            break
 
         # ── EXIT CHECKS ──────────────────────────────────────────────
         # For LIVE trades, CoinDCX handles SL/TP/MAX_LOSS via exchange
