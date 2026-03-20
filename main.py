@@ -1159,6 +1159,7 @@ class RegimeMasterBot:
                 self._coin_states[symbol] = {
                     "symbol": symbol, "regime": "N/A", "confidence": 0,
                     "price": 0, "action": "MTF_INSUFFICIENT_MODELS",
+                    "segment": get_segment_for_coin(symbol),
                 }
                 return None
 
@@ -1171,6 +1172,7 @@ class RegimeMasterBot:
                 self._coin_states[symbol] = {
                     "symbol": symbol, "regime": regime_summary,
                     "confidence": 0, "price": 0, "action": "MTF_NO_CONSENSUS",
+                    "segment": get_segment_for_coin(symbol),
                 }
                 return None
 
@@ -1179,6 +1181,7 @@ class RegimeMasterBot:
                 self._coin_states[symbol] = {
                     "symbol": symbol, "regime": regime_summary,
                     "confidence": 0, "price": 0, "action": "MACRO_VETO_BTC_CRASH",
+                    "segment": get_segment_for_coin(symbol),
                 }
                 return None
 
@@ -1233,6 +1236,7 @@ class RegimeMasterBot:
                         "symbol": symbol, "regime": regime_summary,
                         "confidence": round(conf, 4), "price": current_price,
                         "action": "WEEKEND_SKIP",
+                        "segment": get_segment_for_coin(symbol),
                     }
                     return None
 
@@ -1244,6 +1248,7 @@ class RegimeMasterBot:
                         "symbol": symbol, "regime": regime_summary,
                         "confidence": round(conf, 4), "price": current_price,
                         "action": "VOL_TOO_LOW",
+                        "segment": get_segment_for_coin(symbol),
                     }
                     return None
                 if vol_ratio > config.VOL_MAX_ATR_PCT:
@@ -1251,6 +1256,7 @@ class RegimeMasterBot:
                         "symbol": symbol, "regime": regime_summary,
                         "confidence": round(conf, 4), "price": current_price,
                         "action": "VOL_TOO_HIGH",
+                        "segment": get_segment_for_coin(symbol),
                     }
                     return None
 
@@ -1263,6 +1269,7 @@ class RegimeMasterBot:
                     "confidence": round(conf, 4), "price": current_price,
                     "action": f"LOW_CONVICTION:{conviction:.1f}<{conv_min}",
                     "brain": brain_id,
+                    "segment": get_segment_for_coin(symbol),
                 }
                 return None
 
@@ -1286,6 +1293,7 @@ class RegimeMasterBot:
                 "tf_agreement": tf_agreement,
                 "regime_summary": regime_summary,
                 "athena": athena_action,
+                "segment": get_segment_for_coin(symbol),
             }
 
             return {
