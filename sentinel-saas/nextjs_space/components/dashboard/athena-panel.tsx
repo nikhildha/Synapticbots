@@ -102,9 +102,6 @@ export function AthenaPanel({ athena }: Props) {
                         <h2 style={{ margin: 0, fontSize: 18, fontWeight: 800, color: '#E8EDF5', letterSpacing: '1px' }}>
                             ATHENA A.I.
                         </h2>
-                        <div style={{ fontSize: 11, color: '#00E5FF', opacity: 0.8, letterSpacing: '2px', textTransform: 'uppercase' }}>
-                            Lead Investment Officer
-                        </div>
                     </div>
                 </div>
 
