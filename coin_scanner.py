@@ -424,36 +424,40 @@ def get_segment_pools_for_regime(short_n=None, long_n=None):
 def get_active_bot_segment_pool(active_bots):
     """
     Builds the coin scan pool based on the segment_filter of all active bots.
-    If any bot has segment_filter == "ALL", or if no bots are registered,
-    it dynamically fetches the Top 2 hottest segments (and writes heatmap JSON).
-    For all other bots, it appends the coins from their specific mapped segments.
+    If USE_SEGMENT_FILTER=True: ONLY use the top-N hottest segments (SEGMENT_SCAN_LIMIT).
+      Individual bot segment_filter assignments are ignored for pool sizing —
+      the per-coin direction gate in main.py handles LONG/SHORT direction per bot.
+    If USE_SEGMENT_FILTER=False: all bot segments are merged (legacy behaviour).
     """
     logger.info("🔍 Compiling segment scan pool for %d active bots...", len(active_bots))
 
-    target_segments = set()
-    needs_dynamic_all = False
+    segment_limit = getattr(config, "SEGMENT_SCAN_LIMIT", 4)
+    use_segment_filter = getattr(config, "USE_SEGMENT_FILTER", True)
 
-    if not active_bots:
-        # No bots registered yet — treat as 'ALL' mode so we still scan segments
-        # and write the heatmap for the dashboard
-        needs_dynamic_all = True
-        logger.info("⚡ No active bots registered — falling back to ALL/dynamic segment mode")
+    # ── FAST PATH: USE_SEGMENT_FILTER=True ───────────────────────────────────
+    # Always use ONLY top-N dynamic segments. Ignore individual bot segment_filter settings
+    # so we don't merge all 10 segments → 74 coins when all bots are default 'ALL'.
+    if use_segment_filter:
+        top_segments = get_hottest_segments(segment_limit)  # writes heatmap JSON
+        logger.info("🎯 Segment filter ON — pool capped to top %d segments: %s",
+                    segment_limit, ", ".join(top_segments))
+        target_segments = set(top_segments)
     else:
-        for bot in active_bots:
-            seg = bot.get("segment_filter", "ALL")
-            if seg == "ALL":
-                needs_dynamic_all = True
-            elif seg in config.CRYPTO_SEGMENTS:
-                target_segments.add(seg)
+        # Segment filter disabled — merge all individual bot segment assignments
+        target_segments = set()
+        if not active_bots:
+            get_hottest_segments(segment_limit)  # still write heatmap JSON
+            target_segments = set(config.CRYPTO_SEGMENTS.keys())
+        else:
+            for bot in active_bots:
+                seg = bot.get("segment_filter", "ALL")
+                if seg == "ALL":
+                    target_segments = set(config.CRYPTO_SEGMENTS.keys())
+                    break
+                elif seg in config.CRYPTO_SEGMENTS:
+                    target_segments.add(seg)
+        logger.info("🔓 Segment filter OFF — scanning all %d segments", len(target_segments))
 
-    if needs_dynamic_all:
-        segment_limit = getattr(config, "SEGMENT_SCAN_LIMIT", 2)
-        top_segments = get_hottest_segments(segment_limit)  # ← also writes heatmap JSON
-        logger.info("🎯 Dynamic segment selection — Top %d: %s", segment_limit, ", ".join(top_segments))
-        for t_seg in top_segments:
-            target_segments.add(t_seg)
-
-    # Compile the final unique list of coins from exactly these target segments
     candidates = set()
     for seg in target_segments:
         coins = config.CRYPTO_SEGMENTS.get(seg, [])

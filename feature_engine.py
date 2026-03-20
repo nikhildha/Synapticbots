@@ -27,7 +27,9 @@ def compute_hmm_features(df, btc_df=None):
     df = df.copy()
     # Guard: replace zero close prices to avoid log(0) = -inf / RuntimeWarning
     close_safe = df["close"].replace(0, np.nan)
-    df["log_return"] = np.log(close_safe / close_safe.shift(1)).clip(-5, 5)
+    with np.errstate(divide='ignore', invalid='ignore'):
+        df["log_return"] = np.log(close_safe / close_safe.shift(1)).clip(-5, 5)
+
     df["volatility"] = (df["high"] - df["low"]) / df["close"]
     df["volume_change"] = np.log(df["volume"] / df["volume"].shift(1).replace(0, np.nan))
     df["volume_change"] = df["volume_change"].fillna(0).clip(-3, 3)
