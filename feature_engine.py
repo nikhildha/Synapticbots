@@ -2,11 +2,17 @@
 Project Regime-Master — Feature Engine
 Computes HMM input features and technical indicators (RSI, Bollinger, ATR).
 """
+import warnings
 import numpy as np
 import pandas as pd
 import logging
 
 import config
+
+# Suppress RuntimeWarning from np.log when pandas routes it through its ufunc
+# path (arraylike.py) — np.errstate alone doesn't catch that internal call.
+warnings.filterwarnings("ignore", category=RuntimeWarning, message="divide by zero encountered in log")
+warnings.filterwarnings("ignore", category=RuntimeWarning, message="invalid value encountered in log")
 
 logger = logging.getLogger("FeatureEngine")
 
@@ -27,8 +33,7 @@ def compute_hmm_features(df, btc_df=None):
     df = df.copy()
     # Guard: replace zero close prices to avoid log(0) = -inf / RuntimeWarning
     close_safe = df["close"].replace(0, np.nan)
-    with np.errstate(divide='ignore', invalid='ignore'):
-        df["log_return"] = np.log(close_safe / close_safe.shift(1)).clip(-5, 5)
+    df["log_return"] = np.log(close_safe / close_safe.shift(1)).clip(-5, 5)
 
     df["volatility"] = (df["high"] - df["low"]) / df["close"]
     df["volume_change"] = np.log(df["volume"] / df["volume"].shift(1).replace(0, np.nan))
