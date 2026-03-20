@@ -37,6 +37,7 @@ _engine_bot = None
 _engine_crash_count = 0
 _engine_last_crash = None
 _engine_start_lock = threading.Lock()  # Prevents duplicate engine threads on startup
+_ENGINE_INITIALIZED = False            # Module-level guard: prevents re-entrant start_engine() calls
 
 # ─── PID Lock File ────────────────────────────────────────────────────
 # Prevents two engine processes running simultaneously.
@@ -1160,6 +1161,12 @@ def _setup_sigterm_handler():
         # Give the engine thread 15s to wind down
         if _engine_thread and _engine_thread.is_alive():
             _engine_thread.join(timeout=15)
+        # Clear startup lock so next deployment can start cleanly
+        try:
+            if os.path.exists(_STARTUP_LOCK_FILE):
+                os.remove(_STARTUP_LOCK_FILE)
+        except Exception:
+            pass
         logger.info("👋 Engine shut down cleanly after SIGTERM")
         sys.exit(0)
 
@@ -1439,13 +1446,43 @@ _stream_handler.setLevel(logging.INFO)
 logging.getLogger().addHandler(_stream_handler)
 logging.getLogger().setLevel(logging.INFO)
 
-# Start the trading engine and watchdog in background
-# This MUST happen at module scope so it runs even if Railway uses Gunicorn/Flask instead of python
-start_engine()
+# ─── One-shot startup guard ──────────────────────────────────────────
+# engine_api.py runs its module-scope code every time it is imported.
+# On Railway this happens multiple times (overlapping deploys, threads
+# importing each other, etc.). Use an atomic O_CREAT|O_EXCL lock file
+# so only ONE instance ever calls start_engine().
+_STARTUP_LOCK_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", "engine_startup.lock")
 
-_watchdog_thread = threading.Thread(target=_engine_watchdog, daemon=True, name="EngineWatchdog")
-_watchdog_thread.start()
-logger.info("🐕 Engine watchdog started (checks every 60s)")
+def _acquire_startup_lock() -> bool:
+    """Atomically create startup lock file. Returns True only for the winner."""
+    global _ENGINE_INITIALIZED
+    if _ENGINE_INITIALIZED:
+        return False  # Already started in this process
+    try:
+        os.makedirs(os.path.dirname(_STARTUP_LOCK_FILE), exist_ok=True)
+        fd = os.open(_STARTUP_LOCK_FILE, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+        os.write(fd, str(os.getpid()).encode())
+        os.close(fd)
+        _ENGINE_INITIALIZED = True
+        logger.info("🔒 Startup lock acquired (PID %d) — this is the primary engine instance", os.getpid())
+        return True
+    except FileExistsError:
+        logger.warning("⏭️  Startup lock already held — skipping duplicate engine start")
+        return False
+    except Exception as e:
+        logger.warning("Could not acquire startup lock (%s) — starting anyway", e)
+        _ENGINE_INITIALIZED = True
+        return True
+
+# Only the instance that wins the startup lock starts the engine
+if _acquire_startup_lock():
+    start_engine()
+    _watchdog_thread = threading.Thread(target=_engine_watchdog, daemon=True, name="EngineWatchdog")
+    _watchdog_thread.start()
+    logger.info("🐕 Engine watchdog started (checks every 60s)")
+else:
+    logger.info("⏭️  Skipped engine + watchdog start — another instance is primary")
+
 
 # ─── Entry Point (Local Testing) ──────────────────────────────────────
 
