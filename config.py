@@ -237,6 +237,15 @@ SEGMENT_SHORT_POOL_SIZE   = 2       # N worst segments used in BEARISH / MIXED m
 SEGMENT_LONG_POOL_SIZE    = 2       # N best segments used in BULLISH / MIXED mode
 MAX_ACTIVE_PER_SEGMENT = 1          # Correlation control: max 1 trade per segment
 
+# ── Multi-Timeframe Market Mode Confirmation ─────────────────────────────────
+# Prevents false BULLISH/BEARISH locks at swing highs, fake breakouts, reversals.
+# Requires 3 timeframes to agree before committing to a directional mode.
+# If any shorter frame disagrees with 24h → stays MIXED (both directions allowed).
+# Set SEGMENT_MTF_ENABLED = False to revert to legacy 24h-only behaviour instantly.
+SEGMENT_MTF_ENABLED      = True   # Enable 3-frame mode confirmation
+SEGMENT_MTF_4H_TF        = "4h"  # Swing-level candle interval (per-segment top coin)
+SEGMENT_MTF_1H_TF        = "1h"  # Intraday BTC gate candle interval
+
 
 
 # ─── Telegram Notifications ──────────────────────────────────────────────────────

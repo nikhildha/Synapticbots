@@ -197,6 +197,67 @@ def get_hottest_segments(segment_limit=2):
     return [seg["segment"] for seg in segment_data[:segment_limit]]
 
 
+def _get_btc_structure_signals() -> tuple[str, float]:
+    """
+    Two-signal structural confirmation for market mode detection — BTC only.
+
+    Signal 1 — 4h market structure ("bullish" / "bearish" / "neutral")
+      Compares the last two completed 4h candle HIGHS.
+      Higher-high  → swing structure intact on the bull side.
+      Lower-high   → structural breakdown beginning (catches swing highs
+                     and fake-breakout failures 1–2 candles before the
+                     24h return turns negative).
+      Equal / flat → neutral (treated as non-confirming).
+
+    Signal 2 — 1h BTC momentum (%)
+      Net return of the last completed 1h candle.
+      Fast intraday gate — flips within one engine cycle of a reversal.
+
+    Uses only 2 API calls (both BTCUSDT) regardless of how many segments
+    are configured. Falls back to ("neutral", 0.0) on any fetch failure
+    so the caller degrades to MIXED mode gracefully.
+    """
+    from data_pipeline import fetch_klines
+
+    tf_4h = getattr(config, "SEGMENT_MTF_4H_TF", "4h")
+    tf_1h = getattr(config, "SEGMENT_MTF_1H_TF", "1h")
+    sym   = config.PRIMARY_SYMBOL  # BTCUSDT
+
+    # ── Signal 1: 4h candle-high structure ───────────────────────────────────
+    btc_4h_structure = "neutral"
+    try:
+        df4 = fetch_klines(sym, tf_4h, limit=4)   # need at least 2 completed candles
+        if df4 is not None and len(df4) >= 3:
+            # iloc[-1] is the in-progress candle; use [-2] and [-3] as completed
+            cur_high  = float(df4["high"].iloc[-2])
+            prev_high = float(df4["high"].iloc[-3])
+            if cur_high > prev_high:
+                btc_4h_structure = "bullish"   # higher-high → swing trend intact
+            elif cur_high < prev_high:
+                btc_4h_structure = "bearish"   # lower-high  → structural breakdown
+            # else equal → stays "neutral"
+    except Exception as exc:
+        logger.debug("MTF 4h structure fetch failed: %s", exc)
+
+    # ── Signal 2: 1h BTC momentum ────────────────────────────────────────────
+    btc_1h_return = 0.0
+    try:
+        df1 = fetch_klines(sym, tf_1h, limit=3)
+        if df1 is not None and len(df1) >= 2:
+            btc_1h_return = (
+                (float(df1["close"].iloc[-1]) - float(df1["close"].iloc[-2]))
+                / float(df1["close"].iloc[-2]) * 100
+            )
+    except Exception as exc:
+        logger.debug("MTF 1h momentum fetch failed: %s", exc)
+
+    logger.info(
+        "📡 BTC structure signals → 4h_structure=%s | 1h_return=%.3f%%",
+        btc_4h_structure, btc_1h_return,
+    )
+    return btc_4h_structure, btc_1h_return
+
+
 def get_segment_pools_for_regime(short_n=None, long_n=None):
     """
     3-Mode Macro-Regime-Aware Segment Selection.
@@ -275,18 +336,50 @@ def get_segment_pools_for_regime(short_n=None, long_n=None):
         all_segs = list(config.CRYPTO_SEGMENTS.keys())
         return "MIXED", all_segs[:short_n], all_segs[-long_n:]
 
-    # ── Market mode detection ──────────────────────────────────────────────
+    # ── 24h Frame: composite score across all segments ─────────────────────
     scores = [s["composite_score"] for s in segment_data]
     avg_score = sum(scores) / len(scores)
     positive_count = sum(1 for s in scores if s > 0)
     bullish_breadth = positive_count / len(scores)  # fraction of green segments
 
-    if avg_score < bearish_threshold and bullish_breadth < 0.25:
-        market_mode = "BEARISH"
-    elif avg_score > bullish_threshold and bullish_breadth > 0.75:
-        market_mode = "BULLISH"
+    # ── 24h signal (same thresholds as before) ─────────────────────────────
+    tf24_bullish = avg_score > bullish_threshold and bullish_breadth > 0.75
+    tf24_bearish = avg_score < bearish_threshold and bullish_breadth < 0.25
+
+    # ── Multi-TF confirmation: BTC structure (4h) + momentum (1h) ────────────
+    # BULLISH locked only when: 24h bullish AND 4h BTC making higher-highs AND 1h positive
+    # BEARISH locked only when: 24h bearish AND 4h BTC making lower-highs  AND 1h negative
+    # Neutral 4h structure or disagreement on any frame → MIXED (no forced lock)
+    mtf_enabled = getattr(config, "SEGMENT_MTF_ENABLED", True)
+    if mtf_enabled:
+        btc_4h_structure, btc_1h_return = _get_btc_structure_signals()
+
+        if tf24_bullish and btc_4h_structure == "bullish" and btc_1h_return > 0:
+            market_mode = "BULLISH"
+        elif tf24_bearish and btc_4h_structure == "bearish" and btc_1h_return < 0:
+            market_mode = "BEARISH"
+        else:
+            market_mode = "MIXED"   # any frame disagrees → no forced directional lock
+
+        logger.info(
+            "📊 Market Mode: %s | 24h avg=%.2f breadth=%.0f%% | "
+            "4h structure=%s | btc_1h=%.3f%%",
+            market_mode, avg_score, bullish_breadth * 100,
+            btc_4h_structure, btc_1h_return,
+        )
     else:
-        market_mode = "MIXED"
+        # Legacy single-frame mode (SEGMENT_MTF_ENABLED = False)
+        if tf24_bullish:
+            market_mode = "BULLISH"
+        elif tf24_bearish:
+            market_mode = "BEARISH"
+        else:
+            market_mode = "MIXED"
+
+        logger.info(
+            "📊 Market Mode (legacy): %s (avg_score=%.2f, green_breadth=%.0f%%)",
+            market_mode, avg_score, bullish_breadth * 100,
+        )
 
     # ── Build directional pools ────────────────────────────────────────────
     sorted_asc  = sorted(segment_data, key=lambda s: s["composite_score"])        # worst first
@@ -295,12 +388,8 @@ def get_segment_pools_for_regime(short_n=None, long_n=None):
     short_pool = [s["segment"] for s in sorted_asc[:short_n]]  if market_mode != "BULLISH" else []
     long_pool  = [s["segment"] for s in sorted_desc[:long_n]]  if market_mode != "BEARISH" else []
 
-    logger.info(
-        "📊 Market Mode: %s (avg_score=%.2f, green_breadth=%.0f%%) | "
-        "SHORT pool: %s | LONG pool: %s",
-        market_mode, avg_score, bullish_breadth * 100,
-        short_pool or "none", long_pool or "none",
-    )
+    logger.info("   ↳ SHORT pool: %s | LONG pool: %s",
+                short_pool or "none", long_pool or "none")
     return market_mode, short_pool, long_pool
 
 
