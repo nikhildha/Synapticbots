@@ -736,14 +736,8 @@ class RegimeMasterBot:
                         # Compute market structure levels for Athena context
                         mkt_struct = compute_market_structure(sym)
 
-                        # Per-TF HMM predictions (for Athena context)
-                        tf_summary = {}
-                        if hasattr(mtf_brain, '_predictions') and mtf_brain._predictions:
-                            for _tf, (_regime, _margin) in mtf_brain._predictions.items():
-                                tf_summary[_tf] = {
-                                    "regime": config.REGIME_NAMES.get(_regime, "?"),
-                                    "margin": round(_margin, 3),
-                                }
+                        # Per-TF HMM predictions — passed from _analyze_coin via top dict
+                        tf_summary = top.get("tf_breakdown", {})
 
                         llm_ctx = {
                             # ── Core signal ──────────────────────────────
@@ -1152,6 +1146,15 @@ class RegimeMasterBot:
                     logger.debug("Multi-TF %s fetch failed for %s: %s", tf, symbol, e)
 
             # Check if enough models are ready
+            # Build a compact tf_breakdown dict for Athena context
+            tf_breakdown = {}
+            if hasattr(mtf_brain, '_predictions') and mtf_brain._predictions:
+                for _tf, (_r, _m) in mtf_brain._predictions.items():
+                    tf_breakdown[_tf] = {
+                        "regime": config.REGIME_NAMES.get(_r, "?"),
+                        "margin": round(_m, 3),
+                    }
+
             if not mtf_brain.is_ready():
                 self._coin_states[symbol] = {
                     "symbol": symbol, "regime": "N/A", "confidence": 0,
@@ -1605,6 +1608,8 @@ class RegimeMasterBot:
             "funding_rate": round(funding, 6) if funding is not None else None,
             "oi_change":    round(oi_chg, 4)  if oi_chg  is not None else None,
             "orderflow_score": round(orderflow_score, 3) if orderflow_score is not None else None,
+            "tf_breakdown":    tf_breakdown,   # ← passed to Athena context
+            "tf_agreement":    tf_agreement,
             "reason": f"Trend {regime_name} | conf={conf:.0%} | conv={conviction:.1f}{of_note}",
         }
 
