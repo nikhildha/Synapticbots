@@ -756,7 +756,7 @@ class RegimeMasterBot:
                             "signal_type":     top.get("signal_type", "TREND_FOLLOW"),
                             "tf_agreement":    top.get("tf_agreement", 0),
                             # ── Per-TF breakdown ─────────────────────────
-                            "tf_breakdown":    tf_summary,  # e.g. {"1h": {regime,margin}, "4h": ..., "1d": ...}
+                            "tf_breakdown":    tf_summary,
                             # ── Price context ────────────────────────────
                             "current_price":   current_price,
                             "atr":             atr_val,
@@ -765,6 +765,10 @@ class RegimeMasterBot:
                             # ── BTC macro ────────────────────────────────
                             "btc_regime":      self._coin_states.get("BTCUSDT", {}).get("regime", "UNKNOWN"),
                             "btc_margin":      self._coin_states.get("BTCUSDT", {}).get("confidence", 0),
+                            # ── Derivatives context (from conviction score) ────
+                            "funding_rate":    top.get("funding_rate"),   # float or None
+                            "oi_change":       top.get("oi_change"),      # % OI change
+                            "orderflow_score": top.get("orderflow_score"), # -1.0 to +1.0
                             # ── Market structure levels ───────────────────
                             "pdh":             mkt_struct.get("pdh"),
                             "pdl":             mkt_struct.get("pdl"),
@@ -1598,6 +1602,9 @@ class RegimeMasterBot:
             "regime_name": regime_name,
             "confidence": conf,
             "conviction": conviction,
+            "funding_rate": round(funding, 6) if funding is not None else None,
+            "oi_change":    round(oi_chg, 4)  if oi_chg  is not None else None,
+            "orderflow_score": round(orderflow_score, 3) if orderflow_score is not None else None,
             "reason": f"Trend {regime_name} | conf={conf:.0%} | conv={conviction:.1f}{of_note}",
         }
 

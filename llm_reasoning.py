@@ -83,6 +83,9 @@ Your job is to make the FINAL DECISION: LONG, SHORT, or SKIP.
 | **Swing High 3/5** | Most recent fractal swing high (3-bar and 5-bar lookback) |
 | **Swing Low 3/5** | Most recent fractal swing low (3-bar and 5-bar lookback) |
 | **ATH 7D / ATL 7D** | 7-day all-time high / low range |
+| **Funding Rate** | Perpetual swap carry signal — negative=longs paid (bullish), positive=shorts paid (bearish) |
+| **OI Change %** | Open Interest change — growing OI = fresh positioning, falling OI = unwinding |
+| **Orderflow Score** | L2 taker flow score (−1 to +1) — positive=buy pressure, negative=sell pressure |
 
 ## Your Analysis Workflow
 
@@ -113,6 +116,9 @@ Return ONLY a valid JSON object — no markdown, no backticks, no extra text:
   "adjusted_confidence": 0.0-1.0,
   "leverage_recommendation": "5x",
   "size_recommendation": "50%",
+  "entry_price": "$X.XXXX  (ideal entry zone)",
+  "stop_loss": "$X.XXXX  (below key S/R — cite the level)",
+  "target": "$X.XXXX  (nearest resistance — cite the level)",
   "reasoning": "3-4 sentences: analytical synthesis + embedded risk identifiers citing specific price levels, structure (VWAP/PDH/PWH/swings), news, and BTC context.",
   "key_support": "$X.XX (PDL=$X, VWAP=$X)",
   "key_resistance": "$X.XX (PDH=$X, PWH=$X)"
@@ -429,6 +435,53 @@ class AthenaEngine:
             else:
                 vwap_direction = "  ← AT VWAP (neutral)"
 
+        # ── Derivatives context ─────────────────────────────────────────────────
+        side        = ctx.get("side", "BUY")
+        fr          = ctx.get("funding_rate")
+        oi          = ctx.get("oi_change")
+        of_score    = ctx.get("orderflow_score")
+
+        # Funding rate annotation
+        if fr is None:
+            fr_str = "N/A"
+        else:
+            fr_pct = fr * 100
+            if side == "BUY":
+                fr_note = "✅ longs paid" if fr < 0 else ("⚠️ crowded longs" if fr > 0.0003 else "neutral")
+            else:
+                fr_note = "✅ shorts paid" if fr > 0 else ("⚠️ crowded shorts" if fr < -0.0003 else "neutral")
+            fr_str = f"{fr_pct:.4f}%  ({fr_note})"
+
+        # OI change annotation
+        if oi is None:
+            oi_str = "N/A"
+        else:
+            if side == "BUY":
+                oi_note = "✅ fresh longs" if oi > 0.02 else ("⚠️ unwinding" if oi < -0.02 else "neutral")
+            else:
+                oi_note = "✅ fresh shorts" if oi < -0.02 else ("⚠️ covering" if oi > 0.02 else "neutral")
+            oi_str = f"{oi:+.4f}  ({oi_note})"
+
+        # Orderflow score annotation
+        if of_score is None:
+            of_str = "N/A"
+        elif of_score > 0.5:
+            of_str = f"{of_score:+.3f}  ✅ strong buy pressure"
+        elif of_score > 0.2:
+            of_str = f"{of_score:+.3f}  mild buy pressure"
+        elif of_score > -0.2:
+            of_str = f"{of_score:+.3f}  neutral flow"
+        elif of_score > -0.5:
+            of_str = f"{of_score:+.3f}  ⚠️ mild sell pressure"
+        else:
+            of_str = f"{of_score:+.3f}  🔴 strong sell pressure"
+
+        derivatives_block = (
+            f"- Funding Rate     : {fr_str}\n"
+            f"- OI Change        : {oi_str}\n"
+            f"- Orderflow Score  : {of_str}"
+        )
+
         return f"""## Signal Under Review: {ctx.get('ticker', 'N/A')}
 
 ### ── HMM Quantitative Signal (40% weight) ──
@@ -448,6 +501,9 @@ class AthenaEngine:
 ### ── BTC Macro Context ──
 - BTC Regime       : {ctx.get('btc_regime', 'N/A')}
 - BTC HMM Margin   : {ctx.get('btc_margin', 0):.3f}
+
+### ── Derivatives Context ──
+{derivatives_block}
 
 ### ── Key Price Structure Levels ──
 | Level              | Price                              | Notes                    |
@@ -473,7 +529,7 @@ class AthenaEngine:
 5. Confirm BTC macro regime alignment
 6. **Write your reasoning as a complete analytical synthesis** — embed any risk identifiers (approaching resistance, BTC macro conflict, news overhang, low conviction) naturally INSIDE the reasoning paragraph
 7. Give FINAL CONVICTION: LONG, SHORT, or SKIP
-8. Recommend LEVERAGE and POSITION SIZE based on structure quality
+8. Recommend LEVERAGE, POSITION SIZE, ENTRY PRICE, STOP LOSS (below key S/R level), and TARGET (nearest resistance level)
 
 Return your analysis as a single JSON object."""
 
