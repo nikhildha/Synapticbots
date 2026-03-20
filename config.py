@@ -46,8 +46,8 @@ EXCLUDED_COINS = ["AKTUSDT", "WIFUSDT", "FILUSDT"]
 CRYPTO_SEGMENTS = {
     "L1": ["BTCUSDT", "ETHUSDT", "SOLUSDT", "BNBUSDT", "AVAXUSDT", "SUIUSDT", "XRPUSDT", "APTUSDT", "ETCUSDT",
            "ADAUSDT", "DOTUSDT", "NEARUSDT", "TRXUSDT", "BCHUSDT", "TONUSDT", "ICPUSDT", "KASUSDT"],
-    "L2": ["ARBUSDT", "OPUSDT", "POLUSDT", "MNTUSDT", "STRKUSDT", "IMXUSDT", "RONINUSDT", "ZKUSDT",
-           "MANTAUSDT", "METISUSDT", "AXLUSDT"],
+    "L2": ["ARBUSDT", "OPUSDT", "POLUSDT", "STRKUSDT", "IMXUSDT", "RONINUSDT", "ZKUSDT",
+           "MANTAUSDT", "METISUSDT", "AXLUSDT"],   # MNTUSDT removed — not on Binance
     "DeFi": ["UNIUSDT", "AAVEUSDT", "CRVUSDT", "JUPUSDT", "RUNEUSDT", "PENDLEUSDT", "LINKUSDT", "LDOUSDT", "GMXUSDT", "ENAUSDT",
              "SUSHIUSDT", "COMPUSDT", "SNXUSDT", "CAKEUSDT", "GRTUSDT"],
     "AI": ["TAOUSDT", "FETUSDT", "INJUSDT", "WLDUSDT", "AKTUSDT", "RENDERUSDT", "ARKMUSDT"],
@@ -55,7 +55,7 @@ CRYPTO_SEGMENTS = {
              "1000BONKUSDT", "MEWUSDT", "NOTUSDT", "MANAUSDT"],
     "RWA": ["ONDOUSDT", "POLYXUSDT", "TRUUSDT"],
     "Gaming": ["AXSUSDT", "SANDUSDT", "PIXELUSDT", "IOTXUSDT", "GALAUSDT", "ENJUSDT", "YGGUSDT", "GLMUSDT"],
-    "DePIN": ["FILUSDT", "ARUSDT", "HNTUSDT", "IOUSDT", "JTOUSDT"],
+    "DePIN": ["FILUSDT", "ARUSDT", "IOUSDT", "JTOUSDT"],          # HNTUSDT removed — not on Binance
     "Modular": ["TIAUSDT", "DYMUSDT", "STXUSDT", "QNTUSDT"],
     "Oracles": ["PYTHUSDT", "TRBUSDT", "API3USDT", "HBARUSDT"]
 }
@@ -228,7 +228,7 @@ MULTI_COIN_MODE = True          # Enable multi-coin scanning
 # ─── Dynamic Segment Scanner ─────────────────────────────────────────────────────
 SCANNER_SEGMENT_ROTATION = True     # Rotate market segments every hour
 SCANNER_COINS_PER_SEGMENT = 5       # Scan top 5 highest-volume coins within the active segment
-SEGMENT_SCAN_LIMIT = 2              # Legacy: kept for get_hottest_segments() backwards compat
+SEGMENT_SCAN_LIMIT = 4              # Top N segments to scan per cycle (4h+1h blended scorer)
 
 # ── 3-Mode Macro-Regime-Aware Segment Selection ──────────────────────────────
 # The engine detects market mode each cycle and picks segment pools accordingly:

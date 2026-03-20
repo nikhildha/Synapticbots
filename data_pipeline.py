@@ -150,28 +150,34 @@ def fetch_klines(symbol, interval, limit=500):
     """
     Fetch historical candlestick data.
 
-    Always uses CoinDCX for price consistency between paper and live modes.
-    Falls back to Binance only if CoinDCX fails.
+    Paper mode → Binance (primary, broad altcoin coverage)
+    Live mode  → CoinDCX (primary), fallback to Binance if coin not listed
     """
-    try:
-        return _fetch_klines_coindcx(symbol, interval, limit)
-    except Exception as e:
-        logger.warning("CoinDCX klines failed for %s, falling back to Binance: %s", symbol, e)
+    if config.PAPER_TRADE:
         return _fetch_klines_binance(symbol, interval, limit)
+    else:
+        try:
+            return _fetch_klines_coindcx(symbol, interval, limit)
+        except Exception as e:
+            logger.warning("CoinDCX klines failed for %s, falling back to Binance: %s", symbol, e)
+            return _fetch_klines_binance(symbol, interval, limit)
 
 
 def fetch_futures_klines(symbol, interval, limit=500):
     """
     Fetch futures candlestick data.
 
-    Routes:
-      Paper mode → Binance Futures
-      Live mode  → CoinDCX Futures
+    Paper mode → Binance Futures
+    Live mode  → CoinDCX Futures, fallback to Binance
     """
     if config.PAPER_TRADE:
         return _fetch_futures_klines_binance(symbol, interval, limit)
     else:
-        return _fetch_klines_coindcx(symbol, interval, limit)
+        try:
+            return _fetch_klines_coindcx(symbol, interval, limit)
+        except Exception as e:
+            logger.warning("CoinDCX futures failed for %s, falling back to Binance: %s", symbol, e)
+            return _fetch_futures_klines_binance(symbol, interval, limit)
 
 
 def get_multi_timeframe_data(symbol=None, limit=500):
@@ -197,8 +203,14 @@ def get_multi_timeframe_data(symbol=None, limit=500):
 
 
 def get_current_price(symbol=None):
-    """Get the latest price for a symbol. Always uses CoinDCX."""
+    """Get the latest price for a symbol.
+
+    Paper mode → Binance
+    Live mode  → CoinDCX, fallback to Binance
+    """
     symbol = symbol or config.PRIMARY_SYMBOL
+    if config.PAPER_TRADE:
+        return _get_current_price_binance(symbol)
     try:
         return _get_current_price_coindcx(symbol)
     except Exception as e:

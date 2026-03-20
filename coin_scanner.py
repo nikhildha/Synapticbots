@@ -105,27 +105,48 @@ def _save_rotation_state(state):
 
 def get_hottest_segments(segment_limit=2):
     """
-    Evaluate the pulse/momentum of all crypto segments via the 3-Pillar Institutional method:
-    Pillar 1: Volume-Weighted Relative Return (VW-RR)
-    Pillar 2: Benchmark Alpha (vs BTC)
-    Pillar 3: Participation Breadth
-    
-    Returns the top 'segment_limit' segments.
+    Evaluate segment momentum using cycle-matched timeframes (NOT lagged 24h).
+
+    Scoring (matched to 15-min execution cycle):
+      Pillar 1 — 4h candle return (50%): recent sector momentum, 1-2 session lag max
+      Pillar 2 — 1h breadth (50%): are coins *still* participating RIGHT NOW?
+
+    Ranked by absolute blended score → both hot longs and hot shorts surface.
+    Direction (LONG/SHORT) is decided downstream by HMM + Athena.
+    Falls back to 24h ticker return if kline fetch fails for a coin.
     """
+    client = _get_binance_client()
+
+    # ── Fetch live ticker for volume weighting ─────────────────────────────────
     try:
-        client = _get_binance_client()
         tickers = client.get_ticker()
         ticker_map = {t["symbol"]: t for t in tickers}
     except Exception as e:
         logger.error("Failed to fetch tickers for segment heatmap: %s", e)
         return list(config.CRYPTO_SEGMENTS.keys())[:segment_limit]
 
-    # Get Benchmark (BTC) 24h Return
-    btc_return = 0.0
-    if "BTCUSDT" in ticker_map:
+    # ── Fetch 4h and 1h klines for each coin (cached Binance client) ──────────
+    # One pass over all unique coins across all segments
+    all_coins = list({c for coins in config.CRYPTO_SEGMENTS.values() for c in coins})
+    coin_4h = {}   # symbol → % return of last completed 4h candle
+    coin_1h = {}   # symbol → % return of last completed 1h candle
+
+    for symbol in all_coins:
         try:
-            btc_return = float(ticker_map["BTCUSDT"]["priceChangePercent"])
-        except:
+            df4 = fetch_klines(symbol, "4h", limit=3)
+            if df4 is not None and len(df4) >= 3:
+                c0 = float(df4["close"].iloc[-3])
+                c1 = float(df4["close"].iloc[-2])   # completed candle
+                coin_4h[symbol] = (c1 - c0) / c0 * 100 if c0 else 0.0
+        except Exception:
+            pass
+        try:
+            df1 = fetch_klines(symbol, "1h", limit=3)
+            if df1 is not None and len(df1) >= 3:
+                c0 = float(df1["close"].iloc[-3])
+                c1 = float(df1["close"].iloc[-2])   # completed candle
+                coin_1h[symbol] = (c1 - c0) / c0 * 100 if c0 else 0.0
+        except Exception:
             pass
 
     segment_data = []
@@ -133,68 +154,74 @@ def get_hottest_segments(segment_limit=2):
         valid_coins = []
         for symbol in coins:
             t = ticker_map.get(symbol)
-            if t:
-                try:
-                    change = float(t["priceChangePercent"])
-                    volume = float(t.get("quoteVolume", 0))
-                    valid_coins.append({"symbol": symbol, "change": change, "volume": volume})
-                except (ValueError, TypeError):
-                    pass
-        
+            if not t:
+                continue
+            try:
+                volume = float(t.get("quoteVolume", 0))
+                # 4h return: kline preferred, fallback to 24h ticker
+                ret_4h = coin_4h.get(symbol, float(t.get("priceChangePercent", 0)))
+                ret_1h = coin_1h.get(symbol, 0.0)
+                valid_coins.append({"symbol": symbol, "ret_4h": ret_4h,
+                                     "ret_1h": ret_1h, "volume": volume})
+            except (ValueError, TypeError):
+                pass
+
         if not valid_coins:
             continue
 
         total_vol = sum(c["volume"] for c in valid_coins)
-        
-        # Pillar 1: VW-RR (Volume-Weighted Relative Return)
-        vw_rr = sum(c["change"] * (c["volume"] / total_vol) for c in valid_coins) if total_vol > 0 else 0.0
-        
-        # Pillar 2: Benchmark Alpha
-        alpha = vw_rr - btc_return
-        
-        # Pillar 3: Participation Breadth (% of coins participating in the direction of the segment)
-        if vw_rr >= 0:
-            participating = sum(1 for c in valid_coins if c["change"] > 0)
+
+        # Pillar 1: Volume-weighted 4h return
+        if total_vol > 0:
+            vw_4h = sum(c["ret_4h"] * (c["volume"] / total_vol) for c in valid_coins)
         else:
-            participating = sum(1 for c in valid_coins if c["change"] < 0)
-            
-        breadth_pct = (participating / len(valid_coins)) * 100 if valid_coins else 0.0
-        
-        # Composite Score: VW-RR absolute magnitude scaled by breadth
-        # Example: A 10% move with 20% breadth is weak. A 5% move with 100% breadth is strong.
-        composite_score = vw_rr * (breadth_pct / 100.0)
+            vw_4h = sum(c["ret_4h"] for c in valid_coins) / len(valid_coins)
+
+        # Pillar 2: 1h participation breadth (% moving in same direction as segment)
+        direction = 1 if vw_4h >= 0 else -1
+        participating = sum(
+            1 for c in valid_coins
+            if (direction > 0 and c["ret_1h"] > 0) or (direction < 0 and c["ret_1h"] < 0)
+        )
+        breadth_1h = (participating / len(valid_coins)) * 100 if valid_coins else 0.0
+
+        # Blended score: 50% raw momentum + 50% breadth-attenuated momentum
+        blended = 0.5 * vw_4h + 0.5 * (vw_4h * breadth_1h / 100.0)
 
         segment_data.append({
-            "segment": segment,
-            "vw_rr": round(vw_rr, 2),
-            "btc_alpha": round(alpha, 2),
-            "breadth_pct": round(breadth_pct, 1),
-            "composite_score": round(composite_score, 2),
-            "is_positive": composite_score >= 0,
-            "abs_score": abs(composite_score)
+            "segment":       segment,
+            "vw_4h":         round(vw_4h, 2),
+            "breadth_1h":    round(breadth_1h, 1),
+            "blended_score": round(blended, 2),
+            "abs_score":     abs(blended),
+            "direction":     "LONG" if blended >= 0 else "SHORT",
         })
-        
-    # Rank by hottest absolute composite score (fastest movers)
+
+    # Sort by hottest absolute score — direction agnostic
     segment_data.sort(key=lambda x: x["abs_score"], reverse=True)
-    
-    # Save the heatmap to disk for the dashboard to read
+
+    # Save heatmap JSON for dashboard
     try:
         heatmap_file = os.path.join(config.DATA_DIR, "segment_heatmap.json")
         with open(heatmap_file, "w") as f:
             json.dump({
                 "timestamp": datetime.utcnow().isoformat() + "Z",
-                "btc_24h": round(btc_return, 2),
-                "segments": segment_data
+                "scoring":   "4h_return(50pct)+1h_breadth(50pct)",
+                "segments":  segment_data,
             }, f, indent=2)
     except Exception as e:
         logger.error("Failed to save segment heatmap: %s", e)
-    
-    logger.info("🔥 Institutional Segment Heatmap (Composite):")
+
+    logger.info("🔥 Segment Heatmap [4h+1h blended | top %d]:", segment_limit)
     for i, seg in enumerate(segment_data):
-        logger.info("   #%d %-8s : VW-RR %+.2f%% | Alpha %+.2f%% | Breadth %.0f%% -> Score: %.2f", 
-                    i+1, seg["segment"], seg["vw_rr"], seg["btc_alpha"], seg["breadth_pct"], seg["composite_score"])
-        
+        logger.info(
+            "   #%d %-10s : 4h=%+.2f%% | 1h_breadth=%.0f%% | Score=%+.2f [%s]",
+            i + 1, seg["segment"], seg["vw_4h"], seg["breadth_1h"],
+            seg["blended_score"], seg["direction"],
+        )
+
     return [seg["segment"] for seg in segment_data[:segment_limit]]
+
 
 
 def _get_btc_structure_signals() -> tuple[str, float]:
