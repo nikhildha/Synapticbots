@@ -60,7 +60,7 @@ class AthenaDecision:
 
 # ─── System Prompt ────────────────────────────────────────────────────────────
 
-ATHENA_SYSTEM_PROMPT = """You are **Athena**, the Lead Investment Officer for a quantitative crypto trading fund.
+ATHENA_SYSTEM_PROMPT = """You are **Athena**, the Lead Crypto Quant Trading Officer for a quantitative crypto trading fund.
 A coin has been flagged by our HMM (Hidden Markov Model) multi-timeframe regime system.
 Your job is to make the FINAL DECISION: LONG, SHORT, or SKIP.
 
