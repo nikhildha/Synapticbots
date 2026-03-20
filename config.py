@@ -237,6 +237,11 @@ SEGMENT_SHORT_POOL_SIZE   = 2       # N worst segments used in BEARISH / MIXED m
 SEGMENT_LONG_POOL_SIZE    = 2       # N best segments used in BULLISH / MIXED mode
 MAX_ACTIVE_PER_SEGMENT = 1          # Correlation control: max 1 trade per segment
 
+# ── Segment filter master switch ─────────────────────────────────────────────
+# Set to True to re-enable the 3-mode macro-regime segment pre-filter and
+# direction gate. While False, the engine scans ALL coins in every cycle.
+USE_SEGMENT_FILTER = False
+
 # ── Multi-Timeframe Market Mode Confirmation ─────────────────────────────────
 # Prevents false BULLISH/BEARISH locks at swing highs, fake breakouts, reversals.
 # Requires 3 timeframes to agree before committing to a directional mode.

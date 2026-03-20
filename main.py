@@ -530,37 +530,45 @@ class RegimeMasterBot:
         logger.info("📡 Initial Scan list: %d coins | active trades in book: %d",
                     len(scan_symbols), tradebook_active_count)
 
-        # ── 4a-1. 3-Mode Macro-Regime-Aware Segment Pre-Filter ──────────────
-        # BEARISH mode (deep bear): worst N segments → SHORT candidates only
-        # BULLISH mode (strong bull): best N segments → LONG candidates only
-        # MIXED mode (pullback/chop/rotation): both pools active simultaneously
+        # ── 4a-1. Segment Pre-Filter (controlled by config.USE_SEGMENT_FILTER) ──
+        # When USE_SEGMENT_FILTER=True: 3-mode macro-regime gate (BEARISH/BULLISH/MIXED pools)
+        # When USE_SEGMENT_FILTER=False: scan ALL coins, no segment restriction
         from coin_scanner import get_segment_pools_for_regime
-        allowed_segment_coins = set()
-        allowed_segment_coins.add("BTCUSDT")  # Always process BTC for macro context
-
         _market_mode  = "MIXED"   # safe fallback
-        _short_pool_coins: set = set()
-        _long_pool_coins:  set = set()
+        _short_pool_segs: set = set()
+        _long_pool_segs:  set = set()
 
-        try:
-            _market_mode, _short_pool_segs, _long_pool_segs = get_segment_pools_for_regime()
-            for seg in _short_pool_segs:
-                _short_pool_coins.update(config.CRYPTO_SEGMENTS.get(seg, []))
-            for seg in _long_pool_segs:
-                _long_pool_coins.update(config.CRYPTO_SEGMENTS.get(seg, []))
-            allowed_segment_coins.update(_short_pool_coins)
-            allowed_segment_coins.update(_long_pool_coins)
-            logger.info("🔒 Segment gate: %s mode | SHORT=%s LONG=%s | allowed=%d coins",
-                _market_mode,
-                list(_short_pool_segs),
-                list(_long_pool_segs),
-                len(allowed_segment_coins))
-        except Exception as e:
-            logger.error("Segment pool fetch failed: %s — scanning all segments.", e)
-            for seg, coins in getattr(config, "CRYPTO_SEGMENTS", {}).items():
-                allowed_segment_coins.update(coins)
-                _short_pool_coins.update(coins)
-                _long_pool_coins.update(coins)
+        if getattr(config, "USE_SEGMENT_FILTER", True):
+            allowed_segment_coins: set = {"BTCUSDT"}
+            _short_pool_coins: set = set()
+            _long_pool_coins:  set = set()
+            try:
+                _market_mode, _short_pool_segs, _long_pool_segs = get_segment_pools_for_regime()
+                for seg in _short_pool_segs:
+                    _short_pool_coins.update(config.CRYPTO_SEGMENTS.get(seg, []))
+                for seg in _long_pool_segs:
+                    _long_pool_coins.update(config.CRYPTO_SEGMENTS.get(seg, []))
+                allowed_segment_coins.update(_short_pool_coins)
+                allowed_segment_coins.update(_long_pool_coins)
+                logger.info("🔒 Segment gate: %s mode | SHORT=%s LONG=%s | allowed=%d coins",
+                    _market_mode,
+                    list(_short_pool_segs),
+                    list(_long_pool_segs),
+                    len(allowed_segment_coins))
+            except Exception as e:
+                logger.error("Segment pool fetch failed: %s — scanning all segments.", e)
+                for seg, coins in getattr(config, "CRYPTO_SEGMENTS", {}).items():
+                    allowed_segment_coins.update(coins)
+                    _short_pool_coins.update(coins)
+                    _long_pool_coins.update(coins)
+        else:
+            # Segment filter disabled — allow every coin in the scan list
+            allowed_segment_coins = set(scan_symbols)
+            allowed_segment_coins.add("BTCUSDT")
+            _short_pool_coins = set(scan_symbols)
+            _long_pool_coins  = set(scan_symbols)
+            logger.info("🔓 Segment filter DISABLED — scanning all %d coins", len(scan_symbols))
+
 
         # ── 4b. Macro Veto Overlay (BTC Flash Crash Detection) ──
         btc_flash_crash = False
@@ -605,21 +613,20 @@ class RegimeMasterBot:
                 result = self._analyze_coin(symbol, balance, btc_flash_crash=btc_flash_crash)
                 if result and symbol != "BTCUSDT":
                     side = result.get("side")
-                    # ── Direction gate: HMM signal must align with pool direction ──
-                    # Prevents LONG signals from bearish segments (and vice-versa)
-                    # in directional markets, avoiding gain neutralization.
-                    if side == "BUY" and symbol not in _long_pool_coins:
-                        logger.debug("🚫 %s LONG signal but seg not in LONG pool (%s mode) — skip",
-                                     symbol, _market_mode)
-                        self._coin_states[symbol]["action"] = "DIRECTION_GATE_SKIP"
-                        self._coin_states[symbol]["reason"] = f"LONG signal but {_market_mode} mode — SHORT pool only"
-                        continue
-                    if side == "SELL" and symbol not in _short_pool_coins:
-                        logger.debug("🚫 %s SHORT signal but seg not in SHORT pool (%s mode) — skip",
-                                     symbol, _market_mode)
-                        self._coin_states[symbol]["action"] = "DIRECTION_GATE_SKIP"
-                        self._coin_states[symbol]["reason"] = f"SHORT signal but {_market_mode} mode — LONG pool only"
-                        continue
+                    # ── Direction gate: only active when USE_SEGMENT_FILTER is on ──
+                    if getattr(config, "USE_SEGMENT_FILTER", True):
+                        if side == "BUY" and symbol not in _long_pool_coins:
+                            logger.debug("🚫 %s LONG signal but seg not in LONG pool (%s mode) — skip",
+                                         symbol, _market_mode)
+                            self._coin_states[symbol]["action"] = "DIRECTION_GATE_SKIP"
+                            self._coin_states[symbol]["reason"] = f"LONG signal but {_market_mode} mode — SHORT pool only"
+                            continue
+                        if side == "SELL" and symbol not in _short_pool_coins:
+                            logger.debug("🚫 %s SHORT signal but seg not in SHORT pool (%s mode) — skip",
+                                         symbol, _market_mode)
+                            self._coin_states[symbol]["action"] = "DIRECTION_GATE_SKIP"
+                            self._coin_states[symbol]["reason"] = f"SHORT signal but {_market_mode} mode — LONG pool only"
+                            continue
                 if result:
                     raw_results.append(result)
             except Exception as e:
