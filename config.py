@@ -298,7 +298,7 @@ SENTIMENT_VADER_WEIGHT      = 0.4      # VADER contribution when blending with F
 # Acts as a "risk committee" — can EXECUTE, REDUCE_SIZE, or VETO trades.
 LLM_REASONING_ENABLED       = True
 LLM_API_KEY                 = os.getenv("GEMINI_API_KEY", "")
-LLM_MODEL                   = "gemini-1.5-flash"          # Stable REST API — 2.0-flash/2.5-flash 404 on generateContent
+LLM_MODEL                   = "gemini-2.5-flash"          # Confirmed working with this API key (1.5/2.0 return 404)
 LLM_CACHE_MINUTES           = 10                          # Cache per-coin LLM decisions
 LLM_TIMEOUT_SECONDS         = 30                          # Includes Google Search grounding time
 LLM_VETO_THRESHOLD          = 0.30                        # Below this → LLM vetoes the trade
