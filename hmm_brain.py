@@ -189,13 +189,21 @@ class HMMBrain:
         self._last_trained = datetime.utcnow()
         self._is_trained = True
 
-        # Build per-state mean log-return for logging (handle both GaussianHMM and GMMHMM)
+        # Build per-state mean log-return for logging (handle both GaussianHMM and GMMHMM).
+        # IMPORTANT: use ret_idx (the log_return feature index) — NOT [:, 0].
+        # Most COIN_FEATURES have vol_zscore at index 0, not log_return, so [:, 0]
+        # was silently showing volatility means instead of return means, making
+        # logs appear inverted (e.g. BEARISH showing the highest "log-return" value).
+        try:
+            ret_idx_log = self.features.index("log_return")
+        except ValueError:
+            ret_idx_log = 0
         raw_means = self.model.means_
         if raw_means.ndim == 3:
             w = self.model.weights_
-            state_means_log = np.einsum("ij,ijk->ik", w, raw_means)[:, 0]
+            state_means_log = np.einsum("ij,ijk->ik", w, raw_means)[:, ret_idx_log]
         else:
-            state_means_log = raw_means[:, 0]
+            state_means_log = raw_means[:, ret_idx_log]
         logger.info(
             "HMM trained on %d samples. State means (log-ret): %s",
             len(features),

@@ -38,6 +38,85 @@ _engine_crash_count = 0
 _engine_last_crash = None
 _engine_start_lock = threading.Lock()  # Prevents duplicate engine threads on startup
 
+# ─── PID Lock File ────────────────────────────────────────────────────
+# Prevents two engine processes running simultaneously.
+# On Railway overlapping deploys, old + new containers temporarily share
+# the same /app/data/ volume. The new container writes its PID here;
+# if the old container's PID file is still present AND the old process
+# is alive, the new engine defers startup for up to 45 seconds.
+ENGINE_PID_FILE = os.path.join(os.path.dirname(__file__), "data", "engine.pid")
+
+
+def _write_pid_lock():
+    """Write our PID to the lock file so other instances can detect us."""
+    try:
+        os.makedirs(os.path.dirname(ENGINE_PID_FILE), exist_ok=True)
+        with open(ENGINE_PID_FILE, "w") as f:
+            f.write(str(os.getpid()))
+    except Exception as e:
+        logger.warning("Could not write engine PID lock: %s", e)
+
+
+def _clear_pid_lock():
+    """Remove the PID file on clean shutdown."""
+    try:
+        if os.path.exists(ENGINE_PID_FILE):
+            os.remove(ENGINE_PID_FILE)
+    except Exception:
+        pass
+
+
+def _is_pid_alive(pid: int) -> bool:
+    """Check if a process with the given PID is currently running."""
+    try:
+        os.kill(pid, 0)  # signal 0 = just check existence
+        return True
+    except (ProcessLookupError, PermissionError):
+        return False
+    except Exception:
+        return False
+
+
+def _wait_for_old_engine_to_die(timeout: int = 45) -> bool:
+    """
+    Wait up to `timeout` seconds for the previous engine instance to exit.
+    Returns True if the old instance is gone (safe to start), False if it
+    timed out (should still start — old container may be on separate host).
+    """
+    if not os.path.exists(ENGINE_PID_FILE):
+        return True
+    try:
+        with open(ENGINE_PID_FILE) as f:
+            old_pid = int(f.read().strip())
+    except Exception:
+        return True  # Unreadable lock → assume safe
+
+    if old_pid == os.getpid():
+        return True  # Our own PID from a previous loop iteration — ignore
+
+    if not _is_pid_alive(old_pid):
+        logger.info("✅ Old engine PID %d is already gone — safe to start", old_pid)
+        return True
+
+    logger.warning(
+        "⏳ Old engine instance (PID %d) still running — waiting up to %ds for it to stop...",
+        old_pid, timeout
+    )
+    deadline = time.time() + timeout
+    while time.time() < deadline:
+        time.sleep(3)
+        if not _is_pid_alive(old_pid):
+            logger.info("✅ Old engine PID %d stopped after %.0fs — starting new instance",
+                        old_pid, timeout - (deadline - time.time()))
+            return True
+
+    logger.warning(
+        "⚠️ Old engine PID %d still alive after %ds (may be separate container) — "
+        "starting anyway but disabling tradebook writes for first 30s to avoid race",
+        old_pid, timeout
+    )
+    return False  # Timed out — old instance may be on a different container
+
 logger = logging.getLogger("EngineAPI")
 
 # ─── Persistent crash log (survives process restarts) ─────────────────
@@ -980,6 +1059,27 @@ def _fmt_uptime(seconds):
 
 def _run_engine():
     """Run the bot's main loop in a background thread with auto-restart."""
+    global _engine_bot, _engine_crash_count, _engine_last_crash
+    MAX_RETRIES = 5
+    BASE_BACKOFF = 10  # seconds
+    RECOVERY_COOLDOWN = 300  # 5 minutes before infinite recovery attempt
+
+    # ── PID Lock Guard ────────────────────────────────────────────────
+    # Wait for any existing engine instance (from a Railway overlapping deploy)
+    # to finish before we start our own loop.
+    _wait_for_old_engine_to_die(timeout=45)
+    _write_pid_lock()
+    logger.info("🔒 Engine PID lock acquired (PID %d)", os.getpid())
+
+    try:
+      _run_engine_inner()
+    finally:
+        _clear_pid_lock()
+        logger.info("🔓 Engine PID lock released")
+
+
+def _run_engine_inner():
+    """Inner engine loop — separated so the PID lock wrapper stays clean."""
     global _engine_bot, _engine_crash_count, _engine_last_crash
     MAX_RETRIES = 5
     BASE_BACKOFF = 10  # seconds

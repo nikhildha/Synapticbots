@@ -27,6 +27,8 @@ logger = logging.getLogger("PriceStream")
 STALE_THRESHOLD_SECONDS = 60
 # How long (seconds) to wait between watchdog checks
 WATCHDOG_INTERVAL_SECONDS = 20
+# How long (seconds) to wait before retrying a failed subscription
+SUB_RETRY_COOLDOWN_SECONDS = 300  # 5 minutes — avoids log spam every heartbeat
 
 
 class PriceStreamManager:
@@ -48,6 +50,7 @@ class PriceStreamManager:
         self._running = False
         self._last_update: dict[str, float] = {}   # symbol → epoch of last update
         self._watchdog_thread: threading.Thread | None = None
+        self._failed_subs: dict[str, float] = {}   # symbol → epoch of last failure (cooldown guard)
 
     # ─── Public API ─────────────────────────────────────────────────────────
 
@@ -106,10 +109,15 @@ class PriceStreamManager:
         """Initialize (or re-initialize) the ThreadedWebsocketManager."""
         try:
             from binance import ThreadedWebsocketManager
-            # API keys not required for public market data streams
-            twm = ThreadedWebsocketManager(api_key="", api_secret="")
+            # Pass None (not "") for public market data streams — empty strings cause
+            # auth failures on some network environments (e.g. Railway) even for
+            # unauthenticated endpoints.
+            twm = ThreadedWebsocketManager(api_key=None, api_secret=None)
             twm.start()
             self._twm = twm
+            # Clear failed-sub cooldowns on successful (re-)init so all symbols retry
+            with self._lock:
+                self._failed_subs.clear()
             logger.info("⚡ PriceStream: ThreadedWebsocketManager ready")
         except Exception as e:
             logger.error("❌ PriceStream: Failed to init WebSocket manager: %s", e)
@@ -130,6 +138,17 @@ class PriceStreamManager:
         """Subscribe a single symbol to the bookTicker stream."""
         if not self._twm:
             return
+
+        # Cooldown guard — don't retry a recently-failed subscription every heartbeat.
+        # After a failure, wait SUB_RETRY_COOLDOWN_SECONDS before trying again.
+        now = time.time()
+        with self._lock:
+            last_fail = self._failed_subs.get(sym, 0)
+        if now - last_fail < SUB_RETRY_COOLDOWN_SECONDS:
+            remaining = int(SUB_RETRY_COOLDOWN_SECONDS - (now - last_fail))
+            logger.debug("PriceStream: %s sub cooldown active (%ds remaining) — skip", sym, remaining)
+            return
+
         try:
             key = self._twm.start_symbol_book_ticker_socket(
                 callback=self._on_message,
@@ -138,9 +157,15 @@ class PriceStreamManager:
             with self._lock:
                 self._streams[sym] = key
                 self._subscribed.add(sym)
+                self._failed_subs.pop(sym, None)  # clear failure on success
             logger.info("📡 PriceStream: Subscribed to %s bookTicker", sym)
         except Exception as e:
-            logger.warning("⚠️ PriceStream: Failed to subscribe %s: %s", sym, e)
+            with self._lock:
+                self._failed_subs[sym] = now  # record failure time for cooldown
+            logger.warning(
+                "⚠️ PriceStream: Failed to subscribe %s: %s (retry in %ds)",
+                sym, e, SUB_RETRY_COOLDOWN_SECONDS
+            )
 
     def _start_watchdog(self):
         """Start a background thread that monitors connection health."""
@@ -196,9 +221,11 @@ class PriceStreamManager:
             return
 
         # Re-subscribe to ALL previously subscribed symbols
+        # Also reset failed-sub cooldowns so all symbols get a fresh attempt
         with self._lock:
             to_resubscribe = set(self._subscribed)
             self._subscribed.clear()     # clear so _subscribe_one adds them back
+            self._failed_subs.clear()    # reset cooldowns — fresh TWM deserves fresh retry
 
         for sym in to_resubscribe:
             self._subscribe_one(sym)
