@@ -835,6 +835,71 @@ COIN_FEATURES = {
         "bb_width_norm",
         "rel_strength_btc"
     ],
+
+    # ── Meme: same-coin proxies (1000x denomination equivalents) ─────────────
+    "BONKUSDT": [
+        "log_return",
+        "volatility",
+        "volume_change",
+        "vol_zscore",
+        "rel_strength_btc",
+        "liquidity_vacuum",
+        "exhaustion_tail",
+        "vwap_dist",
+        "bb_width_norm"
+    ],
+
+    "PEPEUSDT": [
+        "exhaustion_tail",
+        "vol_zscore",
+        "liquidity_vacuum",
+        "volume_trend_intensity",
+        "volatility",
+        "log_return",
+        "amihud_illiquidity",
+        "vwap_dist",
+        "bb_width_norm",
+        "rel_strength_btc"
+    ],
+
+    "SHIBUSDT": [
+        "exhaustion_tail",
+        "vol_zscore",
+        "amihud_illiquidity",
+        "volume_trend_intensity",
+        "liquidity_vacuum",
+        "volatility",
+        "log_return",
+        "vwap_dist",
+        "bb_width_norm",
+        "rel_strength_btc"
+    ],
+
+    # ── L2: Mantle — thin L2 book, vacuum-dominant (proxy: OPUSDT) ───────────
+    "MNTUSDT": [
+        "vol_zscore",
+        "liquidity_vacuum",
+        "volume_trend_intensity",
+        "log_return",
+        "amihud_illiquidity",
+        "rel_strength_btc",
+        "exhaustion_tail",
+        "vwap_dist",
+        "bb_width_norm"
+    ],
+
+    # ── DePIN: IoT/wireless infra — narrative-driven (proxy: ARUSDT) ─────────
+    "HNTUSDT": [
+        "log_return",
+        "vol_zscore",
+        "rel_strength_btc",
+        "liquidity_vacuum",
+        "volume_trend_intensity",
+        "exhaustion_tail",
+        "amihud_illiquidity",
+        "vwap_dist",
+        "bb_width_norm"
+    ],
 }
 
 def get_features_for_coin(coin: str) -> list:
