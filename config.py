@@ -254,6 +254,28 @@ SEGMENT_MTF_ENABLED      = True   # Enable 3-frame mode confirmation
 SEGMENT_MTF_4H_TF        = "4h"  # Swing-level candle interval (per-segment top coin)
 SEGMENT_MTF_1H_TF        = "1h"  # Intraday BTC gate candle interval
 
+# ── Stepped Trailing SL (Profit Lock) ────────────────────────────────────────
+# Controls the stepped breakeven + profit-lock ratchet in tradebook.update_unrealized().
+# Each tuple: (trigger_leveraged_pnl_pct, lock_leveraged_pnl_pct)
+#   trigger = position must reach this % leveraged PnL before step activates
+#   lock    = SL is moved to lock in this % of leveraged PnL (0 = breakeven)
+#
+# UI labels (trades-client.tsx): Breakeven, +5%, +10%, +15%...
+TRAILING_SL_ENABLED = True
+TRAILING_SL_STEPS = [
+    ( 5.0,  0.0),   # Step 1: trigger at +5%  PnL → move SL to breakeven
+    (10.0,  5.0),   # Step 2: trigger at +10% → lock +5%
+    (15.0, 10.0),   # Step 3: trigger at +15% → lock +10%
+    (20.0, 15.0),   # Step 4: trigger at +20% → lock +15%
+    (25.0, 20.0),   # Step 5: trigger at +25% → lock +20%
+    (30.0, 25.0),   # Step 6: trigger at +30% → lock +25%
+    (35.0, 30.0),   # Step 7: trigger at +35% → lock +30%
+    (40.0, 35.0),   # Step 8: trigger at +40% → lock +35%
+    (45.0, 40.0),   # Step 9: trigger at +45% → lock +40%
+    (50.0, 45.0),   # Step 10: trigger at +50% → lock +45%
+]
+
+
 
 
 # ─── Telegram Notifications ──────────────────────────────────────────────────────
