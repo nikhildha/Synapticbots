@@ -16,7 +16,7 @@ IST = timezone(timedelta(hours=5, minutes=30))
 
 import config
 from hmm_brain import HMMBrain, MultiTFHMMBrain
-from data_pipeline import fetch_klines, get_multi_timeframe_data, _get_binance_client
+from data_pipeline import fetch_klines, get_multi_timeframe_data, _get_binance_client, compute_market_structure
 from feature_engine import compute_all_features, compute_hmm_features, compute_trend, compute_ema
 from execution_engine import ExecutionEngine
 from risk_manager import RiskManager
@@ -733,20 +733,51 @@ class RegimeMasterBot:
                         )
                         continue
                     try:
+                        # Compute market structure levels for Athena context
+                        mkt_struct = compute_market_structure(sym)
+
+                        # Per-TF HMM predictions (for Athena context)
+                        tf_summary = {}
+                        if hasattr(mtf_brain, '_predictions') and mtf_brain._predictions:
+                            for _tf, (_regime, _margin) in mtf_brain._predictions.items():
+                                tf_summary[_tf] = {
+                                    "regime": config.REGIME_NAMES.get(_regime, "?"),
+                                    "margin": round(_margin, 3),
+                                }
+
                         llm_ctx = {
-                            "ticker":         sym,
-                            "side":           top["side"],
-                            "leverage":       lev,
-                            "hmm_confidence": top["confidence"],
-                            "hmm_regime":     top.get("regime_name", ""),
-                            "conviction":     conviction,
-                            "current_price":  current_price,
-                            "atr":            atr_val,
-                            "atr_pct":        (atr_val / max(current_price, 0.0001)) * 100,
-                            "trend":          self._coin_states.get(sym, {}).get("context", {}).get("trend_alignment", "UNKNOWN"),
-                            "signal_type":    top.get("signal_type", "TREND_FOLLOW"),
-                            "tf_agreement":   top.get("tf_agreement", 0),
-                            "btc_regime":     self._coin_states.get("BTCUSDT", {}).get("regime", "UNKNOWN"),
+                            # ── Core signal ──────────────────────────────
+                            "ticker":          sym,
+                            "side":            top["side"],
+                            "leverage":        lev,
+                            "hmm_confidence":  top["confidence"],
+                            "hmm_regime":      top.get("regime_name", ""),
+                            "conviction":      conviction,
+                            "signal_type":     top.get("signal_type", "TREND_FOLLOW"),
+                            "tf_agreement":    top.get("tf_agreement", 0),
+                            # ── Per-TF breakdown ─────────────────────────
+                            "tf_breakdown":    tf_summary,  # e.g. {"1h": {regime,margin}, "4h": ..., "1d": ...}
+                            # ── Price context ────────────────────────────
+                            "current_price":   current_price,
+                            "atr":             atr_val,
+                            "atr_pct":         round((atr_val / max(current_price, 0.0001)) * 100, 3),
+                            "trend":           self._coin_states.get(sym, {}).get("context", {}).get("trend_alignment", "UNKNOWN"),
+                            # ── BTC macro ────────────────────────────────
+                            "btc_regime":      self._coin_states.get("BTCUSDT", {}).get("regime", "UNKNOWN"),
+                            "btc_margin":      self._coin_states.get("BTCUSDT", {}).get("confidence", 0),
+                            # ── Market structure levels ───────────────────
+                            "pdh":             mkt_struct.get("pdh"),
+                            "pdl":             mkt_struct.get("pdl"),
+                            "pwh":             mkt_struct.get("pwh"),
+                            "pwl":             mkt_struct.get("pwl"),
+                            "vwap":            mkt_struct.get("vwap"),
+                            "dist_vwap_pct":   mkt_struct.get("dist_vwap_pct"),
+                            "swing_high_3":    mkt_struct.get("swing_high_3"),
+                            "swing_low_3":     mkt_struct.get("swing_low_3"),
+                            "swing_high_5":    mkt_struct.get("swing_high_5"),
+                            "swing_low_5":     mkt_struct.get("swing_low_5"),
+                            "ath_7d":          mkt_struct.get("ath_7d"),
+                            "atl_7d":          mkt_struct.get("atl_7d"),
                         }
                         athena_decision = self._athena.validate_signal(llm_ctx)
                         # Only count REAL Gemini API calls — cached decisions are free.

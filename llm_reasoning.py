@@ -60,40 +60,51 @@ class AthenaDecision:
 
 # ─── System Prompt ────────────────────────────────────────────────────────────
 
-ATHENA_SYSTEM_PROMPT = """You are the **Lead Investment Officer (Athena)**. Below is a list of crypto assets that have passed our HMM-Score threshold (>50%).
+ATHENA_SYSTEM_PROMPT = """You are **Athena**, the Lead Investment Officer for a quantitative crypto trading fund.
+A coin has been flagged by our HMM (Hidden Markov Model) multi-timeframe regime system.
+Your job is to make the FINAL DECISION: LONG, SHORT, or SKIP.
 
-## Your Goal
+## Context You Receive Per Coin
 
-Analyze the following for EACH coin presented:
+| Field | What It Means |
+|---|---|
+| HMM Signal Dir | Direction the HMM voted: BUY or SELL |
+| HMM Regime | BULLISH / BEARISH / SIDEWAYS |
+| HMM Confidence | Margin between best & 2nd-best state (0–1). Above 0.3 = meaningful. |
+| Multi-TF Conviction | 0–100 weighted score: 1D×40pts + 1H×35pts + 15m×25pts |
+| TF Breakdown | Per-timeframe regime + margin |
+| Signal Type | TREND_FOLLOW or REVERSAL |
+| TF Agreement | How many timeframes agree (1–3) |
+| ATR % | Average True Range as % of price — volatility proxy |
+| BTC Regime / Margin | Current macro environment |
+| **PDH / PDL** | **Previous Day High / Low** — key daily S/R zones |
+| **PWH / PWL** | **Previous Week High / Low** — major structural levels |
+| **VWAP** | **24h Volume-Weighted Average Price** — institutional reference |
+| **Dist from VWAP %** | Price vs VWAP — positive=above, negative=below |
+| **Swing High 3/5** | Most recent fractal swing high (3-bar and 5-bar lookback) |
+| **Swing Low 3/5** | Most recent fractal swing low (3-bar and 5-bar lookback) |
+| **ATH 7D / ATL 7D** | 7-day all-time high / low rage |
 
-1. **Technical Price Action Analysis** — Study recent price action, candlestick patterns, and momentum
-2. **Support & Resistance** — Is price approaching key support or resistance levels? How close?
-3. **FVG (Fair Value Gaps)** — Are there unfilled fair value gaps above or below the current price?
-4. **Order Blocks** — Identify institutional order blocks that could act as magnets or barriers
-5. **Global News** — Search for any breaking news, macro events, regulatory actions, or token-specific events
-6. **BTC Macro Regime** — Ensure the trade aligns with BTC's current regime (if BTC is bearish, be cautious on long altcoin trades)
+## Your Analysis Workflow
 
-## Your Output
+1. **Use Google Search** to find any breaking news, token events, listings, or regulatory actions for this coin RIGHT NOW. If news is decisively negative → SKIP regardless of HMM.
 
-For each coin, provide:
-- **Final Conviction**: LONG or SHORT (or SKIP if neither)
-- **Confidence Rating**: 1-10 (10 = extremely confident)
-- **Leverage Recommendation**: Suggested leverage (e.g., 3x, 5x, 10x, 20x)
-- **Size Recommendation**: What % of available capital (e.g., 25%, 50%, 100%)
-- **GIVE 40% BIAS TO HMM OUTPUT AS WELL** — The HMM model's signal direction and conviction score should carry 40% weight in your final decision. Your own analysis (price action, news, S/R, etc.) carries 60%.
-- **Key Reasoning**: 2-3 sentence summary of your analysis
+2. **Read the Structure Levels:**
+   - Is price ABOVE or BELOW VWAP? (bullish bias = above VWAP)
+   - Is price approaching PDH/PWH (resistance)? → Be cautious on LONG
+   - Is price approaching PDL/PWL (support)? → Be cautious on SHORT
+   - Are recent swing highs being broken (higher high)? → Bullish
+   - Are recent swing lows breaking down (lower low)? → Bearish
 
-## Constraints
+3. **Check BTC Macro Alignment** — if BTC is BEARISH and we're asked to LONG an altcoin, require much stronger conviction.
 
-- Ensure the BTC Macro Regime aligns with the trade
-- Be SPECIFIC — cite price levels, news events, pattern names
-- If news is negative for a coin, recommend SKIP regardless of HMM score
-- Search for REAL current news and data, do not make assumptions
-- The HMM output carries 40% weight — respect its signal direction unless your 60% analysis strongly contradicts it
+4. **Give 40% weight to HMM** — the quantitative model's signal + conviction carry 40% of your final decision. Your fundamental/technical analysis is 60%.
 
-## Response Format
+5. **Output your decision** as clean JSON.
 
-Return ONLY a valid JSON object:
+## Output Format
+
+Return ONLY a valid JSON object — no markdown, no backticks, no extra text:
 {
   "ticker": "BTCUSDT",
   "action": "LONG" | "SHORT" | "SKIP",
@@ -101,13 +112,11 @@ Return ONLY a valid JSON object:
   "adjusted_confidence": 0.0-1.0,
   "leverage_recommendation": "5x",
   "size_recommendation": "50%",
-  "reasoning": "Brief 2-3 sentence analysis.",
+  "reasoning": "2-3 sentence specific analysis citing price levels and news.",
   "risk_flags": ["flag1", "flag2"],
-  "support_levels": "$80,000, $78,500",
-  "resistance_levels": "$85,000, $87,200"
-}
-
-IMPORTANT: Return ONLY the JSON object. No markdown, no backticks, no extra text."""
+  "key_support": "$X.XX, $X.XX (PDL=$X, VWAP=$X)",
+  "key_resistance": "$X.XX, $X.XX (PDH=$X, PWH=$X)"
+}"""
 
 
 # ─── Main Engine ──────────────────────────────────────────────────────────────
@@ -220,6 +229,7 @@ class AthenaEngine:
         payload = {
             "contents": [{"parts": [{"text": prompt}]}],
             "systemInstruction": {"parts": [{"text": ATHENA_SYSTEM_PROMPT}]},
+            "tools": [{"google_search_retrieval": {}}],
             "generationConfig": {
                 "temperature": 0.3,
                 "maxOutputTokens": 4096,
@@ -379,35 +389,93 @@ class AthenaEngine:
         return None
 
     def _build_prompt(self, ctx: dict) -> str:
-        """Build the user prompt with all signal context."""
+        """Build the user prompt with all enriched signal context."""
 
-        return f"""The following crypto asset has passed our HMM-Score threshold. Perform your full analysis.
+        # Helper to format a price or return "N/A" if None
+        def _p(val, decimals=4):
+            if val is None:
+                return "N/A"
+            return f"${val:,.{decimals}f}"
 
-## Asset Under Review
-- **Ticker**: {ctx.get('ticker', 'N/A')}
-- **HMM Signal Direction**: {ctx.get('side', 'N/A')}
-- **HMM Regime**: {ctx.get('hmm_regime', 'N/A')}
-- **HMM Confidence**: {ctx.get('hmm_confidence', 0):.4f}
-- **Multi-TF Conviction Score**: {ctx.get('conviction', 0):.1f}/100
-- **Timeframe Agreement**: {ctx.get('tf_agreement', 0)}/3 timeframes agree
-- **Current Price**: ${ctx.get('current_price', 0):,.4f}
-- **ATR (hourly)**: ${ctx.get('atr', 0):,.4f}
-- **Volatility Percentile**: {ctx.get('vol_percentile', 0):.1%}
+        # Conviction tier label
+        conv = ctx.get("conviction", 0)
+        if conv >= 80:
+            conv_label = "STRONG ★★★"
+        elif conv >= 60:
+            conv_label = "MEDIUM ★★"
+        elif conv >= 40:
+            conv_label = "WEAK ★"
+        else:
+            conv_label = "LOW"
 
-## BTC Macro Context
-- **BTC Regime**: {ctx.get('btc_regime', 'N/A')}
-- **BTC Margin**: {ctx.get('btc_margin', 0):.3f}
+        # Per-TF breakdown string
+        tf_bd = ctx.get("tf_breakdown", {})
+        tf_lines = []
+        for tf_name, tf_info in tf_bd.items():
+            regime = tf_info.get("regime", "?")
+            margin = tf_info.get("margin", 0)
+            tf_lines.append(f"    {tf_name:>4s}: {regime:<10s}  (margin={margin:.3f})")
+        tf_str = "\n".join(tf_lines) if tf_lines else "    N/A"
 
-## Your Tasks
-1. Analyze the PRICE ACTION for {ctx.get('ticker', 'this coin').replace('USDT', '')} — recent candles, patterns, momentum
-2. Identify KEY SUPPORT & RESISTANCE levels
-3. Check for FVG (Fair Value Gaps) and ORDER BLOCKS
-4. Search for CURRENT NEWS about {ctx.get('ticker', 'this coin').replace('USDT', '')} and the broader crypto market
-5. Verify BTC macro regime alignment
-6. Give your FINAL CONVICTION: LONG, SHORT, or SKIP
-7. Recommend LEVERAGE and POSITION SIZE
+        ticker_short = ctx.get("ticker", "COIN").replace("USDT", "")
+        dist_vwap = ctx.get("dist_vwap_pct")
+        dist_str = (f"{dist_vwap:+.2f}%" if dist_vwap is not None else "N/A")
+        vwap_direction = ""
+        if dist_vwap is not None:
+            if dist_vwap > 1.5:
+                vwap_direction = "  ← ABOVE VWAP (bullish bias)"
+            elif dist_vwap < -1.5:
+                vwap_direction = "  ← BELOW VWAP (bearish bias)"
+            else:
+                vwap_direction = "  ← AT VWAP (neutral)"
 
-Return your analysis as a JSON object (single object, not array)."""
+        return f"""## Signal Under Review: {ctx.get('ticker', 'N/A')}
+
+### ── HMM Quantitative Signal (40% weight) ──
+- Signal Direction : {ctx.get('side', 'N/A')}  ({ctx.get('signal_type', 'N/A')})
+- HMM Regime       : {ctx.get('hmm_regime', 'N/A')}
+- HMM Confidence   : {ctx.get('hmm_confidence', 0):.4f}  (margin best vs 2nd-best state)
+- Multi-TF Conviction: {conv:.1f}/100  [{conv_label}]
+- TF Agreement     : {ctx.get('tf_agreement', 0)}/3 timeframes agree
+
+### ── Per-Timeframe Breakdown ──
+{tf_str}
+
+### ── Price & Volatility ──
+- Current Price    : {_p(ctx.get('current_price'), 4)}
+- ATR (hourly)     : {_p(ctx.get('atr'), 4)}  ({ctx.get('atr_pct', 0):.2f}% of price)
+- Trend Alignment  : {ctx.get('trend', 'N/A')}
+
+### ── BTC Macro Context ──
+- BTC Regime       : {ctx.get('btc_regime', 'N/A')}
+- BTC HMM Margin   : {ctx.get('btc_margin', 0):.3f}
+
+### ── Key Price Structure Levels ──
+| Level              | Price                              | Notes                    |
+|--------------------|-------------------------------------|--------------------------|
+| PWH (Prev Wk High) | {_p(ctx.get('pwh'), 4):<35} | Major weekly resistance  |
+| PWL (Prev Wk Low)  | {_p(ctx.get('pwl'), 4):<35} | Major weekly support     |
+| PDH (Prev Day High)| {_p(ctx.get('pdh'), 4):<35} | Daily resistance         |
+| PDL (Prev Day Low) | {_p(ctx.get('pdl'), 4):<35} | Daily support            |
+| VWAP (24h)         | {_p(ctx.get('vwap'), 4):<35} | Institutional ref{vwap_direction} |
+| Dist from VWAP     | {dist_str:<35} | +above / -below          |
+| Swing High 3       | {_p(ctx.get('swing_high_3'), 4):<35} | Recent 3-bar fractal high|
+| Swing Low  3       | {_p(ctx.get('swing_low_3'), 4):<35} | Recent 3-bar fractal low |
+| Swing High 5       | {_p(ctx.get('swing_high_5'), 4):<35} | Recent 5-bar fractal high|
+| Swing Low  5       | {_p(ctx.get('swing_low_5'), 4):<35} | Recent 5-bar fractal low |
+| 7D ATH             | {_p(ctx.get('ath_7d'), 4):<35} | 7-day all-time high      |
+| 7D ATL             | {_p(ctx.get('atl_7d'), 4):<35} | 7-day all-time low       |
+
+### ── Your Tasks ──
+1. **Search for REAL-TIME NEWS** on {ticker_short} right now — any negative events = SKIP
+2. Assess if current price is at a KEY S/R zone (PDH/PDL/PWH/PWL/VWAP)
+3. Check VWAP positioning — above = bullish context, below = bearish context
+4. Verify swing structure — are we making higher highs or lower lows?
+5. Confirm BTC macro regime alignment
+6. Give FINAL CONVICTION: LONG, SHORT, or SKIP
+7. Recommend LEVERAGE and POSITION SIZE based on structure quality
+
+Return your analysis as a single JSON object."""
 
     def _check_cache(self, symbol: str) -> Optional[AthenaDecision]:
         """Return cached decision if still valid."""
