@@ -150,7 +150,15 @@ class AthenaEngine:
                 with open(log_path, "r") as f:
                     entries = json.loads(f.read())
                 if isinstance(entries, list):
-                    return entries[-50:]
+                    # Filter out stale entries with empty/placeholder reasoning
+                    valid = [
+                        e for e in entries
+                        if e.get("reasoning") and
+                           e["reasoning"] not in ("No reasoning provided", "") and
+                           not e["reasoning"].startswith("Auto-approve:") and
+                           not e["reasoning"].startswith("REST API error")
+                    ]
+                    return valid[-50:]
         except Exception:
             pass
         return []
@@ -281,18 +289,38 @@ class AthenaEngine:
         if isinstance(data, list):
             data = data[0] if data else {}
 
-        # Map LONG/SHORT/SKIP → EXECUTE/REDUCE_SIZE/VETO for engine compatibility
+        # Map LONG/SHORT/SKIP/BUY/SELL → EXECUTE/REDUCE_SIZE/VETO for engine compatibility
         raw_action = data.get("action", "SKIP").upper()
-        if raw_action in ("LONG", "SHORT"):
+        if raw_action in ("LONG", "SHORT", "BUY", "SELL"):
             action = "EXECUTE"
         elif raw_action == "SKIP":
             action = "VETO"
         else:
             action = raw_action  # fallback: EXECUTE/REDUCE_SIZE/VETO
 
-        # Use confidence_rating (1-10) → adjusted_confidence (0-1)
+        # Handle confidence_rating: gemini-2.5-flash returns 0-1 float OR 1-10 int.
+        # If value is > 1.0 treat it as 1-10 scale and normalise; otherwise use as-is.
         conf_rating = data.get("confidence_rating", 5)
-        adj_conf = float(data.get("adjusted_confidence", conf_rating / 10.0))
+        try:
+            conf_rating = float(conf_rating)
+        except (TypeError, ValueError):
+            conf_rating = 5.0
+        if conf_rating > 1.0:
+            conf_rating_norm = conf_rating / 10.0  # 1-10 → 0-1
+        else:
+            conf_rating_norm = conf_rating          # already 0-1
+
+        # Prefer explicit adjusted_confidence from model; fall back to normalised rating
+        adj_conf_raw = data.get("adjusted_confidence")
+        if adj_conf_raw is not None:
+            try:
+                adj_conf = float(adj_conf_raw)
+                if adj_conf > 1.0:
+                    adj_conf = adj_conf / 10.0  # guard against 1-10 scale here too
+            except (TypeError, ValueError):
+                adj_conf = conf_rating_norm
+        else:
+            adj_conf = conf_rating_norm
         adj_conf = max(0.0, min(1.0, adj_conf))
 
         # Apply veto threshold
