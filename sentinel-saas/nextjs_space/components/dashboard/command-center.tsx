@@ -103,17 +103,19 @@ export function RegimeCard({ regime, confidence, symbol, macroRegime, trend15m, 
     // Live BTC price + 1s background sparkline (persists last 25 pts via sessionStorage)
     const [btcPrice, setBtcPrice] = useState<number | null>(null);
     const [btcChange, setBtcChange] = useState<number>(0);
-    const [btcPriceHistory, setBtcPriceHistory] = useState<number[]>(() => {
-        // Seed from sessionStorage on mount so sparkline doesn't restart on refresh
+    // Always start empty (SSR-safe). Hydrate from sessionStorage after mount in useEffect below.
+    const [btcPriceHistory, setBtcPriceHistory] = useState<number[]>([]);
+
+    // Seed sparkline history from sessionStorage on mount (safe — client-only useEffect)
+    useEffect(() => {
         try {
             const saved = sessionStorage.getItem('btcSparkHistory');
             if (saved) {
                 const arr = JSON.parse(saved) as number[];
-                return Array.isArray(arr) ? arr.slice(-25) : [];
+                if (Array.isArray(arr) && arr.length > 0) setBtcPriceHistory(arr.slice(-25));
             }
         } catch { /* ignore */ }
-        return [];
-    });
+    }, []);
 
     useEffect(() => {
         const fetchBtc = async () => {
