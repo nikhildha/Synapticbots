@@ -367,13 +367,37 @@ class RegimeMasterBot:
         """Full analysis cycle — runs every ANALYSIS_INTERVAL_SECONDS."""
         cycle_start = time.time()
         self._cycle_count += 1
+        _cycle_ts = datetime.utcnow().isoformat() + "Z"
 
-        # ── Clear stale coin states from previous cycle ───────────────────────
-        # Keep only coins that have an active trade so live position data is
-        # preserved. Everything else gets a fresh state this cycle — no stale
-        # reasons, actions, or confidence scores bleeding through.
-        _active_syms = set(self._active_positions.keys()) if hasattr(self, "_active_positions") else set()
-        self._coin_states = {s: v for s, v in self._coin_states.items() if s in _active_syms}
+        # ── CACHE FIX: Hard-reset all coin states at cycle start ────────────────
+        # Strategy: keep ONLY coins with active trades (preserve live PnL data).
+        # For every other coin, wipe the old state completely — no stale ELIGIBLE/
+        # READY reasons, actions, or confidence scores bleeding from prior cycles.
+        # Pre-populate pool coins with a SCANNING placeholder so the dashboard
+        # shows "SCANNING" during analysis instead of last cycle's stale READY.
+        _active_syms = set(self._active_positions.keys()) \
+            if hasattr(self, "_active_positions") else set()
+
+        # Hard clear: drop every non-active-position coin state
+        self._coin_states = {
+            s: v for s, v in self._coin_states.items()
+            if s in _active_syms
+        }
+
+        # Pre-seed pool coins with SCANNING placeholder so dashboard reflects
+        # real cycle state immediately (not stale state from previous cycle)
+        _pool_to_seed = getattr(self, "_full_coin_pool", []) or []
+        for _sym in _pool_to_seed:
+            if _sym not in self._coin_states:
+                self._coin_states[_sym] = {
+                    "symbol":     _sym,
+                    "action":     "SCANNING",
+                    "regime":     None,
+                    "confidence": None,
+                    "conviction": None,
+                    "cycle":      self._cycle_count,
+                    "scanned_at": _cycle_ts,
+                }
 
         # ── 0a. Pull active bots from SaaS DB (every cycle) ───
         # Engine is the pull side — no push/registration required.
