@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 
 const REGIME_MAP: Record<string, { emoji: string; color: string; bgGlow: string }> = {
     'BULLISH': { emoji: '🟢', color: '#00FF88', bgGlow: 'rgba(0,255,136,0.12)' },
@@ -12,37 +12,8 @@ const REGIME_MAP: Record<string, { emoji: string; color: string; bgGlow: string 
     'OFFLINE': { emoji: '⚫', color: '#4B5563', bgGlow: 'rgba(75,85,99,0.08)' },
 };
 
-// Mirrors CRYPTO_SEGMENTS in config.py — keep in sync when adding new coins
-const SEGMENT_MAP: Record<string, string> = {
-    // L1
-    BTC: 'L1', ETH: 'L1', SOL: 'L1', BNB: 'L1', AVAX: 'L1', SUI: 'L1',
-    // L2
-    MATIC: 'L2', ARB: 'L2', OP: 'L2', POL: 'L2', MNT: 'L2', STRK: 'L2', IMX: 'L2', RONIN: 'L2', RON: 'L2', MANTA: 'L2',
-    // DeFi
-    UNI: 'DeFi', AAVE: 'DeFi', DYDX: 'DeFi', CRV: 'DeFi', JUP: 'DeFi', RUNE: 'DeFi',
-    LINK: 'DeFi', PENDLE: 'DeFi', GMX: 'DeFi', ENS: 'DeFi',
-    // Gaming
-    AXS: 'Gaming', SAND: 'Gaming', MANA: 'Gaming', GALA: 'Gaming', ILV: 'Gaming',
-    BEAM: 'Gaming', PIXEL: 'Gaming', IOTX: 'Gaming',
-    // AI
-    FET: 'AI', AGIX: 'AI', RENDER: 'AI', WLD: 'AI', TAO: 'AI', OCEAN: 'AI', NMR: 'AI', ALT: 'AI', INJ: 'AI', AKT: 'AI',
-    // RWA
-    POLYX: 'RWA', ONDO: 'RWA', TRU: 'RWA', CPOOL: 'RWA', CFG: 'RWA', RIO: 'RWA',
-    // DePIN
-    FIL: 'DePIN', AR: 'DePIN', HNT: 'DePIN',
-    // Oracles
-    PYTH: 'Oracles', TRB: 'Oracles', API3: 'Oracles',
-    // Modular
-    TIA: 'Modular', DYM: 'Modular',
-    // Meme
-    DOGE: 'Meme', SHIB: 'Meme', PEPE: 'Meme', WIF: 'Meme', BONK: 'Meme',
-};
 
 
-function getSegment(symbol: string): string {
-    const coin = symbol.replace('USDT', '').toUpperCase();
-    return SEGMENT_MAP[coin] || '';
-}
 
 function getRegimeInfo(regime: string) {
     const key = regime.toUpperCase();
@@ -622,28 +593,19 @@ export function ActivePositionsCard({ deployedCount, activePositions, trades }: 
     );
 }
 
-interface SignalSummaryProps {
+interface BrainExecutionProps {
     coinStates: Record<string, any>;
     multi?: any;
     heatmap?: any;
     botId?: string;
 }
 
-function formatPrice(price: number): string {
-    if (!price || isNaN(price)) return '$0';
-    if (price >= 1000) return '$' + price.toLocaleString('en-US', { maximumFractionDigits: 2 });
-    if (price >= 1) return '$' + price.toFixed(4);
-    return '$' + price.toFixed(6);
-}
-
-export function SignalSummaryTable({ coinStates, multi, heatmap: heatmapProp, botId }: SignalSummaryProps) {
-    const [selectedCoins, setSelectedCoins] = useState<string[]>([]);
-    const [filterOpen, setFilterOpen] = useState(false);
+export function BrainExecutionSummary({ coinStates, multi, heatmap: heatmapProp, botId }: BrainExecutionProps) {
+    const [expandedCoin, setExpandedCoin] = useState<string | null>(null);
     const [liveMulti, setLiveMulti] = useState<any>(multi);
     const [liveCoinStates, setLiveCoinStates] = useState<Record<string, any>>(coinStates || {});
-    const [liveHeatmap, setLiveHeatmap] = useState<any>(heatmapProp || null);
 
-    // Main data refresh: poll at engine interval (10min)
+    // Auto-refresh at engine interval
     const refreshMs = Math.min(Math.max((liveMulti?.analysis_interval_seconds || 60) * 1000, 30000), 900000);
     useEffect(() => {
         const fetchLatest = async () => {
@@ -653,7 +615,6 @@ export function SignalSummaryTable({ coinStates, multi, heatmap: heatmapProp, bo
                     const d = await res.json();
                     if (d?.multi?.coin_states) setLiveCoinStates(d.multi.coin_states);
                     if (d?.multi) setLiveMulti(d.multi);
-                    if (d?.heatmap) setLiveHeatmap(d.heatmap);
                 }
             } catch { /* silent */ }
         };
@@ -661,34 +622,15 @@ export function SignalSummaryTable({ coinStates, multi, heatmap: heatmapProp, bo
         return () => clearInterval(timer);
     }, [refreshMs]);
 
-    // Fast re-registration heartbeat: every 30s check if bots are still registered.
-    // Engine restart clears ENGINE_ACTIVE_BOTS — this re-pushes them quickly.
-    useEffect(() => {
-        const reRegister = async () => {
-            try {
-                await fetch('/api/bot-state', { cache: 'no-store' });
-                // bot-state/route.ts auto-re-registers any unregistered active bots
-                // on every call — so simply calling it is enough.
-            } catch { /* silent */ }
-        };
-        // Run immediately on mount, then every 30s
-        reRegister();
-        const hb = setInterval(reRegister, 30_000);
-        return () => clearInterval(hb);
-    }, []);
-
     useEffect(() => { if (coinStates) setLiveCoinStates(coinStates); }, [coinStates]);
     useEffect(() => { if (multi) setLiveMulti(multi); }, [multi]);
 
     const coins = liveCoinStates ? Object.entries(liveCoinStates).map(([sym, c]: [string, any]) => ({ ...c, symbol: sym })) : [];
-    const allSymbols = coins.map((c: any) => c.symbol || '').filter(Boolean).sort();
     const lastCycle = liveMulti?.last_analysis_time || null;
-    const intervalSec = Number(liveMulti?.analysis_interval_seconds || 0);
 
     const formatIST = (iso: string | null) => {
         if (!iso) return '—';
         try {
-            // Normalize: if no timezone suffix, assume UTC (Railway engine runs UTC)
             const normalized = /Z$|[+-]\d{2}:\d{2}$/.test(iso) ? iso : iso + 'Z';
             return new Date(normalized).toLocaleTimeString('en-IN', {
                 hour: '2-digit', minute: '2-digit', second: '2-digit',
@@ -697,30 +639,116 @@ export function SignalSummaryTable({ coinStates, multi, heatmap: heatmapProp, bo
         } catch { return '—'; }
     };
 
+    // ── Pipeline Stage Classification ──────────────────────────────────────
+    const getStage = (c: any): { stage: string; stageNum: number; reason: string; color: string; icon: string } => {
+        const a = (c.action || '').toUpperCase();
+        const ds = (botId && c.bot_deploy_statuses?.[botId]) || c.deploy_status || '';
+        const athena = c.athena_state;
 
-    const filtered = selectedCoins.length > 0 ? coins.filter((c: any) => selectedCoins.includes(c.symbol)) : coins;
-    const sorted = [...filtered].sort((a: any, b: any) => {
-        const ae = (a.action || '').includes('ELIGIBLE') ? 1 : 0;
-        const be = (b.action || '').includes('ELIGIBLE') ? 1 : 0;
-        if (ae !== be) return be - ae;
-        const ac = a.conviction != null ? Number(a.conviction) : (a.confidence != null ? (a.confidence <= 1 ? a.confidence * 100 : a.confidence) : 0);
-        const bc = b.conviction != null ? Number(b.conviction) : (b.confidence != null ? (b.confidence <= 1 ? b.confidence * 100 : b.confidence) : 0);
+        // Stage 5: Deployed
+        if (ds === 'DEPLOY_QUEUED' || ds === 'ACTIVE' || a.includes('DEPLOYED')) {
+            return { stage: 'DEPLOYED', stageNum: 5, reason: 'Trade opened successfully', color: '#06B6D4', icon: '🚀' };
+        }
+
+        // Stage 4: Athena processed
+        if (athena) {
+            if (athena.action === 'EXECUTE' || athena.action === 'LONG' || athena.action === 'SHORT') {
+                // Athena approved but something else blocked
+                const blockReason = ds.startsWith('FILTERED') ? ds.replace('FILTERED: ', '') : 'Exec failed';
+                return { stage: 'ATHENA ✅', stageNum: 4, reason: `Approved but: ${blockReason}`, color: '#22C55E', icon: '🏛️' };
+            }
+            if (athena.action === 'VETO' || athena.action === 'SKIP' || athena.action === 'HOLD') {
+                return { stage: 'ATHENA 🚫', stageNum: 4, reason: `Vetoed: ${(athena.reasoning || '').slice(0, 80)}`, color: '#EF4444', icon: '🚫' };
+            }
+        }
+
+        // Check if filtered by deploy pipeline (after Athena)
+        if (ds.startsWith('FILTERED')) {
+            const filterReason = ds.replace('FILTERED: ', '');
+            // Athena-related filter
+            if (filterReason.includes('Athena')) {
+                return { stage: 'ATHENA 🚫', stageNum: 4, reason: filterReason, color: '#EF4444', icon: '🚫' };
+            }
+            // Cap/dupe/conviction filters — coin was qualified but blocked
+            return { stage: 'FILTERED', stageNum: 3, reason: filterReason, color: '#F59E0B', icon: '⛔' };
+        }
+
+        // Stage 3: HMM Qualified (eligible but not yet sent to Athena — shouldn't happen in normal flow)
+        if (a.includes('ELIGIBLE')) {
+            return { stage: 'QUALIFIED', stageNum: 3, reason: 'HMM eligible — awaiting deploy', color: '#22C55E', icon: '✓' };
+        }
+
+        // Stage 2: In Segment Pool but no signal
+        if (!a.includes('SEGMENT_POOL_SKIP') && !a.includes('SEGMENT POOL SKIP') &&
+            !a.includes('DIRECTION_GATE_SKIP') && !a.includes('DIRECTION GATE SKIP')) {
+            // In pool but no HMM signal
+            let reason = 'No HMM consensus';
+            if (a.includes('MTF_CONFLICT') || a.includes('NO_CONSENSUS')) reason = 'No multi-TF consensus';
+            else if (a.includes('CHOP')) reason = 'Sideways — no signal';
+            else if (a.includes('15M_FILTER')) reason = '15m momentum opposes';
+            else if (a.includes('CRASH') || a.includes('MACRO')) reason = 'Crash regime — safety skip';
+            else if (a.includes('WEEKEND')) reason = 'Weekend skip';
+            else if (a.includes('VOL_TOO_HIGH')) reason = 'ATR too high';
+            else if (a.includes('VOL_TOO_LOW')) reason = 'ATR too low';
+            else if (a.includes('SENTIMENT')) reason = 'Sentiment veto';
+            else if (a.includes('LOW_CONVICTION')) reason = 'Conviction too low';
+            const conv = c.conviction != null ? Number(c.conviction) : (c.confidence != null ? (c.confidence <= 1 ? c.confidence * 100 : c.confidence) : 0);
+            if (conv === 0 && !a) reason = 'No HMM consensus across timeframes';
+            return { stage: 'IN POOL', stageNum: 2, reason, color: '#6B7280', icon: '~' };
+        }
+
+        // Stage 1: Scanned but not in segment pool
+        const poolReason = c.reason || c.pool_desc || 'Not in current segment rotation';
+        return { stage: 'OUT OF POOL', stageNum: 1, reason: poolReason, color: '#4B5563', icon: '⊘' };
+    };
+
+    // Classify all coins
+    const classified = coins.map(c => ({ ...c, ...getStage(c) }));
+
+    // Sort: deployed first, then by stage (highest first), then by conviction
+    const sorted = [...classified].sort((a, b) => {
+        if (a.stageNum !== b.stageNum) return b.stageNum - a.stageNum;
+        const ac = a.conviction != null ? Number(a.conviction) : 0;
+        const bc = b.conviction != null ? Number(b.conviction) : 0;
         return bc - ac;
     });
 
-    const eligible = coins.filter((c: any) => (c.action || '').includes('ELIGIBLE'));
-    const skipped = coins.filter((c: any) => {
-        const a = c.action || '';
-        return a.includes('SKIP') || a.includes('VETO') || a.includes('CONFLICT') || a.includes('CRASH');
-    });
+    // Pipeline counts
+    const total = coins.length;
+    const inPool = classified.filter(c => c.stageNum >= 2).length;
+    const qualified = classified.filter(c => c.stageNum >= 3).length;
+    const athenaProcessed = classified.filter(c => c.stageNum >= 4).length;
+    const deployed = classified.filter(c => c.stageNum === 5).length;
+    const athenaVetoed = classified.filter(c => c.stage === 'ATHENA 🚫').length;
 
-    const actStyle = (action: string) => {
-        if (action.includes('ELIGIBLE')) return { bg: 'rgba(34,197,94,0.12)', color: '#22C55E', icon: '✓' };
-        if (action.includes('CRASH')) return { bg: 'rgba(220,38,38,0.12)', color: '#DC2626', icon: '✕' };
-        if (action.includes('SEGMENT POOL SKIP') || action.includes('DIRECTION GATE SKIP')) return { bg: 'rgba(245,158,11,0.12)', color: '#F59E0B', icon: '⊘' };
-        if (action.includes('SKIP') || action.includes('VETO') || action.includes('CONFLICT')) return { bg: 'rgba(239,68,68,0.12)', color: '#EF4444', icon: '✕' };
-        if (action.includes('CHOP') || action.includes('MEAN_REV')) return { bg: 'rgba(245,158,11,0.12)', color: '#F59E0B', icon: '~' };
-        return { bg: 'rgba(107,114,128,0.08)', color: '#6B7280', icon: '•' };
+    const getSegment = (symbol: string): string => {
+        const coin = symbol.replace('USDT', '').toUpperCase();
+        const map: Record<string, string> = {
+            BTC: 'L1', ETH: 'L1', SOL: 'L1', BNB: 'L1', AVAX: 'L1', SUI: 'L1', XRP: 'L1', APT: 'L1',
+            MATIC: 'L2', ARB: 'L2', OP: 'L2', POL: 'L2', MNT: 'L2', STRK: 'L2', IMX: 'L2',
+            UNI: 'DeFi', AAVE: 'DeFi', DYDX: 'DeFi', CRV: 'DeFi', JUP: 'DeFi', RUNE: 'DeFi', LINK: 'DeFi', PENDLE: 'DeFi',
+            AXS: 'Gaming', SAND: 'Gaming', GALA: 'Gaming', PIXEL: 'Gaming', IOTX: 'Gaming', GLM: 'Gaming', ENJ: 'Gaming', YGG: 'Gaming',
+            FET: 'AI', RENDER: 'AI', WLD: 'AI', TAO: 'AI', INJ: 'AI', AKT: 'AI',
+            ONDO: 'RWA', TRU: 'RWA',
+            FIL: 'DePIN', AR: 'DePIN', HNT: 'DePIN',
+            DOGE: 'Meme', SHIB: 'Meme', PEPE: 'Meme', WIF: 'Meme', BONK: 'Meme',
+            TIA: 'Modular', DYM: 'Modular',
+            PYTH: 'Oracles',
+        };
+        return map[coin] || '—';
+    };
+
+    const segColors: Record<string, { bg: string; color: string }> = {
+        L1: { bg: 'rgba(139,92,246,0.12)', color: '#A78BFA' },
+        L2: { bg: 'rgba(6,182,212,0.12)', color: '#22D3EE' },
+        DeFi: { bg: 'rgba(16,185,129,0.12)', color: '#34D399' },
+        Gaming: { bg: 'rgba(245,158,11,0.12)', color: '#FBBF24' },
+        AI: { bg: 'rgba(236,72,153,0.12)', color: '#F472B6' },
+        RWA: { bg: 'rgba(59,130,246,0.12)', color: '#60A5FA' },
+        DePIN: { bg: 'rgba(168,85,247,0.12)', color: '#C084FC' },
+        Meme: { bg: 'rgba(251,146,60,0.12)', color: '#FB923C' },
+        Modular: { bg: 'rgba(52,211,153,0.12)', color: '#34D399' },
+        Oracles: { bg: 'rgba(96,165,250,0.12)', color: '#60A5FA' },
     };
 
     const regColor = (r: string) => {
@@ -731,228 +759,214 @@ export function SignalSummaryTable({ coinStates, multi, heatmap: heatmapProp, bo
         return '#6B7280';
     };
 
-    const getReason = (c: any) => {
-        const ds = (botId && c.bot_deploy_statuses?.[botId]) || c.deploy_status || '';
-        const a = ds || c.action || '', r = c.regime || '';
-        // Use conviction (post 8-factor score, 0-100) if available, fallback to raw HMM confidence
-        const pct = c.conviction != null ? Number(c.conviction) : (c.confidence != null ? (c.confidence <= 1 ? c.confidence * 100 : c.confidence) : 0);
-        // If coin was eligible but filtered in deploy phase, show the deploy filter reason
-        if (ds.startsWith('FILTERED')) return ds.replace('FILTERED: ', '').charAt(0).toUpperCase() + ds.replace('FILTERED: ', '').slice(1);
-        // Segment pool skip — use the pre-built reason from engine (includes mode + pools)
-        if (a.includes('SEGMENT_POOL_SKIP') || a.includes('SEGMENT POOL SKIP')) {
-            return c.reason || c.pool_desc || 'Not in current segment pool';
-        }
-        // Direction gate skip — HMM signal direction opposed to pool
-        if (a.includes('DIRECTION_GATE_SKIP') || a.includes('DIRECTION GATE SKIP')) {
-            return c.reason || 'Signal direction ≠ regime pool';
-        }
-        if (a.includes('ELIGIBLE_BUY')) return `Bullish @ ${pct.toFixed(0)} conv — LONG ready`;
-        if (a.includes('ELIGIBLE_SELL')) return `Bearish @ ${pct.toFixed(0)} conv — SHORT ready`;
-        if (a.includes('ELIGIBLE')) return `${r} @ ${pct.toFixed(0)} conv — trade ready`;
-        if (a.includes('CRASH_SKIP') || a.includes('MACRO_CRASH')) return 'Crash regime — safety skip';
-        if (a.includes('WEEKEND') || a.includes('WEEK_SKIP')) return 'Weekend — skipped';
-        if (a.includes('MTF_CONFLICT') || a.includes('MTF_NO_CONSENSUS') || a.includes('NO_CONSENSUS')) return 'No HMM consensus across timeframes';
-        if (a.includes('15M_FILTER')) return '15m momentum opposes direction';
-        if (a.includes('SENTIMENT_VETO') || a.includes('SENTIMENT_ALERT')) return 'Sentiment filter — vetoed';
-        if (a.includes('CHOP_NO_SIGNAL')) return 'Sideways — no mean-rev signal';
-        if (a.includes('MEAN_REV')) return 'Mean-reversion in choppy market';
-        if (a.includes('LOW_CONVICTION') || (pct === 0 && !a)) return 'Conviction too low';
-        if (a.includes('VOL_TOO_HIGH')) return 'ATR too high — risky';
-        if (a.includes('VOL_TOO_LOW')) return 'ATR too low — no opportunity';
-        // 0.0% confidence with no known code → HMM model couldn't converge on a state
-        if (pct === 0) return 'No HMM consensus across timeframes';
-        // Fallback: show the raw action code so users can see the actual engine reason
-        return a ? a.replace(/_/g, ' ').toLowerCase().replace(/\b\w/g, (c: string) => c.toUpperCase()) : 'Analyzing market conditions...';
-    };
-
-    const toggleCoin = (sym: string) => setSelectedCoins(prev => prev.includes(sym) ? prev.filter(s => s !== sym) : [...prev, sym]);
+    // Pipeline funnel stages
+    const funnelStages = [
+        { label: 'SCANNED', count: total, color: '#9CA3AF', icon: '🔍' },
+        { label: 'IN POOL', count: inPool, color: '#A78BFA', icon: '📊' },
+        { label: 'QUALIFIED', count: qualified, color: '#22C55E', icon: '✓' },
+        { label: 'ATHENA', count: athenaProcessed, color: '#F59E0B', icon: '🏛️', sub: athenaVetoed > 0 ? `${athenaVetoed} vetoed` : undefined },
+        { label: 'DEPLOYED', count: deployed, color: '#06B6D4', icon: '🚀' },
+    ];
 
     return (
         <div>
             {/* Header */}
-            <div style={{ marginBottom: '16px' }}>
-                <h2 style={{ fontSize: 20, fontWeight: 800, color: '#00E5FF', margin: 0, textShadow: '0 0 12px rgba(0,229,255,0.3)' }}>Bot Scan Summary <span style={{ fontSize: 13, fontWeight: 600, color: 'rgba(0,229,255,0.4)', fontFamily: 'var(--font-mono, monospace)' }}>· Cycle #{liveMulti?.cycle || 0}</span></h2>
-                <p style={{ fontSize: 12, color: 'rgba(0,229,255,0.25)', marginTop: 4, fontFamily: 'var(--font-mono, monospace)' }}>Synaptic Adaptive · Auto-refreshes every {Math.round(refreshMs / 1000)}s · <span style={{ color: 'rgba(255,255,255,0.2)' }}>showing current batch slice</span></p>
+            <div style={{ marginBottom: '20px' }}>
+                <h2 style={{ fontSize: '22px', fontWeight: 800, color: '#E5E7EB', margin: 0, letterSpacing: '-0.3px' }}>
+                    🧠 Brain Execution Summary
+                    <span style={{ fontSize: '13px', fontWeight: 600, color: 'rgba(156,163,175,0.5)', fontFamily: 'var(--font-mono, monospace)', marginLeft: '10px' }}>
+                        Cycle #{liveMulti?.cycle || 0} · {formatIST(lastCycle)}
+                    </span>
+                </h2>
+                <p style={{ fontSize: '12px', color: 'rgba(156,163,175,0.35)', marginTop: 4, fontFamily: 'var(--font-mono, monospace)' }}>
+                    Full pipeline visibility — Segment → HMM → Athena → Deploy
+                </p>
             </div>
 
-            {/* Stats Bar */}
-            {(() => {
-                const engineTs = liveMulti?.last_analysis_time || liveMulti?.timestamp || null;
-                // Multi-signal engine detection:
-                // 1. Engine status field from health endpoint (most reliable)
-                // 2. Uptime > 0 means Flask is serving
-                // 3. Timestamp staleness fallback (generous 20-min to cover long cycles)
-                const engineStatus = liveMulti?.status || '';
-                const engineUptime = liveMulti?.uptime_seconds || 0;
-                const tsAge = engineTs ? (Date.now() - new Date(String(engineTs)).getTime()) : Infinity;
-                const isEngineOn = engineStatus === 'running' || engineUptime > 0 || tsAge < 1200000;
-                // Detect if engine is mid-cycle (ON but no recent completed cycle). Allow 14m before showing SCANNING.
-                const isScanning = isEngineOn && (!engineTs || tsAge > 240000);
-                const nextCycleLabel = (() => {
-                    const nextRaw = liveMulti?.next_analysis_time;
-                    try {
-                        // Countdown timer to next cycle
-                        if (nextRaw) {
-                            const ts = String(nextRaw);
-                            const normalized = /Z$|[+-]\d{2}:\d{2}$/.test(ts) ? ts : ts + 'Z';
-                            const nextMs = new Date(normalized).getTime();
-                            const secsLeft = Math.max(0, Math.round((nextMs - Date.now()) / 1000));
-                            if (secsLeft <= 0) return 'Running…';
-                            const m = Math.floor(secsLeft / 60);
-                            const s = secsLeft % 60;
-                            const timeStr = new Date(nextMs).toLocaleTimeString('en-IN', {
-                                hour: '2-digit', minute: '2-digit', hour12: true, timeZone: 'Asia/Kolkata',
-                            });
-                            return m > 0 ? `${m}m ${s}s · ${timeStr} IST` : `${s}s · ${timeStr} IST`;
-                        }
-                        // Fallback: compute from last_analysis_time + interval
-                        if (!engineTs || !intervalSec) return isScanning ? 'Scanning…' : '—';
-                        const ts = String(engineTs);
-                        const normalized = /Z$|[+-]\d{2}:\d{2}$/.test(ts) ? ts : ts + 'Z';
-                        const nextMs = new Date(normalized).getTime() + (intervalSec * 1000);
-                        if (isNaN(nextMs) || nextMs <= Date.now()) return 'Running…';
-                        return new Date(nextMs).toLocaleTimeString('en-IN', {
-                            hour: '2-digit', minute: '2-digit', hour12: true, timeZone: 'Asia/Kolkata',
-                        }) + ' IST';
-                    } catch { return '—'; }
-                })();
-                const engineLabel = isScanning ? '🔄 SCANNING' : isEngineOn ? '🟢 ON' : '🔴 OFF';
-                const engineColor = isScanning ? '#A78BFA' : isEngineOn ? '#22C55E' : '#EF4444';
-                const statsItems = [
-                    { label: 'Engine', value: engineLabel, color: engineColor, isText: true },
-                    { label: 'Next Cycle', value: nextCycleLabel, color: '#A78BFA', isText: true },
-                    { label: 'Scanned', value: coins.length, color: '#06B6D4' },
-                    { label: 'Eligible', value: eligible.length, color: '#22C55E' },
-                    { label: 'Deployed', value: (liveMulti as any)?.deployed_count ?? '?', color: '#F59E0B' },
-                    { label: 'Filtered', value: skipped.length, color: '#EF4444' },
-                    { label: 'Last Cycle', value: formatIST(lastCycle), color: '#9CA3AF', isText: true },
-                    { label: 'Interval', value: intervalSec ? `${Math.round(Number(intervalSec) / 60)}m` : '—', color: '#9CA3AF', isText: true },
-                ];
-                return (
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(8, 1fr)', gap: '8px', marginBottom: '12px' }}>
-                        {statsItems.map((s, i) => (
-                            <div key={i} style={{ background: 'rgba(255,255,255,0.03)', border: `1px solid ${s.label === 'Engine' ? (isEngineOn ? 'rgba(34,197,94,0.2)' : 'rgba(239,68,68,0.2)') : 'rgba(255,255,255,0.06)'}`, borderRadius: '10px', padding: '10px 12px', textAlign: 'center' }}>
-                                <div style={{ fontSize: '9px', textTransform: 'uppercase', letterSpacing: '1px', color: '#6B7280', marginBottom: '4px' }}>{s.label}</div>
-                                <div style={{ fontSize: (s as any).isText ? '12px' : '20px', fontWeight: 700, color: '#FFFFFF', fontFamily: (s as any).isText ? 'monospace' : 'inherit' }}>{s.value}</div>
+            {/* ── Pipeline Funnel ──────────────────────────────────────── */}
+            <div style={{
+                display: 'flex', alignItems: 'center', gap: '0', marginBottom: '20px',
+                background: 'rgba(255,255,255,0.02)', borderRadius: '14px', padding: '16px 12px',
+                border: '1px solid rgba(255,255,255,0.05)',
+            }}>
+                {funnelStages.map((s, i) => (
+                    <div key={s.label} style={{ display: 'flex', alignItems: 'center', flex: 1 }}>
+                        <div style={{
+                            textAlign: 'center', flex: 1, padding: '8px 4px',
+                            background: s.count > 0 ? `${s.color}08` : 'transparent',
+                            borderRadius: '10px',
+                            border: s.count > 0 ? `1px solid ${s.color}20` : '1px solid transparent',
+                        }}>
+                            <div style={{ fontSize: '10px', textTransform: 'uppercase' as const, letterSpacing: '1.2px', color: '#6B7280', marginBottom: '4px', fontWeight: 700 }}>
+                                {s.icon} {s.label}
                             </div>
-                        ))}
-                    </div>
-                );
-            })()}
-
-            {/* ── Segment Heatmap ─────────────────────────────────── */}
-            {liveHeatmap?.segments?.length > 0 && (() => {
-                const segs: any[] = liveHeatmap.segments;
-                const btc24h: number = liveHeatmap.btc_24h ?? 0;
-                const maxAbs = Math.max(...segs.map((s: any) => Math.abs(s.composite_score)), 0.01);
-                return (
-                    <div style={{ marginBottom: '14px' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
-                            <span style={{ fontSize: '11px', fontWeight: 700, color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: '1px' }}>🔥 Segment Heatmap</span>
-                            <span style={{ fontSize: '10px', color: btc24h >= 0 ? '#22C55E' : '#EF4444', fontFamily: 'monospace', background: 'rgba(255,255,255,0.05)', padding: '2px 7px', borderRadius: '6px' }}>
-                                BTC 24h: {btc24h >= 0 ? '+' : ''}{btc24h.toFixed(2)}%
-                            </span>
-                            <span style={{ fontSize: '10px', color: '#4B5563', marginLeft: 'auto' }}>Score = VW-RR × Breadth</span>
+                            <div style={{ fontSize: '26px', fontWeight: 800, color: s.count > 0 ? s.color : '#374151', lineHeight: 1 }}>
+                                {s.count}
+                            </div>
+                            {s.sub && (
+                                <div style={{ fontSize: '9px', color: '#EF4444', marginTop: '3px', fontWeight: 600 }}>
+                                    {s.sub}
+                                </div>
+                            )}
                         </div>
-                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '6px' }}>
-                            {segs.map((seg: any, i: number) => {
-                                const pos = seg.composite_score >= 0;
-                                const barW = Math.round((Math.abs(seg.composite_score) / maxAbs) * 100);
-                                const rankColors = ['#FFD700', '#C0C0C0', '#CD7F32'];
-                                return (
-                                    <div key={seg.segment} style={{
-                                        background: pos ? 'rgba(34,197,94,0.06)' : 'rgba(239,68,68,0.06)',
-                                        border: `1px solid ${pos ? 'rgba(34,197,94,0.2)' : 'rgba(239,68,68,0.2)'}`,
-                                        borderRadius: '10px', padding: '8px 10px', position: 'relative', overflow: 'hidden',
-                                    }}>
-                                        {/* rank badge */}
-                                        {i < 3 && <span style={{ position: 'absolute', top: 4, right: 6, fontSize: '10px', color: rankColors[i] }}>#{i + 1}</span>}
-                                        {/* segment name */}
-                                        <div style={{ fontSize: '11px', fontWeight: 700, color: '#E5E7EB', marginBottom: '4px' }}>{seg.segment}</div>
-                                        {/* composite score */}
-                                        <div style={{ fontSize: '15px', fontWeight: 800, color: pos ? '#22C55E' : '#EF4444', lineHeight: 1, marginBottom: '4px' }}>
-                                            {pos ? '+' : ''}{seg.composite_score.toFixed(2)}
-                                        </div>
-                                        {/* bar */}
-                                        <div style={{ height: '3px', background: 'rgba(255,255,255,0.05)', borderRadius: '2px', marginBottom: '5px' }}>
-                                            <div style={{ height: '100%', width: `${barW}%`, background: pos ? '#22C55E' : '#EF4444', borderRadius: '2px', transition: 'width 0.4s ease' }} />
-                                        </div>
-                                        {/* sub-metrics */}
-                                        <div style={{ display: 'flex', gap: '6px', fontSize: '9px', color: '#6B7280' }}>
-                                            <span title="VW-RR">VW {seg.vw_rr >= 0 ? '+' : ''}{seg.vw_rr}%</span>
-                                            <span title="Alpha vs BTC">α {seg.btc_alpha >= 0 ? '+' : ''}{seg.btc_alpha}%</span>
-                                            <span title="Breadth">🫧{seg.breadth_pct}%</span>
-                                        </div>
-                                    </div>
-                                );
-                            })}
-                        </div>
+                        {i < funnelStages.length - 1 && (
+                            <div style={{ color: '#374151', fontSize: '16px', padding: '0 4px', fontWeight: 300 }}>→</div>
+                        )}
                     </div>
-                );
-            })()}
+                ))}
+            </div>
 
-            {/* Coin Filter Dropdown removed as per user request */}
-
-            {/* Table */}
+            {/* ── Per-Coin Detail Table ────────────────────────────────── */}
             <div className="card-gradient rounded-xl overflow-hidden">
-                <div style={{ overflowX: 'auto', maxHeight: '480px', overflowY: 'auto' }}>
-                    <table style={{ width: '100%', minWidth: '900px', borderCollapse: 'collapse', fontSize: '14px' }}>
+                <div style={{ overflowX: 'auto', maxHeight: '520px', overflowY: 'auto' }}>
+                    <table style={{ width: '100%', minWidth: '900px', borderCollapse: 'collapse', fontSize: '13px' }}>
                         <thead>
                             <tr style={{ borderBottom: '2px solid rgba(255,255,255,0.08)' }}>
-                                {['#', 'Coin', 'Segment', 'Regime', 'Conv %', 'Deploy', 'Reason', 'Cycle #', 'Scan Time'].map(h => (
-                                    <th key={h} style={{ padding: '10px 8px', textAlign: h === '#' || h === 'Coin' || h === 'Reason' ? 'left' : 'center', fontSize: '9px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '1px', color: '#4B5563', position: 'sticky' as const, top: 0, background: 'var(--color-surface, rgba(17,24,39,0.98))' }}>{h}</th>
+                                {['#', 'Coin', 'Segment', 'Pool', 'HMM Regime', 'Conv %', 'Athena', 'Result', 'Reason'].map(h => (
+                                    <th key={h} style={{
+                                        padding: '12px 8px', textAlign: h === '#' || h === 'Coin' || h === 'Reason' ? 'left' : 'center',
+                                        fontSize: '10px', fontWeight: 700, textTransform: 'uppercase' as const, letterSpacing: '1px', color: '#6B7280',
+                                        position: 'sticky' as const, top: 0, background: 'var(--color-surface, rgba(17,24,39,0.98))',
+                                    }}>{h}</th>
                                 ))}
                             </tr>
                         </thead>
                         <tbody>
                             {sorted.map((c: any, idx: number) => {
-                                const regime = c.regime || 'WAITING';
-                                const conf = c.conviction != null ? Number(c.conviction) : (c.confidence != null ? (c.confidence <= 1 ? c.confidence * 100 : c.confidence) : 0);
-                                const action = (c.action || '').replace(/_/g, ' ');
-                                const as = actStyle(action);
-                                const isE = action.includes('ELIGIBLE');
-                                const regBg = regime.includes('BULL') ? 'rgba(34,197,94,0.12)' : regime.includes('BEAR') ? 'rgba(239,68,68,0.12)' : regime.includes('CHOP') || regime.includes('SIDE') ? 'rgba(245,158,11,0.12)' : 'rgba(107,114,128,0.10)';
-                                // Check if this coin has an active trade (deployed)
-                                const activePositions = liveMulti?.active_positions || liveMulti?.positions || {};
-                                const symBase = (c.symbol || '').replace('USDT', '');
-                                const isDeployed = Object.keys(activePositions).some(k => k === symBase || k === c.symbol || k.endsWith(':' + c.symbol) || k.endsWith(':' + symBase));
-                                const deployStatus = (botId && c.bot_deploy_statuses?.[botId]) || c.deploy_status || '';
-                                let dLabel = 'PENDING', dColor = '#6B7280', dBg = 'rgba(107,114,128,0.08)';
-                                if (isDeployed || deployStatus === 'ACTIVE') { dLabel = 'DEPLOYED'; dColor = '#06B6D4'; dBg = 'rgba(6,182,212,0.12)'; }
-                                else if (deployStatus.startsWith('FILTERED')) { dLabel = 'NOT ELIGIBLE'; dColor = '#F59E0B'; dBg = 'rgba(245,158,11,0.08)'; }
-                                else if (action.includes('SEGMENT POOL SKIP') || action.includes('DIRECTION GATE SKIP')) { dLabel = 'OUT OF POOL'; dColor = '#F59E0B'; dBg = 'rgba(245,158,11,0.08)'; }
-                                else if (isE) { dLabel = 'READY'; dColor = '#22C55E'; dBg = 'rgba(34,197,94,0.12)'; }
-                                else if (action.includes('SKIP') || action.includes('VETO') || action.includes('CONFLICT') || action.includes('CRASH')) { dLabel = 'NOT ELIGIBLE'; dColor = '#EF4444'; dBg = 'rgba(239,68,68,0.08)'; }
+                                const regime = c.regime || '—';
+                                const conv = c.conviction != null ? Number(c.conviction) : (c.confidence != null ? (c.confidence <= 1 ? c.confidence * 100 : c.confidence) : 0);
+                                const isExpanded = expandedCoin === c.symbol;
+                                const athena = c.athena_state;
+                                const seg = getSegment(c.symbol || '');
+                                const sc = segColors[seg] || { bg: 'rgba(107,114,128,0.10)', color: '#9CA3AF' };
+                                const isDeployed = c.stageNum === 5;
+                                const inSegPool = c.stageNum >= 2;
 
                                 return (
-                                    <tr key={c.symbol}
-                                        style={{ borderBottom: '1px solid rgba(0,229,255,0.04)', background: isE ? 'rgba(0,255,136,0.03)' : 'transparent', transition: 'background 0.2s, box-shadow 0.2s' }}
-                                        onMouseEnter={e => (e.currentTarget.style.background = isE ? 'rgba(0,255,136,0.06)' : 'rgba(0,229,255,0.04)')}
-                                        onMouseLeave={e => (e.currentTarget.style.background = isE ? 'rgba(0,255,136,0.03)' : 'transparent')}>
-                                        <td style={{ padding: '8px 8px', color: 'rgba(0,229,255,0.3)', fontSize: 10, fontWeight: 600, fontFamily: 'var(--font-mono, monospace)' }}>{idx + 1}</td>
-                                        <td style={{ padding: '8px 8px' }}><div style={{ fontWeight: 800, color: '#E8EDF5', fontSize: 14, fontFamily: 'var(--font-mono, monospace)', letterSpacing: '-0.3px' }}>{(c.symbol || '').replace('USDT', '')}</div></td>
-                                        <td style={{ padding: '8px 8px', textAlign: 'center' }}>
-                                            {(() => {
-                                                const seg = getSegment(c.symbol || '');
-                                                const segColors: Record<string, { bg: string; color: string }> = {
-                                                    L1: { bg: 'rgba(139,92,246,0.12)', color: '#A78BFA' },
-                                                    L2: { bg: 'rgba(6,182,212,0.12)', color: '#22D3EE' },
-                                                    DeFi: { bg: 'rgba(16,185,129,0.12)', color: '#34D399' },
-                                                    Gaming: { bg: 'rgba(245,158,11,0.12)', color: '#FBBF24' },
-                                                    AI: { bg: 'rgba(236,72,153,0.12)', color: '#F472B6' },
-                                                    RWA: { bg: 'rgba(59,130,246,0.12)', color: '#60A5FA' },
-                                                };
-                                                const sc = segColors[seg] || { bg: 'rgba(107,114,128,0.10)', color: '#9CA3AF' };
-                                                return <span style={{ background: sc.bg, color: sc.color, padding: '3px 9px', borderRadius: 8, fontSize: 10, fontWeight: 700 }}>{seg || '—'}</span>;
-                                            })()}
-                                        </td>
-                                        <td style={{ padding: '8px 8px', textAlign: 'center' }}><span style={{ background: regBg, color: regColor(regime), padding: '3px 10px', borderRadius: 10, fontSize: 10, fontWeight: 700, textShadow: `0 0 6px ${regColor(regime)}66` }}>{regime}</span></td>
-                                        <td style={{ padding: '8px 8px', textAlign: 'center', fontWeight: 800, fontSize: 14, fontFamily: 'var(--font-mono, monospace)', color: conf > 80 ? '#00FF88' : conf > 60 ? '#00E5FF' : conf > 40 ? '#FFB300' : '#4B5563', textShadow: conf > 80 ? '0 0 8px rgba(0,255,136,0.4)' : undefined }}>{conf.toFixed(1)}%</td>
-                                        <td style={{ padding: '8px 8px', textAlign: 'center' }}><span style={{ background: dBg, color: dColor, padding: '3px 10px', borderRadius: 10, fontSize: 10, fontWeight: 700 }}>{dLabel}</span></td>
-                                        <td style={{ padding: '8px 8px', fontSize: 12, color: 'rgba(180,200,220,0.6)', maxWidth: 200 }}>{getReason(c)}</td>
-                                        <td style={{ padding: '8px 8px', textAlign: 'center', fontFamily: 'var(--font-mono, monospace)', fontSize: 12, fontWeight: 700, color: '#A78BFA' }}>{liveMulti?.cycle || '—'}</td>
-                                        <td style={{ padding: '8px 8px', textAlign: 'center', fontFamily: 'var(--font-mono, monospace)', fontSize: 11, color: 'rgba(0,229,255,0.3)' }}>{formatIST(lastCycle)}</td>
-                                    </tr>
+                                    <React.Fragment key={c.symbol}>
+                                        <tr
+                                            style={{
+                                                borderBottom: '1px solid rgba(255,255,255,0.04)',
+                                                background: isDeployed ? 'rgba(6,182,212,0.04)' : 'transparent',
+                                                cursor: athena ? 'pointer' : 'default',
+                                                transition: 'background 0.2s',
+                                            }}
+                                            onClick={() => athena && setExpandedCoin(isExpanded ? null : c.symbol)}
+                                            onMouseEnter={e => (e.currentTarget.style.background = isDeployed ? 'rgba(6,182,212,0.07)' : 'rgba(255,255,255,0.03)')}
+                                            onMouseLeave={e => (e.currentTarget.style.background = isDeployed ? 'rgba(6,182,212,0.04)' : 'transparent')}
+                                        >
+                                            {/* # */}
+                                            <td style={{ padding: '10px 8px', color: 'rgba(156,163,175,0.4)', fontSize: '10px', fontWeight: 600, fontFamily: 'monospace' }}>{idx + 1}</td>
+                                            {/* Coin */}
+                                            <td style={{ padding: '10px 8px' }}>
+                                                <div style={{ fontWeight: 800, color: '#E8EDF5', fontSize: '14px', fontFamily: 'var(--font-mono, monospace)', letterSpacing: '-0.3px' }}>
+                                                    {(c.symbol || '').replace('USDT', '')}
+                                                    {athena && <span style={{ fontSize: '9px', marginLeft: '5px', color: '#6B7280' }}>{isExpanded ? '▼' : '▶'}</span>}
+                                                </div>
+                                            </td>
+                                            {/* Segment */}
+                                            <td style={{ padding: '10px 8px', textAlign: 'center' }}>
+                                                <span style={{ background: sc.bg, color: sc.color, padding: '3px 9px', borderRadius: '8px', fontSize: '10px', fontWeight: 700 }}>{seg}</span>
+                                            </td>
+                                            {/* Pool */}
+                                            <td style={{ padding: '10px 8px', textAlign: 'center' }}>
+                                                <span style={{
+                                                    padding: '3px 8px', borderRadius: '8px', fontSize: '10px', fontWeight: 700,
+                                                    background: inSegPool ? 'rgba(34,197,94,0.1)' : 'rgba(107,114,128,0.08)',
+                                                    color: inSegPool ? '#22C55E' : '#6B7280',
+                                                }}>{inSegPool ? '✅ IN' : '⛔ OUT'}</span>
+                                            </td>
+                                            {/* HMM Regime */}
+                                            <td style={{ padding: '10px 8px', textAlign: 'center' }}>
+                                                {inSegPool ? (
+                                                    <span style={{
+                                                        background: regime.includes('BULL') ? 'rgba(34,197,94,0.12)' : regime.includes('BEAR') ? 'rgba(239,68,68,0.12)' : 'rgba(107,114,128,0.10)',
+                                                        color: regColor(regime), padding: '3px 10px', borderRadius: '10px', fontSize: '10px', fontWeight: 700,
+                                                    }}>{regime}</span>
+                                                ) : <span style={{ color: '#374151' }}>—</span>}
+                                            </td>
+                                            {/* Conv % */}
+                                            <td style={{
+                                                padding: '10px 8px', textAlign: 'center', fontWeight: 800, fontSize: '14px', fontFamily: 'monospace',
+                                                color: conv > 80 ? '#00FF88' : conv > 60 ? '#06B6D4' : conv > 40 ? '#F59E0B' : '#4B5563',
+                                            }}>
+                                                {inSegPool && conv > 0 ? `${conv.toFixed(0)}%` : <span style={{ color: '#374151' }}>—</span>}
+                                            </td>
+                                            {/* Athena */}
+                                            <td style={{ padding: '10px 8px', textAlign: 'center' }}>
+                                                {athena ? (
+                                                    <span style={{
+                                                        padding: '3px 10px', borderRadius: '10px', fontSize: '10px', fontWeight: 700,
+                                                        background: athena.action === 'EXECUTE' || athena.action === 'LONG' || athena.action === 'SHORT'
+                                                            ? 'rgba(34,197,94,0.12)' : 'rgba(239,68,68,0.12)',
+                                                        color: athena.action === 'EXECUTE' || athena.action === 'LONG' || athena.action === 'SHORT'
+                                                            ? '#22C55E' : '#EF4444',
+                                                    }}>
+                                                        {athena.action === 'EXECUTE' || athena.action === 'LONG' || athena.action === 'SHORT'
+                                                            ? `✅ ${Math.round((athena.confidence || 0) * 100)}%`
+                                                            : `🚫 ${athena.action}`}
+                                                    </span>
+                                                ) : <span style={{ color: '#374151' }}>—</span>}
+                                            </td>
+                                            {/* Result */}
+                                            <td style={{ padding: '10px 8px', textAlign: 'center' }}>
+                                                <span style={{
+                                                    padding: '4px 10px', borderRadius: '10px', fontSize: '10px', fontWeight: 700,
+                                                    background: `${c.color}15`,
+                                                    color: c.color,
+                                                }}>{c.stage}</span>
+                                            </td>
+                                            {/* Reason */}
+                                            <td style={{ padding: '10px 8px', fontSize: '11px', color: 'rgba(180,200,220,0.55)', maxWidth: '220px' }}>
+                                                {c.reason}
+                                            </td>
+                                        </tr>
+
+                                        {/* ── Expanded Athena Detail Row ── */}
+                                        {isExpanded && athena && (
+                                            <tr>
+                                                <td colSpan={9} style={{ padding: 0 }}>
+                                                    <div style={{
+                                                        background: 'rgba(139,92,246,0.04)', borderLeft: '3px solid #A78BFA',
+                                                        padding: '14px 20px', margin: '0',
+                                                    }}>
+                                                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '14px', marginBottom: '10px' }}>
+                                                            <div>
+                                                                <div style={{ fontSize: '9px', color: '#6B7280', textTransform: 'uppercase' as const, letterSpacing: '1px', marginBottom: '4px' }}>Athena Decision</div>
+                                                                <div style={{ fontSize: '13px', fontWeight: 700, color: athena.action === 'EXECUTE' ? '#22C55E' : '#EF4444' }}>
+                                                                    {athena.action} ({Math.round((athena.confidence || 0) * 100)}%)
+                                                                </div>
+                                                            </div>
+                                                            <div>
+                                                                <div style={{ fontSize: '9px', color: '#6B7280', textTransform: 'uppercase' as const, letterSpacing: '1px', marginBottom: '4px' }}>Model</div>
+                                                                <div style={{ fontSize: '13px', fontWeight: 600, color: '#A78BFA', fontFamily: 'monospace' }}>{athena.model || 'gpt-4o'}</div>
+                                                            </div>
+                                                            <div>
+                                                                <div style={{ fontSize: '9px', color: '#6B7280', textTransform: 'uppercase' as const, letterSpacing: '1px', marginBottom: '4px' }}>Latency</div>
+                                                                <div style={{ fontSize: '13px', fontWeight: 600, color: '#9CA3AF', fontFamily: 'monospace' }}>
+                                                                    {athena.latency_ms ? `${athena.latency_ms}ms` : '—'}
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                        {athena.risk_flags && athena.risk_flags.length > 0 && (
+                                                            <div style={{ marginBottom: '8px' }}>
+                                                                <span style={{ fontSize: '9px', color: '#EF4444', textTransform: 'uppercase' as const, letterSpacing: '1px' }}>Risk Flags: </span>
+                                                                {athena.risk_flags.map((f: string, i: number) => (
+                                                                    <span key={i} style={{ fontSize: '11px', color: '#F59E0B', background: 'rgba(245,158,11,0.1)', padding: '2px 6px', borderRadius: '4px', marginRight: '4px' }}>{f}</span>
+                                                                ))}
+                                                            </div>
+                                                        )}
+                                                        <div>
+                                                            <div style={{ fontSize: '9px', color: '#6B7280', textTransform: 'uppercase' as const, letterSpacing: '1px', marginBottom: '4px' }}>Reasoning</div>
+                                                            <div style={{ fontSize: '12px', color: '#D1D5DB', lineHeight: 1.5, fontFamily: 'var(--font-mono, monospace)' }}>
+                                                                {athena.reasoning || '—'}
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        )}
+                                    </React.Fragment>
                                 );
                             })}
                         </tbody>

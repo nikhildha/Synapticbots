@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { Header } from '@/components/header';
 import { StatsCard } from '@/components/stats-card';
 import { BotCard } from '@/components/bot-card';
-import { RegimeCard, PnlCard, ActivePositionsCard, SignalSummaryTable } from '@/components/dashboard/command-center';
+import { RegimeCard, PnlCard, ActivePositionsCard, BrainExecutionSummary } from '@/components/dashboard/command-center';
 
 import { AthenaPanel } from '@/components/dashboard/athena-panel';
 
@@ -691,14 +691,14 @@ export function DashboardClient({ user, stats, bots, recentTrades }: DashboardCl
           </motion.div>
 
 
-          {/* ═══ Row 5: Signal Summary Table ═══ */}
+          {/* ═══ Row 6: Brain Execution Scan Summary ═══ */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.35 }}
             className="mt-8"
           >
-            <SignalSummaryTable coinStates={multi?.coin_states || {}} multi={multi} heatmap={botState?.heatmap || null} botId={bots.find(b => b.isActive)?.id || bots[0]?.id} />
+            <BrainExecutionSummary coinStates={multi?.coin_states || {}} multi={multi} heatmap={botState?.heatmap || null} botId={bots.find(b => b.isActive)?.id || bots[0]?.id} />
           </motion.div>
 
         </div>
