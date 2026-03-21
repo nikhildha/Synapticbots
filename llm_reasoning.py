@@ -164,14 +164,14 @@ class AthenaEngine:
         return []
 
     def _ensure_initialized(self):
-        """Lazy-init the Gemini REST client."""
+        """Lazy-init the OpenAI REST client."""
         if self._initialized:
             return True
         if not config.LLM_API_KEY:
-            logger.warning("🏛️ Athena disabled — no GEMINI_API_KEY configured")
+            logger.warning("🏹 Athena disabled — no GEMINI_API_KEY configured (now holds OpenAI key)")
             return False
         self._initialized = True
-        logger.info("🏛️ Athena initialized — model: %s (REST API)", config.LLM_MODEL)
+        logger.info("🏹 Athena initialized — model: %s (OpenAI REST API)", config.LLM_MODEL)
         return True
 
     def reset_cycle(self):
@@ -220,9 +220,9 @@ class AthenaEngine:
         if not self._ensure_initialized():
             return self._default_execute(symbol, reason="Not initialized")
 
-        # 4. Call Gemini — fail-closed: log error and re-raise so caller skips the trade
+        # 4. Call OpenAI — fail-closed: log error and re-raise so caller skips the trade
         try:
-            return self._call_gemini(symbol, signal_context)
+            return self._call_openai(symbol, signal_context)
         except Exception as e:
             err_entry = {
                 "time": datetime.now(timezone.utc).isoformat(),
@@ -237,29 +237,36 @@ class AthenaEngine:
             logger.error("🏛️ Athena [%s] API error — trade will be skipped: %s", symbol, e)
             raise
 
-    def _call_gemini(self, symbol: str, ctx: dict) -> AthenaDecision:
-        """Make the actual Gemini API call using REST."""
+    def _call_openai(self, symbol: str, ctx: dict) -> AthenaDecision:
+        """Make the actual OpenAI Chat Completions API call via REST."""
         import requests
-        
+
         prompt = self._build_prompt(ctx)
-        url = f"https://generativelanguage.googleapis.com/v1beta/models/{config.LLM_MODEL}:generateContent?key={config.LLM_API_KEY}"
-        
+        url = "https://api.openai.com/v1/chat/completions"
+
         payload = {
-            "contents": [{"parts": [{"text": prompt}]}],
-            "systemInstruction": {"parts": [{"text": ATHENA_SYSTEM_PROMPT}]},
-            "generationConfig": {
-                "temperature": 0.3,
-                "maxOutputTokens": 2048,
-            }
+            "model": config.LLM_MODEL,
+            "messages": [
+                {"role": "system", "content": ATHENA_SYSTEM_PROMPT},
+                {"role": "user",   "content": prompt},
+            ],
+            "temperature": 0.3,
+            "max_tokens":  2048,
+            "response_format": {"type": "json_object"},   # GPT-4o-mini supports JSON mode
+        }
+
+        headers = {
+            "Content-Type":  "application/json",
+            "Authorization": f"Bearer {config.LLM_API_KEY}",
         }
 
         start = time.time()
         try:
-            resp = requests.post(url, json=payload, headers={"Content-Type": "application/json"}, timeout=30)
+            resp = requests.post(url, json=payload, headers=headers, timeout=config.LLM_TIMEOUT_SECONDS)
             resp.raise_for_status()
             resp_data = resp.json()
         except Exception as e:
-            logger.warning("🏛️ Athena [%s] REST error (fail-open): %s", symbol, e)
+            logger.warning("🏹 Athena [%s] OpenAI REST error (fail-open): %s", symbol, e)
             return self._default_execute(symbol, reason=f"REST API error: {str(e)[:80]}")
 
         latency_ms = int((time.time() - start) * 1000)
@@ -267,17 +274,15 @@ class AthenaEngine:
 
         raw = ""
         try:
-            candidates = resp_data.get("candidates", [])
-            if candidates:
-                parts = candidates[0].get("content", {}).get("parts", [])
-                if parts:
-                    raw = parts[0].get("text", "").strip()
+            choices = resp_data.get("choices", [])
+            if choices:
+                raw = choices[0].get("message", {}).get("content", "").strip()
 
             if not raw:
-                logger.warning("🏛️ Athena [%s] empty response (latency=%dms)", symbol, latency_ms)
+                logger.warning("🏹 Athena [%s] empty OpenAI response (latency=%dms)", symbol, latency_ms)
                 return self._default_execute(symbol, reason="Empty API response")
 
-            # Strip markdown code fences if present
+            # Strip markdown code fences if present (shouldn't happen with json_object mode)
             if raw.startswith("```"):
                 raw = raw.split("\n", 1)[-1]
                 raw = raw.rsplit("```", 1)[0].strip()
@@ -285,10 +290,10 @@ class AthenaEngine:
             # Try to extract valid JSON from the response
             data = self._extract_json(raw)
             if data is None:
-                logger.warning("🏛️ Athena [%s] could not extract JSON | raw=%s", symbol, repr(raw[:400]))
+                logger.warning("🏹 Athena [%s] could not extract JSON | raw=%s", symbol, repr(raw[:400]))
                 return self._default_execute(symbol, reason="Could not extract JSON from response")
         except Exception as e:
-            logger.warning("🏛️ Athena [%s] response error: %s", symbol, str(e)[:100])
+            logger.warning("🏹 Athena [%s] response error: %s", symbol, str(e)[:100])
             return self._default_execute(symbol, reason=f"Response error: {str(e)[:80]}")
 
         # Handle JSON array (prompt asks for array format) — take first element

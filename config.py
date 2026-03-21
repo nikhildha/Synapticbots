@@ -293,17 +293,17 @@ SENTIMENT_VETO_THRESHOLD    = -0.65    # Hard veto gate (fast path before convic
 SENTIMENT_STRONG_POS        = 0.45     # Threshold for "strongly positive" label
 SENTIMENT_USE_FINBERT       = False    # DISABLED — FinBERT loads ~400MB transformer model (OOM on Railway)
 SENTIMENT_VADER_WEIGHT      = 0.4      # VADER contribution when blending with FinBERT
-# ─── Athena — LLM Reasoning Layer (Gemini) ────────────────────────────────────
+# ─── Athena — LLM Reasoning Layer (OpenAI ChatGPT) ───────────────────────────
 # Strategic AI brain that validates HMM signals using contextual reasoning.
 # Acts as a "risk committee" — can EXECUTE, REDUCE_SIZE, or VETO trades.
 LLM_REASONING_ENABLED       = True
-LLM_API_KEY                 = os.getenv("GEMINI_API_KEY", "")
-LLM_MODEL                   = "gemini-2.5-flash"          # Confirmed working with this API key (1.5/2.0 return 404)
-LLM_CACHE_MINUTES           = 10                          # Cache per-coin LLM decisions
-LLM_TIMEOUT_SECONDS         = 30                          # Includes Google Search grounding time
-LLM_VETO_THRESHOLD          = 0.30                        # Below this → LLM vetoes the trade
-LLM_CONFIDENCE_WEIGHT       = 0.20                        # LLM can adjust conviction by ±20%
-LLM_MAX_CALLS_PER_CYCLE     = 10                          # Rate limit: max N Athena calls per cycle (fail-closed when exceeded)
+LLM_API_KEY                 = os.getenv("GEMINI_API_KEY", "")  # Env var name unchanged — now holds OpenAI key
+LLM_MODEL                   = "gpt-4o-mini"                    # Fast, cost-effective, excellent JSON adherence
+LLM_CACHE_MINUTES           = 10                               # Cache per-coin LLM decisions
+LLM_TIMEOUT_SECONDS         = 30                               # API timeout
+LLM_VETO_THRESHOLD          = 0.30                             # Below this → LLM vetoes the trade
+LLM_CONFIDENCE_WEIGHT       = 0.20                             # LLM can adjust conviction by ±20%
+LLM_MAX_CALLS_PER_CYCLE     = 10                               # Rate limit: max N Athena calls per cycle
 LLM_LOG_FILE                = os.path.join(DATA_DIR, "athena_decisions.json")
 
 
