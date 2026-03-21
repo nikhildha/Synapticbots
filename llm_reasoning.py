@@ -547,14 +547,14 @@ class AthenaEngine:
 | 7D ATL             | {_p(ctx.get('atl_7d'), 4):<35} | 7-day all-time low       |
 
 ### ── Your Tasks ──
-1. **Search for REAL-TIME NEWS** on {ticker_short} right now — any negative events = SKIP
-2. Assess if current price is at a KEY S/R zone (PDH/PDL/PWH/PWL/VWAP)
-3. Check VWAP positioning — above = bullish context, below = bearish context
-4. Verify swing structure — are we making higher highs or lower lows?
-5. Confirm BTC macro regime alignment
-6. **Write your reasoning as a complete analytical synthesis** — embed any risk identifiers (approaching resistance, BTC macro conflict, news overhang, low conviction) naturally INSIDE the reasoning paragraph
+1. Assess if current price is at a KEY S/R zone (PDH/PDL/PWH/PWL/VWAP)
+2. Check VWAP positioning — above = bullish context, below = bearish context
+3. Verify swing structure — are we making higher highs or lower lows?
+4. Confirm BTC macro regime alignment
+5. Assess derivatives context — funding rate, OI change, orderflow for confirmation
+6. **Write your reasoning as a complete analytical synthesis** — embed any risk identifiers (approaching resistance, BTC macro conflict, low conviction) naturally INSIDE the reasoning paragraph
 7. Give FINAL CONVICTION: LONG, SHORT, or SKIP
-8. Recommend LEVERAGE, POSITION SIZE, ENTRY PRICE, STOP LOSS (below key S/R level), and TARGET (nearest resistance level)
+8. Recommend LEVERAGE and POSITION SIZE
 
 Return your analysis as a single JSON object."""
 
