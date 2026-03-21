@@ -20,6 +20,8 @@ Reconnect behaviour:
 import threading
 import logging
 import time
+import urllib.request
+import json as _json
 
 logger = logging.getLogger("PriceStream")
 
@@ -28,7 +30,10 @@ STALE_THRESHOLD_SECONDS = 60
 # How long (seconds) to wait between watchdog checks
 WATCHDOG_INTERVAL_SECONDS = 20
 # How long (seconds) to wait before retrying a failed subscription
-SUB_RETRY_COOLDOWN_SECONDS = 300  # 5 minutes — avoids log spam every heartbeat
+SUB_RETRY_COOLDOWN_SECONDS = 60   # reduced from 300 — retry failed subs faster
+# REST fallback: poll prices via REST when WS is unavailable
+REST_POLL_INTERVAL_SECONDS = 5    # poll every 5s (vs 100ms WS, but better than 300s gap)
+BINANCE_REST_PRICE_URL = "https://fapi.binance.com/fapi/v1/ticker/price"
 
 
 class PriceStreamManager:
@@ -51,6 +56,7 @@ class PriceStreamManager:
         self._last_update: dict[str, float] = {}   # symbol → epoch of last update
         self._watchdog_thread: threading.Thread | None = None
         self._failed_subs: dict[str, float] = {}   # symbol → epoch of last failure (cooldown guard)
+        self._rest_poll_thread: threading.Thread | None = None  # REST fallback thread
 
     # ─── Public API ─────────────────────────────────────────────────────────
 
@@ -106,7 +112,11 @@ class PriceStreamManager:
     # ─── Internal ───────────────────────────────────────────────────────────
 
     def _init_twm(self):
-        """Initialize (or re-initialize) the ThreadedWebsocketManager."""
+        """Initialize (or re-initialize) the ThreadedWebsocketManager.
+        
+        On failure, automatically starts a REST fallback polling thread so prices
+        stay fresh even when the Binance WebSocket fails to initialize.
+        """
         try:
             from binance import ThreadedWebsocketManager
             # Pass None (not "") for public market data streams — empty strings cause
@@ -120,8 +130,13 @@ class PriceStreamManager:
                 self._failed_subs.clear()
             logger.info("⚡ PriceStream: ThreadedWebsocketManager ready")
         except Exception as e:
-            logger.error("❌ PriceStream: Failed to init WebSocket manager: %s", e)
+            logger.warning(
+                "⚠️ PriceStream: WebSocket init failed (%s) — using REST fallback poll every %ds",
+                e, REST_POLL_INTERVAL_SECONDS
+            )
             self._twm = None
+            # Start REST fallback so prices don't go stale for 300s
+            self._start_rest_fallback()
 
     def _stop_twm(self):
         """Tear down the current ThreadedWebsocketManager cleanly."""
@@ -166,6 +181,48 @@ class PriceStreamManager:
                 "⚠️ PriceStream: Failed to subscribe %s: %s (retry in %ds)",
                 sym, e, SUB_RETRY_COOLDOWN_SECONDS
             )
+
+    def _start_rest_fallback(self):
+        """Start a background REST polling thread as fallback when WebSocket is unavailable.
+        
+        Polls Binance Futures REST /fapi/v1/ticker/price every REST_POLL_INTERVAL_SECONDS.
+        Only fetches prices for currently subscribed symbols.
+        Stops automatically when WebSocket becomes available (twm is set).
+        """
+        if self._rest_poll_thread and self._rest_poll_thread.is_alive():
+            return  # already running
+
+        def rest_poll():
+            logger.info("📡 PriceStream REST fallback: polling every %ds", REST_POLL_INTERVAL_SECONDS)
+            while self._running:
+                # If WebSocket comes back, let it take over — REST stays as safety net
+                with self._lock:
+                    symbols = list(self._subscribed)
+                if symbols:
+                    try:
+                        url = BINANCE_REST_PRICE_URL
+                        req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+                        with urllib.request.urlopen(req, timeout=5) as resp:
+                            data = _json.loads(resp.read())
+                        # data is a list of {"symbol": "BTCUSDT", "price": "85000.00"}
+                        price_map = {item["symbol"]: float(item["price"]) for item in data if "symbol" in item}
+                        now = time.time()
+                        with self._lock:
+                            for sym in symbols:
+                                if sym in price_map:
+                                    # Only update if WS hasn't updated recently (WS takes priority)
+                                    last_ws = self._last_update.get(sym, 0)
+                                    if now - last_ws > REST_POLL_INTERVAL_SECONDS:
+                                        self._prices[sym] = price_map[sym]
+                                        self._last_update[sym] = now
+                    except Exception as e:
+                        logger.debug("PriceStream REST poll error: %s", e)
+                time.sleep(REST_POLL_INTERVAL_SECONDS)
+            logger.info("📡 PriceStream REST fallback: stopped")
+
+        t = threading.Thread(target=rest_poll, name="PriceStream-REST", daemon=True)
+        t.start()
+        self._rest_poll_thread = t
 
     def _start_watchdog(self):
         """Start a background thread that monitors connection health."""

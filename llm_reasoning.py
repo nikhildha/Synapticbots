@@ -565,10 +565,26 @@ class AthenaEngine:
 Return your analysis as a single JSON object."""
 
     def _check_cache(self, symbol: str) -> Optional[AthenaDecision]:
-        """Return cached decision if still valid."""
+        """Return cached decision if still valid AND has real reasoning.
+        
+        Evicts the cache entry if reasoning is empty/stale so the next call
+        immediately triggers a fresh Gemini API call — prevents 'No reasoning
+        provided' from persisting for the full cache window after a fix deploys.
+        """
         if symbol in self._cache:
             decision, expiry = self._cache[symbol]
             if time.time() < expiry:
+                # Evict stale reasoning — treat as cache miss to force fresh API call
+                _STALE = (
+                    not decision.reasoning or
+                    decision.reasoning in ("No reasoning provided", "", "N/A") or
+                    decision.reasoning.startswith("Auto-approve:") or
+                    decision.reasoning.startswith("REST API error")
+                )
+                if _STALE:
+                    del self._cache[symbol]
+                    logger.debug("🏛️ Athena [%s] cache evicted — empty reasoning, forcing fresh call", symbol)
+                    return None
                 cached_decision = AthenaDecision(
                     action=decision.action,
                     adjusted_confidence=decision.adjusted_confidence,
