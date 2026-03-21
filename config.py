@@ -298,7 +298,7 @@ SENTIMENT_VADER_WEIGHT      = 0.4      # VADER contribution when blending with F
 # Acts as a "risk committee" — can EXECUTE, REDUCE_SIZE, or VETO trades.
 LLM_REASONING_ENABLED       = True
 LLM_API_KEY                 = os.getenv("GEMINI_API_KEY", "")  # Env var name unchanged — now holds OpenAI key
-LLM_MODEL                   = "gpt-4o-mini"                    # Fast, cost-effective, excellent JSON adherence
+LLM_MODEL                   = "gpt-4o"                         # Strongest reasoning, excellent JSON adherence
 LLM_CACHE_MINUTES           = 10                               # Cache per-coin LLM decisions
 LLM_TIMEOUT_SECONDS         = 30                               # API timeout
 LLM_VETO_THRESHOLD          = 0.30                             # Below this → LLM vetoes the trade
