@@ -22,6 +22,17 @@ import logging
 import time
 import urllib.request
 import json as _json
+import asyncio
+
+# Patch asyncio to allow nested event loops — fixes the
+# "RuntimeError: This event loop is already running" crash that occurs
+# when the watchdog restarts ThreadedWebsocketManager from a thread
+# that already has an event loop.
+try:
+    import nest_asyncio
+    nest_asyncio.apply()
+except ImportError:
+    pass  # nest_asyncio not installed — rely on fresh event loop creation
 
 logger = logging.getLogger("PriceStream")
 
@@ -119,6 +130,19 @@ class PriceStreamManager:
         """
         try:
             from binance import ThreadedWebsocketManager
+            # Force a fresh event loop for this thread — the previous TWM may have
+            # left its loop attached, causing 'RuntimeError: event loop already running'
+            # on restart.
+            try:
+                loop = asyncio.get_event_loop()
+                if loop.is_running():
+                    # Close the stale loop and create a brand new one
+                    asyncio.set_event_loop(asyncio.new_event_loop())
+                    logger.debug("PriceStream: replaced running event loop with fresh one")
+            except RuntimeError:
+                # No current event loop — create one
+                asyncio.set_event_loop(asyncio.new_event_loop())
+
             # Pass None (not "") for public market data streams — empty strings cause
             # auth failures on some network environments (e.g. Railway) even for
             # unauthenticated endpoints.
