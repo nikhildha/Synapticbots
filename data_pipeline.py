@@ -20,16 +20,24 @@ _binance_client = None
 
 
 def _get_binance_client():
-    """Lazy-init the Binance client (paper trading only)."""
+    """Lazy-init the Binance client (paper trading only).
+    
+    When PAPER_USE_MAINNET is True, connects to Binance MAINNET for real 
+    market prices — fixes testnet price divergence. No API keys needed 
+    for public data (klines, ticker prices).
+    """
     global _binance_client
     if _binance_client is None:
         from binance.client import Client
+        # If paper trading with mainnet prices, override testnet=False
+        use_testnet = config.TESTNET and not getattr(config, 'PAPER_USE_MAINNET', False)
         _binance_client = Client(
             api_key=config.BINANCE_API_KEY,
             api_secret=config.BINANCE_API_SECRET,
-            testnet=config.TESTNET,
+            testnet=use_testnet,
         )
-        mode = "TESTNET" if config.TESTNET else "PRODUCTION"
+        mode = "MAINNET (shadow)" if not use_testnet and config.TESTNET else (
+            "TESTNET" if use_testnet else "PRODUCTION")
         logger.info("Binance client initialized (%s).", mode)
     return _binance_client
 

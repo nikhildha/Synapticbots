@@ -622,12 +622,12 @@ export function TradesClient({ trades: initialTrades }: TradesClientProps) {
                 <div style={{ overflowX: 'auto', maxHeight: '600px', overflowY: 'auto' }}>
                   <table style={{ width: '100%', minWidth: '1300px', borderCollapse: 'collapse', fontSize: '17px' }}>
                     <thead>
-                      <tr style={{ borderBottom: '2px solid rgba(255,255,255,0.08)' }}>
+                      <tr style={{ borderBottom: '2px solid rgba(255,255,255,0.10)' }}>
                         {['Bot', 'Coin', 'Position', 'Leverage', 'Capital', 'Entry', 'LTP', 'Stop Loss', 'SL Step', 'Target Price', 'PnL', 'Fee', 'Net PnL', 'Exit', 'Action'].map(h => (
                           <th key={h} style={{
-                            padding: '10px 10px', textAlign: h === 'Bot' || h === 'Coin' ? 'left' : 'center',
-                            fontSize: '11px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.8px',
-                            color: '#6B7280', position: 'sticky', top: 0, background: 'rgba(17, 24, 39, 0.95)',
+                            padding: '12px 14px', textAlign: h === 'Bot' || h === 'Coin' ? 'left' : 'center',
+                            fontSize: '13px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.8px',
+                            color: '#9CA3AF', position: 'sticky', top: 0, background: 'rgba(17, 24, 39, 0.95)',
                           }}>{h}</th>
                         ))}
                       </tr>
@@ -644,12 +644,12 @@ export function TradesClient({ trades: initialTrades }: TradesClientProps) {
                           : { pnl: t.totalPnl, pnlPct: t.totalPnlPercent };
 
                         return (
-                          <tr key={t.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
-                            <td style={{ padding: '10px', color: '#0891B2', fontWeight: 600, fontSize: '12px' }}>
+                          <tr key={t.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                            <td style={{ padding: '12px 14px', color: '#0891B2', fontWeight: 600, fontSize: '14px' }}>
                               <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                                 {t.botName || 'Unknown Bot'}
                                 <span style={{
-                                  fontSize: '9px', fontWeight: 700, padding: '1px 5px', borderRadius: '4px',
+                                  fontSize: '11px', fontWeight: 700, padding: '2px 7px', borderRadius: '4px',
                                   background: isActive ? 'rgba(34,197,94,0.15)' : 'rgba(107,114,128,0.15)',
                                   color: isActive ? '#22C55E' : '#9CA3AF',
                                 }}>
@@ -657,7 +657,7 @@ export function TradesClient({ trades: initialTrades }: TradesClientProps) {
                                 </span>
                               </div>
                               {t.sessionId && (
-                                <div style={{ fontSize: '9px', color: '#6B7280', marginTop: '2px' }}>
+                                <div style={{ fontSize: '11px', color: '#6B7280', marginTop: '2px' }}>
                                   {(() => {
                                     const idx = uniqueSessions.indexOf(t.sessionId);
                                     return idx === -1 ? 'Legacy' : `Run #${uniqueSessions.length - idx}`;
@@ -665,22 +665,22 @@ export function TradesClient({ trades: initialTrades }: TradesClientProps) {
                                 </div>
                               )}
                             </td>
-                            <td style={{ padding: '10px', fontWeight: 700, color: '#F0F4F8' }}>
+                            <td style={{ padding: '12px 14px', fontWeight: 700, color: '#F0F4F8', fontSize: '14px' }}>
                               {t.coin.replace('USDT', '')}
                             </td>
-                            <td style={{ padding: '10px', textAlign: 'center' }}>
+                            <td style={{ padding: '12px 14px', textAlign: 'center' }}>
                               <span style={{
-                                padding: '2px 8px', borderRadius: '6px', fontSize: '10px', fontWeight: 700,
+                                padding: '3px 10px', borderRadius: '6px', fontSize: '12px', fontWeight: 700,
                                 color: isLong ? '#22C55E' : '#EF4444',
                                 background: isLong ? 'rgba(34,197,94,0.15)' : 'rgba(239,68,68,0.15)',
                               }}>
                                 {isLong ? 'LONG' : 'SHORT'}
                               </span>
                             </td>
-                            <td style={{ padding: '10px', textAlign: 'center', color: '#D1D5DB' }}>{t.leverage}×</td>
-                            <td style={{ padding: '10px', textAlign: 'center', color: '#D1D5DB' }}>${t.capital}</td>
-                            <td style={{ padding: '10px', textAlign: 'center', color: '#D1D5DB', fontFamily: 'monospace', fontSize: '12px' }}>{fmtPrice(t.entryPrice)}</td>
-                            <td style={{ padding: '10px', textAlign: 'center', fontFamily: 'monospace', fontSize: '12px' }}>
+                            <td style={{ padding: '12px 14px', textAlign: 'center', color: '#E5E7EB', fontSize: '14px' }}>{t.leverage}×</td>
+                            <td style={{ padding: '12px 14px', textAlign: 'center', color: '#E5E7EB', fontSize: '14px' }}>${t.capital}</td>
+                            <td style={{ padding: '12px 14px', textAlign: 'center', color: '#E5E7EB', fontFamily: 'monospace', fontSize: '14px' }}>{fmtPrice(t.entryPrice)}</td>
+                            <td style={{ padding: '12px 14px', textAlign: 'center', fontFamily: 'monospace', fontSize: '14px' }}>
                               {isActive && currentPrice ? (
                                 <span style={{ color: livePrice ? '#22C55E' : '#9CA3AF', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px' }}>
                                   {livePrice && <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#22C55E', animation: 'pulse 2s infinite', display: 'inline-block' }} />}
@@ -689,7 +689,7 @@ export function TradesClient({ trades: initialTrades }: TradesClientProps) {
                               ) : <span style={{ color: '#6B7280' }}>—</span>}
                             </td>
                             {/* Stop Loss — shows trailing_sl for active trades (updates live as SL ratchets up) */}
-                            <td style={{ padding: '10px', textAlign: 'center', fontFamily: 'monospace', fontSize: '12px' }}>
+                            <td style={{ padding: '12px 14px', textAlign: 'center', fontFamily: 'monospace', fontSize: '14px' }}>
                               {(() => {
                                 const liveSl = isActive && (t.trailingSl ?? 0) > 0 ? t.trailingSl! : t.stopLoss;
                                 const isTrailing = isActive && t.trailingActive;
@@ -700,14 +700,14 @@ export function TradesClient({ trades: initialTrades }: TradesClientProps) {
                                       {fmtPrice(liveSl)}
                                     </span>
                                     {isTrailing && t.stopLoss !== liveSl && (
-                                      <span style={{ fontSize: '9px', color: '#6B7280' }}>orig: {fmtPrice(t.stopLoss)}</span>
+                                      <span style={{ fontSize: '11px', color: '#6B7280' }}>orig: {fmtPrice(t.stopLoss)}</span>
                                     )}
                                   </div>
                                 );
                               })()}
                             </td>
                             {/* SL Step — shows which trailing step is active */}
-                            <td style={{ padding: '10px', textAlign: 'center' }}>
+                            <td style={{ padding: '12px 14px', textAlign: 'center' }}>
                               {isActive ? (() => {
                                 const lvl = t.steppedLockLevel ?? -1;
                                 const count = t.trailSlCount ?? 0;
@@ -717,40 +717,40 @@ export function TradesClient({ trades: initialTrades }: TradesClientProps) {
                                   '+25%', '+30%', '+35%', '+40%', '+45%',
                                 ];
                                 if (lvl < 0) {
-                                  return <span style={{ fontSize: '10px', color: '#4B5563' }}>—</span>;
+                                  return <span style={{ fontSize: '12px', color: '#4B5563' }}>—</span>;
                                 }
                                 return (
                                   <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px' }}>
                                     <span style={{
-                                      fontSize: '10px', fontWeight: 700,
+                                      fontSize: '12px', fontWeight: 700,
                                       background: 'rgba(245,158,11,0.15)', color: '#F59E0B',
                                       border: '1px solid rgba(245,158,11,0.3)',
-                                      borderRadius: '6px', padding: '2px 7px',
+                                      borderRadius: '6px', padding: '3px 9px',
                                     }}>
                                       Step {lvl + 1} · {stepLabels[lvl] ?? `+${(lvl + 1) * 5}%`}
                                     </span>
-                                    <span style={{ fontSize: '9px', color: '#6B7280' }}>{count}× moved</span>
+                                    <span style={{ fontSize: '11px', color: '#6B7280' }}>{count}× moved</span>
                                   </div>
                                 );
-                              })() : <span style={{ fontSize: '10px', color: '#4B5563' }}>—</span>}
+                              })() : <span style={{ fontSize: '12px', color: '#4B5563' }}>—</span>}
                             </td>
-                            <td style={{ padding: '10px', textAlign: 'center', color: '#22C55E', fontFamily: 'monospace', fontSize: '12px' }}>{fmtPrice(t.takeProfit)}</td>
+                            <td style={{ padding: '12px 14px', textAlign: 'center', color: '#22C55E', fontFamily: 'monospace', fontSize: '14px' }}>{fmtPrice(t.takeProfit)}</td>
 
-                            <td style={{ padding: '10px', textAlign: 'center', fontWeight: 700, color: pnlColor(pnl) }}>
-                              {fmt$(pnl)} <span style={{ fontSize: '10px', fontWeight: 600, color: pnlColor(pnlPct) }}>({fmtPct(pnlPct)})</span>
+                            <td style={{ padding: '12px 14px', textAlign: 'center', fontWeight: 700, fontSize: '14px', color: pnlColor(pnl) }}>
+                              {fmt$(pnl)} <span style={{ fontSize: '12px', fontWeight: 600, color: pnlColor(pnlPct) }}>({fmtPct(pnlPct)})</span>
                             </td>
-                            <td style={{ padding: '10px', textAlign: 'center', fontFamily: 'monospace', fontSize: '11px', color: t.fee > 0 ? '#F59E0B' : '#4B5563' }}>
+                            <td style={{ padding: '12px 14px', textAlign: 'center', fontFamily: 'monospace', fontSize: '13px', color: t.fee > 0 ? '#F59E0B' : '#4B5563' }}>
                               {!isActive && t.fee > 0 ? `$${t.fee.toFixed(4)}` : '—'}
                             </td>
-                            <td style={{ padding: '10px', textAlign: 'center', fontWeight: 700, fontFamily: 'monospace', fontSize: '12px', color: pnlColor(pnl - (isActive ? 0 : t.fee)) }}>
+                            <td style={{ padding: '12px 14px', textAlign: 'center', fontWeight: 700, fontFamily: 'monospace', fontSize: '14px', color: pnlColor(pnl - (isActive ? 0 : t.fee)) }}>
                               {fmt$(pnl - (isActive ? 0 : t.fee))}
                             </td>
 
-                            <td style={{ padding: '10px', textAlign: 'center', fontFamily: 'monospace', fontSize: '12px', color: '#D1D5DB' }}>
+                            <td style={{ padding: '12px 14px', textAlign: 'center', fontFamily: 'monospace', fontSize: '14px', color: '#E5E7EB' }}>
                               {!isActive && t.exitPrice ? fmtPrice(t.exitPrice) : '—'}
                             </td>
 
-                            <td style={{ padding: '10px', textAlign: 'center' }}>
+                            <td style={{ padding: '12px 14px', textAlign: 'center' }}>
                               {isActive && (
                                 <button
                                   disabled={closingTradeId === t.id}
@@ -783,9 +783,9 @@ export function TradesClient({ trades: initialTrades }: TradesClientProps) {
                                     }
                                   }}
                                   style={{
-                                    padding: '4px 10px', borderRadius: '6px',
+                                    padding: '6px 12px', borderRadius: '6px',
                                     border: confirmingTradeId === t.id ? '1px solid #22C55E' : 'none',
-                                    fontSize: '10px', fontWeight: 700, cursor: 'pointer',
+                                    fontSize: '12px', fontWeight: 700, cursor: 'pointer',
                                     background: pnl >= 0 ? 'rgba(34,197,94,0.2)' : 'rgba(239,68,68,0.2)',
                                     color: pnl >= 0 ? '#22C55E' : '#EF4444',
                                     transition: 'all 0.2s',
@@ -827,9 +827,9 @@ export function TradesClient({ trades: initialTrades }: TradesClientProps) {
                                   }}
                                   title="Delete this trade from DB"
                                   style={{
-                                    padding: '4px 8px', borderRadius: '6px',
+                                    padding: '6px 10px', borderRadius: '6px',
                                     border: confirmingDeleteId === t.id ? '1px solid #EF4444' : '1px solid rgba(255,255,255,0.08)',
-                                    fontSize: '10px', fontWeight: 700, cursor: 'pointer',
+                                    fontSize: '12px', fontWeight: 700, cursor: 'pointer',
                                     background: confirmingDeleteId === t.id ? 'rgba(239,68,68,0.25)' : 'rgba(255,255,255,0.04)',
                                     color: confirmingDeleteId === t.id ? '#EF4444' : '#6B7280',
                                     transition: 'all 0.2s',

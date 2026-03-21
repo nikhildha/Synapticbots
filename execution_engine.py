@@ -136,6 +136,17 @@ class ExecutionEngine:
                 current_price = get_current_price(symbol) or 0
                 logger.debug("📡 PAPER WS not ready for %s — using REST price %.6f", symbol, current_price)
 
+            # Apply simulated slippage for realistic paper fills
+            slippage_pct = getattr(config, 'PAPER_SIMULATED_SLIPPAGE_PCT', 0) / 100.0
+            if slippage_pct > 0 and current_price > 0:
+                import random
+                slip = random.uniform(0, slippage_pct)
+                if side.upper() == "BUY":
+                    current_price = round(current_price * (1 + slip), 6)  # BUY fills slightly higher
+                else:
+                    current_price = round(current_price * (1 - slip), 6)  # SELL fills slightly lower
+                logger.debug("📡 PAPER slippage applied %s: %.4f%% → %.6f", symbol, slip * 100, current_price)
+
             sl, tp, rm_id = self.risk.calculate_optimal_stops(symbol, current_price, atr, side, leverage, swing_l, swing_h)
             log_entry = {
                 "timestamp":   datetime.utcnow().isoformat(),
@@ -152,7 +163,7 @@ class ExecutionEngine:
                 "reason":      reason,
                 "rm_id":       rm_id,
                 "mode":        "PAPER",
-                "exchange":    "binance_ws",
+                "exchange":    "binance_mainnet" if getattr(config, 'PAPER_USE_MAINNET', False) else "binance_testnet",
                 "order_type":  "MARKET",
                 "status":      "FILLED",
             }

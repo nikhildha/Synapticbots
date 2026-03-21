@@ -12,6 +12,8 @@ BINANCE_API_KEY = os.getenv("BINANCE_API_KEY", "")
 BINANCE_API_SECRET = os.getenv("BINANCE_API_SECRET", "")
 TESTNET = os.getenv("TESTNET", "true").lower() == "true"
 PAPER_TRADE = os.getenv("PAPER_TRADE", "true").lower() == "true"
+PAPER_USE_MAINNET           = True      # Use Binance MAINNET prices for paper trades (fixes testnet price divergence)
+PAPER_SIMULATED_SLIPPAGE_PCT = 0.05     # ±0.05% simulated market slippage on paper fills
 ENGINE_USER_ID = "cmmbvbo2l0000j1xo3rqvkfhz"  # Default user for engine trades (admin)
 ENGINE_BOT_ID  = os.getenv("ENGINE_BOT_ID", "")    # DB Bot.id — set in Railway per deployment
 ENGINE_BOT_NAME = os.getenv("ENGINE_BOT_NAME", "") # Human-readable bot name shown in trades UI
