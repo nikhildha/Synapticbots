@@ -220,6 +220,20 @@ class RegimeMasterBot:
                 self._running = False
                 raise  # Re-raise so _run_engine() sees it as a signal, not clean exit
             except Exception as e:
+                err_str = str(e)
+                # ── Binance IP ban: parse expiry and sleep until it passes ──
+                if 'banned until' in err_str and '-1003' in err_str:
+                    import re
+                    m = re.search(r'banned until (\d+)', err_str)
+                    if m:
+                        ban_until_ms = int(m.group(1))
+                        wait_sec = max(10, (ban_until_ms - int(time.time() * 1000)) / 1000 + 10)
+                        logger.warning(
+                            "🔒 Binance IP ban — sleeping %.0fs until ban expires",
+                            wait_sec,
+                        )
+                        time.sleep(min(wait_sec, 600))  # cap at 10 min
+                        continue
                 logger.error("⚠️ Loop error: %s", e, exc_info=True)
                 time.sleep(config.ERROR_RETRY_SECONDS)
 

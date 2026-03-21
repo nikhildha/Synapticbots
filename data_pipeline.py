@@ -17,6 +17,7 @@ logger = logging.getLogger("DataPipeline")
 # ═══════════════════════════════════════════════════════════════════════════════
 
 _binance_client = None
+_binance_ban_until = 0  # epoch-ms when IP ban expires (0 = no ban)
 
 
 def _get_binance_client():
@@ -25,17 +26,54 @@ def _get_binance_client():
     When PAPER_USE_MAINNET is True, connects to Binance MAINNET for real 
     market prices — fixes testnet price divergence. No API keys needed 
     for public data (klines, ticker prices).
+    
+    IP ban guard: if we hit -1003 (rate limit), cache the ban expiry and
+    raise immediately on subsequent calls until the ban window passes.
     """
-    global _binance_client
+    global _binance_client, _binance_ban_until
+    import time as _time
+
+    # ── IP ban backoff: skip if still banned ──
+    if _binance_ban_until > 0:
+        now_ms = int(_time.time() * 1000)
+        if now_ms < _binance_ban_until:
+            remaining = (_binance_ban_until - now_ms) / 1000
+            raise RuntimeError(
+                f"Binance IP ban active — skipping API calls for {remaining:.0f}s more"
+            )
+        else:
+            logger.info("🔓 Binance IP ban expired — resuming API calls")
+            _binance_ban_until = 0
+
     if _binance_client is None:
         from binance.client import Client
+        from binance.exceptions import BinanceAPIException
         # If paper trading with mainnet prices, override testnet=False
         use_testnet = config.TESTNET and not getattr(config, 'PAPER_USE_MAINNET', False)
-        _binance_client = Client(
-            api_key=config.BINANCE_API_KEY,
-            api_secret=config.BINANCE_API_SECRET,
-            testnet=use_testnet,
-        )
+        try:
+            _binance_client = Client(
+                api_key=config.BINANCE_API_KEY,
+                api_secret=config.BINANCE_API_SECRET,
+                testnet=use_testnet,
+            )
+        except BinanceAPIException as e:
+            if e.code == -1003:
+                # Parse ban expiry from error message: "...banned until <epoch_ms>"
+                import re
+                m = re.search(r'banned until (\d+)', str(e))
+                if m:
+                    _binance_ban_until = int(m.group(1))
+                    remaining = max(0, (_binance_ban_until - int(_time.time() * 1000))) / 1000
+                    logger.warning(
+                        "🔒 Binance IP ban detected — backing off for %.0fs (until %s)",
+                        remaining,
+                        _time.strftime('%H:%M:%S', _time.gmtime(_binance_ban_until / 1000)),
+                    )
+                else:
+                    # Can't parse expiry — back off 5 minutes as safe default
+                    _binance_ban_until = int(_time.time() * 1000) + 300_000
+                    logger.warning("🔒 Binance IP ban detected — backing off 5min (no expiry parsed)")
+            raise
         mode = "MAINNET (shadow)" if not use_testnet and config.TESTNET else (
             "TESTNET" if use_testnet else "PRODUCTION")
         logger.info("Binance client initialized (%s).", mode)
