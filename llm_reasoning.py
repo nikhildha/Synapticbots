@@ -200,7 +200,13 @@ class AthenaEngine:
         cached = self._check_cache(symbol)
         if cached:
             logger.info("🏛️ Athena [%s] → %s (cached)", symbol, cached.action)
-            self._log_decision(symbol, signal_context, cached)
+            # Only log cached decisions that have real reasoning — skip stale/empty ones
+            # so they don't pollute the dashboard while a fresh API call hasn't run yet.
+            stale_reasoning = not cached.reasoning or cached.reasoning in (
+                "No reasoning provided", "", "Auto-approve: Rate limit reached",
+            ) or cached.reasoning.startswith("Auto-approve:") or cached.reasoning.startswith("REST API error")
+            if not stale_reasoning:
+                self._log_decision(symbol, signal_context, cached)
             return cached
 
         # 2. Rate limit check
