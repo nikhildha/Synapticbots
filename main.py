@@ -903,6 +903,44 @@ class RegimeMasterBot:
                 fill_sl      = result.get("stop_loss",  0)      if result else 0
                 fill_tp      = result.get("take_profit", 0)     if result else 0
 
+                # ── Athena SL/TP Override ──────────────────────────────────
+                # Use Athena's structure-aware SL/TP when available,
+                # falling back to traditional ATR-based SL/TP otherwise.
+                athena_sl_used = False
+                athena_tp_used = False
+                if athena_decision and entry_price > 0:
+                    a_sl = getattr(athena_decision, 'suggested_sl', 0) or 0
+                    a_tp = getattr(athena_decision, 'suggested_tp', 0) or 0
+                    is_long = top["side"].upper() in ("BUY", "LONG")
+
+                    # Sanity check: SL must be on correct side and within 20% of entry
+                    if a_sl > 0:
+                        sl_dist_pct = abs(a_sl - entry_price) / entry_price
+                        sl_correct_side = (is_long and a_sl < entry_price) or (not is_long and a_sl > entry_price)
+                        if sl_correct_side and sl_dist_pct < 0.20:
+                            fill_sl = a_sl
+                            athena_sl_used = True
+                        else:
+                            logger.debug("🏛️ Athena SL rejected for %s: sl=%.4f entry=%.4f side=%s",
+                                         sym, a_sl, entry_price, top["side"])
+
+                    # Sanity check: TP must be on correct side and within 30% of entry
+                    if a_tp > 0:
+                        tp_dist_pct = abs(a_tp - entry_price) / entry_price
+                        tp_correct_side = (is_long and a_tp > entry_price) or (not is_long and a_tp < entry_price)
+                        if tp_correct_side and tp_dist_pct < 0.30:
+                            fill_tp = a_tp
+                            athena_tp_used = True
+                        else:
+                            logger.debug("🏛️ Athena TP rejected for %s: tp=%.4f entry=%.4f side=%s",
+                                         sym, a_tp, entry_price, top["side"])
+
+                    if athena_sl_used or athena_tp_used:
+                        logger.info("🏛️ Athena SL/TP override [%s]: SL=%s(%.4f) TP=%s(%.4f)",
+                                    sym,
+                                    "ATHENA" if athena_sl_used else "ATR", fill_sl,
+                                    "ATHENA" if athena_tp_used else "ATR", fill_tp)
+
                 # H5 Fix: validate entry_price in ALL modes, not just live
                 if entry_price <= 0:
                     if config.PAPER_TRADE and current_price > 0:

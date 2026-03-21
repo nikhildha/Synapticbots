@@ -52,9 +52,11 @@ class AthenaDecision:
     reasoning: str          # Human-readable explanation
     risk_flags: list        # List of identified risk factors
     athena_direction: str = ""  # LONG, SHORT, or SKIP — Athena's own directional view
-    model: str = ""         # Model used (e.g. "gemini-2.5-flash")
+    model: str = ""         # Model used (e.g. "gpt-4o")
     latency_ms: int = 0     # API call duration
     cached: bool = False    # Whether this was a cache hit
+    suggested_sl: float = 0.0   # Athena's recommended stop-loss (0 = not provided)
+    suggested_tp: float = 0.0   # Athena's recommended target/take-profit (0 = not provided)
     timestamp: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
 
 
@@ -352,6 +354,22 @@ class AthenaEngine:
 
         risk_flags = data.get("risk_flags", [])
 
+        # ─── Parse Athena's suggested SL and Target ───────────────────────
+        def _parse_price(val) -> float:
+            """Extract a numeric price from Athena's response (handles '$1.2345 (note)' format)."""
+            if val is None:
+                return 0.0
+            if isinstance(val, (int, float)):
+                return float(val)
+            # String: strip $, commas, trailing notes
+            import re
+            s = str(val).replace(',', '')
+            m = re.search(r'\$?([\d.]+)', s)
+            return float(m.group(1)) if m else 0.0
+
+        suggested_sl = _parse_price(data.get("stop_loss"))
+        suggested_tp = _parse_price(data.get("target"))
+
         decision = AthenaDecision(
             action=action,
             adjusted_confidence=adj_conf,
@@ -360,6 +378,8 @@ class AthenaEngine:
             athena_direction=raw_action,  # Preserve LONG/SHORT/SKIP
             model=config.LLM_MODEL,
             latency_ms=latency_ms,
+            suggested_sl=suggested_sl,
+            suggested_tp=suggested_tp,
         )
 
         # Cache and log
@@ -367,8 +387,9 @@ class AthenaEngine:
         self._log_decision(symbol, ctx, decision)
 
         logger.info(
-            "🏛️ Athena [%s] → %s (conf=%.2f, %dms) — %s",
-            symbol, action, adj_conf, latency_ms, reasoning[:80],
+            "🏛️ Athena [%s] → %s (conf=%.2f, %dms) SL=%.4f TP=%.4f — %s",
+            symbol, action, adj_conf, latency_ms,
+            suggested_sl, suggested_tp, reasoning[:80],
         )
 
         return decision
