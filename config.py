@@ -206,6 +206,10 @@ ERROR_RETRY_SECONDS = 60          # Retry after error
 MIN_CONVICTION_FOR_DEPLOY = 65    # 65 out of 100 — matches MultiTFHMMBrain conviction scale (0-100)
 TOP_COINS_PER_SEGMENT = 1         # Athena evaluates the single highest-HMM coin per segment
 
+# ─── Deploy Waterfall ────────────────────────────────────────────────────────────
+ATHENA_WATERFALL_DEPTH = 4        # How many coins to send to Athena per bot (fallback if #1 vetoed)
+MAX_DEPLOYS_PER_BOT_PER_CYCLE = 3 # Deploy up to N coins per bot per cycle (prevents signal loss on segment rotation)
+
 # ─── Multi-Coin Trading ──────────────────────────────────────────────────────────
 MAX_CONCURRENT_POSITIONS = 10   # Max symbols traded at once (reduced from 15)
 MAX_OPEN_TRADES = 25            # User-configurable max (overridden by /api/set-config at bot start)

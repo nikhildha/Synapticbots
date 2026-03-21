@@ -667,11 +667,12 @@ class RegimeMasterBot:
                 sym = ignored["symbol"]
                 self._coin_states.setdefault(sym, {}).setdefault("bot_deploy_statuses", {})[bot_id] = "FILTERED: Not top coin in segment"
 
-            deployed_this_bot = False  # waterfall stops on first deploy
+            deploys_this_bot = 0  # counter: how many trades deployed this cycle for this bot
+            max_deploys_bot = getattr(config, "MAX_DEPLOYS_PER_BOT_PER_CYCLE", 3)
 
             for _wf_idx, top in enumerate(waterfall_candidates):
-                if deployed_this_bot:
-                    break  # already deployed one trade this cycle for this bot
+                if deploys_this_bot >= max_deploys_bot:
+                    break  # hit max deploys for this bot this cycle
 
                 sym      = top["symbol"]
                 pos_key  = f"{bot_id}:{sym}"
@@ -1016,7 +1017,7 @@ class RegimeMasterBot:
                     "side": top["side"], # Add side for batch notification
                 })
 
-                deployed_this_bot = True  # waterfall: stop after first successful deploy
+                deploys_this_bot += 1  # waterfall: continues until max_deploys_bot reached
 
         # ── Batch Telegram notification for all deployed trades ──
         if deployed_trades:
