@@ -297,3 +297,143 @@ export async function clearUserTrades(userId: string): Promise<number> {
     });
     return result.count;
 }
+
+// ─── Athena Decision Log Sync ───────────────────────────────────────────────
+
+// Throttle: max once per 60s globally (decisions don't change mid-cycle)
+let _lastAthenaSync = 0;
+const ATHENA_SYNC_THROTTLE_MS = 60_000;
+
+/**
+ * Sync Athena decisions from engine coin_states into AthenaDecisionLog.
+ * Called from bot-state GET poll. Deduplicates by cycle+symbol.
+ */
+export async function syncAthenaDecisions(
+    coinStates: Record<string, any>,
+    cycle: number,
+    engineTrades?: any[]
+): Promise<number> {
+    if (!coinStates || typeof coinStates !== 'object') return 0;
+
+    const now = Date.now();
+    if (now - _lastAthenaSync < ATHENA_SYNC_THROTTLE_MS) return 0;
+    _lastAthenaSync = now;
+
+    let synced = 0;
+
+    for (const [symbol, state] of Object.entries(coinStates)) {
+        const athena = state?.athena_state;
+        if (!athena || !athena.action) continue;
+
+        // Derive segment from bot_deploy_statuses or pool_status
+        const segment = state?.segment || state?.pool_segment || null;
+        const regime = (state?.regime || '').replace(/\(.*\)/, '').trim() || null;
+        const conviction = state?.conviction ?? state?.confidence ?? null;
+        const price = state?.price ?? null;
+
+        // Check deployment status
+        const deployStatuses = state?.bot_deploy_statuses || {};
+        const deployValues = Object.values(deployStatuses);
+        const deployed = deployValues.some((v: any) => String(v).includes('DEPLOYED'));
+        const deployReason = deployed
+            ? null
+            : deployValues.find((v: any) => String(v).includes('FILTERED') || String(v).includes('SKIP'))
+                ? String(deployValues.find((v: any) => String(v).includes('FILTERED') || String(v).includes('SKIP')))
+                : athena.action === 'VETO' ? 'Athena VETO' : null;
+
+        try {
+            // Upsert: unique by cycle + symbol
+            const existing = await prisma.athenaDecisionLog.findFirst({
+                where: { cycle, symbol },
+            });
+
+            if (existing) {
+                // Only update if data has changed (e.g., deployment status)
+                if (existing.deployed !== deployed || (!existing.tradeId && deployed)) {
+                    await prisma.athenaDecisionLog.update({
+                        where: { id: existing.id },
+                        data: {
+                            deployed,
+                            deployReason: deployReason || existing.deployReason,
+                        },
+                    });
+                }
+            } else {
+                await prisma.athenaDecisionLog.create({
+                    data: {
+                        cycle,
+                        symbol,
+                        segment,
+                        regime,
+                        conviction: conviction != null ? Number(conviction) : null,
+                        action: athena.action,
+                        side: athena.side || athena.athena_direction || null,
+                        confidence: athena.confidence != null ? Number(athena.confidence) : null,
+                        reasoning: athena.reasoning || null,
+                        riskFlags: Array.isArray(athena.risk_flags) ? JSON.stringify(athena.risk_flags) : null,
+                        model: athena.model || null,
+                        latencyMs: athena.latency_ms != null ? Number(athena.latency_ms) : null,
+                        suggestedSl: athena.suggested_sl && Number(athena.suggested_sl) > 0 ? Number(athena.suggested_sl) : null,
+                        suggestedTp: athena.suggested_tp && Number(athena.suggested_tp) > 0 ? Number(athena.suggested_tp) : null,
+                        entryPrice: price != null ? Number(price) : null,
+                        deployed,
+                        deployReason,
+                    },
+                });
+                synced++;
+            }
+        } catch (err) {
+            console.error(`[athena-sync] Failed for ${symbol} cycle ${cycle}:`, err);
+        }
+    }
+
+    // ── Backfill P&L from closed trades ──
+    try {
+        const unlinked = await prisma.athenaDecisionLog.findMany({
+            where: {
+                deployed: true,
+                tradeStatus: { not: 'CLOSED' },
+            },
+            take: 50,
+            orderBy: { timestamp: 'desc' },
+        });
+
+        for (const log of unlinked) {
+            // Find matching trade by symbol and approximate time
+            const trade = await prisma.trade.findFirst({
+                where: {
+                    coin: log.symbol,
+                    entryTime: { gte: new Date(log.timestamp.getTime() - 300000) }, // within 5 min
+                    ...(log.tradeId ? { id: log.tradeId } : {}),
+                },
+                orderBy: { entryTime: 'desc' },
+            });
+
+            if (!trade) continue;
+
+            const update: any = {};
+            if (!log.tradeId) update.tradeId = trade.id;
+
+            if (trade.status === 'closed') {
+                update.tradeStatus = 'CLOSED';
+                update.pnl = trade.totalPnl || 0;
+                update.pnlPct = trade.totalPnlPercent || 0;
+                update.exitPrice = trade.exitPrice || null;
+                update.closedAt = trade.exitTime || new Date();
+            } else if (!log.tradeStatus) {
+                update.tradeStatus = 'ACTIVE';
+            }
+
+            if (Object.keys(update).length > 0) {
+                await prisma.athenaDecisionLog.update({
+                    where: { id: log.id },
+                    data: update,
+                });
+            }
+        }
+    } catch (err) {
+        console.error('[athena-sync] P&L backfill error:', err);
+    }
+
+    return synced;
+}

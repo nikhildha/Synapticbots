@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth-options';
 import { prisma } from '@/lib/prisma';
-import { syncEngineTrades, getUserTrades } from '@/lib/sync-engine-trades';
+import { syncEngineTrades, getUserTrades, syncAthenaDecisions } from '@/lib/sync-engine-trades';
 import { getEngineUrl } from '@/lib/engine-url';
 
 export const dynamic = 'force-dynamic';
@@ -111,6 +111,14 @@ export async function GET() {
                 trades = await getUserTrades(userId);
             } catch (err) {
                 console.error('[bot-state] getUserTrades failed:', err);
+            }
+
+            // Sync Athena decisions to DB (fire-and-forget, throttled to 60s)
+            const cycle = multi.cycle || 0;
+            if (cycle > 0 && Object.keys(coinStates).length > 0) {
+                syncAthenaDecisions(coinStates, cycle).catch(err =>
+                    console.error('[bot-state] Athena decision sync failed:', err)
+                );
             }
         }
 

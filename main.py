@@ -821,6 +821,9 @@ class RegimeMasterBot:
                             "risk_flags": getattr(athena_decision, "risk_flags", []),
                             "model":     getattr(athena_decision, "model", "unknown"),
                             "latency_ms": getattr(athena_decision, "latency_ms", 0),
+                            "side":       getattr(athena_decision, "athena_direction", ""),
+                            "suggested_sl": getattr(athena_decision, "suggested_sl", 0),
+                            "suggested_tp": getattr(athena_decision, "suggested_tp", 0),
                         }
                         _bcast("ATHENA_DECISION", self._cycle_count, bot_name, bot_id, sym,
                                top["side"], seg_name, athena_decision.adjusted_confidence,

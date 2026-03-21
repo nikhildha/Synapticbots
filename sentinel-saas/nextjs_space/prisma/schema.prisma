@@ -341,3 +341,50 @@ model AuditLog {
   @@index([severity])
   @@index([timestamp])
 }
+
+model AthenaDecisionLog {
+  id            String    @id @default(cuid())
+
+  // ── When & Where ──
+  timestamp     DateTime  @default(now())
+  cycle         Int
+
+  // ── Coin Context ──
+  symbol        String
+  segment       String?
+  regime        String?
+  conviction    Float?
+
+  // ── Athena Decision ──
+  action        String                         // EXECUTE, VETO, REDUCE_SIZE, SKIP
+  side          String?                        // LONG / SHORT (athena_direction)
+  confidence    Float?                         // Athena 0.0–1.0 confidence
+  reasoning     String?
+  riskFlags     String?                        // JSON array
+  model         String?
+  latencyMs     Int?
+  suggestedSl   Float?
+  suggestedTp   Float?
+  entryPrice    Float?
+
+  // ── Deployment Outcome ──
+  deployed      Boolean   @default(false)
+  deployReason  String?
+
+  // ── Trade Outcome (backfilled on close) ──
+  tradeId       String?                        // soft FK to Trade
+  pnl           Float?
+  pnlPct        Float?
+  exitPrice     Float?
+  tradeStatus   String?                        // ACTIVE / CLOSED
+  closedAt      DateTime?
+
+  createdAt     DateTime  @default(now())
+
+  @@index([symbol])
+  @@index([timestamp])
+  @@index([action])
+  @@index([cycle])
+  @@index([tradeId])
+  @@index([deployed])
+}
