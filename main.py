@@ -311,7 +311,7 @@ class RegimeMasterBot:
             # Pass WS prices when available — tradebook falls back to REST for any missing symbols
             tradebook.update_unrealized(funding_rates=funding_rates, prices=ws_prices or None)
         except Exception as e:
-            logger.debug("Tradebook unrealized update error: %s", e)
+            logger.warning("⚠️ Tradebook unrealized update error (max-loss/SL/TP guards may not have run): %s", e, exc_info=True)
 
         # Live mode: sync CoinDCX positions → tradebook → trailing SL/TP
         if not config.PAPER_TRADE:

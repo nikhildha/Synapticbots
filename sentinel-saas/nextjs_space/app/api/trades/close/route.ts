@@ -172,26 +172,73 @@ export async function POST(request: Request) {
             return NextResponse.json({ error: 'No matching active trade found' }, { status: 404 });
         }
 
-        // ─── Calculate PNL at current price (paper trades / fallback) ────────────
-        const currentPrice = trade.currentPrice || trade.entryPrice;
+        // ─── PAPER TRADE: Call engine FIRST to get fresh fill price ─────────────
+        // PRICE FIX: Prisma's currentPrice can be stale by 30-120s (sync lag).
+        // The engine has the freshest price via PriceStream WebSocket/REST fallback.
+        // We call the engine first and use its fill price for Prisma, rather than
+        // the cached DB value. This ensures exit_price = what the user saw in the LTP column.
+        let engineFillPrice: number | null = null;
+        let engineNetPnl: number | null = null;
+        let enginePnlPct: number | null = null;
+
+        if (engineUrl && !isLiveTrade) {
+            try {
+                const engineTradeId = trade.exchangeOrderId || trade.id;
+                const engineRes = await fetch(`${engineUrl}/api/close-trade`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        trade_id: engineTradeId,
+                        symbol: trade.coin,
+                        reason: 'MANUAL_CLOSE',
+                    }),
+                    signal: AbortSignal.timeout(8000),
+                });
+                if (engineRes.ok) {
+                    const engineData = await engineRes.json();
+                    if (engineData.success && engineData.closed?.length > 0) {
+                        const closed = engineData.closed[0];
+                        engineFillPrice = closed.exit_price ?? null;
+                        engineNetPnl = closed.realized_pnl ?? null;
+                        enginePnlPct = closed.realized_pnl_pct ?? null;
+                    }
+                }
+            } catch {
+                // Engine unreachable — fall back to Prisma cached price below
+            }
+        }
+
+        // ─── Calculate PNL at current price (fallback if engine unreachable) ────────────
+        // Use engine's fresh fill price if available; otherwise fall back to Prisma cached price
+        const currentPrice = engineFillPrice ?? trade.currentPrice ?? trade.entryPrice;
         const entry = trade.entryPrice;
         const capital = trade.capital;
         const lev = trade.leverage;
         const isLong = trade.position === 'long';
 
-        const priceDiff = isLong ? (currentPrice - entry) : (entry - currentPrice);
-        // PnL FIX: use quantity (already leveraged) — don't multiply by lev again
-        const quantity = (trade as any).quantity || (capital * lev / entry);
-        const rawPnl = priceDiff * quantity;
-        const netPnl = Math.round(rawPnl * 10000) / 10000;
-        const pnlPct = capital > 0 ? Math.round(netPnl / capital * 100 * 100) / 100 : 0;
+        let netPnl: number;
+        let pnlPct: number;
+
+        if (engineNetPnl !== null && enginePnlPct !== null) {
+            // Use engine's authoritative PnL (already deducts commission correctly)
+            netPnl = engineNetPnl;
+            pnlPct = enginePnlPct;
+        } else {
+            // Fallback calculation from Prisma fields
+            const priceDiff = isLong ? (currentPrice - entry) : (entry - currentPrice);
+            // PnL FIX: use quantity (already leveraged) — don't multiply by lev again
+            const quantity = (trade as any).quantity || (capital * lev / entry);
+            const rawPnl = priceDiff * quantity;
+            netPnl = Math.round(rawPnl * 10000) / 10000;
+            pnlPct = capital > 0 ? Math.round(netPnl / capital * 100 * 100) / 100 : 0;
+        }
 
         // ─── Update trade in Prisma ──────────────────────────────────────
         await prisma.trade.update({
             where: { id: trade.id },
             data: {
                 status: 'closed',
-                exitPrice: currentPrice,
+                exitPrice: currentPrice,          // Engine's fresh fill price (or Prisma fallback)
                 exitTime: new Date(),
                 exitReason: 'MANUAL_CLOSE',
                 totalPnl: netPnl,
@@ -201,24 +248,6 @@ export async function POST(request: Request) {
             },
         });
 
-        // ─── Also try to close on engine (best-effort for paper trades) ──────────
-        if (engineUrl && !isLiveTrade) {
-            try {
-                const engineTradeId = trade.exchangeOrderId || trade.id;
-                await fetch(`${engineUrl}/api/close-trade`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        trade_id: engineTradeId,
-                        symbol: trade.coin,
-                    }),
-                    signal: AbortSignal.timeout(5000),
-                });
-            } catch {
-                // Engine close is best-effort for paper
-            }
-        }
-
         return NextResponse.json({
             success: true,
             closed: [{
@@ -227,6 +256,7 @@ export async function POST(request: Request) {
                 pnl: netPnl,
                 pnl_pct: pnlPct,
             }],
+            price_source: engineFillPrice ? 'engine_live' : 'prisma_cached',
         });
     } catch (error: any) {
         console.error('Trade close error:', error);

@@ -246,6 +246,44 @@ class RiskManager:
 
         return round(sl, decimals), round(tp, decimals), rm_id
 
+    @staticmethod
+    def _clamp_sl_to_max_loss(entry_price: float, sl: float, side: str, leverage: int, capital: float = 100.0) -> float:
+        """Ensure the SL price never implies a loss deeper than MAX_LOSS_PER_TRADE_PCT.
+
+        If ATR-based SL is too wide, it's moved closer to entry.
+        Formula: max_sl_dist_pct = abs(MAX_LOSS_PER_TRADE_PCT) / leverage / 100
+        """
+        import logging as _log
+        _logger = _log.getLogger("RiskManager")
+        max_loss_pct = abs(config.MAX_LOSS_PER_TRADE_PCT)  # e.g. 25
+        max_sl_dist_pct = max_loss_pct / (leverage * 100)  # max fraction of entry price
+        max_sl_dist = entry_price * max_sl_dist_pct
+
+        direction = 1 if side == "BUY" else -1
+        max_sl_price = entry_price - direction * max_sl_dist  # worst acceptable SL price
+
+        # Clamp: SL must be on the right side AND not wider than max_sl_price
+        if side == "BUY":
+            if sl < max_sl_price:  # SL too far below entry
+                _logger.warning(
+                    "⚠️ SL clamped: entry=%.6f sl=%.6f → %.6f (would've been %.1f%% loss at %dx lev, max=%d%%)",
+                    entry_price, sl, max_sl_price,
+                    abs(entry_price - sl) / entry_price * leverage * 100,
+                    leverage, max_loss_pct
+                )
+                return max_sl_price
+        else:  # SELL
+            if sl > max_sl_price:  # SL too far above entry
+                _logger.warning(
+                    "⚠️ SL clamped: entry=%.6f sl=%.6f → %.6f (would've been %.1f%% loss at %dx lev, max=%d%%)",
+                    entry_price, sl, max_sl_price,
+                    abs(sl - entry_price) / entry_price * leverage * 100,
+                    leverage, max_loss_pct
+                )
+                return max_sl_price
+        return sl
+
+
     # ─── Kill Switch ─────────────────────────────────────────────────────────
 
     def record_equity(self, balance):
