@@ -80,6 +80,73 @@ def _get_binance_client():
     return _binance_client
 
 
+# ═══════════════════════════════════════════════════════════════════════════════
+# API RESPONSE CACHING — prevents Binance IP bans (weight budget: 1200/min)
+# ═══════════════════════════════════════════════════════════════════════════════
+
+import time as _cache_time
+
+# ── Ticker cache (get_ticker returns ALL symbols, weight=40) ──────────────────
+_ticker_cache = None        # list of dicts
+_ticker_cache_ts = 0        # epoch seconds
+_TICKER_CACHE_TTL = 60      # 60 seconds — tickers change slowly
+
+def get_cached_ticker():
+    """Return cached Binance 24h ticker list. Refreshes every 60s.
+    
+    Saves ~120 weight/cycle by deduplicating the 3-4 get_ticker() calls
+    in coin_scanner (heatmap, segment pool, volume scan).
+    """
+    global _ticker_cache, _ticker_cache_ts
+    now = _cache_time.time()
+    if _ticker_cache is not None and (now - _ticker_cache_ts) < _TICKER_CACHE_TTL:
+        return _ticker_cache
+    
+    client = _get_binance_client()
+    _ticker_cache = client.get_ticker()
+    _ticker_cache_ts = now
+    logger.info("📊 Ticker cache refreshed (%d symbols, weight=40)", len(_ticker_cache))
+    return _ticker_cache
+
+
+# ── Kline cache (per symbol+interval, weight=2 per call) ─────────────────────
+_kline_cache = {}           # key: "BTCUSDT:4h" → {"data": df, "ts": epoch}
+_KLINE_CACHE_TTL = {        # TTL per interval (seconds)
+    "1h": 1800,             # 30 min — 1h candle barely changes in 30 min
+    "4h": 1800,             # 30 min — 4h candle barely changes
+    "1d": 3600,             # 60 min — daily candle
+    "1w": 3600,             # 60 min
+}
+_KLINE_CACHE_MAX = 200      # max entries to prevent memory leak
+
+
+def _cache_klines(symbol, interval, df):
+    """Store kline data in cache with TTL."""
+    ttl = _KLINE_CACHE_TTL.get(interval)
+    if ttl is None:
+        return  # don't cache short intervals (1m, 5m, 15m)
+    
+    # Evict oldest entries if cache is full
+    if len(_kline_cache) >= _KLINE_CACHE_MAX:
+        oldest_key = min(_kline_cache, key=lambda k: _kline_cache[k]["ts"])
+        del _kline_cache[oldest_key]
+    
+    _kline_cache[f"{symbol}:{interval}"] = {"data": df, "ts": _cache_time.time()}
+
+
+def _get_cached_klines(symbol, interval):
+    """Return cached klines if fresh, else None."""
+    ttl = _KLINE_CACHE_TTL.get(interval)
+    if ttl is None:
+        return None  # short intervals are not cached
+    
+    key = f"{symbol}:{interval}"
+    entry = _kline_cache.get(key)
+    if entry and (_cache_time.time() - entry["ts"]) < ttl:
+        return entry["data"]
+    return None
+
+
 INTERVAL_MAP = {
     "1m":  "1m",
     "3m":  "3m",
@@ -127,7 +194,12 @@ def _parse_klines_df(klines):
 
 
 def _fetch_klines_binance(symbol, interval, limit=500):
-    """Fetch spot candlesticks from Binance."""
+    """Fetch spot candlesticks from Binance (cache-aware for ≥1h intervals)."""
+    # Check cache first for longer intervals
+    cached = _get_cached_klines(symbol, interval)
+    if cached is not None:
+        return cached
+
     client = _get_binance_client()
     binance_interval = _get_binance_interval(interval)
     try:
@@ -138,6 +210,7 @@ def _fetch_klines_binance(symbol, interval, limit=500):
     if not klines:
         return None
     df = _parse_klines_df(klines)
+    _cache_klines(symbol, interval, df)  # cache for next call
     logger.debug("Binance: %d candles for %s %s.", len(df), symbol, interval)
     return df
 

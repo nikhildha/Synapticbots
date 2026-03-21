@@ -14,7 +14,7 @@ import pandas as pd
 import numpy as np
 
 import config
-from data_pipeline import fetch_klines, _get_binance_client
+from data_pipeline import fetch_klines, _get_binance_client, get_cached_ticker
 from feature_engine import compute_hmm_features, compute_all_features
 from hmm_brain import HMMBrain
 
@@ -115,11 +115,9 @@ def get_hottest_segments(segment_limit=2):
     Direction (LONG/SHORT) is decided downstream by HMM + Athena.
     Falls back to 24h ticker return if kline fetch fails for a coin.
     """
-    client = _get_binance_client()
-
-    # ── Fetch live ticker for volume weighting ─────────────────────────────────
+    # ── Fetch live ticker for volume weighting (cached 60s) ─────────────────
     try:
-        tickers = client.get_ticker()
+        tickers = get_cached_ticker()
         ticker_map = {t["symbol"]: t for t in tickers}
     except Exception as e:
         logger.error("Failed to fetch tickers for segment heatmap: %s", e)
@@ -315,10 +313,9 @@ def get_segment_pools_for_regime(short_n=None, long_n=None):
     bearish_threshold = getattr(config, "SEGMENT_BEARISH_THRESHOLD", -2.0)
     bullish_threshold = getattr(config, "SEGMENT_BULLISH_THRESHOLD",  1.0)
 
-    # ── Fetch tickers (single API call, shared with get_hottest_segments) ──
+    # ── Fetch tickers (cached 60s, shared with get_hottest_segments) ──
     try:
-        client = _get_binance_client()
-        tickers = client.get_ticker()
+        tickers = get_cached_ticker()
         ticker_map = {t["symbol"]: t for t in tickers}
     except Exception as e:
         logger.error("Segment pool fetch failed: %s — defaulting to MIXED mode (all segs)", e)
@@ -511,8 +508,7 @@ def get_top_segment_candidates():
 def get_top_coins_by_volume(limit=50):
     """Legacy retail backward-compatibility function."""
     try:
-        client = _get_binance_client()
-        tickers = client.get_ticker()
+        tickers = list(get_cached_ticker())  # copy so sort doesn't mutate cache
         tickers.sort(key=lambda x: float(x.get("quoteVolume", 0)), reverse=True)
         exclusions = get_all_exclusions()
         valid = [t["symbol"] for t in tickers if "USDT" in t["symbol"] and t["symbol"] not in exclusions and "UP" not in t["symbol"] and "DOWN" not in t["symbol"]]
@@ -522,9 +518,8 @@ def get_top_coins_by_volume(limit=50):
 
 def _get_segment_coins_binance(segment_coins, limit=5):
     """Fetch top coins for a specific segment from Binance by 24h volume."""
-    client = _get_binance_client()
     try:
-        tickers = client.get_ticker()
+        tickers = get_cached_ticker()
     except Exception as e:
         logger.error("Failed to fetch Binance tickers: %s", e)
         return [config.PRIMARY_SYMBOL]
