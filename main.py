@@ -435,6 +435,19 @@ class RegimeMasterBot:
 
         # ── 1. Coin scan pool ─────────
         if config.MULTI_COIN_MODE:
+            # Pre-warm BTC 1h kline cache before analysis to avoid race conditions
+            # (two engine threads both try to fetch BTCUSDT:1h simultaneously on fresh start)
+            try:
+                from data_pipeline import fetch_klines as _prefetch
+                _btc_warm = _prefetch("BTCUSDT", config.TIMEFRAME_CONFIRMATION, limit=config.HMM_LOOKBACK)
+                if _btc_warm is not None and len(_btc_warm) >= 60:
+                    logger.debug("🔥 BTC 1h klines pre-warmed (%d candles)", len(_btc_warm))
+                else:
+                    logger.warning("⚠️  BTC 1h pre-warm failed (got %s rows) — regime may be STALE this cycle",
+                                   len(_btc_warm) if _btc_warm is not None else "None")
+            except Exception as _pw_err:
+                logger.warning("⚠️  BTC 1h pre-warm exception: %s", _pw_err)
+
             # Always refresh the segment heatmap JSON every cycle (cheap Binance ticker call)
             # This keeps the dashboard heatmap live even when the pool is not being rebuilt
             try:

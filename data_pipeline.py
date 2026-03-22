@@ -247,6 +247,8 @@ def _fetch_klines_binance(symbol, interval, limit=500):
             logger.error("Binance fetch %s %s failed: %s", symbol, interval, e)
         return None
     if not klines:
+        logger.warning("⚠️  Empty klines for %s %s (limit=%d) — Binance returned no data",
+                       symbol, interval, limit)
         return None
     df = _parse_klines_df(klines)
     _cache_klines(symbol, interval, df)  # cache for next call
