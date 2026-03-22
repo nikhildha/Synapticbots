@@ -45,6 +45,7 @@ class HMMBrain:
         self._is_trained = False
         self._feat_mean = None
         self._feat_std = None
+        self._active_col_mask = None  # bool mask: which features are non-constant
 
     # ─── Training ────────────────────────────────────────────────────────────
 
@@ -73,32 +74,35 @@ class HMMBrain:
         self._feat_std[self._feat_std < 1e-10] = 1e-10  # avoid div-by-zero
         features_scaled = (features - self._feat_mean) / self._feat_std
 
+        # ── Drop constant/near-constant columns (zero variance after scaling) ──
+        # BTCUSDT has `exhaustion_tail` / `liquidity_vacuum` all-zero in 1h data
+        # (BTC is maximally liquid). Zero-var cols → _try_fit pre-flight fails for
+        # ALL 3 tiers. Drop them and train on remaining valid features instead.
+        col_vars = np.var(features_scaled, axis=0)
+        self._active_col_mask = col_vars >= 1e-8    # bool mask, shape (n_features,)
+        if not self._active_col_mask.all():
+            dropped = [self.features[i] for i, keep in enumerate(self._active_col_mask) if not keep]
+            logger.warning(
+                "Dropping %d zero-variance feature(s) for %s before HMM training: %s",
+                len(dropped), self.symbol, dropped,
+            )
+        features_fit = features_scaled[:, self._active_col_mask]
+
+        if features_fit.shape[1] < 2:
+            logger.warning("Too few non-constant features for %s HMM training (%d columns). Skipping.",
+                           self.symbol, features_fit.shape[1])
+            return self
+
         import warnings
 
         def _try_fit(model, data):
-            """Fit + validate. Returns True if model is clean, False if degenerate.
-
-            Validates:
-            1. Input data: no NaN/Inf, no constant-variance features
-               (constant features → 0-variance covariance → 0/0 divide)
-            2. NaN in startprob_ / transmat_ / means_ / weights_
-            3. predict_proba returns valid probabilities on a sample.
-               (Covariances can collapse to 0 without showing NaN in params, but
-               predict_proba then returns NaN because log-likelihood hits -inf.)
-            """
-            # ── Pre-flight: reject data guaranteed to cause 0/0 divide ───────
-            # hmmlearn hmm.py:809 RuntimeWarning fires when a feature column has
-            # near-zero variance (all values identical after scaling), forcing
-            # 0/0 in the E-step normalization.  Detect here before fitting.
+            """Fit + validate. Returns True if model is clean, False if degenerate."""
+            # ── Pre-flight: reject data with NaN/Inf ───────────────────────────
+            # (Constant-variance check is now done before calling _try_fit)
             if np.isnan(data).any() or np.isinf(data).any():
                 return False
-            if (np.var(data, axis=0) < 1e-8).any():
-                return False  # constant/near-constant feature → degenerate model
 
             # ── Fit: suppress Python AND NumPy-layer warnings ─────────────────
-            # warnings.catch_warnings only handles Python-level warnings.
-            # hmmlearn calls NumPy C-extensions which emit at the seterr level,
-            # so np.errstate is also required to silence them completely.
             with warnings.catch_warnings():
                 warnings.simplefilter("ignore", category=RuntimeWarning)
                 warnings.filterwarnings("ignore", module="hmmlearn")
@@ -115,8 +119,6 @@ class HMMBrain:
                 return False
 
             # ── Final gate: run predict_proba on a sample ─────────────────────
-            # Covariances can collapse to 0 without surfacing as NaN in params,
-            # but predict_proba returns NaN because log-likelihood → -inf.
             try:
                 with warnings.catch_warnings():
                     warnings.simplefilter("ignore")
@@ -136,11 +138,11 @@ class HMMBrain:
         m1 = GMMHMM(
             n_components=self.n_states, n_mix=3,
             covariance_type="diag", n_iter=config.HMM_ITERATIONS,
-            min_covar=1e-2,   # raised from 1e-3 — prevents zero-variance collapse
+            min_covar=1e-2,
             random_state=42,
         )
         try:
-            if _try_fit(m1, features_scaled):
+            if _try_fit(m1, features_fit):
                 self.model = m1
                 fitted = True
         except Exception:
@@ -155,7 +157,7 @@ class HMMBrain:
                 random_state=42,
             )
             try:
-                if _try_fit(m2, features_scaled):
+                if _try_fit(m2, features_fit):
                     self.model = m2
                     fitted = True
                     logger.debug("GMMHMM n_mix=2 fallback used for %s", self.symbol)
@@ -171,7 +173,7 @@ class HMMBrain:
                 random_state=42,
             )
             try:
-                if _try_fit(m3, features_scaled):
+                if _try_fit(m3, features_fit):
                     self.model = m3
                     fitted = True
                     logger.debug("GaussianHMM fallback used for %s", self.symbol)
@@ -189,13 +191,12 @@ class HMMBrain:
         self._last_trained = datetime.utcnow()
         self._is_trained = True
 
-        # Build per-state mean log-return for logging (handle both GaussianHMM and GMMHMM).
-        # IMPORTANT: use ret_idx (the log_return feature index) — NOT [:, 0].
-        # Most COIN_FEATURES have vol_zscore at index 0, not log_return, so [:, 0]
-        # was silently showing volatility means instead of return means, making
-        # logs appear inverted (e.g. BEARISH showing the highest "log-return" value).
+        # Build per-state mean log-return for logging.
+        # The model was trained on features_fit (active columns only), so we need
+        # the index of log_return in the FILTERED feature list.
+        active_features = [f for f, keep in zip(self.features, self._active_col_mask) if keep]
         try:
-            ret_idx_log = self.features.index("log_return")
+            ret_idx_log = active_features.index("log_return")
         except ValueError:
             ret_idx_log = 0
         raw_means = self.model.means_
@@ -205,8 +206,8 @@ class HMMBrain:
         else:
             state_means_log = raw_means[:, ret_idx_log]
         logger.info(
-            "HMM trained on %d samples. State means (log-ret): %s",
-            len(features),
+            "HMM trained on %d samples (%d features). State means (log-ret): %s",
+            len(features), features_fit.shape[1],
             {config.REGIME_NAMES[v]: f"{float(state_means_log[k]):.6f}"
              for k, v in self._state_map.items()},
         )
@@ -302,6 +303,9 @@ class HMMBrain:
             return config.REGIME_CHOP, 0.0
 
         features_scaled = (features - self._feat_mean) / self._feat_std
+        # Apply the same active-column mask used during training
+        if self._active_col_mask is not None:
+            features_scaled = features_scaled[:, self._active_col_mask]
         # ── NaN guard ────────────────────────────────────────────────────────
         # If any feature column is still NaN/inf after scaling (e.g. a zero-std
         # feature that slipped through training data), replace with 0 rather than
