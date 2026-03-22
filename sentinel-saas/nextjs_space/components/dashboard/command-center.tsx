@@ -647,7 +647,7 @@ export function BrainExecutionSummary({ coinStates, multi, heatmap: heatmapProp,
 
         // Stage 5: Deployed
         if (ds === 'DEPLOY_QUEUED' || ds === 'ACTIVE' || a.includes('DEPLOYED')) {
-            return { stage: 'DEPLOYED', stageNum: 5, reason: 'Trade opened successfully', color: '#06B6D4', icon: '🚀' };
+            return { stage: 'DEPLOYED', stageNum: 5, reason: 'Trade opened successfully', color: '#06B6D4', icon: '' };
         }
 
         // Stage 4: Athena processed
@@ -655,10 +655,10 @@ export function BrainExecutionSummary({ coinStates, multi, heatmap: heatmapProp,
             if (athena.action === 'EXECUTE' || athena.action === 'LONG' || athena.action === 'SHORT') {
                 // Athena approved but something else blocked
                 const blockReason = ds.startsWith('FILTERED') ? ds.replace('FILTERED: ', '') : 'Exec failed';
-                return { stage: 'ATHENA ✅', stageNum: 4, reason: `Approved but: ${blockReason}`, color: '#22C55E', icon: '🏛️' };
+                return { stage: 'ATHENA', stageNum: 4, reason: `Approved but: ${blockReason}`, color: '#22C55E', icon: '' };
             }
             if (athena.action === 'VETO' || athena.action === 'SKIP' || athena.action === 'HOLD') {
-                return { stage: 'ATHENA 🚫', stageNum: 4, reason: `Vetoed: ${(athena.reasoning || '').slice(0, 80)}`, color: '#EF4444', icon: '🚫' };
+                return { stage: 'ATHENA VETO', stageNum: 4, reason: `Vetoed: ${(athena.reasoning || '').slice(0, 80)}`, color: '#EF4444', icon: '' };
             }
         }
 
@@ -667,15 +667,15 @@ export function BrainExecutionSummary({ coinStates, multi, heatmap: heatmapProp,
             const filterReason = ds.replace('FILTERED: ', '');
             // Athena-related filter
             if (filterReason.includes('Athena')) {
-                return { stage: 'ATHENA 🚫', stageNum: 4, reason: filterReason, color: '#EF4444', icon: '🚫' };
+                return { stage: 'ATHENA VETO', stageNum: 4, reason: filterReason, color: '#EF4444', icon: '' };
             }
             // Cap/dupe/conviction filters — coin was qualified but blocked
-            return { stage: 'FILTERED', stageNum: 3, reason: filterReason, color: '#F59E0B', icon: '⛔' };
+            return { stage: 'FILTERED', stageNum: 3, reason: filterReason, color: '#F59E0B', icon: '' };
         }
 
         // Stage 3: HMM Qualified (eligible but not yet sent to Athena — shouldn't happen in normal flow)
         if (a.includes('ELIGIBLE')) {
-            return { stage: 'QUALIFIED', stageNum: 3, reason: 'HMM eligible — awaiting deploy', color: '#22C55E', icon: '✓' };
+            return { stage: 'QUALIFIED', stageNum: 3, reason: 'HMM eligible — awaiting deploy', color: '#22C55E', icon: '' };
         }
 
         // Stage 2: In Segment Pool but no signal
@@ -694,12 +694,12 @@ export function BrainExecutionSummary({ coinStates, multi, heatmap: heatmapProp,
             else if (a.includes('LOW_CONVICTION')) reason = 'Conviction too low';
             const conv = c.conviction != null ? Number(c.conviction) : (c.confidence != null ? (c.confidence <= 1 ? c.confidence * 100 : c.confidence) : 0);
             if (conv === 0 && !a) reason = 'No HMM consensus across timeframes';
-            return { stage: 'IN POOL', stageNum: 2, reason, color: '#6B7280', icon: '~' };
+            return { stage: 'IN POOL', stageNum: 2, reason, color: '#6B7280', icon: '' };
         }
 
         // Stage 1: Scanned but not in segment pool
         const poolReason = c.reason || c.pool_desc || 'Not in current segment rotation';
-        return { stage: 'OUT OF POOL', stageNum: 1, reason: poolReason, color: '#4B5563', icon: '⊘' };
+        return { stage: 'OUT OF POOL', stageNum: 1, reason: poolReason, color: '#4B5563', icon: '' };
     };
 
     // Classify all coins
@@ -719,7 +719,7 @@ export function BrainExecutionSummary({ coinStates, multi, heatmap: heatmapProp,
     const qualified = classified.filter(c => c.stageNum >= 3).length;
     const athenaProcessed = classified.filter(c => c.stageNum >= 4).length;
     const deployed = classified.filter(c => c.stageNum === 5).length;
-    const athenaVetoed = classified.filter(c => c.stage === 'ATHENA 🚫').length;
+    const athenaVetoed = classified.filter(c => c.stage === 'ATHENA VETO').length;
 
     const getSegment = (symbol: string): string => {
         const coin = symbol.replace('USDT', '').toUpperCase();
@@ -775,13 +775,12 @@ export function BrainExecutionSummary({ coinStates, multi, heatmap: heatmapProp,
         return '#6B7280';
     };
 
-    // Pipeline funnel stages
     const funnelStages = [
-        { label: 'SCANNED', count: total, color: '#9CA3AF', icon: '🔍' },
-        { label: 'IN POOL', count: inPool, color: '#A78BFA', icon: '📊' },
-        { label: 'QUALIFIED', count: qualified, color: '#22C55E', icon: '✓' },
-        { label: 'ATHENA', count: athenaProcessed, color: '#F59E0B', icon: '🏛️', sub: athenaVetoed > 0 ? `${athenaVetoed} vetoed` : undefined },
-        { label: 'DEPLOYED', count: deployed, color: '#06B6D4', icon: '🚀' },
+        { label: 'SCANNED',   count: total,          color: '#9CA3AF' },
+        { label: 'IN POOL',   count: inPool,         color: '#A78BFA' },
+        { label: 'QUALIFIED', count: qualified,      color: '#22C55E' },
+        { label: 'ATHENA',    count: athenaProcessed, color: '#F59E0B', sub: athenaVetoed > 0 ? `${athenaVetoed} vetoed` : undefined },
+        { label: 'DEPLOYED',  count: deployed,       color: '#06B6D4' },
     ];
 
     return (
@@ -789,7 +788,7 @@ export function BrainExecutionSummary({ coinStates, multi, heatmap: heatmapProp,
             {/* Header */}
             <div style={{ marginBottom: '20px' }}>
                 <h2 style={{ fontSize: '22px', fontWeight: 800, color: '#E5E7EB', margin: 0, letterSpacing: '-0.3px' }}>
-                    🧠 Brain Execution Summary
+                    Brain Execution Summary
                     <span style={{ fontSize: '13px', fontWeight: 600, color: 'rgba(156,163,175,0.5)', fontFamily: 'var(--font-mono, monospace)', marginLeft: '10px' }}>
                         Cycle #{liveMulti?.cycle || 0} · {formatIST(lastCycle)}
                     </span>
@@ -814,7 +813,7 @@ export function BrainExecutionSummary({ coinStates, multi, heatmap: heatmapProp,
                             border: s.count > 0 ? `1px solid ${s.color}20` : '1px solid transparent',
                         }}>
                             <div style={{ fontSize: '10px', textTransform: 'uppercase' as const, letterSpacing: '1.2px', color: '#6B7280', marginBottom: '4px', fontWeight: 700 }}>
-                                {s.icon} {s.label}
+                                {s.label}
                             </div>
                             <div style={{ fontSize: '26px', fontWeight: 800, color: s.count > 0 ? s.color : '#374151', lineHeight: 1 }}>
                                 {s.count}

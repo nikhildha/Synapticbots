@@ -398,6 +398,28 @@ class RegimeMasterBot:
             if s in _active_syms
         }
 
+        # ── DEPLOYED SEED: ensure active trades always appear in Brain Summary ──
+        # On engine restart, _coin_states is empty — deployed coins are excluded
+        # from the scan pool so they'd never get a DEPLOY_QUEUED stamp.
+        # Fix: stamp them from the tradebook every tick before the pool seed.
+        for _at in tradebook.get_active_trades():
+            _sym = _at.get("symbol", "")
+            _bid = _at.get("bot_id", "")
+            if not _sym:
+                continue
+            if _sym not in self._coin_states:
+                self._coin_states[_sym] = {
+                    "symbol":     _sym,
+                    "action":     "DEPLOYED",
+                    "regime":     _at.get("regime", None),
+                    "confidence": _at.get("confidence", None),
+                    "conviction": None,
+                    "cycle":      self._cycle_count,
+                    "scanned_at": _cycle_ts,
+                }
+            if _bid:
+                self._coin_states[_sym].setdefault("bot_deploy_statuses", {})[_bid] = "DEPLOY_QUEUED"
+
         # Pre-seed pool coins with SCANNING placeholder so dashboard reflects
         # real cycle state immediately (not stale state from previous cycle)
         _pool_to_seed = getattr(self, "_full_coin_pool", []) or []
