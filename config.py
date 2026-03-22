@@ -72,9 +72,9 @@ TIMEFRAME_MACRO = "4h"        # Macro regime (legacy — replaced by Multi-TF HM
 
 # ─── Multi-Timeframe HMM (backtest-proven: +$2,421 PnL, PF 1.49) ────────────
 MULTI_TF_ENABLED = True               # Use 3 separate HMM brains per coin
-MULTI_TF_TIMEFRAMES = ["1d", "1h", "5m"]   # Daily (macro), Hourly (swing), 5min (momentum)
+MULTI_TF_TIMEFRAMES = ["4h", "1h", "15m"]  # 4h (trend anchor), 1h (swing), 15m (momentum trigger)
 MULTI_TF_CANDLE_LIMIT = 1000          # Candles per TF (1000 for GMMHMM depth limit)
-MULTI_TF_WEIGHTS = {"1d": 20, "1h": 50, "5m": 30}  # Conviction weights (sum=100)
+MULTI_TF_WEIGHTS = {"4h": 30, "1h": 50, "15m": 20}  # Conviction weights (sum=100)
 MULTI_TF_MIN_AGREEMENT = 2            # Minimum TFs agreeing on direction (2 of 3)
 MULTI_TF_MIN_MODELS = 2               # Minimum trained models required
 
@@ -109,7 +109,7 @@ HMM_N_STATES = 3              # Bull, Chop, Bear (3-state — CRASH merged into 
 HMM_COVARIANCE = "full"       # Optimized: captures cross-feature correlations
 HMM_ITERATIONS = 100
 HMM_LOOKBACK = 250            # Candles used for training (reduced for speed)
-HMM_RETRAIN_HOURS = 15 / 60   # Retrain every 15 minutes (once per analysis cycle — 5m TF gets 3 fresh bars)
+HMM_RETRAIN_HOURS = 1         # Retrain every 1h — 1h TF gets 1 new bar, 15m TF gets 4 new bars
 
 # ─── Regime Labels (assigned post-training by sorting mean returns) ──────────
 REGIME_BULL = 0
