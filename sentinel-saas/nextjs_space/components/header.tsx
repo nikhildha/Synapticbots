@@ -70,6 +70,9 @@ export function Header() {
                   <Link href="/trades" className="text-[17px] font-medium text-[var(--color-text-secondary)] hover:text-[var(--color-primary)] transition-colors">
                     Trade Book
                   </Link>
+                  <Link href="/journal" className="text-[17px] font-medium text-[var(--color-text-secondary)] hover:text-[var(--color-primary)] transition-colors">
+                    Journal
+                  </Link>
                   <Link href="/account" className="text-[17px] font-medium text-[var(--color-text-secondary)] hover:text-[var(--color-primary)] transition-colors">
                     Account
                   </Link>
@@ -157,6 +160,9 @@ export function Header() {
                   </Link>
                   <Link href="/trades" className="block text-[var(--color-text-secondary)] hover:text-[var(--color-primary)] transition-colors">
                     Trade Book
+                  </Link>
+                  <Link href="/journal" className="block text-[var(--color-text-secondary)] hover:text-[var(--color-primary)] transition-colors">
+                    Journal
                   </Link>
                   <Link href="/account" className="block text-[var(--color-text-secondary)] hover:text-[var(--color-primary)] transition-colors">
                     Account
