@@ -54,11 +54,11 @@ CRYPTO_SEGMENTS = {
              "SUSHIUSDT", "COMPUSDT", "SNXUSDT", "CAKEUSDT", "GRTUSDT"],
     "AI": ["TAOUSDT", "FETUSDT", "INJUSDT", "WLDUSDT", "AKTUSDT", "RENDERUSDT", "ARKMUSDT"],
     "Meme": ["DOGEUSDT", "SHIBUSDT", "PEPEUSDT", "WIFUSDT", "BONKUSDT", "NOTUSDT", "MANAUSDT"],  # 1000X and MEWUSDT removed — not on testnet
-    "RWA": ["ONDOUSDT", "POLYXUSDT", "TRUUSDT"],
+    "RWA": ["ONDOUSDT", "POLYXUSDT", "TRUUSDT", "RSRUSDT"],
     "Gaming": ["AXSUSDT", "SANDUSDT", "PIXELUSDT", "IOTXUSDT", "GALAUSDT", "ENJUSDT", "YGGUSDT", "GLMUSDT"],
     "DePIN": ["FILUSDT", "ARUSDT", "IOUSDT", "JTOUSDT"],          # HNTUSDT removed — not on Binance
-    "Modular": ["TIAUSDT", "DYMUSDT", "STXUSDT", "QNTUSDT"],
-    "Oracles": ["PYTHUSDT", "TRBUSDT", "API3USDT", "HBARUSDT"]
+    "Modular": ["TIAUSDT", "DYMUSDT", "STXUSDT", "QNTUSDT", "ALTUSDT", "EIGENUSDT"],
+    "Oracles": ["PYTHUSDT", "TRBUSDT", "API3USDT", "HBARUSDT", "BANDUSDT", "DIAUSDT"]
 }
 
 # Apply exclusion filter immediately
