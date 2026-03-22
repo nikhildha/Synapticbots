@@ -42,7 +42,7 @@ SECONDARY_SYMBOLS = ["ETHUSDT"]
 
 # ─── Excluded Coins ─────────────────────────────────────────────────────────────
 # Coins placed here are completely ignored by the engine, scanner, and scanners.
-EXCLUDED_COINS = ["AKTUSDT", "WIFUSDT", "FILUSDT"]
+EXCLUDED_COINS = ["AKTUSDT", "WIFUSDT", "FILUSDT", "DIAUSDT"]  # DIAUSDT: too illiquid — constant PriceStream stale restarts
 
 # ─── Crypto Segments (for Segment-Level Analysis) ───────────────────────────────
 CRYPTO_SEGMENTS = {
