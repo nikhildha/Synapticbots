@@ -625,369 +625,385 @@ def update_unrealized(prices=None, funding_rates=None):
     for trade in book["trades"]:
         if trade["status"] not in ("ACTIVE", "OPEN"):
             continue
-
-        symbol = trade["symbol"]
-        if prices and symbol in prices:
-            current = prices[symbol]
-        else:
-            # A4 FIX: For LIVE trades, try CoinDCX price first (not Binance)
-            if trade.get("mode", "").upper().startswith("LIVE"):
-                try:
-                    import coindcx_client as cdx
-                    cdx_pair = trade.get("pair") or cdx.to_coindcx_pair(symbol)
-                    if cdx_pair:
-                        current = cdx.get_current_price(cdx_pair)
-                except Exception:
-                    current = None
-            else:
-                current = None
-
-            if not current:
-                current = get_current_price(symbol)
-                if not current:
-                    continue
-
-        current = round(current, 6)
-        entry = trade["entry_price"]
-        qty = trade["quantity"]
-        lev = trade["leverage"]
-        capital = trade["capital"]
-
-        if trade["position"] == "LONG":
-            raw_pnl = (current - entry) * qty
-        else:
-            raw_pnl = (entry - current) * qty
-
-        # ── Accumulate funding rate cost ──────────────────────────
-        # Initialize funding fields for legacy trades
-        if "funding_cost" not in trade:
-            trade["funding_cost"] = 0
-            trade["funding_payments"] = 0
-            trade["last_funding_check"] = trade["entry_timestamp"]
-
         try:
-            last_check = datetime.fromisoformat(trade["last_funding_check"])
-            hours_since = (datetime.utcnow() - last_check).total_seconds() / 3600
-            intervals = int(hours_since / config.FUNDING_INTERVAL_HOURS)
-            if intervals > 0:
-                # Use live funding rate if available, else default
-                sym = trade["symbol"]
-                fr = config.DEFAULT_FUNDING_RATE
-                if funding_rates and sym in funding_rates:
-                    fr = abs(funding_rates[sym])  # always treat as cost
-                notional = entry * qty * lev
-                cost_per_interval = notional * fr
-                new_cost = round(cost_per_interval * intervals, 6)
-                trade["funding_cost"] = round(trade["funding_cost"] + new_cost, 6)
-                trade["funding_payments"] += intervals
-                trade["last_funding_check"] = datetime.utcnow().isoformat()
-        except Exception:
-            pass
-
-        funding_cost = trade.get("funding_cost", 0)
-
-        # To prevent trades from starting in an immediate deep paper loss,
-        # we do NOT subtract estimated exit commissions from the unrealized PnL.
-        # It is only subtracted during a real exit (realized PnL).
-        net_pnl = round(raw_pnl - funding_cost, 4)
-        pnl_pct = round(net_pnl / capital * 100, 2) if capital else 0
-
-        # Track max favorable / adverse excursion
-        if net_pnl > trade.get("max_favorable", 0):
-            trade["max_favorable"] = net_pnl
-        if net_pnl < trade.get("max_adverse", 0):
-            trade["max_adverse"] = net_pnl
-
-        # Duration
-        entry_time = datetime.fromisoformat(trade["entry_timestamp"])
-        duration = (datetime.utcnow() - entry_time).total_seconds() / 60
-
-        trade["current_price"] = current
-        trade["unrealized_pnl"] = net_pnl
-        trade["unrealized_pnl_pct"] = pnl_pct
-        trade["duration_minutes"] = round(duration, 1)
-
-        # ── Trailing SL: Stepped Breakeven + Profit Lock (F2) ────
-        atr = trade.get("atr_at_entry", 0)
-        is_long = trade["position"] == "LONG"
-
-        # Initialize trailing fields for legacy trades that lack them
-        if "trailing_sl" not in trade:
-            trade["trailing_sl"] = trade["stop_loss"]
-        if "trailing_tp" not in trade:
-            trade["trailing_tp"] = trade["take_profit"]
-        if "peak_price" not in trade:
-            trade["peak_price"] = entry
-        if "trailing_active" not in trade:
-            trade["trailing_active"] = False
-        if "trail_sl_count" not in trade:
-            trade["trail_sl_count"] = 0
-        if "tp_extensions" not in trade:
-            trade["tp_extensions"] = 0
-        if "stepped_lock_level" not in trade:
-            trade["stepped_lock_level"] = -1  # No milestone hit yet
-
-        # ── F2 Stepped Trailing SL ────────────────────────────────
-        # Iterate through TRAILING_SL_STEPS milestones and progressively
-        # tighten SL based on leveraged P&L %.
-        # Each step: (trigger_pnl_pct, lock_pnl_pct)
-        # lock_pnl_pct = 0 means breakeven (entry price)
-        if config.TRAILING_SL_ENABLED:
-            lev = trade["leverage"]
-            steps = getattr(config, 'TRAILING_SL_STEPS', [])
-
-            # Safety: skip if entry is zero/missing (prevents garbage SL values)
-            if entry <= 0 or lev <= 0:
-                logger.warning("⚠️ SL trail skipped for %s — entry=%.6f lev=%s",
-                               trade.get("trade_id"), entry, lev)
-            else:
-                for step_idx, (trigger_pnl, lock_pnl) in enumerate(steps):
-                    # Only process steps we haven't activated yet
-                    if step_idx <= trade["stepped_lock_level"]:
-                        continue
-                    if pnl_pct >= trigger_pnl:
-                        # lock_pnl is a leveraged P&L %. Convert to a price move fraction.
-                        # e.g. lock_pnl=5.0, lev=20 → price_move = 5/100/20 = 0.0025 (0.25%)
-                        lock_price_move = (lock_pnl / 100.0) / lev
-                        if is_long:
-                            new_sl = round(entry * (1.0 + lock_price_move), 8)
-                        else:
-                            new_sl = round(entry * (1.0 - lock_price_move), 8)
-
-                        # Sanity check: profit-lock SL must be on the "secured" side of entry.
-                        # LONG:  new_sl >= entry means we've secured breakeven or better price-wise.
-                        # SHORT: new_sl <= entry means we've secured breakeven or better price-wise.
-                        # The 0.01% tolerance handles floating-point rounding at lock_pnl=0 (breakeven).
-                        sl_sane = (is_long and new_sl >= entry * 0.9999) or \
-                                  (not is_long and new_sl <= entry * 1.0001)
-                        if not sl_sane:
-                            logger.error(
-                                "❌ SL trail sanity fail for %s [step %d]: entry=%.6f lock_pnl=%.1f "
-                                "new_sl=%.6f is_long=%s — SKIPPING",
-                                trade.get("trade_id"), step_idx+1, entry, lock_pnl,
-                                new_sl, is_long,
-                            )
-                            break
-
-                        # Only tighten, never loosen
-                        sl_improved = (is_long and new_sl > trade["trailing_sl"]) or \
-                                      (not is_long and new_sl < trade["trailing_sl"])
-
-                        if sl_improved or trade["stepped_lock_level"] < 0:
-                            old_sl = trade["trailing_sl"]
-                            trade["trailing_sl"] = new_sl
-                            trade["trailing_active"] = True
-                            trade["stepped_lock_level"] = step_idx
-                            trade["trail_sl_count"] = trade.get("trail_sl_count", 0) + 1
-
-                            lock_label = "BREAKEVEN" if lock_pnl == 0 else f"+{lock_pnl:.0f}% profit"
-                            logger.info(
-                                "🔒 SL Step %d for %s: pnl=%.2f%% ≥ trigger=%.0f%% | "
-                                "entry=%.6f lock_move=%.6f | SL %.6f→%.6f [%s]",
-                                step_idx + 1, trade.get("trade_id"), pnl_pct, trigger_pnl,
-                                entry, lock_price_move, old_sl, new_sl, lock_label,
-                            )
-
-                            # For LIVE trades: modify exchange SL order
-                            is_live_trail = trade.get("mode") == "LIVE"
-                            if is_live_trail:
-                                try:
-                                    from execution_engine import ExecutionEngine
-                                    ExecutionEngine.modify_sl_live(symbol, new_sl)
-                                    logger.info("🔒 Live SL modified on exchange for %s → %.6f", symbol, new_sl)
-                                except Exception as e:
-                                    logger.error("❌ Failed to modify live SL for %s: %s", symbol, e)
-
-                            # Only advance ONE step per cycle — prevents
-                            # multi-step runaway when pnl jumps are large
-                            break
-
-        # ── EXIT CHECKS ──────────────────────────────────────────────
-        # For LIVE trades, CoinDCX handles SL/TP/MAX_LOSS via exchange.
-        # PAPER_TRADE override: if config.PAPER_TRADE=True the entire
-        # engine is simulated — always auto-close regardless of mode stamp.
-        is_live = trade.get("mode") == "LIVE"
-        should_auto_close = (not is_live) or config.PAPER_TRADE
-
-        # ── Stamp exit guard state on trade (synced to DB + UI on next heartbeat) ──
-        from datetime import datetime as _dt
-        trade["exit_guard_active"] = should_auto_close
-        trade["exit_check_at"]    = _dt.utcnow().isoformat() + "Z"
-        trade["exit_check_price"] = round(float(current), 8)
-
-        # Diagnostic: promote to INFO so Railway logs show guard status without debug filter
-        logger.info(
-            "Exit check [%s]: mode=%s is_live=%s guard=%s "
-            "pnl=%.2f%% eff_sl=%.6f eff_tp=%.6f price=%.6f",
-            trade.get("trade_id"), trade.get("mode"), is_live, should_auto_close,
-            pnl_pct,
-            trade.get("trailing_sl", trade.get("stop_loss", 0)),
-            trade.get("trailing_tp", trade.get("take_profit", 0)),
-            current,
-        )
-
-        # HARD MAX LOSS GUARD (paper + live safety net)
-        max_loss_limit = config.MAX_LOSS_PER_TRADE_PCT
-        if pnl_pct <= max_loss_limit:
-            logger.warning(
-                "🛑 MAX LOSS hit on %s (%.2f%% <= %.0f%%) — auto-closing trade %s",
-                symbol, pnl_pct, max_loss_limit, trade["trade_id"],
-            )
-            if is_live:
-                from execution_engine import ExecutionEngine
-                ExecutionEngine.close_position_live(symbol)
-            _close_trade_inline(trade, current, f"MAX_LOSS_{int(max_loss_limit)}%")
+            _update_single_trade(trade, book, prices, funding_rates)
             changed = True
-            continue
-
-        # ── MULTI-TARGET EXIT CHECKS (paper + live) ──
-        mt_enabled = getattr(config, 'MULTI_TARGET_ENABLED', False)
-        t1_price = trade.get("t1_price")
-        t2_price = trade.get("t2_price")
-        t3_price = trade.get("t3_price")
-
-        if mt_enabled and t1_price is not None:
-            # Initialize fields for legacy trades
-            if "t1_hit" not in trade:
-                trade["t1_hit"] = False
-            if "t2_hit" not in trade:
-                trade["t2_hit"] = False
-            if "original_qty" not in trade:
-                trade["original_qty"] = trade["quantity"]
-            if "original_capital" not in trade:
-                trade["original_capital"] = trade["capital"]
-
-            # T1 check
-            if not trade["t1_hit"]:
-                t1_hit = (is_long and current >= t1_price) or (not is_long and current <= t1_price)
-                if t1_hit:
-                    book_frac = config.MT_T1_BOOK_PCT  # 25%
-                    # Live: partial close on exchange
-                    if is_live:
-                        from execution_engine import ExecutionEngine
-                        close_qty = trade["quantity"] * book_frac
-                        ExecutionEngine.partial_close_live(symbol, trade["position"], close_qty)
-                        ExecutionEngine.modify_sl_live(symbol, trade["entry_price"])
-                    _book_partial_inline(trade, book, current, book_frac, "T1")
-                    trade["t1_hit"] = True
-                    trade["trailing_sl"] = trade["entry_price"]  # SL → breakeven
-                    trade["trailing_active"] = True
-                    logger.info("🎯 T1 hit on %s — booked 25%%, SL → breakeven (%.6f)",
-                                trade["trade_id"], trade["entry_price"])
-                    changed = True
-
-            # T2 check
-            if trade["t1_hit"] and not trade["t2_hit"]:
-                t2_hit = (is_long and current >= t2_price) or (not is_long and current <= t2_price)
-                if t2_hit:
-                    book_frac = config.MT_T2_BOOK_PCT  # 50% of remaining
-                    # Live: partial close on exchange
-                    if is_live:
-                        from execution_engine import ExecutionEngine
-                        close_qty = trade["quantity"] * book_frac
-                        ExecutionEngine.partial_close_live(symbol, trade["position"], close_qty)
-                        ExecutionEngine.modify_sl_live(symbol, t1_price)
-                    _book_partial_inline(trade, book, current, book_frac, "T2")
-                    trade["t2_hit"] = True
-                    trade["trailing_sl"] = t1_price  # SL → T1
-                    logger.info("🎯 T2 hit on %s — booked 50%% remaining, SL → T1 (%.6f)",
-                                trade["trade_id"], t1_price)
-                    changed = True
-
-            # T3 check (close everything remaining)
-            if trade["t2_hit"]:
-                t3_hit = (is_long and current >= t3_price) or (not is_long and current <= t3_price)
-                if t3_hit:
-                    logger.info("🏆 T3 hit on %s — closing remaining position",
-                                trade["trade_id"])
-                    if is_live:
-                        from execution_engine import ExecutionEngine
-                        ExecutionEngine.close_position_live(symbol)
-                    _close_trade_inline(trade, current, "T3")
-                    changed = True
-                    continue
-
-        # Use trailing values for SL hit checks
-        # (paper mode override: always auto-close when config.PAPER_TRADE=True)
-        if should_auto_close:
-            effective_sl = trade.get("trailing_sl", trade["stop_loss"])
-
-            sl_hit = False
-            if is_long:
-                sl_hit = current <= effective_sl
-            else:
-                sl_hit = current >= effective_sl
-
-            if sl_hit:
-                sl_n = trade.get("trail_sl_count", 0)
-                step_level = trade.get("stepped_lock_level", -1)
-                # Determine SL reason based on target state
-                if trade.get("t2_hit"):
-                    reason = "SL_T2"  # SL hit after T2 (at T1 price)
-                elif trade.get("t1_hit"):
-                    reason = "SL_T1"  # SL hit after T1 (at breakeven)
-                elif trade["trailing_active"] and step_level >= 0:
-                    # Stepped lock was active — show which level
-                    steps = getattr(config, 'TRAILING_SL_STEPS', [])
-                    if step_level < len(steps):
-                        _, lock_pnl = steps[step_level]
-                        if lock_pnl == 0:
-                            lock_tag = " (BEV)"
-                        else:
-                            lock_tag = f" (+{lock_pnl:.0f}% Locked)"
-                    else:
-                        lock_tag = ""
-                    reason = f"STEPPED_SL_{sl_n}{lock_tag}"
-                else:
-                    reason = "FIXED_SL"
-                _close_trade_inline(trade, current, reason)
-                changed = True
-                continue
-
-            # Old TP hit (only when multi-target is NOT active for this trade)
-            if not mt_enabled or t1_price is None:
-                effective_tp = trade.get("trailing_tp", trade["take_profit"])
-                tp_hit = False
-                if is_long:
-                    tp_hit = current >= effective_tp
-                else:
-                    tp_hit = current <= effective_tp
-                if tp_hit:
-                    ext = trade["tp_extensions"]
-                    reason = f"TP_EXT_{ext}" if ext > 0 else "FIXED_TP"
-                    _close_trade_inline(trade, current, reason)
-                    changed = True
-                    continue
-
-        # ── TP OVERSHOOT SAFETY NET ──────────────────────────────────────
-        # Fires when price GAPS THROUGH the TP level between heartbeats.
-        # Checks PnL% directly — independent of price-based TP checks.
-        # If the trade's current PnL% has exceeded what TP would give by ≥2%,
-        # the trade must have passed its TP and should be closed.
-        # paper_override: also runs when config.PAPER_TRADE=True.
-        if should_auto_close:
-            eff_tp = trade.get("trailing_tp", trade.get("take_profit", 0))
-            lev_overshoot = trade.get("leverage", 1)
-            if eff_tp and eff_tp > 0 and entry and entry > 0 and lev_overshoot > 0:
-                # Expected PnL% at TP level (leveraged)
-                price_move_to_tp = abs(eff_tp - entry) / entry
-                expected_tp_pnl_pct = round(price_move_to_tp * lev_overshoot * 100, 2)
-                # If actual PnL% exceeds expected TP PnL% by ≥2% buffer → overshoot
-                if expected_tp_pnl_pct > 0 and pnl_pct >= expected_tp_pnl_pct + 2.0:
-                    logger.warning(
-                        "🎯 TP OVERSHOOT on %s: actual PnL %.1f%% > TP target %.1f%% — "
-                        "price gapped through TP (%.6f). Closing trade.",
-                        trade["trade_id"], pnl_pct, expected_tp_pnl_pct, eff_tp,
-                    )
-                    _close_trade_inline(trade, current, "TP_OVERSHOOT")
-                    changed = True
-                    continue
-
-        changed = True
+        except Exception as _te:
+            logger.error(
+                "❌ update_unrealized: unhandled error on trade %s (%s) — skipping. err=%s",
+                trade.get("trade_id", "?"), trade.get("symbol", "?"), _te, exc_info=True,
+            )
 
     if changed:
         _compute_summary(book)
         _save_book(book)
+
+
+def _update_single_trade(trade, book, prices, funding_rates):
+    """Process SL/TP/step logic for one active trade. Called by update_unrealized."""
+    symbol = trade["symbol"]
+    if prices and symbol in prices:
+        current = prices[symbol]
+    else:
+        # A4 FIX: For LIVE trades, try CoinDCX price first (not Binance)
+        if trade.get("mode", "").upper().startswith("LIVE"):
+            try:
+                import coindcx_client as cdx
+                cdx_pair = trade.get("pair") or cdx.to_coindcx_pair(symbol)
+                if cdx_pair:
+                    current = cdx.get_current_price(cdx_pair)
+            except Exception:
+                current = None
+        else:
+            current = None
+
+        if not current:
+            current = get_current_price(symbol)
+            if not current:
+                return
+
+    current = round(current, 6)
+    entry = trade["entry_price"]
+    qty = trade["quantity"]
+    lev = trade["leverage"]
+    capital = trade["capital"]
+
+    if trade["position"] == "LONG":
+        raw_pnl = (current - entry) * qty
+    else:
+        raw_pnl = (entry - current) * qty
+
+    # ── Accumulate funding rate cost ──────────────────────────
+    # Initialize funding fields for legacy trades
+    if "funding_cost" not in trade:
+        trade["funding_cost"] = 0
+        trade["funding_payments"] = 0
+        trade["last_funding_check"] = trade["entry_timestamp"]
+
+    try:
+        last_check = datetime.fromisoformat(trade["last_funding_check"])
+        hours_since = (datetime.utcnow() - last_check).total_seconds() / 3600
+        intervals = int(hours_since / config.FUNDING_INTERVAL_HOURS)
+        if intervals > 0:
+            # Use live funding rate if available, else default
+            sym = trade["symbol"]
+            fr = config.DEFAULT_FUNDING_RATE
+            if funding_rates and sym in funding_rates:
+                fr = abs(funding_rates[sym])  # always treat as cost
+            notional = entry * qty * lev
+            cost_per_interval = notional * fr
+            new_cost = round(cost_per_interval * intervals, 6)
+            trade["funding_cost"] = round(trade["funding_cost"] + new_cost, 6)
+            trade["funding_payments"] += intervals
+            trade["last_funding_check"] = datetime.utcnow().isoformat()
+    except Exception:
+        pass
+
+    funding_cost = trade.get("funding_cost", 0)
+
+    # To prevent trades from starting in an immediate deep paper loss,
+    # we do NOT subtract estimated exit commissions from the unrealized PnL.
+    # It is only subtracted during a real exit (realized PnL).
+    net_pnl = round(raw_pnl - funding_cost, 4)
+    pnl_pct = round(net_pnl / capital * 100, 2) if capital else 0
+
+    # Track max favorable / adverse excursion
+    if net_pnl > trade.get("max_favorable", 0):
+        trade["max_favorable"] = net_pnl
+    if net_pnl < trade.get("max_adverse", 0):
+        trade["max_adverse"] = net_pnl
+
+    # Duration
+    entry_time = datetime.fromisoformat(trade["entry_timestamp"])
+    duration = (datetime.utcnow() - entry_time).total_seconds() / 60
+
+    trade["current_price"] = current
+    trade["unrealized_pnl"] = net_pnl
+    trade["unrealized_pnl_pct"] = pnl_pct
+    trade["duration_minutes"] = round(duration, 1)
+
+    # ── Trailing SL: Stepped Breakeven + Profit Lock (F2) ────
+    atr = trade.get("atr_at_entry", 0)
+    is_long = trade["position"] == "LONG"
+
+    # Initialize trailing fields for legacy trades that lack them
+    if "trailing_sl" not in trade:
+        trade["trailing_sl"] = trade["stop_loss"]
+    if "trailing_tp" not in trade:
+        trade["trailing_tp"] = trade["take_profit"]
+    if "peak_price" not in trade:
+        trade["peak_price"] = entry
+    if "trailing_active" not in trade:
+        trade["trailing_active"] = False
+    if "trail_sl_count" not in trade:
+        trade["trail_sl_count"] = 0
+    if "tp_extensions" not in trade:
+        trade["tp_extensions"] = 0
+    if "stepped_lock_level" not in trade:
+        trade["stepped_lock_level"] = -1  # No milestone hit yet
+
+    # ── F2 Stepped Trailing SL ────────────────────────────────
+    # Iterate through TRAILING_SL_STEPS milestones and progressively
+    # tighten SL based on leveraged P&L %.
+    # Each step: (trigger_pnl_pct, lock_pnl_pct)
+    # lock_pnl_pct = 0 means breakeven (entry price)
+    if config.TRAILING_SL_ENABLED:
+        lev = trade["leverage"]
+        steps = getattr(config, 'TRAILING_SL_STEPS', [])
+
+        # Safety: skip if entry is zero/missing (prevents garbage SL values)
+        if entry <= 0 or lev <= 0:
+            logger.warning("⚠️ SL trail skipped for %s — entry=%.6f lev=%s",
+                           trade.get("trade_id"), entry, lev)
+        else:
+            for step_idx, (trigger_pnl, lock_pnl) in enumerate(steps):
+                # Only process steps we haven't activated yet
+                if step_idx <= trade["stepped_lock_level"]:
+                    continue
+                if pnl_pct >= trigger_pnl:
+                    # lock_pnl is a leveraged P&L %. Convert to a price move fraction.
+                    # e.g. lock_pnl=5.0, lev=20 → price_move = 5/100/20 = 0.0025 (0.25%)
+                    lock_price_move = (lock_pnl / 100.0) / lev
+                    if is_long:
+                        new_sl = round(entry * (1.0 + lock_price_move), 8)
+                    else:
+                        new_sl = round(entry * (1.0 - lock_price_move), 8)
+
+                    # Sanity check: profit-lock SL must be on the "secured" side of entry.
+                    # LONG:  new_sl >= entry means we've secured breakeven or better price-wise.
+                    # SHORT: new_sl <= entry means we've secured breakeven or better price-wise.
+                    # The 0.01% tolerance handles floating-point rounding at lock_pnl=0 (breakeven).
+                    sl_sane = (is_long and new_sl >= entry * 0.9999) or \
+                              (not is_long and new_sl <= entry * 1.0001)
+                    if not sl_sane:
+                        logger.error(
+                            "❌ SL trail sanity fail for %s [step %d]: entry=%.6f lock_pnl=%.1f "
+                            "new_sl=%.6f is_long=%s — SKIPPING",
+                            trade.get("trade_id"), step_idx+1, entry, lock_pnl,
+                            new_sl, is_long,
+                        )
+                        break
+
+                    # Only tighten, never loosen
+                    sl_improved = (is_long and new_sl > trade["trailing_sl"]) or \
+                                  (not is_long and new_sl < trade["trailing_sl"])
+
+                    if sl_improved or trade["stepped_lock_level"] < 0:
+                        old_sl = trade["trailing_sl"]
+                        trade["trailing_sl"] = new_sl
+                        trade["trailing_active"] = True
+                        trade["stepped_lock_level"] = step_idx
+                        trade["trail_sl_count"] = trade.get("trail_sl_count", 0) + 1
+
+                        lock_label = "BREAKEVEN" if lock_pnl == 0 else f"+{lock_pnl:.0f}% profit"
+                        logger.info(
+                            "🔒 SL Step %d for %s: pnl=%.2f%% ≥ trigger=%.0f%% | "
+                            "entry=%.6f lock_move=%.6f | SL %.6f→%.6f [%s]",
+                            step_idx + 1, trade.get("trade_id"), pnl_pct, trigger_pnl,
+                            entry, lock_price_move, old_sl, new_sl, lock_label,
+                        )
+
+                        # For LIVE trades: modify exchange SL order
+                        is_live_trail = trade.get("mode") == "LIVE"
+                        if is_live_trail:
+                            try:
+                                from execution_engine import ExecutionEngine
+                                ExecutionEngine.modify_sl_live(symbol, new_sl)
+                                logger.info("🔒 Live SL modified on exchange for %s → %.6f", symbol, new_sl)
+                            except Exception as e:
+                                logger.error("❌ Failed to modify live SL for %s: %s", symbol, e)
+
+                        # Only advance ONE step per cycle — prevents
+                        # multi-step runaway when pnl jumps are large
+                        break
+
+    # ── EXIT CHECKS ──────────────────────────────────────────────
+    # For LIVE trades, CoinDCX handles SL/TP/MAX_LOSS via exchange.
+    # PAPER_TRADE override: if config.PAPER_TRADE=True the entire
+    # engine is simulated — always auto-close regardless of mode stamp.
+    is_live = trade.get("mode") == "LIVE"
+    should_auto_close = (not is_live) or config.PAPER_TRADE
+
+    # ── Stamp exit guard state on trade (synced to DB + UI on next heartbeat) ──
+    from datetime import datetime as _dt
+    trade["exit_guard_active"] = should_auto_close
+    trade["exit_check_at"]    = _dt.utcnow().isoformat() + "Z"
+    trade["exit_check_price"] = round(float(current), 8)
+
+    # Diagnostic: promote to INFO so Railway logs show guard status without debug filter
+    logger.info(
+        "Exit check [%s]: mode=%s is_live=%s guard=%s "
+        "pnl=%.2f%% eff_sl=%.6f eff_tp=%.6f price=%.6f",
+        trade.get("trade_id"), trade.get("mode"), is_live, should_auto_close,
+        pnl_pct,
+        trade.get("trailing_sl", trade.get("stop_loss", 0)),
+        trade.get("trailing_tp", trade.get("take_profit", 0)),
+        current,
+    )
+
+    # HARD MAX LOSS GUARD (paper + live safety net)
+    max_loss_limit = config.MAX_LOSS_PER_TRADE_PCT
+    if pnl_pct <= max_loss_limit:
+        logger.warning(
+            "🛑 MAX LOSS hit on %s (%.2f%% <= %.0f%%) — auto-closing trade %s",
+            symbol, pnl_pct, max_loss_limit, trade["trade_id"],
+        )
+        if is_live:
+            from execution_engine import ExecutionEngine
+            ExecutionEngine.close_position_live(symbol)
+        _close_trade_inline(trade, current, f"MAX_LOSS_{int(max_loss_limit)}%")
+        changed = True
+        return
+
+    # ── MULTI-TARGET EXIT CHECKS (paper + live) ──
+    mt_enabled = getattr(config, 'MULTI_TARGET_ENABLED', False)
+    t1_price = trade.get("t1_price")
+    t2_price = trade.get("t2_price")
+    t3_price = trade.get("t3_price")
+
+    if mt_enabled and t1_price is not None:
+        # Initialize fields for legacy trades
+        if "t1_hit" not in trade:
+            trade["t1_hit"] = False
+        if "t2_hit" not in trade:
+            trade["t2_hit"] = False
+        if "original_qty" not in trade:
+            trade["original_qty"] = trade["quantity"]
+        if "original_capital" not in trade:
+            trade["original_capital"] = trade["capital"]
+
+        # T1 check
+        if not trade["t1_hit"]:
+            t1_hit = (is_long and current >= t1_price) or (not is_long and current <= t1_price)
+            if t1_hit:
+                book_frac = config.MT_T1_BOOK_PCT  # 25%
+                # Live: partial close on exchange
+                if is_live:
+                    from execution_engine import ExecutionEngine
+                    close_qty = trade["quantity"] * book_frac
+                    ExecutionEngine.partial_close_live(symbol, trade["position"], close_qty)
+                    ExecutionEngine.modify_sl_live(symbol, trade["entry_price"])
+                _book_partial_inline(trade, book, current, book_frac, "T1")
+                trade["t1_hit"] = True
+                trade["trailing_sl"] = trade["entry_price"]  # SL → breakeven
+                trade["trailing_active"] = True
+                logger.info("🎯 T1 hit on %s — booked 25%%, SL → breakeven (%.6f)",
+                            trade["trade_id"], trade["entry_price"])
+                changed = True
+
+        # T2 check
+        if trade["t1_hit"] and not trade["t2_hit"]:
+            t2_hit = (is_long and current >= t2_price) or (not is_long and current <= t2_price)
+            if t2_hit:
+                book_frac = config.MT_T2_BOOK_PCT  # 50% of remaining
+                # Live: partial close on exchange
+                if is_live:
+                    from execution_engine import ExecutionEngine
+                    close_qty = trade["quantity"] * book_frac
+                    ExecutionEngine.partial_close_live(symbol, trade["position"], close_qty)
+                    ExecutionEngine.modify_sl_live(symbol, t1_price)
+                _book_partial_inline(trade, book, current, book_frac, "T2")
+                trade["t2_hit"] = True
+                trade["trailing_sl"] = t1_price  # SL → T1
+                logger.info("🎯 T2 hit on %s — booked 50%% remaining, SL → T1 (%.6f)",
+                            trade["trade_id"], t1_price)
+                changed = True
+
+        # T3 check (close everything remaining)
+        if trade["t2_hit"]:
+            t3_hit = (is_long and current >= t3_price) or (not is_long and current <= t3_price)
+            if t3_hit:
+                logger.info("🏆 T3 hit on %s — closing remaining position",
+                            trade["trade_id"])
+                if is_live:
+                    from execution_engine import ExecutionEngine
+                    ExecutionEngine.close_position_live(symbol)
+                _close_trade_inline(trade, current, "T3")
+                changed = True
+                return
+
+    # Use trailing values for SL hit checks
+    # (paper mode override: always auto-close when config.PAPER_TRADE=True)
+    if should_auto_close:
+        effective_sl = trade.get("trailing_sl", trade["stop_loss"])
+
+        sl_hit = False
+        if is_long:
+            sl_hit = current <= effective_sl
+        else:
+            sl_hit = current >= effective_sl
+
+        if sl_hit:
+            sl_n = trade.get("trail_sl_count", 0)
+            step_level = trade.get("stepped_lock_level", -1)
+            # Determine SL reason based on target state
+            if trade.get("t2_hit"):
+                reason = "SL_T2"  # SL hit after T2 (at T1 price)
+            elif trade.get("t1_hit"):
+                reason = "SL_T1"  # SL hit after T1 (at breakeven)
+            elif trade["trailing_active"] and step_level >= 0:
+                # Stepped lock was active — show which level
+                steps = getattr(config, 'TRAILING_SL_STEPS', [])
+                if step_level < len(steps):
+                    _, lock_pnl = steps[step_level]
+                    if lock_pnl == 0:
+                        lock_tag = " (BEV)"
+                    else:
+                        lock_tag = f" (+{lock_pnl:.0f}% Locked)"
+                else:
+                    lock_tag = ""
+                reason = f"STEPPED_SL_{sl_n}{lock_tag}"
+            else:
+                reason = "FIXED_SL"
+            _close_trade_inline(trade, current, reason)
+            changed = True
+            continue
+
+        # Old TP hit (only when multi-target is NOT active for this trade)
+        if not mt_enabled or t1_price is None:
+            effective_tp = trade.get("trailing_tp", trade["take_profit"])
+            tp_hit = False
+            if is_long:
+                tp_hit = current >= effective_tp
+            else:
+                tp_hit = current <= effective_tp
+            if tp_hit:
+                ext = trade["tp_extensions"]
+                reason = f"TP_EXT_{ext}" if ext > 0 else "FIXED_TP"
+                _close_trade_inline(trade, current, reason)
+                changed = True
+                return
+
+    # ── TP OVERSHOOT SAFETY NET ──────────────────────────────────────
+    # Fires when price GAPS THROUGH the TP level between heartbeats.
+    # Checks PnL% directly — independent of price-based TP checks.
+    # If the trade's current PnL% has exceeded what TP would give by ≥2%,
+    # the trade must have passed its TP and should be closed.
+    # paper_override: also runs when config.PAPER_TRADE=True.
+    if should_auto_close:
+        eff_tp = trade.get("trailing_tp", trade.get("take_profit", 0))
+        lev_overshoot = trade.get("leverage", 1)
+        if eff_tp and eff_tp > 0 and entry and entry > 0 and lev_overshoot > 0:
+            # Expected PnL% at TP level (leveraged)
+            price_move_to_tp = abs(eff_tp - entry) / entry
+            expected_tp_pnl_pct = round(price_move_to_tp * lev_overshoot * 100, 2)
+            # If actual PnL% exceeds expected TP PnL% by ≥2% buffer → overshoot
+            if expected_tp_pnl_pct > 0 and pnl_pct >= expected_tp_pnl_pct + 2.0:
+                logger.warning(
+                    "🎯 TP OVERSHOOT on %s: actual PnL %.1f%% > TP target %.1f%% — "
+                    "price gapped through TP (%.6f). Closing trade.",
+                    trade["trade_id"], pnl_pct, expected_tp_pnl_pct, eff_tp,
+                )
+                _close_trade_inline(trade, current, "TP_OVERSHOOT")
+                changed = True
+                return
+
+    changed = True
+
+
+
+
+
 
 
 def get_tradebook():
@@ -1082,9 +1098,9 @@ def sync_live_tpsl():
 
     for trade in book["trades"]:
         if trade["status"] != "ACTIVE":
-            continue
+            return
         if trade.get("mode") != "LIVE":
-            continue
+            return
 
         symbol = trade["symbol"]
         trailing_sl = trade.get("trailing_sl", trade["stop_loss"])
