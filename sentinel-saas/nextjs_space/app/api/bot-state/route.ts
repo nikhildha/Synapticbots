@@ -88,7 +88,8 @@ export async function GET() {
             if (secondaryUrl && paperEngineData) engineTradeCache[secondaryUrl] = paperEngineData.tradebook?.trades || [];
 
             for (const ub of userBots) {
-                if (!ub.startedAt) continue;
+                // Note: no startedAt guard — bots may have active trades without an explicit session
+                // (engine bulk-activates bots from DB without the dashboard Start flow)
                 const isLive = (ub.config?.mode || 'paper').toLowerCase().includes('live');
                 const botEngineUrl = getEngineUrl(isLive ? 'live' : 'paper');
                 if (!botEngineUrl) continue;
