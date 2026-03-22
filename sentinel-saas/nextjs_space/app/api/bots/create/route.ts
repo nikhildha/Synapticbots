@@ -70,6 +70,7 @@ export async function POST(request: Request) {
             exchange,
             status: 'stopped',
             isActive: false,
+            startedAt: new Date(),  // Set on creation so Tradebook sync never skips this bot
             config: {
               create: {
                 mode: botMode,

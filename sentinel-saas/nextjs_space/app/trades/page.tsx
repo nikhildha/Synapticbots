@@ -78,14 +78,16 @@ export default async function TradesPage() {
   // Sync each bot from its own engine (paper or live)
   const engineTradeCache: Record<string, any[]> = {};
   for (const ub of userBots) {
-    if (!ub.startedAt) continue;
+    // Use startedAt as the filter date; fall back to epoch so newly-created bots
+    // (startedAt=null) still sync all available engine trades rather than being skipped.
+    const syncFrom = ub.startedAt ?? new Date(0);
     const botMode: EngineMode = ((ub.config as any)?.mode || 'paper').toLowerCase().includes('live') ? 'live' : 'paper';
     try {
       if (!engineTradeCache[botMode]) {
         engineTradeCache[botMode] = await fetchEngineTradesAll(botMode);
       }
       if (engineTradeCache[botMode].length > 0) {
-        await syncEngineTrades(engineTradeCache[botMode], ub.id, ub.startedAt);
+        await syncEngineTrades(engineTradeCache[botMode], ub.id, syncFrom);
       }
     } catch (err) {
       console.error(`[trades-page] Sync failed for bot ${ub.id} (${botMode}):`, err);
