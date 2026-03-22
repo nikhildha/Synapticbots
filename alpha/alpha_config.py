@@ -80,7 +80,7 @@ ALPHA_AUDIT_LOG_FILE: str = str(_BASE_DIR / "data" / "audit_log.json")
 ALPHA_LOG_FILE: str       = str(_BASE_DIR / "data" / "alpha.log")
 
 # ── Server ────────────────────────────────────────────────────────────────────
-ALPHA_PORT: int = int(os.getenv("ALPHA_PORT", "5001"))
+ALPHA_PORT: int = int(os.getenv("PORT", os.getenv("ALPHA_PORT", "5001")))
 
 # ── Mode ──────────────────────────────────────────────────────────────────────
 ALPHA_PAPER_MODE: bool = os.getenv("ALPHA_PAPER_MODE", "true").lower() == "true"
