@@ -1,0 +1,159 @@
+==================================================================================================================================
+  SYNAPTIC QUANT LAB — ROUND 5: PRECISION TUNING ON PROVEN WINNERS
+  Fee: 0.05%/leg = 0.10% RT  |  Generated: 2026-03-22 22:35
+  Winners to beat: R4 #34 +$613 (PF=1.251) | R4 #18 +$492 (PF=1.379)
+==================================================================================================================================
+
+   Rk   #  Group           Label                                                     Entry               Coins        BE  SL/TP      Lev    Trd   T/c         PnL      WR      PF      Sh       MDD
+  ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+    1  29  E-Grand         core3 | 4h_strong margin>0.20 + multi+BE  TP=6.0          multi_bar_vol       core3      @2.0  1.5/6.0     25     97    32  $   852.47   28.9%   1.290   0.830  $  -1425  ★ PROFIT
+    2  13  C-Selectivity   core3 | strong_vol (z>2.0, 1 bar)  BE  TP=6               strong_vol          core3      @2.0  1.5/6.0     25    204    68  $   348.70   26.5%   1.053   0.268  $  -1979  ★ PROFIT
+    3  28  E-Grand         SOL+AAVE | multi_bar_vol + BE  TP=6.0                     multi_bar_vol       sol_aave   @2.0  1.5/6.0     25     34    17  $   194.52   23.5%   1.167   0.316  $   -449  ★ PROFIT
+    4  18  C-Selectivity   core3 | score>=4 (vol+2)  BE  TP=6                        score4              core3      @2.0  1.5/6.0     25      4     2  $   184.67   50.0%   2.993   0.971  $    -45  ★ PROFIT
+    5  15  C-Selectivity   core3 | multi_bar_vol_3 (z>2, 3 bars)  BE  TP=6           multi_bar_vol_3     core3      @2.0  1.5/6.0     25      7     4  $    86.72   28.6%   1.368   0.341  $   -169  ★ PROFIT
+    6  27  E-Grand         SOL ONLY | multi_bar_vol + BE@2×ATR  TP=6.0               multi_bar_vol       sol        @2.0  1.5/6.0     25     12    12  $    19.54   25.0%   1.056   0.073  $   -140  ★ PROFIT
+    7  22  D-TPLev         core3 | multi+BE  SL=1.5  TP=7.5  lev=25                  multi_bar_vol       core3      @2.0  1.5/7.5     25     41    14  $   -19.69   22.0%   0.988  -0.027  $   -854  ~ NEAR
+    8  25  E-Grand         ULTRA: multi+score3 BOTH fire + BE + TP=6.0               multi_and_score3    core3      @2.0  1.5/6.0     25      1     1  $   -45.19    0.0%   0.000   0.000  $      0  ~ NEAR
+    9  26  E-Grand         ULTRA: multi+score3 BOTH + BE@1.5 + TP=7.5                multi_and_score3    core3      @1.5  1.5/7.5     25      1     1  $   -45.19    0.0%   0.000   0.000  $      0  ~ NEAR
+   10   7  B-BETuning      core3 | BE trigger at +1.0×ATR (fast protect)             multi_bar_vol       core3      @1.0  1.5/6.0     25     42    14  $   -73.58   21.4%   0.949  -0.116  $   -718  ~ NEAR
+   11   8  B-BETuning      core3 | BE trigger at +1.5×ATR                            multi_bar_vol       core3      @1.5  1.5/6.0     25     42    14  $   -98.46   21.4%   0.933  -0.155  $   -718  ~ NEAR
+   12  23  D-TPLev         core3 | multi+BE  SL=1.5  TP=6.0  lev=15                  multi_bar_vol       core3      @2.0  1.5/6.0     15     42    14  $  -176.62   21.4%   0.824  -0.452  $   -549  
+   13  24  D-TPLev         core3 | multi+BE  SL=1.5  TP=6.0  lev=20                  multi_bar_vol       core3      @2.0  1.5/6.0     20     42    14  $  -216.34   21.4%   0.836  -0.418  $   -712  
+   14   1  A-Core3         core3 | multi_bar_vol + BE  TP=6.0  ← R4 winner setup     multi_bar_vol       core3      @2.0  1.5/6.0     25     42    14  $  -234.56   21.4%   0.854  -0.366  $   -854  
+   15   9  B-BETuning      core3 | BE trigger at +2.0×ATR ← R4 winner                multi_bar_vol       core3      @2.0  1.5/6.0     25     42    14  $  -234.56   21.4%   0.854  -0.366  $   -854  
+   16  14  C-Selectivity   core3 | multi_bar_vol (z>2, 2 bars)  BE  TP=6             multi_bar_vol       core3      @2.0  1.5/6.0     25     42    14  $  -234.56   21.4%   0.854  -0.366  $   -854  
+   17  21  D-TPLev         core3 | multi+BE  SL=1.5  TP=6.0  lev=25  ← R4 base       multi_bar_vol       core3      @2.0  1.5/6.0     25     42    14  $  -234.56   21.4%   0.854  -0.366  $   -854  
+   18  12  B-BETuning      core3 | score>=3 BE at +1.0×ATR                           score3              core3      @1.0  1.5/6.0     25     21     7  $  -280.86   14.3%   0.604  -0.899  $   -508  
+   19  10  B-BETuning      core3 | BE trigger at +2.5×ATR (slow, let breathe)        multi_bar_vol       core3      @2.5  1.5/6.0     25     42    14  $  -313.71   21.4%   0.814  -0.486  $   -907  
+   20   4  A-Core3         core3 | score>=3  no BE  TP=6.0                           score3              core3       off  1.5/6.0     25     21     7  $  -319.74   19.0%   0.625  -0.938  $   -573  
+   21  30  E-Grand         FINAL: core3+score3+BE@1.5+TP=6.0+lev=20                  score3              core3      @1.5  1.5/6.0     20     21     7  $  -342.72   14.3%   0.500  -1.348  $   -458  
+   22   5  A-Core3         core3 | multi_bar_vol + BE  TP=4.5                        multi_bar_vol       core3      @2.0  1.5/4.5     25     42    14  $  -374.39   21.4%   0.767  -0.652  $   -854  
+   23  20  D-TPLev         core3 | multi+BE  SL=1.5  TP=4.5  lev=25                  multi_bar_vol       core3      @2.0  1.5/4.5     25     42    14  $  -374.39   21.4%   0.767  -0.652  $   -854  
+   24  19  D-TPLev         core3 | multi+BE  SL=1.0  TP=3.0  lev=25                  multi_bar_vol       core3      @2.0  1.0/3.0     25     43    14  $  -403.21   20.9%   0.701  -0.970  $   -867  
+   25   2  A-Core3         core3 | score>=3 + BE  TP=6.0  ← R4 #2 setup              score3              core3      @2.0  1.5/6.0     25     21     7  $  -428.41   14.3%   0.500  -1.348  $   -573  
+   26  11  B-BETuning      core3 | score>=3 BE at +1.5×ATR                           score3              core3      @1.5  1.5/6.0     25     21     7  $  -428.41   14.3%   0.500  -1.348  $   -573  
+   27  17  C-Selectivity   core3 | score>=3 (vol+1)  BE  TP=6                        score3              core3      @2.0  1.5/6.0     25     21     7  $  -428.41   14.3%   0.500  -1.348  $   -573  
+   28   3  A-Core3         core3 | multi_bar_vol  no BE  TP=6.0                      multi_bar_vol       core3       off  1.5/6.0     25     41    14  $  -454.05   22.0%   0.745  -0.718  $  -1001  
+   29   6  A-Core3         core3 | score>=3 + BE  TP=4.5                             score3              core3      @2.0  1.5/4.5     25     21     7  $  -491.99   14.3%   0.425  -1.724  $   -573  
+   30  16  C-Selectivity   core3 | score>=2 (vol alone ok)  BE  TP=6                 score2              core3      @2.0  1.5/6.0     25    282    94  $  -561.43   25.2%   0.938  -0.389  $  -2713  
+
+================================================================================
+  GROUP AVERAGES
+================================================================================
+  A-Core3             n=6  avgPnL=$  -383.86  avgPF=0.653  avgSh=-0.958  best=#1 $-234.56
+  B-BETuning          n=6  avgPnL=$  -238.26  avgPF=0.776  avgSh=-0.562  best=#7 $-73.58
+  C-Selectivity       n=6  avgPnL=$  -100.72  avgPF=1.284  avgSh=-0.087  best=#13 $+348.70
+  D-TPLev             n=6  avgPnL=$  -237.47  avgPF=0.828  avgSh=-0.481  best=#22 $-19.69
+  E-Grand             n=6  avgPnL=$   105.57  avgPF=0.669  avgSh=-0.022  best=#29 $+852.47
+
+================================================================================
+  BE THRESHOLD ANALYSIS
+================================================================================
+  BE@1.0×ATR  core3      PnL=$   -73.58  PF=0.949  WR=21.4%  Trades=42
+  BE@1.5×ATR  core3      PnL=$   -98.46  PF=0.933  WR=21.4%  Trades=42
+  BE@2.0×ATR  core3      PnL=$  +852.47  PF=1.290  WR=28.9%  Trades=97
+  BE@2.0×ATR  sol_aave   PnL=$  +194.52  PF=1.167  WR=23.5%  Trades=34
+  BE@2.0×ATR  sol        PnL=$   +19.54  PF=1.056  WR=25.0%  Trades=12
+  BE@2.0×ATR  core3      PnL=$   -19.69  PF=0.988  WR=22.0%  Trades=41
+  BE@2.0×ATR  core3      PnL=$  -176.62  PF=0.824  WR=21.4%  Trades=42
+  BE@2.0×ATR  core3      PnL=$  -216.34  PF=0.836  WR=21.4%  Trades=42
+  BE@2.0×ATR  core3      PnL=$  -234.56  PF=0.854  WR=21.4%  Trades=42
+  BE@2.0×ATR  core3      PnL=$  -234.56  PF=0.854  WR=21.4%  Trades=42
+  BE@2.0×ATR  core3      PnL=$  -234.56  PF=0.854  WR=21.4%  Trades=42
+  BE@2.0×ATR  core3      PnL=$  -234.56  PF=0.854  WR=21.4%  Trades=42
+  BE@2.0×ATR  core3      PnL=$  -374.39  PF=0.767  WR=21.4%  Trades=42
+  BE@2.0×ATR  core3      PnL=$  -374.39  PF=0.767  WR=21.4%  Trades=42
+  BE@2.0×ATR  core3      PnL=$  -403.21  PF=0.701  WR=20.9%  Trades=43
+  BE@2.5×ATR  core3      PnL=$  -313.71  PF=0.814  WR=21.4%  Trades=42
+
+================================================================================
+  ENTRY SELECTIVITY LADDER
+================================================================================
+  strong_vol              n=1  avgTrades/coin=68  best=#13 $+348.70  PF=1.053  Sh=0.268
+  multi_bar_vol           n=17  avgTrades/coin=14  best=#29 $+852.47  PF=1.290  Sh=0.830
+  multi_bar_vol_3         n=1  avgTrades/coin=4  best=#15 $+86.72  PF=1.368  Sh=0.341
+  score2                  n=1  avgTrades/coin=94  best=#16 $-561.43  PF=0.938  Sh=-0.389
+  score3                  n=7  avgTrades/coin=7  best=#12 $-280.86  PF=0.604  Sh=-0.899
+  score4                  n=1  avgTrades/coin=2  best=#18 $+184.67  PF=2.993  Sh=0.971
+  multi_and_score3        n=2  avgTrades/coin=1  best=#25 $-45.19  PF=0.000  Sh=0.000
+
+================================================================================
+  COIN UNIVERSE ANALYSIS
+================================================================================
+  sol_aave    n=1  avgPnL=$   194.52  best=#28 $+194.52
+  sol         n=1  avgPnL=$    19.54  best=#27 $+19.54
+  core3       n=28  avgPnL=$  -190.80  best=#29 $+852.47
+
+================================================================================
+  EXIT REASON BREAKDOWN
+================================================================================
+  SL                 986  (71.7%)
+  DIR_FLIP           256  (18.6%)
+  TP                 134  (9.7%)
+
+================================================================================
+  PER-COIN — Best Config #29
+================================================================================
+  core3 | 4h_strong margin>0.20 + multi+BE  TP=6.0
+  Entry=multi_bar_vol  BE=True@2.0×ATR  SL=1.5/TP=6.0  Lev=25x
+
+  AAVEUSDT      [DeFi  ] ★  PnL=$ +837.53  trades=  35  WR= 34.3%  PF= 1.943  Sh= 1.282  exits={'SL': 19, 'DIR_FLIP': 12, 'TP': 4}
+  SOLUSDT       [L1    ] ★  PnL=$ +358.11  trades=  30  WR= 23.3%  PF= 1.334  Sh= 0.519  exits={'DIR_FLIP': 5, 'SL': 20, 'TP': 5}
+  ETHUSDT       [L1    ] ✗  PnL=$ -343.17  trades=  32  WR= 28.1%  PF= 0.652  Sh=-0.942  exits={'SL': 19, 'DIR_FLIP': 11, 'TP': 2}
+
+================================================================================
+  TOP 10 CONFIGURATIONS
+================================================================================
+
+  #1  [E-Grand] #29 — core3 | 4h_strong margin>0.20 + multi+BE  TP=6.0
+      Entry=multi_bar_vol  Coins=core3  BE@2.0×ATR  SL=1.5/TP=6.0×ATR  MaxLev=25x  MinMargin=0.2
+      PnL=$+852.47  WR=28.9%  PF=1.290  Sharpe=0.830  Trades=97(32/coin)  MDD=$-1425
+      Exits: {'SL': 58, 'DIR_FLIP': 28, 'TP': 11}
+
+  #2  [C-Selectivity] #13 — core3 | strong_vol (z>2.0, 1 bar)  BE  TP=6
+      Entry=strong_vol  Coins=core3  BE@2.0×ATR  SL=1.5/TP=6.0×ATR  MaxLev=25x  MinMargin=0.05
+      PnL=$+348.70  WR=26.5%  PF=1.053  Sharpe=0.268  Trades=204(68/coin)  MDD=$-1979
+      Exits: {'SL': 140, 'TP': 18, 'DIR_FLIP': 46}
+
+  #3  [E-Grand] #28 — SOL+AAVE | multi_bar_vol + BE  TP=6.0
+      Entry=multi_bar_vol  Coins=sol_aave  BE@2.0×ATR  SL=1.5/TP=6.0×ATR  MaxLev=25x  MinMargin=0.15
+      PnL=$+194.52  WR=23.5%  PF=1.167  Sharpe=0.316  Trades=34(17/coin)  MDD=$-449
+      Exits: {'SL': 24, 'TP': 4, 'DIR_FLIP': 6}
+
+  #4  [C-Selectivity] #18 — core3 | score>=4 (vol+2)  BE  TP=6
+      Entry=score4  Coins=core3  BE@2.0×ATR  SL=1.5/TP=6.0×ATR  MaxLev=25x  MinMargin=0.05
+      PnL=$+184.67  WR=50.0%  PF=2.993  Sharpe=0.971  Trades=4(2/coin)  MDD=$-45
+      Exits: {'DIR_FLIP': 1, 'SL': 2, 'TP': 1}
+
+  #5  [C-Selectivity] #15 — core3 | multi_bar_vol_3 (z>2, 3 bars)  BE  TP=6
+      Entry=multi_bar_vol_3  Coins=core3  BE@2.0×ATR  SL=1.5/TP=6.0×ATR  MaxLev=25x  MinMargin=0.15
+      PnL=$+86.72  WR=28.6%  PF=1.368  Sharpe=0.341  Trades=7(4/coin)  MDD=$-169
+      Exits: {'TP': 2, 'SL': 4, 'DIR_FLIP': 1}
+
+  #6  [E-Grand] #27 — SOL ONLY | multi_bar_vol + BE@2×ATR  TP=6.0
+      Entry=multi_bar_vol  Coins=sol  BE@2.0×ATR  SL=1.5/TP=6.0×ATR  MaxLev=25x  MinMargin=0.15
+      PnL=$+19.54  WR=25.0%  PF=1.056  Sharpe=0.073  Trades=12(12/coin)  MDD=$-140
+      Exits: {'SL': 9, 'TP': 2, 'DIR_FLIP': 1}
+
+  #7  [D-TPLev] #22 — core3 | multi+BE  SL=1.5  TP=7.5  lev=25
+      Entry=multi_bar_vol  Coins=core3  BE@2.0×ATR  SL=1.5/TP=7.5×ATR  MaxLev=25x  MinMargin=0.15
+      PnL=$-19.69  WR=22.0%  PF=0.988  Sharpe=-0.027  Trades=41(14/coin)  MDD=$-854
+      Exits: {'SL': 31, 'DIR_FLIP': 7, 'TP': 3}
+
+  #8  [E-Grand] #25 — ULTRA: multi+score3 BOTH fire + BE + TP=6.0
+      Entry=multi_and_score3  Coins=core3  BE@2.0×ATR  SL=1.5/TP=6.0×ATR  MaxLev=25x  MinMargin=0.15
+      PnL=$-45.19  WR=0.0%  PF=0.000  Sharpe=0.000  Trades=1(1/coin)  MDD=$0
+      Exits: {'SL': 1}
+
+  #9  [E-Grand] #26 — ULTRA: multi+score3 BOTH + BE@1.5 + TP=7.5
+      Entry=multi_and_score3  Coins=core3  BE@1.5×ATR  SL=1.5/TP=7.5×ATR  MaxLev=25x  MinMargin=0.15
+      PnL=$-45.19  WR=0.0%  PF=0.000  Sharpe=0.000  Trades=1(1/coin)  MDD=$0
+      Exits: {'SL': 1}
+
+  #10  [B-BETuning] #7 — core3 | BE trigger at +1.0×ATR (fast protect)
+      Entry=multi_bar_vol  Coins=core3  BE@1.0×ATR  SL=1.5/TP=6.0×ATR  MaxLev=25x  MinMargin=0.15
+      PnL=$-73.58  WR=21.4%  PF=0.949  Sharpe=-0.116  Trades=42(14/coin)  MDD=$-718
+      Exits: {'SL': 32, 'DIR_FLIP': 6, 'TP': 4}
+
+==================================================================================================================================
+  Elapsed: 271.1s

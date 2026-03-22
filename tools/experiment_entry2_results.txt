@@ -1,0 +1,182 @@
+========================================================================================================================
+  SYNAPTIC QUANT LAB — ROUND 3 ENTRY TIMING REFINEMENT
+  Fee: 0.05% per leg + 0.00% slip = 0.10% RT  (R2 was 0.20% RT)
+  Period: 12-month walk-forward  |  Generated: 2026-03-22 22:01
+========================================================================================================================
+
+   Rk   #  Group             Label                                                    Dir         Ent                 Coins    SL/TP      Lev    Trd    T/c         PnL     TWR     TPF      TSh       MDD
+  ──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+    1  16  C-Entry           elite6 + strong_vol (zscore>2.0)                         4h_1h       strong_vol          elite6   1.5/4.5     25   6    549     92  $   479.34   32.8%    1.03    0.250  $  -4848  ★ PROFIT
+    2  17  C-Entry           elite6 + vol_then_pullback      (vol confirms, then dip  4h_1h       vol_then_pullback   elite6   1.5/6.0     25   4      8      2  $    91.68   25.0%    1.42    0.373  $    -55  ★ PROFIT
+    3   5  A-Universe        4h+1h + PullbackRSI | Universe: bluechip (4 coins)       4h_1h       pullback_rsi        bluechip  1.5/4.5     25   3     15      5  $    10.88   26.7%    1.02    0.038  $   -260  ★ PROFIT
+    4  27  F-Novel           SNIPER: vol_confirm→pullback_rsi  margin>0.10  TP=8×     4h_1h       vol_then_pullback   elite4   2.0/8.0     20   3      7      2  $  -127.16   14.3%    0.41   -1.031  $    -49  ~ NEAR
+    5  12  B-TPSL            elite4 + PR | SL=1.0  TP=4.0  (1:4 tight SL)             4h_1h       pullback_rsi        elite4   1.0/4.0     25   3     34     11  $  -141.46   20.6%    0.85   -0.375  $   -618  ~ NEAR
+    6   4  A-Universe        4h+1h + PullbackRSI | Universe: defi_l1                  4h_1h       pullback_rsi        defi_l1  1.5/4.5     25   5     34      7  $  -369.58   23.5%    0.70   -0.910  $   -708  ~ NEAR
+    7   2  A-Universe        4h+1h + PullbackRSI | Universe: elite6 (+BTC+SOL)        4h_1h       pullback_rsi        elite6   1.5/4.5     25   5     38      8  $  -389.27   23.7%    0.71   -0.912  $   -896  ~ NEAR
+    8  13  C-Entry           elite6 + pullback_rsi           (R2 winner repro)        4h_1h       pullback_rsi        elite6   1.5/4.5     25   5     38      8  $  -389.27   23.7%    0.71   -0.912  $   -896  ~ NEAR
+    9   7  B-TPSL            elite4 + PR | SL=1.5  TP=3.0  (1:2 baseline R2)          4h_1h       pullback_rsi        elite4   1.5/3.0     25   3     31     10  $  -392.20   22.6%    0.67   -1.018  $   -825  ~ NEAR
+   10   1  A-Universe        4h+1h + PullbackRSI | Universe: elite4 (4 winners)       4h_1h       pullback_rsi        elite4   1.5/4.5     25   3     31     10  $  -405.67   22.6%    0.66   -1.018  $   -790  ~ NEAR
+   11   8  B-TPSL            elite4 + PR | SL=1.5  TP=4.5  (1:3)                      4h_1h       pullback_rsi        elite4   1.5/4.5     25   3     31     10  $  -405.67   22.6%    0.66   -1.018  $   -790  ~ NEAR
+   12  23  E-HighConf        elite4 + PR  margin>0.10  TP=4.5                         4h_1h       pullback_rsi        elite4   1.5/4.5     25   3     31     10  $  -405.67   22.6%    0.66   -1.018  $   -790  ~ NEAR
+   13  24  E-HighConf        elite4 + PR  margin>0.15  TP=4.5                         4h_1h       pullback_rsi        elite4   1.5/4.5     25   3     31     10  $  -405.67   22.6%    0.66   -1.018  $   -790  ~ NEAR
+   14   9  B-TPSL            elite4 + PR | SL=1.5  TP=6.0  (1:4)                      4h_1h       pullback_rsi        elite4   1.5/6.0     25   3     31     10  $  -585.62   19.4%    0.53   -1.536  $   -850
+   15  25  E-HighConf        elite4 + PR  margin>0.20  TP=6.0                         4h_1h       pullback_rsi        elite4   1.5/6.0     25   3     31     10  $  -585.62   19.4%    0.53   -1.536  $   -850
+   16   6  A-Universe        4h+1h + VolSurge   | Universe: elite4                    4h_1h       vol_surge           elite4   1.5/4.5     25   4    535    134  $  -639.62   32.1%    0.97   -0.325  $  -4766
+   17  28  F-Novel           TREND RIDER: strong_vol → ride to DIR_FLIP  elite4       4h_1h       strong_vol          elite4   1.5/wave    20   4    353     88  $  -736.21   27.5%    0.93   -0.438  $  -3492
+   18  10  B-TPSL            elite4 + PR | SL=1.5  TP=7.5  (1:5)                      4h_1h       pullback_rsi        elite4   1.5/7.5     25   3     31     10  $  -837.65   16.1%    0.35   -2.692  $  -1048
+   19   3  A-Universe        4h+1h + PullbackRSI | Universe: quality10 (no FET)       4h_1h       pullback_rsi        quality10  1.5/4.5     25   9     53      6  $  -898.28   22.6%    0.58   -1.771  $  -1430
+   20  18  D-RideWave        RIDE WAVE | elite4 + pullback_rsi  SL=2.0                4h_1h       pullback_rsi        elite4   2.0/wave    20   3     29     10  $  -913.97   17.2%    0.27   -3.466  $  -1068
+   21  22  D-RideWave        RIDE WAVE | elite4 + PR  high conf (margin>0.15)         4h_1h       pullback_rsi        elite4   2.0/wave    20   3     29     10  $  -913.97   17.2%    0.27   -3.466  $  -1068
+   22  21  D-RideWave        RIDE WAVE | elite6 + pullback_rsi  SL=1.5  lev=25        4h_1h       pullback_rsi        elite6   1.5/wave    25   5     38      8  $  -964.57   15.8%    0.35   -2.943  $  -1191
+   23  15  C-Entry           elite6 + pullback_rsi OR vol    (union: more setups)     4h_1h       pullback_rsi_or_vol  elite6   1.5/4.5     25   6    724    121  $ -1083.09   32.2%    0.95   -0.506  $  -6478
+   24  14  C-Entry           elite6 + vol_surge              (R2 #3 entry)            4h_1h       vol_surge           elite6   1.5/4.5     25   6    710    118  $ -1097.65   32.3%    0.95   -0.518  $  -6334
+   25  11  B-TPSL            elite4 + PR | SL=2.0  TP=8.0  (1:4 wide SL)              4h_1h       pullback_rsi        elite4   2.0/8.0     25   3     29     10  $ -1121.42   17.2%    0.27   -3.448  $  -1314
+   26  19  D-RideWave        RIDE WAVE | elite4 + vol_surge      SL=2.0               4h_1h       vol_surge           elite4   2.0/wave    20   4    410    102  $ -1992.38   32.4%    0.86   -1.077  $  -4430
+   27  20  D-RideWave        RIDE WAVE | elite4 + PR OR vol      SL=2.0               4h_1h       pullback_rsi_or_vol  elite4   2.0/wave    20   4    416    104  $ -2071.70   32.5%    0.85   -1.114  $  -4551
+   28  26  E-HighConf        elite6 + vol  margin>0.15  TP=6.0                        4h_1h       vol_surge           elite6   1.5/6.0     25   6    680    113  $ -2319.31   29.9%    0.90   -1.075  $  -6807
+
+================================================================================
+  GROUP AVERAGES
+================================================================================
+  A-Universe          n=6  avgPnL=$  -448.59  avgTWR=25.2%  avgSh=-0.816  avgTrades=118  best=#5 $+10.88
+  B-TPSL              n=6  avgPnL=$  -580.67  avgTWR=19.8%  avgSh=-1.681  avgTrades=31  best=#12 $-141.46
+  C-Entry             n=5  avgPnL=$  -399.80  avgTWR=29.2%  avgSh=-0.263  avgTrades=406  best=#16 $+479.34
+  D-RideWave          n=5  avgPnL=$ -1371.32  avgTWR=23.0%  avgSh=-2.413  avgTrades=184  best=#18 $-913.97
+  E-HighConf          n=4  avgPnL=$  -929.07  avgTWR=23.6%  avgSh=-1.162  avgTrades=193  best=#23 $-405.67
+  F-Novel             n=2  avgPnL=$  -431.69  avgTWR=20.9%  avgSh=-0.734  avgTrades=180  best=#27 $-127.16
+
+================================================================================
+  ENTRY TYPE ANALYSIS (avg across direction modes)
+================================================================================
+  vol_then_pullback       n=2  avgPnL=$   -17.74  avgTWR=19.6%  avgTrades=8  best=#17 $+91.68
+  strong_vol              n=2  avgPnL=$  -128.44  avgTWR=30.1%  avgTrades=451  best=#16 $+479.34
+  pullback_rsi            n=18  avgPnL=$  -561.93  avgTWR=20.9%  avgTrades=32  best=#5 $+10.88
+  vol_surge               n=4  avgPnL=$ -1512.24  avgTWR=31.7%  avgTrades=584  best=#6 $-639.62
+  pullback_rsi_or_vol     n=2  avgPnL=$ -1577.39  avgTWR=32.4%  avgTrades=570  best=#15 $-1083.09
+
+================================================================================
+  UNIVERSE ANALYSIS
+================================================================================
+  bluechip      n=1  avgPnL=$    10.88  best=#5 $+10.88
+  defi_l1       n=1  avgPnL=$  -369.58  best=#4 $-369.58
+  elite6        n=8  avgPnL=$  -709.02  best=#16 $+479.34
+  elite4        n=17  avgPnL=$  -745.98  best=#27 $-127.16
+  quality10     n=1  avgPnL=$  -898.28  best=#3 $-898.28
+
+================================================================================
+  EXIT REASON BREAKDOWN (all experiments combined)
+================================================================================
+  SL                3050  (61.3%)
+  DIR_FLIP          1378  (27.7%)
+  TP                 547  (11.0%)
+  EOD                  2  (0.0%)
+
+================================================================================
+  PER-COIN BREAKDOWN — Best Experiment
+================================================================================
+  Best: #16 — elite6 + strong_vol (zscore>2.0)
+  Direction: 4h_1h  |  Entry: strong_vol  |  Universe: elite6
+
+  AAVEUSDT      [DeFi  ]  PnL=$ +821.55  trades= 184  WR= 34.2%  PF=  1.13  Sharpe=  0.69  exits={'SL': 107, 'TP': 37, 'DIR_FLIP': 40}  ★ BEST
+  ETHUSDT       [L1    ]  PnL=$ +186.72  trades=  67  WR= 29.9%  PF=  1.09  Sharpe=  0.27  exits={'SL': 42, 'TP': 14, 'DIR_FLIP': 11}  ★ BEST
+  SOLUSDT       [L1    ]  PnL=$ +183.28  trades=  69  WR= 36.2%  PF=  1.09  Sharpe=  0.30  exits={'TP': 13, 'SL': 42, 'DIR_FLIP': 14}  ★ BEST
+  ARBUSDT       [L2    ]  PnL=$  +12.37  trades=  84  WR= 34.5%  PF=  1.00  Sharpe=  0.01  exits={'SL': 47, 'DIR_FLIP': 24, 'TP': 13}  ★ BEST
+  BTCUSDT       [L1    ]  PnL=$ -109.35  trades=  60  WR= 35.0%  PF=  0.91  Sharpe= -0.30  exits={'DIR_FLIP': 14, 'SL': 34, 'TP': 12}  ✗ DRAG
+  ADAUSDT       [L1    ]  PnL=$ -615.23  trades=  85  WR= 25.9%  PF=  0.81  Sharpe= -0.80  exits={'SL': 61, 'DIR_FLIP': 9, 'TP': 15}  ✗ DRAG
+
+================================================================================
+  TOP 5 CONFIGURATIONS
+================================================================================
+
+  #1  Exp 16 — elite6 + strong_vol (zscore>2.0)
+      Direction : 4h_1h  |  Entry trigger : strong_vol  |  Min dir margin : 0.05
+      Universe  : elite6  |  SL=1.5×ATR  TP=4.5×ATR  |  Max lev: 25x (avg 25.0x)
+      PnL       : $479.34  |  Trade WR: 32.8%  |  PF: 1.027  |  Sharpe: 0.250
+      Trades    : 549 total  (92/coin)  |  Exit breakdown: {'DIR_FLIP': 112, 'SL': 333, 'TP': 104}
+
+  #2  Exp 17 — elite6 + vol_then_pullback      (vol confirms, then dip-buy)
+      Direction : 4h_1h  |  Entry trigger : vol_then_pullback  |  Min dir margin : 0.05
+      Universe  : elite6  |  SL=1.5×ATR  TP=6.0×ATR  |  Max lev: 25x (avg 25.0x)
+      PnL       : $91.68  |  Trade WR: 25.0%  |  PF: 1.417  |  Sharpe: 0.373
+      Trades    : 8 total  (2/coin)  |  Exit breakdown: {'SL': 5, 'TP': 1, 'DIR_FLIP': 2}
+
+  #3  Exp 5 — 4h+1h + PullbackRSI | Universe: bluechip (4 coins)
+      Direction : 4h_1h  |  Entry trigger : pullback_rsi  |  Min dir margin : 0.05
+      Universe  : bluechip  |  SL=1.5×ATR  TP=4.5×ATR  |  Max lev: 25x (avg 24.7x)
+      PnL       : $10.88  |  Trade WR: 26.7%  |  PF: 1.024  |  Sharpe: 0.038
+      Trades    : 15 total  (5/coin)  |  Exit breakdown: {'SL': 11, 'DIR_FLIP': 2, 'TP': 2}
+
+  #4  Exp 27 — SNIPER: vol_confirm→pullback_rsi  margin>0.10  TP=8×
+      Direction : 4h_1h  |  Entry trigger : vol_then_pullback  |  Min dir margin : 0.1
+      Universe  : elite4  |  SL=2.0×ATR  TP=8.0×ATR  |  Max lev: 20x (avg 20.0x)
+      PnL       : $-127.16  |  Trade WR: 14.3%  |  PF: 0.414  |  Sharpe: -1.031
+      Trades    : 7 total  (2/coin)  |  Exit breakdown: {'SL': 3, 'DIR_FLIP': 4}
+
+  #5  Exp 12 — elite4 + PR | SL=1.0  TP=4.0  (1:4 tight SL)
+      Direction : 4h_1h  |  Entry trigger : pullback_rsi  |  Min dir margin : 0.05
+      Universe  : elite4  |  SL=1.0×ATR  TP=4.0×ATR  |  Max lev: 25x (avg 25.0x)
+      PnL       : $-141.46  |  Trade WR: 20.6%  |  PF: 0.848  |  Sharpe: -0.375
+      Trades    : 34 total  (11/coin)  |  Exit breakdown: {'TP': 3, 'SL': 26, 'DIR_FLIP': 5}
+
+
+========================================================================================================================
+
+╔══════════════════════════════════════════════════════════════════════════════╗
+║        SYNAPTIC QUANT — EXPERIMENTATION ROADMAP                             ║
+╠══════════════════════════════════════════════════════════════════════════════╣
+║  COMPLETED                                                                   ║
+║  Round 1 — experiment_multistrat.py                                         ║
+║    50 configs: Scalp/Sniper/Swing/Position/Momentum/Volume archetypes       ║
+║    Finding: Only 1h-sniper w/ 3-TF unanimous profitable. 15m = fee death.  ║
+║                                                                              ║
+║  Round 2 — experiment_entry.py                                              ║
+║    30 configs: Direction TF vs Entry TF separation concept                  ║
+║    Finding: 4h+1h direction + pullback_rsi = -$27 (near-breakeven)         ║
+║             17% TP hit rate → TP too tight. FET is a drag coin.            ║
+║                                                                              ║
+║  Round 3 — experiment_entry2.py  ← YOU ARE HERE                            ║
+║    28 configs: Fee fix, coin elimination, wider TP, ride-the-wave           ║
+║    Targets: Find first consistently profitable config                       ║
+║                                                                              ║
+║  PLANNED                                                                     ║
+║  Round 4 — experiment_portfolio.py                                          ║
+║    Multi-coin portfolio: allocate capital across top 3-5 winning coins      ║
+║    Test: equal weight vs conviction-weighted allocation                      ║
+║    Test: position sizing (Kelly fraction, fixed fractional, volatility adj) ║
+║                                                                              ║
+║  Round 5 — experiment_live_shadow.py                                        ║
+║    Paper-trade the winning config in real-time (forward test)               ║
+║    Run alongside live engine for 4-6 weeks before deploying                 ║
+║                                                                              ║
+║  Round 6 — engine_integration.py                                            ║
+║    Apply best direction+entry+universe to main.py production engine         ║
+║    Add: DIR_FLIP exit hook, pullback_rsi entry gate, coin whitelist         ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+
+  ELIMINATION CRITERIA DEVELOPED SO FAR
+  ───────────────────────────────────────
+  Coin level:
+    ✗ FET — 14% WR, -$393 on 7 trades (AI sector momentum unreliable)
+    ✗ GALA — 0 qualifying setups in 12 months (too choppy)
+    ✗ DOGE — 0 qualifying setups (meme price action != HMM-friendly)
+    ✗ BONK — no 4h futures data on Binance
+    ? SOL — 0% WR in best R2 config but high liquidity — testing with wider TP
+    ? BTC — dragging (-$27 in best config) but needed as market anchor
+
+  Config level:
+    ✗ 1h direction alone — catastrophic (-$47k avg, 7,960 trades/yr fee drag)
+    ✗ Immediate entry — worst in every group, 7,700+ trades/year
+    ✗ RSI dip alone — overcrowded signal, fires too often, low precision
+    ✗ Flip entry — too many false signals, creates churn
+    ✗ 15m exec < 1h exec — fee drag at high leverage is fatal (proven R1)
+    ✓ pullback_rsi — most selective, 33 trades/yr, near-breakeven at 0.2% fee
+    ✓ DIR_FLIP exit — essential, 37% of exits, prevents runaway losses
+    ✓ 4h+1h agreement — strongest direction filter, lowest false signals
+
+  R:R / TP insights:
+    ✗ 1:2 TP (3×ATR) — only 17% TP hit rate, leaving money on the table
+    ? 1:3 to 1:5 — testing now
+    ? Ride-to-DIR_FLIP — removes TP ceiling, lets trend carry the trade
+
+========================================================================================================================
+  Elapsed: 488.7s

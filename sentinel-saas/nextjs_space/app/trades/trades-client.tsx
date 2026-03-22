@@ -190,11 +190,6 @@ export function TradesClient({ trades: initialTrades }: TradesClientProps) {
   const [mounted, setMounted] = useState(false);
   const [trades, setTrades] = useState<Trade[]>(initialTrades);
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'closed'>('active');
-  const [closingTradeId, setClosingTradeId] = useState<string | null>(null);
-  const [confirmingTradeId, setConfirmingTradeId] = useState<string | null>(null);
-  const [confirmingClear, setConfirmingClear] = useState(false);
-  const [deletingTradeId, setDeletingTradeId] = useState<string | null>(null);
-  const [confirmingDeleteId, setConfirmingDeleteId] = useState<string | null>(null);
 
   const [livePrices, setLivePrices] = useState<Record<string, number>>({});
   const [posFilter, setPosFilter] = useState<string>('all');
@@ -204,8 +199,7 @@ export function TradesClient({ trades: initialTrades }: TradesClientProps) {
   const [sessionFilter, setSessionFilter] = useState<string>('all');
   const [isClearing, setIsClearing] = useState(false);
   const [clearSuccess, setClearSuccess] = useState<string | null>(null);
-  const [isExitingAll, setIsExitingAll] = useState(false);
-  const [confirmExitAll, setConfirmExitAll] = useState(false);
+  const [confirmingClear, setConfirmingClear] = useState(false);
   const clearPauseRef = useRef(false);
 
   useEffect(() => { setMounted(true); }, []);
@@ -456,48 +450,7 @@ export function TradesClient({ trades: initialTrades }: TradesClientProps) {
                 }}>
                   <Download size={14} /> Export CSV
                 </button>
-                {/* Exit All — two-click confirmation */}
-                <button
-                  onClick={async () => {
-                    if (!confirmExitAll) {
-                      setConfirmExitAll(true);
-                      setTimeout(() => setConfirmExitAll(false), 5000);
-                      return;
-                    }
-                    setIsExitingAll(true);
-                    setConfirmExitAll(false);
-                    try {
-                      const res = await fetch('/api/trades/exit-all', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ mode: modeFilter }),
-                      });
-                      const data = await res.json();
-                      if (data.success) {
-                        showMsg(`Exited ${data.totalClosed} trades · PnL: $${(data.totalPnl || 0).toFixed(2)}`, 8000);
-                        refreshTrades();
-                      } else {
-                        showMsg(`Error: ${data.error}`);
-                      }
-                    } catch {
-                      showMsg('Exit all failed');
-                    } finally {
-                      setIsExitingAll(false);
-                    }
-                  }}
-                  disabled={isExitingAll}
-                  style={{
-                    display: 'flex', alignItems: 'center', gap: '6px',
-                    padding: '10px 14px', borderRadius: '12px', border: 'none',
-                    background: confirmExitAll ? 'rgba(245,158,11,0.3)' : 'rgba(245,158,11,0.1)',
-                    color: '#F59E0B',
-                    fontSize: '13px', fontWeight: 600, cursor: 'pointer',
-                    opacity: isExitingAll ? 0.5 : 1,
-                    ...(confirmExitAll ? { border: '1px solid #F59E0B' } : {}),
-                  }}
-                >
-                  ⚡ {isExitingAll ? 'Exiting...' : confirmExitAll ? '⚠️ Confirm Exit All' : `Exit All${modeFilter !== 'all' ? ` (${modeFilter})` : ''}`}
-                </button>
+
                 <button onClick={clearAllTrades} disabled={isClearing} style={{
                   display: 'flex', alignItems: 'center', gap: '6px',
                   padding: '10px 14px', borderRadius: '12px', border: 'none',
@@ -631,7 +584,7 @@ export function TradesClient({ trades: initialTrades }: TradesClientProps) {
                   <table style={{ width: '100%', minWidth: '1300px', borderCollapse: 'collapse', fontSize: '17px' }}>
                     <thead>
                       <tr style={{ borderBottom: '2px solid rgba(255,255,255,0.10)' }}>
-                        {['Bot', 'Coin', 'Position', 'Leverage', 'Capital', 'Entry', 'LTP', 'Stop Loss', 'SL Step', 'Exit Guard', 'Target Price', 'PnL', 'Fee', 'Net PnL', 'Exit', 'Action'].map(h => (
+                        {['Bot', 'Coin', 'Position', 'Leverage', 'Capital', 'Entry', 'LTP', 'Stop Loss', 'SL Step', 'Exit Guard', 'Target Price', 'PnL', 'Fee', 'Net PnL', 'Exit'].map(h => (
                           <th key={h} style={{
                             padding: '12px 14px', textAlign: h === 'Bot' || h === 'Coin' ? 'left' : 'center',
                             fontSize: '13px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.8px',
@@ -787,96 +740,7 @@ export function TradesClient({ trades: initialTrades }: TradesClientProps) {
                               {!isActive && t.exitPrice ? fmtPrice(t.exitPrice) : '—'}
                             </td>
 
-                            <td style={{ padding: '12px 14px', textAlign: 'center' }}>
-                              {isActive && (
-                                <button
-                                  disabled={closingTradeId === t.id}
-                                  onClick={async () => {
-                                    // Two-click pattern: first click shows confirm, second executes
-                                    if (confirmingTradeId !== t.id) {
-                                      setConfirmingTradeId(t.id);
-                                      setTimeout(() => setConfirmingTradeId(prev => prev === t.id ? null : prev), 5000);
-                                      return;
-                                    }
-                                    setConfirmingTradeId(null);
-                                    setClosingTradeId(t.id);
-                                    try {
-                                      const res = await fetch('/api/trades/close', {
-                                        method: 'POST',
-                                        headers: { 'Content-Type': 'application/json' },
-                                        body: JSON.stringify({ tradeId: t.id, symbol: t.symbol }),
-                                      });
-                                      if (res.ok) {
-                                        // Remove from local state immediately
-                                        setTrades(prev => prev.filter(tr => tr.id !== t.id));
-                                      } else {
-                                        const err = await res.json();
-                                        showMsg(`❌ ${err.error || 'Failed to close trade'}`);
-                                      }
-                                    } catch {
-                                      showMsg('❌ Network error');
-                                    } finally {
-                                      setClosingTradeId(null);
-                                    }
-                                  }}
-                                  style={{
-                                    padding: '6px 12px', borderRadius: '6px',
-                                    border: confirmingTradeId === t.id ? '1px solid #22C55E' : 'none',
-                                    fontSize: '12px', fontWeight: 700, cursor: 'pointer',
-                                    background: pnl >= 0 ? 'rgba(34,197,94,0.2)' : 'rgba(239,68,68,0.2)',
-                                    color: pnl >= 0 ? '#22C55E' : '#EF4444',
-                                    transition: 'all 0.2s',
-                                    opacity: closingTradeId === t.id ? 0.5 : 1,
-                                  }}
-                                >
-                                  {closingTradeId === t.id ? '...' : confirmingTradeId === t.id ? '⚡ Confirm?' : pnl >= 0 ? '💰 Book Profit' : '✕ Close'}
-                                </button>
-                              )}
-                              {/* Delete button — closed trades only */}
-                              {!isActive && (
-                                <button
-                                  disabled={deletingTradeId === t.id}
-                                  onClick={async () => {
-                                    if (confirmingDeleteId !== t.id) {
-                                      setConfirmingDeleteId(t.id);
-                                      setTimeout(() => setConfirmingDeleteId(prev => prev === t.id ? null : prev), 3000);
-                                      return;
-                                    }
-                                    setConfirmingDeleteId(null);
-                                    setDeletingTradeId(t.id);
-                                    try {
-                                      const res = await fetch('/api/trades/delete', {
-                                        method: 'POST',
-                                        headers: { 'Content-Type': 'application/json' },
-                                        body: JSON.stringify({ tradeId: t.id }),
-                                      });
-                                      if (res.ok) {
-                                        setTrades(prev => prev.filter(tr => tr.id !== t.id));
-                                      } else {
-                                        const err = await res.json();
-                                        showMsg(`❌ ${err.error || 'Failed to delete'}`);
-                                      }
-                                    } catch {
-                                      showMsg('❌ Network error');
-                                    } finally {
-                                      setDeletingTradeId(null);
-                                    }
-                                  }}
-                                  title="Delete this trade from DB"
-                                  style={{
-                                    padding: '6px 10px', borderRadius: '6px',
-                                    border: confirmingDeleteId === t.id ? '1px solid #EF4444' : '1px solid rgba(255,255,255,0.08)',
-                                    fontSize: '12px', fontWeight: 700, cursor: 'pointer',
-                                    background: confirmingDeleteId === t.id ? 'rgba(239,68,68,0.25)' : 'rgba(255,255,255,0.04)',
-                                    color: confirmingDeleteId === t.id ? '#EF4444' : '#6B7280',
-                                    transition: 'all 0.2s',
-                                    opacity: deletingTradeId === t.id ? 0.4 : 1,
-                                  }}
-                                >
-                                  {deletingTradeId === t.id ? '...' : confirmingDeleteId === t.id ? '⚠️ Sure?' : '🗑'}
-                                </button>
-                              )}
-                            </td>
+
                           </tr>
                         );
                       })}

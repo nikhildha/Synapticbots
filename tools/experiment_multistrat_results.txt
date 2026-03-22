@@ -1,0 +1,161 @@
+========================================================================================================================
+  SYNAPTIC QUANT LAB — 50-CONFIG MULTI-STRATEGY BACKTEST RESULTS
+  Period: 12-month walk-forward  |  Coins: BTCUSDT, ETHUSDT, SOLUSDT, ADAUSDT, ARBUSDT, OPUSDT, UNIUSDT, AAVEUSDT, TAOUSDT, FETUSDT, DOGEUSDT, GALAUSDT, AXSUSDT, ARUSDT
+  Generated: 2026-03-22 21:03
+========================================================================================================================
+
+  RANKED BY TOTAL PnL (all experiments)
+   Rk   #  Group          Label                                     ETF  Segs        CV  Ag    SL/TP  Lev  Cns   Trd   T/c         PnL    CWR    CPF    CSh       MDD
+  ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+    1  27  D-Swing        Swing — sniper mode (1h, agree=3, conv=7  1h   quality     70   3  2.0/4.0   25   10  1647   165  $  2501.64  50.0%   1.63  0.199  $ -13684 ★★★
+    2  32  E-Position     Position — L1 only (4h exec)              4h   l1_only     60   2  2.0/4.0   10    4   949   237  $ -1548.80  25.0%   0.11  -0.794  $  -3085 ★★★
+    3  29  E-Position     Position — standard (4h exec, bluechip)   4h   bluechip    65   2  2.0/4.0   15    6  1400   233  $ -2121.14  50.0%   0.25  -0.567  $  -6251 ★★★
+    4  45  H-Combo        Combo — Sniper+Swing (1h, quality, agree  1h   quality     75   3  1.5/4.5   25   10  1763   176  $ -2209.73  50.0%   0.63  -0.175  $ -15279
+    5  31  E-Position     Position — macro dominant (4h=70wt)       4h   bluechip    65   2  2.0/4.0   15    6  1237   206  $ -2358.27  50.0%   0.45  -0.344  $  -7683
+    6  49  H-Combo        Combo — Balanced (1h, quality, equal, co  1h   quality     70   3  1.5/4.5   20   10  1782   178  $ -2749.33  30.0%   0.51  -0.263  $ -13005
+    7  18  C-Sniper       Sniper — macro weights (agree=3, conv=75  15m  quality     75   3  1.5/3.0   35   10  3034   303  $ -3254.39  40.0%   0.62  -0.193  $ -21838
+    8  30  E-Position     Position — wide 1:3 (4h exec, bluechip)   4h   bluechip    65   2  2.0/6.0   15    6  1316   219  $ -3334.07  33.3%   0.04  -0.961  $  -6733
+    9  33  E-Position     Position — patient 1:4 (L1, 4h exec, 10x  4h   l1_only     60   2  2.5/10.0   10    4   695   174  $ -3368.25  25.0%   0.01  -1.143  $  -4865
+   10  47  H-Combo        Combo — Position+Patient (4h, L1, macro,  4h   l1_only     60   2  2.5/10.0   10    4   695   174  $ -3368.25  25.0%   0.01  -1.143  $  -4865
+   11  16  C-Sniper       Sniper — wide R:R 1:3 (agree=3, conv=75)  15m  quality     75   3  1.5/4.5   35   10  2625   262  $ -3843.90  40.0%   0.56  -0.228  $ -23252
+   12  20  C-Sniper       Sniper — 1h exec (agree=3, conv=75)       1h   quality     75   3  1.5/3.0   25   10  2003   200  $ -3988.27  40.0%   0.50  -0.308  $ -15540
+   13  50  H-Combo        Combo — Ultra-Sniper (15m, bluechip, agr  15m  bluechip    80   3  1.5/3.0   35    6  1723   287  $ -4330.58  33.3%   0.23  -0.568  $ -12219
+   14  48  H-Combo        Combo — Swing+Macro (1h, quality, macro,  1h   quality     70   2  2.0/6.0   20   10  3059   306  $ -8712.31  20.0%   0.39  -0.340  $ -22486
+   15  19  C-Sniper       Sniper — blue chip only (agree=3, conv=7  15m  bluechip    75   3  1.0/2.0   35    6  2454   409  $-14541.90   0.0%   0.00  -2.388  $ -17417
+   16  25  D-Swing        Swing — macro-heavy weights (1h exec)     1h   quality     65   2  1.5/3.0   25   10  5824   582  $-18474.16  20.0%   0.07  -0.963  $ -28409
+   17  35  F-Momentum     Momentum — standard (equal weights, conv  15m  quality     70   2  1.0/2.0   25   10  4348   435  $-22529.33   0.0%   0.00  -1.474  $ -27159
+   18  17  C-Sniper       Sniper — very high conv=80 (agree=3)      15m  quality     80   3  1.0/2.0   35   10  4287   429  $-29197.65  10.0%   0.01  -1.320  $ -36168
+   19  21  C-Sniper       Sniper — core (agree=3, conv=70)          15m  core        70   3  1.0/2.0   35   10  4335   434  $-29318.29  10.0%   0.00  -1.359  $ -36223
+   20  15  C-Sniper       Sniper — classic (agree=3, conv=75, std)  15m  quality     75   3  1.0/2.0   35   10  4313   431  $-29464.85  10.0%   0.01  -1.347  $ -36254
+   21  24  D-Swing        Swing — very wide 1:4 (1h exec)           1h   quality     65   2  1.5/6.0   20   10  7470   747  $-30413.21  10.0%   0.01  -1.427  $ -38381
+   22  26  D-Swing        Swing — conv=70 (1h exec)                 1h   quality     70   2  1.5/3.0   25   10  8573   857  $-31754.22  10.0%   0.01  -1.595  $ -41728
+   23  41  G-Volume       Volume — swing (1h exec, vol weights)     1h   quality     65   2  1.5/4.5   20   10  7884   788  $-33107.62   0.0%   0.00  -1.782  $ -40512
+   24  23  D-Swing        Swing — wide 1:3 (1h exec)                1h   quality     65   2  1.5/4.5   25   10  7838   784  $-34287.59  10.0%   0.02  -1.309  $ -43797
+   25  28  D-Swing        Swing — core only (1h exec, 1:3)          1h   core        65   2  1.5/4.5   25   10  7838   784  $-34287.59  10.0%   0.02  -1.309  $ -43797
+   26  39  F-Momentum     Momentum — swing TP (1h, mom, 1:5)        1h   quality     65   2  1.0/5.0   20   10  8873   887  $-35192.95   0.0%   0.00  -2.816  $ -38942
+   27  36  F-Momentum     Momentum — 1h exec (mom weights)          1h   quality     65   2  1.0/3.0   25   10  9944   994  $-38904.06   0.0%   0.00  -2.970  $ -45842
+   28  38  F-Momentum     Momentum — sniper (mom wts, agree=3, con  15m  quality     70   3  0.7/2.1   35   10  5145   514  $-40543.26   0.0%   0.00  -2.152  $ -43748
+   29   6  A-Universe     Blue Chip (L1+DeFi)                       15m  bluechip    65   2  1.0/2.0   35    6  9599  1600  $-43567.95   0.0%   0.00  -10.399  $ -44929
+   30  22  D-Swing        Swing — standard 1:2 (1h exec)            1h   quality     65   2  1.0/2.0   25   10  11753  1175  $-44805.15   0.0%   0.00  -3.049  $ -49513
+   31  44  G-Volume       Volume — conservative (quality, wide SL,  15m  quality     70   2  1.5/4.5   20   10  10785  1078  $-51068.65   0.0%   0.00  -3.029  $ -56675
+   32  12  B-Scalp        Scalp — unanimous (agree=3, tight)        15m  quality     75   3  0.5/1.0   35   10  8068   807  $-53680.10   0.0%   0.00  -2.551  $ -55173
+   33  43  G-Volume       Volume — liquid only (bluechip, vol weig  15m  bluechip    65   2  0.8/1.6   35    6  12127  2021  $-61579.02   0.0%   0.00  -8.032  $ -62381
+   34  13  B-Scalp        Scalp — liquid only (bluechip)            15m  bluechip    65   2  0.5/1.0   35    6  20361  3394  $-79997.44   0.0%   0.00  -13.760  $ -80768
+   35   4  A-Universe     Quality (no Meme/Gaming/DePIN)            15m  quality     65   2  1.0/2.0   35   10  16494  1649  $-82816.60   0.0%   0.00  -3.960  $ -86981
+   36   5  A-Universe     Core (L1+L2+DeFi+AI)                      15m  core        65   2  1.0/2.0   35   10  16494  1649  $-82816.60   0.0%   0.00  -3.960  $ -86981
+   37   7  A-Universe     Quality + conv=70                         15m  quality     70   2  1.0/2.0   35   10  16395  1640  $-82917.78   0.0%   0.00  -3.900  $ -87214
+   38   3  A-Universe     No Gaming                                 15m  no_gaming   65   2  1.0/2.0   35   12  19660  1638  $-93711.26   0.0%   0.00  -3.525  $ -98632
+   39  11  B-Scalp        Scalp — high conv (tight, conv=75)        15m  quality     75   2  0.5/1.0   35   10  17014  1701  $-93756.57   0.0%   0.00  -3.186  $ -96139
+   40  42  G-Volume       Volume — momentum combo (vol+mom, 15m)    15m  quality     65   2  1.0/3.0   30   10  18192  1819  $-99977.06   0.0%   0.00  -3.947  $-101761
+   41   2  A-Universe     No Meme                                   15m  no_meme     65   2  1.0/2.0   35   13  20647  1588  $-103136.07   0.0%   0.00  -4.076  $-108191
+   42   9  B-Scalp        Scalp — standard (SL=0.8, TP=1.6)         15m  quality     65   2  0.8/1.6   35   10  20756  2076  $-106241.24   0.0%   0.00  -4.468  $-108951
+   43   1  A-Universe     Baseline — all segs                       15m  all         65   2  1.0/2.0   35   14  22396  1600  $-107643.75   0.0%   0.00  -3.710  $-113394
+   44  40  G-Volume       Volume — breakout (vol weights, conv=70)  15m  quality     70   2  0.8/1.6   35   10  20736  2074  $-117134.87   0.0%   0.00  -5.268  $-119214
+   45  34  F-Momentum     Momentum — fast 15m (15m dom weights)     15m  quality     65   2  0.7/2.1   35   10  23933  2393  $-128493.00   0.0%   0.00  -4.457  $-129913
+   46  10  B-Scalp        Scalp — wide TP (SL=0.5, TP=2.0)          15m  quality     65   2  0.5/2.0   35   10  25196  2520  $-132560.87   0.0%   0.00  -4.738  $-134457
+   47  46  H-Combo        Combo — Scalp+Momentum (15m, mom wts, ti  15m  quality     70   2  0.5/1.5   35   10  22194  2219  $-136615.46   0.0%   0.00  -5.310  $-138059
+   48  37  F-Momentum     Momentum — aggressive (very tight SL, wi  15m  quality     65   2  0.5/2.5   35   10  27073  2707  $-138607.97   0.0%   0.00  -4.880  $-139556 ✗✗✗
+   49   8  B-Scalp        Scalp — tight (SL=0.5, TP=1.0)            15m  quality     65   2  0.5/1.0   35   10  34923  3492  $-145629.39   0.0%   0.00  -4.895  $-147058 ✗✗✗
+   50  14  B-Scalp        Scalp — momentum weights                  15m  quality     65   2  0.5/1.5   35   10  32314  3231  $-153688.19   0.0%   0.00  -4.982  $-154679 ✗✗✗
+
+==========================================================================================
+  GROUP SUMMARY — Average metrics per strategy archetype
+==========================================================================================
+  Group             Exps      AvgPnL   AvgWR   AvgPF  AvgSharpe  AvgTrades   Best#
+  ────────────────────────────────────────────────────────────────────────────────
+  A-Universe           7  $-85230.00    0.0%    0.00     -4.790      17384  #   6
+  B-Scalp              7  $-109364.83    0.0%    0.00     -5.511      22662  #  12
+  C-Sniper             7  $-16229.89   21.4%    0.24     -1.020       3293  #  18
+  D-Swing              7  $-27360.04   15.7%    0.25     -1.350       7278  #  27
+  E-Position           5  $ -2546.11   36.7%    0.17     -0.762       1119  #  32
+  F-Momentum           6  $-67378.43    0.0%    0.00     -3.125      13219  #  35
+  G-Volume             5  $-72573.44    0.0%    0.00     -4.412      13945  #  41
+  H-Combo              6  $-26330.94   26.4%    0.29     -1.300       5203  #  45
+
+==========================================================================================
+  EXECUTION TF BREAKDOWN
+==========================================================================================
+  15m  (30 exps)  avg PnL=$-75755.47  avg Sharpe=-3.935  avg trades=14921  best=#18 $-3254.39  worst=#14 $-153688.19
+  1h   (14 exps)  avg PnL=$-22598.90  avg Sharpe=-1.293  avg trades=6161  best=#27 $+2501.64  worst=#22 $-44805.15
+  4h   ( 6 exps)  avg PnL=$-2683.13  avg Sharpe=-0.825  avg trades=1049  best=#32 $-1548.80  worst=#33 $-3368.25
+
+==========================================================================================
+  CONVICTION THRESHOLD ANALYSIS (quality/core/bluechip, 15m exec only)
+==========================================================================================
+  conv=65  (12 exps)  avg PnL=$-104664.61  avg WR=0.0%  avg Sharpe=-6.040  avg trades/run=21455
+  conv=70  ( 7 exps)  avg PnL=$-68589.66  avg WR=1.4%  avg Sharpe=-3.213  avg trades/run=11991
+  conv=75  ( 6 exps)  avg PnL=$-33090.29  avg WR=15.0%  avg Sharpe=-1.649  avg trades/run=6251
+  conv=80  ( 2 exps)  avg PnL=$-16764.12  avg WR=21.6%  avg Sharpe=-0.944  avg trades/run=3005
+
+==========================================================================================
+  SEGMENT CONTRIBUTION — Baseline (#1) per-coin PnL decomposition
+==========================================================================================
+
+  AI (total $-14929.28)
+    FETUSDT       PnL=$-6410.39  trades=1567  WR= 35.2%  PF=0.81  Sharpe=-3.21  ← DRAG
+    TAOUSDT       PnL=$-8518.89  trades=1834  WR= 36.3%  PF=0.78  Sharpe=-4.37  ← DRAG
+
+  DeFi (total $-13503.62)
+    AAVEUSDT      PnL=$-6642.07  trades=1624  WR= 35.7%  PF=0.79  Sharpe=-3.98  ← DRAG
+    UNIUSDT       PnL=$-6861.55  trades=1646  WR= 36.6%  PF=0.79  Sharpe=-3.89  ← DRAG
+
+  DePIN (total $-6386.98)
+    ARUSDT        PnL=$-6386.98  trades=1417  WR= 36.4%  PF=0.78  Sharpe=-3.70  ← DRAG
+
+  Gaming (total $-13932.49)
+    AXSUSDT       PnL=$-6835.39  trades=1173  WR= 34.6%  PF=0.74  Sharpe=-4.25  ← DRAG
+    GALAUSDT      PnL=$-7097.10  trades=1563  WR= 36.0%  PF=0.78  Sharpe=-4.04  ← DRAG
+
+  L1 (total $-30064.33)
+    ETHUSDT       PnL=$-6363.86  trades=1532  WR= 35.2%  PF=0.75  Sharpe=-4.55  ← DRAG
+    BTCUSDT       PnL=$-7422.35  trades=1513  WR= 33.0%  PF=0.57  Sharpe=-8.72  ← DRAG
+    ADAUSDT       PnL=$-8069.37  trades=1439  WR= 33.3%  PF=0.70  Sharpe=-5.69  ← DRAG
+    SOLUSDT       PnL=$-8208.75  trades=1845  WR= 35.6%  PF=0.72  Sharpe=-5.76  ← DRAG
+
+  L2 (total $-24319.37)
+    ARBUSDT       PnL=$-11480.02  trades=1647  WR= 34.2%  PF=0.69  Sharpe=-6.22  ← DRAG
+    OPUSDT        PnL=$-12839.35  trades=1847  WR= 33.5%  PF=0.70  Sharpe=-6.45  ← DRAG
+
+  Meme (total $-4507.68)
+    DOGEUSDT      PnL=$-4507.68  trades=1749  WR= 36.8%  PF=0.84  Sharpe=-2.81  ← DRAG
+
+==========================================================================================
+  TOP 5 CONFIGURATIONS — Recommendation for live deployment
+==========================================================================================
+
+  #1  Experiment 27 — Swing — sniper mode (1h, agree=3, conv=70)
+      Exec TF   : 1h  |  Universe : quality  |  Coins: 10
+      Conviction: 70  |  Agreement: 3/3  |  Weights: 30/50/20 (4h/1h/15m)
+      SL/TP     : 2.0/4.0× ATR  |  Max Lev: 25x  |  Avg Lev: 24.9x
+      PnL       : $+2501.64  |  Win Rate: 50.0%  |  PF: 1.63  |  Sharpe: 0.199
+      Trades    : 1647 total  (165/coin)
+
+  #2  Experiment 32 — Position — L1 only (4h exec)
+      Exec TF   : 4h  |  Universe : l1_only  |  Coins: 4
+      Conviction: 60  |  Agreement: 2/3  |  Weights: 30/50/20 (4h/1h/15m)
+      SL/TP     : 2.0/4.0× ATR  |  Max Lev: 10x  |  Avg Lev: 10.0x
+      PnL       : $-1548.80  |  Win Rate: 25.0%  |  PF: 0.11  |  Sharpe: -0.794
+      Trades    : 949 total  (237/coin)
+
+  #3  Experiment 29 — Position — standard (4h exec, bluechip)
+      Exec TF   : 4h  |  Universe : bluechip  |  Coins: 6
+      Conviction: 65  |  Agreement: 2/3  |  Weights: 30/50/20 (4h/1h/15m)
+      SL/TP     : 2.0/4.0× ATR  |  Max Lev: 15x  |  Avg Lev: 14.9x
+      PnL       : $-2121.14  |  Win Rate: 50.0%  |  PF: 0.25  |  Sharpe: -0.567
+      Trades    : 1400 total  (233/coin)
+
+  #4  Experiment 45 — Combo — Sniper+Swing (1h, quality, agree=3, conv=75)
+      Exec TF   : 1h  |  Universe : quality  |  Coins: 10
+      Conviction: 75  |  Agreement: 3/3  |  Weights: 30/50/20 (4h/1h/15m)
+      SL/TP     : 1.5/4.5× ATR  |  Max Lev: 25x  |  Avg Lev: 24.9x
+      PnL       : $-2209.73  |  Win Rate: 50.0%  |  PF: 0.63  |  Sharpe: -0.175
+      Trades    : 1763 total  (176/coin)
+
+  #5  Experiment 31 — Position — macro dominant (4h=70wt)
+      Exec TF   : 4h  |  Universe : bluechip  |  Coins: 6
+      Conviction: 65  |  Agreement: 2/3  |  Weights: 70/20/10 (4h/1h/15m)
+      SL/TP     : 2.0/4.0× ATR  |  Max Lev: 15x  |  Avg Lev: 14.9x
+      PnL       : $-2358.27  |  Win Rate: 50.0%  |  PF: 0.45  |  Sharpe: -0.344
+      Trades    : 1237 total  (206/coin)
+
+========================================================================================================================

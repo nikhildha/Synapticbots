@@ -1,0 +1,150 @@
+==================================================================================================================================
+  SYNAPTIC QUANT LAB — ROUND 4: DRILLING TO PROFITABILITY
+  Fee: 0.05%/leg = 0.10% RT  |  Period: 12m walk-forward  |  Generated: 2026-03-22 22:24
+==================================================================================================================================
+
+   Rk   #  Group           Label                                                     Dir                 Ent               Coins     SL/TP      Lev  Cn    Trd    T/c         PnL     TWR    TPF     TSh       MDD  Flags
+  ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+    1  34  G-Combo         COMBO2: core4+multi_vol+margin>0.15+Breakeven  TP=6.0     4h_1h               multi_bar_vol     core4     1.5/6.0     25   4     83     21  $   613.59   33.7%  1.251   0.724  $  -1104  BE ★ PROFIT
+    2  18  C-Entry         core4 | score>=3: vol+one_more (ultra selective)          4h_1h               score3            core4     1.5/6.0     25   4     47     12  $   492.56   36.2%  1.379   0.875  $   -719  ★ PROFIT
+    3  14  C-Entry         core4 | multi_bar_vol (z>2 for 2 bars sustained)          4h_1h               multi_bar_vol     core4     1.5/4.5     25   4     83     21  $    93.58   34.9%  1.034   0.122  $  -1328  ★ PROFIT
+    4  19  D-Direction     core4 | 4h_strong (margin>0.20) + strong_vol              4h_strong           strong_vol        core4     1.5/4.5     25   4    872    218  $     9.20   35.0%  1.000   0.004  $  -4084  ★ PROFIT
+    5  15  C-Entry         core4 | vol_and_vwap (surge + VWAP cross)                 4h_1h               vol_and_vwap      core4     1.5/4.5     25   4     33      8  $  -214.92   33.3%  0.791  -0.593  $   -663  
+    6  35  G-Combo         COMBO3: SNIPER core4+vol_vwap+LO+Trail+Conf               4h_1h               vol_and_vwap      core4     2.0/6.0     20   4     23      6  $  -322.85   21.7%  0.353  -2.308  $   -434  LO BE TR 
+    7   2  A-Coins         TOP2  {ETH,AAVE}           strong_vol  1:3                4h_1h               strong_vol        top2      1.5/4.5     25   2    149     74  $  -903.97   25.5%  0.830  -0.938  $  -1762  
+    8  29  F-Exit          core4 | TRAIL+NO_TP (SL trails, ride to flip)             4h_1h               strong_vol        core4     1.5/wave    20   4    488    122  $ -1002.83   36.3%  0.872  -1.080  $  -2167  TR 
+    9   3  A-Coins         AAVE ONLY                  strong_vol  1:3                4h_1h               strong_vol        aave      1.5/4.5     25   1     94     94  $ -1075.17   22.3%  0.698  -1.471  $  -1113  
+   10   7  B-TPSL          core4 | SL=1.0  TP=2.5  (1:2.5 tight)                     4h_1h               strong_vol        core4     1.0/2.5     25   4    489    122  $ -1170.28   28.6%  0.899  -1.009  $  -2561  
+   11  16  C-Entry         core4 | vol_and_bb (surge + BB expanding)                 4h_1h               vol_and_bb        core4     1.5/4.5     25   4    252     63  $ -1196.72   27.8%  0.862  -0.949  $  -2375  
+   12  28  F-Exit          core4 | TRAILING STOP (SL trails high-2×ATR)              4h_1h               strong_vol        core4     1.5/6.0     25   4    488    122  $ -1343.73   36.3%  0.862  -1.188  $  -2671  TR 
+   13  31  F-Exit          core4 | BREAKEVEN + TRAILING  TP=6.0                      4h_1h               strong_vol        core4     1.5/6.0     25   4    488    122  $ -1343.73   36.3%  0.862  -1.188  $  -2671  BE TR 
+   14   8  B-TPSL          core4 | SL=1.5  TP=3.0  (1:2)                             4h_1h               strong_vol        core4     1.5/3.0     25   4    441    110  $ -1363.35   33.1%  0.901  -0.954  $  -2915  
+   15  27  F-Exit          core4 | BREAKEVEN STOP (SL→entry at +2×ATR)               4h_1h               strong_vol        core4     1.5/4.5     25   4    434    108  $ -1450.00   24.4%  0.887  -0.954  $  -3019  BE 
+   16   4  A-Coins         CORE4 + LINK               strong_vol  1:3                4h_1h               strong_vol        c4_link   1.5/4.5     25   5    506    101  $ -1471.26   27.9%  0.915  -0.814  $  -4365  
+   17  21  D-Direction     core4 | 4h_soft (1h neutral ok) + strong_vol              4h_soft             strong_vol        core4     1.5/4.5     25   4    702    176  $ -1484.68   32.8%  0.929  -0.779  $  -4265  
+   18  32  F-Exit          core4 | LONG ONLY + BREAKEVEN  TP=6.0                     4h_1h               strong_vol        core4     1.5/6.0     25   4    271     68  $ -1688.19   13.7%  0.807  -1.212  $  -3215  LO BE 
+   19  12  B-TPSL          core4 | SL=2.5  TP=7.5  (1:3 very wide)                   4h_1h               strong_vol        core4     2.5/7.5     20   4    351     88  $ -1850.34   32.8%  0.852  -1.173  $  -3662  
+   20  13  C-Entry         core4 | strong_vol zscore>2.5 (ultra-clean)               4h_1h               strong_vol_25     core4     1.5/4.5     25   4    326     82  $ -1894.77   27.0%  0.835  -1.334  $  -4079  
+   21  10  B-TPSL          core4 | SL=1.5  TP=6.0  (1:4)                             4h_1h               strong_vol        core4     1.5/6.0     25   4    408    102  $ -1931.51   25.7%  0.863  -1.124  $  -3753  
+   22  11  B-TPSL          core4 | SL=2.0  TP=6.0  (1:3 wide SL)                     4h_1h               strong_vol        core4     2.0/6.0     25   4    381     95  $ -1956.32   30.4%  0.872  -1.057  $  -4194  
+   23  33  G-Combo         COMBO1: core4+strong_vol+LongOnly+Breakeven  TP=4.5       4h_1h               strong_vol        core4     1.5/4.5     25   4    284     71  $ -2061.80   17.6%  0.774  -1.652  $  -2987  LO BE 
+   24  30  F-Exit          core4 | TIME STOP 24h + TP=4.5                            4h_1h               strong_vol        core4     1.5/4.5     25   4    442    110  $ -2092.83   31.2%  0.849  -1.391  $  -3429  T96 
+   25  26  E-LongOnly      core4 | ASYM R:R long=1:3 short=1:2                       4h_1h               strong_vol        core4     1.5/4.5     25   4    429    107  $ -2247.98   28.7%  0.843  -1.487  $  -3707  AR 
+   26  17  C-Entry         core4 | score>=2: vol(2)+vwap(1)+pullback(1)              4h_1h               score2            core4     1.5/4.5     25   4    522    130  $ -2289.94   28.2%  0.871  -1.282  $  -3525  
+   27   1  A-Coins         CORE4 {ETH,SOL,ARB,AAVE}  strong_vol  1:3                 4h_1h               strong_vol        core4     1.5/4.5     25   4    423    106  $ -2469.94   26.2%  0.831  -1.545  $  -3865  
+   28   9  B-TPSL          core4 | SL=1.5  TP=4.5  (1:3) ← R3 winner repro           4h_1h               strong_vol        core4     1.5/4.5     25   4    423    106  $ -2469.94   26.2%  0.831  -1.545  $  -3865  
+   29  22  D-Direction     core4 | 4h_1h margin>0.15 + strong_vol                    4h_1h               strong_vol        core4     1.5/4.5     25   4    423    106  $ -2469.94   26.2%  0.831  -1.545  $  -3865  
+   30  24  E-LongOnly      core4 | LONG ONLY + strong_vol  SL=1.5/TP=6.0             4h_1h               strong_vol        core4     1.5/6.0     25   4    253     63  $ -2918.87   15.8%  0.724  -2.003  $  -4171  LO 
+   31  20  D-Direction     core4 | 4h_1h_both_strong (both >0.15) + sv               4h_1h_both_strong   strong_vol        core4     1.5/4.5     25   4    411    103  $ -2934.81   25.5%  0.796  -1.878  $  -4200  
+   32  23  E-LongOnly      core4 | LONG ONLY + strong_vol  SL=1.5/TP=4.5             4h_1h               strong_vol        core4     1.5/4.5     25   4    273     68  $ -2935.26   20.1%  0.725  -2.234  $  -3807  LO 
+   33   5  A-Coins         CORE4 + LDO                strong_vol  1:3                4h_1h               strong_vol        c4_ldo    1.5/4.5     25   5    518    104  $ -2945.34   26.8%  0.840  -1.599  $  -4692  
+   34  25  E-LongOnly      defi8 | LONG ONLY + strong_vol  1:3                       4h_1h               strong_vol        defi8     1.5/4.5     25   8    494     62  $ -3932.62   21.3%  0.806  -1.980  $  -7062  LO 
+   35   6  A-Coins         DEFI8 (no BTC/ADA/FET)    strong_vol  1:3                 4h_1h               strong_vol        defi8     1.5/4.5     25   8    794     99  $ -4086.39   27.7%  0.859  -1.731  $  -8488  
+
+================================================================================
+  GROUP AVERAGES
+================================================================================
+  A-Coins             n=6  avgPnL=$ -2158.68  avgTWR=26.1%  avgSh=-1.350  avgTrades=414  best=#2 $-903.97
+  B-TPSL              n=6  avgPnL=$ -1790.29  avgTWR=29.5%  avgSh=-1.144  avgTrades=416  best=#7 $-1170.28
+  C-Entry             n=6  avgPnL=$  -835.03  avgTWR=31.2%  avgSh=-0.527  avgTrades=210  best=#18 $+492.56
+  D-Direction         n=4  avgPnL=$ -1720.06  avgTWR=29.9%  avgSh=-1.049  avgTrades=602  best=#19 $+9.20
+  E-LongOnly          n=4  avgPnL=$ -3008.68  avgTWR=21.5%  avgSh=-1.926  avgTrades=362  best=#26 $-2247.98
+  F-Exit              n=6  avgPnL=$ -1486.88  avgTWR=29.7%  avgSh=-1.169  avgTrades=435  best=#29 $-1002.83
+  G-Combo             n=3  avgPnL=$  -590.35  avgTWR=24.3%  avgSh=-1.079  avgTrades=130  best=#34 $+613.59
+
+================================================================================
+  ENTRY TYPE ANALYSIS
+================================================================================
+  score3                  n=1  avgPnL=$   492.56  avgTrades=47  best=#18 $+492.56
+  multi_bar_vol           n=2  avgPnL=$   353.59  avgTrades=83  best=#34 $+613.59
+  vol_and_vwap            n=2  avgPnL=$  -268.88  avgTrades=28  best=#15 $-214.92
+  vol_and_bb              n=1  avgPnL=$ -1196.72  avgTrades=252  best=#16 $-1196.72
+  strong_vol_25           n=1  avgPnL=$ -1894.77  avgTrades=326  best=#13 $-1894.77
+  strong_vol              n=27  avgPnL=$ -1984.88  avgTrades=434  best=#19 $+9.20
+  score2                  n=1  avgPnL=$ -2289.94  avgTrades=522  best=#17 $-2289.94
+
+================================================================================
+  COIN UNIVERSE ANALYSIS
+================================================================================
+  top2          n=1  avgPnL=$  -903.97  best=#2 $-903.97
+  aave          n=1  avgPnL=$ -1075.17  best=#3 $-1075.17
+  c4_link       n=1  avgPnL=$ -1471.26  best=#4 $-1471.26
+  core4         n=29  avgPnL=$ -1513.68  best=#34 $+613.59
+  c4_ldo        n=1  avgPnL=$ -2945.34  best=#5 $-2945.34
+  defi8         n=2  avgPnL=$ -4009.51  best=#25 $-3932.62
+
+================================================================================
+  EXIT REASON BREAKDOWN (all experiments combined)
+================================================================================
+  SL                8908  (68.0%)
+  DIR_FLIP          2314  (17.7%)
+  TP                1820  (13.9%)
+  TIME                55  (0.4%)
+  EOD                  1  (0.0%)
+
+================================================================================
+  PER-COIN — Best Experiment #34
+================================================================================
+  COMBO2: core4+multi_vol+margin>0.15+Breakeven  TP=6.0
+  Dir=4h_1h  Entry=multi_bar_vol  Coins=core4  SL=1.5/TP=6.0  LO=False  BE=True  TR=False
+
+  SOLUSDT       [L1    ]  ★  PnL=$ +592.36  trades=  31  WR= 41.9%  PF= 1.930  Sh= 1.085  exits={'DIR_FLIP': 12, 'SL': 15, 'TP': 4}
+  ETHUSDT       [L1    ]  ★  PnL=$ +159.80  trades=   8  WR= 50.0%  PF= 1.622  Sh= 0.535  exits={'SL': 4, 'DIR_FLIP': 2, 'TP': 2}
+  AAVEUSDT      [DeFi  ]  ★  PnL=$  +40.72  trades=  16  WR= 31.2%  PF= 1.074  Sh= 0.113  exits={'SL': 10, 'DIR_FLIP': 5, 'TP': 1}
+  ARBUSDT       [L2    ]  ✗  PnL=$ -179.29  trades=  28  WR= 21.4%  PF= 0.821  Sh=-0.410  exits={'SL': 21, 'DIR_FLIP': 5, 'TP': 2}
+
+================================================================================
+  TOP 10 CONFIGURATIONS
+================================================================================
+  #1  [G-Combo] #34 — COMBO2: core4+multi_vol+margin>0.15+Breakeven  TP=6.0
+      Dir=4h_1h  Entry=multi_bar_vol  Coins=core4  SL=1.5×ATR  TP=6.0×ATR  MaxLev=25x  BREAKEVEN-STOP
+      PnL=$+613.59  WR=33.7%  PF=1.251  Sharpe=0.724  Trades=83(21/coin)  MDD=$-1104
+      Exits: {'SL': 50, 'DIR_FLIP': 24, 'TP': 9}
+
+  #2  [C-Entry] #18 — core4 | score>=3: vol+one_more (ultra selective)
+      Dir=4h_1h  Entry=score3  Coins=core4  SL=1.5×ATR  TP=6.0×ATR  MaxLev=25x  standard
+      PnL=$+492.56  WR=36.2%  PF=1.379  Sharpe=0.875  Trades=47(12/coin)  MDD=$-719
+      Exits: {'SL': 28, 'DIR_FLIP': 12, 'TP': 7}
+
+  #3  [C-Entry] #14 — core4 | multi_bar_vol (z>2 for 2 bars sustained)
+      Dir=4h_1h  Entry=multi_bar_vol  Coins=core4  SL=1.5×ATR  TP=4.5×ATR  MaxLev=25x  standard
+      PnL=$+93.58  WR=34.9%  PF=1.034  Sharpe=0.122  Trades=83(21/coin)  MDD=$-1328
+      Exits: {'SL': 49, 'DIR_FLIP': 21, 'TP': 13}
+
+  #4  [D-Direction] #19 — core4 | 4h_strong (margin>0.20) + strong_vol
+      Dir=4h_strong  Entry=strong_vol  Coins=core4  SL=1.5×ATR  TP=4.5×ATR  MaxLev=25x  standard
+      PnL=$+9.20  WR=35.0%  PF=1.000  Sharpe=0.004  Trades=872(218/coin)  MDD=$-4084
+      Exits: {'SL': 471, 'TP': 124, 'DIR_FLIP': 276, 'EOD': 1}
+
+  #5  [C-Entry] #15 — core4 | vol_and_vwap (surge + VWAP cross)
+      Dir=4h_1h  Entry=vol_and_vwap  Coins=core4  SL=1.5×ATR  TP=4.5×ATR  MaxLev=25x  standard
+      PnL=$-214.92  WR=33.3%  PF=0.791  Sharpe=-0.593  Trades=33(8/coin)  MDD=$-663
+      Exits: {'TP': 5, 'SL': 22, 'DIR_FLIP': 6}
+
+  #6  [G-Combo] #35 — COMBO3: SNIPER core4+vol_vwap+LO+Trail+Conf
+      Dir=4h_1h  Entry=vol_and_vwap  Coins=core4  SL=2.0×ATR  TP=6.0×ATR  MaxLev=20x  LONG-ONLY  BREAKEVEN-STOP  TRAILING-STOP
+      PnL=$-322.85  WR=21.7%  PF=0.353  Sharpe=-2.308  Trades=23(6/coin)  MDD=$-434
+      Exits: {'SL': 23}
+
+  #7  [A-Coins] #2 — TOP2  {ETH,AAVE}           strong_vol  1:3
+      Dir=4h_1h  Entry=strong_vol  Coins=top2  SL=1.5×ATR  TP=4.5×ATR  MaxLev=25x  standard
+      PnL=$-903.97  WR=25.5%  PF=0.830  Sharpe=-0.938  Trades=149(74/coin)  MDD=$-1762
+      Exits: {'TP': 23, 'SL': 102, 'DIR_FLIP': 24}
+
+  #8  [F-Exit] #29 — core4 | TRAIL+NO_TP (SL trails, ride to flip)
+      Dir=4h_1h  Entry=strong_vol  Coins=core4  SL=1.5×ATR  TP=DIR_FLIP/TRAIL only  MaxLev=20x  TRAILING-STOP
+      PnL=$-1002.83  WR=36.3%  PF=0.872  Sharpe=-1.080  Trades=488(122/coin)  MDD=$-2167
+      Exits: {'SL': 458, 'DIR_FLIP': 30}
+
+  #9  [A-Coins] #3 — AAVE ONLY                  strong_vol  1:3
+      Dir=4h_1h  Entry=strong_vol  Coins=aave  SL=1.5×ATR  TP=4.5×ATR  MaxLev=25x  standard
+      PnL=$-1075.17  WR=22.3%  PF=0.698  Sharpe=-1.471  Trades=94(94/coin)  MDD=$-1113
+      Exits: {'DIR_FLIP': 16, 'SL': 67, 'TP': 11}
+
+  #10  [B-TPSL] #7 — core4 | SL=1.0  TP=2.5  (1:2.5 tight)
+      Dir=4h_1h  Entry=strong_vol  Coins=core4  SL=1.0×ATR  TP=2.5×ATR  MaxLev=25x  standard
+      PnL=$-1170.28  WR=28.6%  PF=0.899  Sharpe=-1.009  Trades=489(122/coin)  MDD=$-2561
+      Exits: {'TP': 119, 'SL': 331, 'DIR_FLIP': 39}
+
+==================================================================================================================================
+  Elapsed: 447.6s
