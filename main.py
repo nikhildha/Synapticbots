@@ -792,6 +792,15 @@ class RegimeMasterBot:
                            "user already trading this coin on another bot — skipping")
                     continue
 
+                # ── DEDUP GUARD 3: Intra-tick symbol lock ────────────────────────────
+                # active_symbols is updated immediately after each successful deployment.
+                # This catches the race window where two bots both pass guards 1+2 before
+                # either trade lands in tradebook (happens when user_ids differ or are blank).
+                if sym in active_symbols:
+                    logger.info("🔒 [%s] %s already deployed THIS tick by another bot — skip (intra-tick lock)", bot_name, sym)
+                    self._coin_states.setdefault(sym, {}).setdefault("bot_deploy_statuses", {})[bot_id] = "FILTERED: coin already deployed this tick"
+                    continue
+
                 # ── C4 Fix: Enforce MAX_OPEN_TRADES cap ──────────────────────────
                 max_trades = getattr(config, "MAX_OPEN_TRADES", 25)
                 if tradebook_active_count + deployed >= max_trades:
