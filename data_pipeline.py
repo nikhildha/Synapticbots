@@ -200,10 +200,14 @@ def _fetch_klines_binance(symbol, interval, limit=500):
     if cached is not None:
         return cached
 
-    client = _get_binance_client()
     binance_interval = _get_binance_interval(interval)
     try:
+        client = _get_binance_client()  # may raise RuntimeError if IP-banned
         klines = client.get_klines(symbol=symbol, interval=binance_interval, limit=limit)
+    except RuntimeError as e:
+        # IP ban still active — log clearly and return None
+        logger.warning("⛔ Skipping %s %s kline fetch — %s", symbol, interval, e)
+        return None
     except Exception as e:
         logger.error("Binance fetch %s %s failed: %s", symbol, interval, e)
         return None
