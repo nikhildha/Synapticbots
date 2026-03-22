@@ -73,6 +73,10 @@ export function Header() {
                   <Link href="/account" className="text-[17px] font-medium text-[var(--color-text-secondary)] hover:text-[var(--color-primary)] transition-colors">
                     Account
                   </Link>
+                  {/* Alpha — standalone quant engine, do not merge with main engine */}
+                  <Link href="/alpha" className="text-[17px] font-semibold transition-colors" style={{ color: '#F0B90B', textShadow: '0 0 8px rgba(240,185,11,0.4)' }}>
+                    α Alpha
+                  </Link>
                   {(session.user as any)?.role === 'admin' && (
                     <Link href="/admin" className="text-amber-400 hover:text-amber-300 transition-colors">
                       Admin
@@ -156,6 +160,9 @@ export function Header() {
                   </Link>
                   <Link href="/account" className="block text-[var(--color-text-secondary)] hover:text-[var(--color-primary)] transition-colors">
                     Account
+                  </Link>
+                  <Link href="/alpha" className="block font-semibold transition-colors" style={{ color: '#F0B90B' }}>
+                    α Alpha
                   </Link>
                   <button
                     onClick={handleSignOut}

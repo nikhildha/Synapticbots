@@ -392,3 +392,23 @@ model AthenaDecisionLog {
   @@index([tradeId])
   @@index([deployed])
 }
+
+// ─── Trade Journal: Reconciliation Log ────────────────────────────────────────
+// Stores engine-vs-exchange health check results for the Live Journal tab.
+// Written by /api/journal/health — read-only by all other routes.
+model ReconciliationLog {
+  id            String   @id @default(cuid())
+  userId        String
+  botId         String?
+  checkType     String   // "trade_count" | "balance_match" | "duplicate_order"
+  status        String   // "pass" | "fail" | "warning"
+  engineCount   Int?
+  exchangeCount Int?
+  delta         Float?
+  notes         String?
+  checkedAt     DateTime @default(now())
+
+  @@index([userId])
+  @@index([checkedAt])
+  @@index([status])
+}
