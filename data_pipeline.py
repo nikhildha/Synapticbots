@@ -168,8 +168,12 @@ def _cache_klines(symbol, interval, df):
     _kline_cache[f"{symbol}:{interval}"] = {"data": df, "ts": _cache_time.time()}
 
 
-def _get_cached_klines(symbol, interval):
-    """Return cached klines if fresh, else None."""
+def _get_cached_klines(symbol, interval, min_limit=None):
+    """Return cached klines if fresh and large enough, else None.
+    
+    min_limit: if the cached data has fewer rows than this, treat as cache miss
+               so a larger re-fetch overwrites the small-limit heatmap entries.
+    """
     ttl = _KLINE_CACHE_TTL.get(interval)
     if ttl is None:
         return None  # short intervals are not cached
@@ -177,7 +181,11 @@ def _get_cached_klines(symbol, interval):
     key = f"{symbol}:{interval}"
     entry = _kline_cache.get(key)
     if entry and (_cache_time.time() - entry["ts"]) < ttl:
-        return entry["data"]
+        df = entry["data"]
+        # If caller needs more bars than cached, force re-fetch
+        if min_limit is not None and len(df) < min_limit:
+            return None
+        return df
     return None
 
 
@@ -228,9 +236,14 @@ def _parse_klines_df(klines):
 
 
 def _fetch_klines_binance(symbol, interval, limit=500):
-    """Fetch spot candlesticks from Binance (cache-aware for ≥1h intervals)."""
-    # Check cache first for longer intervals
-    cached = _get_cached_klines(symbol, interval)
+    """Fetch spot candlesticks from Binance (cache-aware for ≥1h intervals).
+    
+    Cache is limit-aware: if cached data has fewer rows than requested,
+    it's treated as a miss so large-limit HMM fetches aren't served
+    stale 3-bar results from the heatmap scorer.
+    """
+    # Check cache first — only serve if cached size ≥ requested limit
+    cached = _get_cached_klines(symbol, interval, min_limit=limit)
     if cached is not None:
         return cached
 
