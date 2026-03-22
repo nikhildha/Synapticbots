@@ -86,6 +86,31 @@ def _get_binance_client():
 
 import time as _cache_time
 
+def _handle_ban_exception(e):
+    """Check if exception is a Binance -1003 IP ban and update _binance_ban_until.
+    
+    Call this from any API wrapper so that ban state is detected and stored
+    even if the ban is first hit during a kline/ticker call (not just Client init).
+    Returns True if it was a ban error, False otherwise.
+    """
+    global _binance_ban_until
+    import re
+    err_str = str(e)
+    code = getattr(e, 'code', None)
+    if code == -1003 or '-1003' in err_str or 'banned until' in err_str.lower():
+        m = re.search(r'banned until (\d+)', err_str)
+        if m:
+            _binance_ban_until = int(m.group(1))
+            remaining = max(0, (_binance_ban_until - int(_cache_time.time() * 1000))) / 1000
+        else:
+            _binance_ban_until = int(_cache_time.time() * 1000) + 300_000  # 5min default
+            remaining = 300
+        logger.warning(
+            "🔒 Binance IP ban detected in API call — backing off %.0fs", remaining
+        )
+        return True
+    return False
+
 # ── Ticker cache (get_ticker returns ALL symbols, weight=40) ──────────────────
 _ticker_cache = None        # list of dicts
 _ticker_cache_ts = 0        # epoch seconds
@@ -102,8 +127,17 @@ def get_cached_ticker():
     if _ticker_cache is not None and (now - _ticker_cache_ts) < _TICKER_CACHE_TTL:
         return _ticker_cache
     
-    client = _get_binance_client()
-    _ticker_cache = client.get_ticker()
+    try:
+        client = _get_binance_client()  # may raise RuntimeError if IP-banned
+        data = client.get_ticker()
+    except RuntimeError as e:
+        logger.warning("⛔ Ticker cache skip (IP ban active): %s", e)
+        return _ticker_cache or []      # serve stale cache if available
+    except Exception as e:
+        _handle_ban_exception(e)        # detect -1003, update ban state
+        logger.error("Ticker fetch failed: %s", e)
+        return _ticker_cache or []      # serve stale cache if available
+    _ticker_cache = data
     _ticker_cache_ts = now
     logger.info("📊 Ticker cache refreshed (%d symbols, weight=40)", len(_ticker_cache))
     return _ticker_cache
@@ -205,11 +239,12 @@ def _fetch_klines_binance(symbol, interval, limit=500):
         client = _get_binance_client()  # may raise RuntimeError if IP-banned
         klines = client.get_klines(symbol=symbol, interval=binance_interval, limit=limit)
     except RuntimeError as e:
-        # IP ban still active — log clearly and return None
+        # IP ban still active — log and return None
         logger.warning("⛔ Skipping %s %s kline fetch — %s", symbol, interval, e)
         return None
     except Exception as e:
-        logger.error("Binance fetch %s %s failed: %s", symbol, interval, e)
+        if not _handle_ban_exception(e):  # detect + record -1003 ban if that's the cause
+            logger.error("Binance fetch %s %s failed: %s", symbol, interval, e)
         return None
     if not klines:
         return None
