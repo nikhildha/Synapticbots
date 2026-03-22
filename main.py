@@ -322,7 +322,32 @@ class RegimeMasterBot:
                 except Exception as e:
                     logger.debug("PriceStream subscription error: %s", e)
 
-            # Pass WS prices when available — tradebook falls back to REST for any missing symbols
+            # ── REST supplement: fetch prices for deployed coins missing from WS ──
+            # Deployed coins are excluded from the scan pool, so the WS stream may
+            # not have a fresh reading for them.  A single batch Binance REST call
+            # costs ~50ms and guarantees every active trade gets a price.
+            try:
+                all_active_syms = list({t['symbol'] for t in tradebook.get_active_trades() if t.get('symbol')})
+                missing_syms = [s for s in all_active_syms if s not in ws_prices]
+                if missing_syms:
+                    import requests as _req
+                    import json as _json
+                    _resp = _req.get(
+                        "https://api.binance.com/api/v3/ticker/price",
+                        params={"symbols": _json.dumps(missing_syms)},
+                        timeout=4,
+                    )
+                    if _resp.status_code == 200:
+                        for _item in _resp.json():
+                            _sym = _item.get("symbol")
+                            _px  = _item.get("price")
+                            if _sym and _px:
+                                ws_prices[_sym] = float(_px)
+                        logger.debug("⚡ REST supplement: fetched prices for %d deployed symbols", len(missing_syms))
+            except Exception as _rest_err:
+                logger.debug("REST supplement price fetch failed: %s", _rest_err)
+
+            # Pass combined prices (WS + REST supplement) to update_unrealized
             tradebook.update_unrealized(funding_rates=funding_rates, prices=ws_prices or None)
         except Exception as e:
             logger.warning("⚠️ Tradebook unrealized update error (max-loss/SL/TP guards may not have run): %s", e, exc_info=True)

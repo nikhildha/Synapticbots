@@ -754,15 +754,18 @@ def update_unrealized(prices=None, funding_rates=None):
                         else:
                             new_sl = round(entry * (1.0 - lock_price_move), 8)
 
-                        # Sanity check: new_sl must be on the correct side of entry
-                        sl_sane = (is_long and new_sl <= entry * 1.01) or \
-                                  (not is_long and new_sl >= entry * 0.99)
+                        # Sanity check: profit-lock SL must be on the "secured" side of entry.
+                        # LONG:  new_sl >= entry means we've secured breakeven or better price-wise.
+                        # SHORT: new_sl <= entry means we've secured breakeven or better price-wise.
+                        # The 0.01% tolerance handles floating-point rounding at lock_pnl=0 (breakeven).
+                        sl_sane = (is_long and new_sl >= entry * 0.9999) or \
+                                  (not is_long and new_sl <= entry * 1.0001)
                         if not sl_sane:
                             logger.error(
                                 "❌ SL trail sanity fail for %s [step %d]: entry=%.6f lock_pnl=%.1f "
-                                "lock_price_move=%.6f new_sl=%.6f — SKIPPING",
+                                "new_sl=%.6f is_long=%s — SKIPPING",
                                 trade.get("trade_id"), step_idx+1, entry, lock_pnl,
-                                lock_price_move, new_sl,
+                                new_sl, is_long,
                             )
                             break
 
