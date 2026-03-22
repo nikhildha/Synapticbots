@@ -90,19 +90,6 @@ export function DashboardClient({ user, stats, bots, recentTrades }: DashboardCl
   const [livePrices, setLivePrices] = useState<Record<string, number>>({});
   const [nextScanSecs, setNextScanSecs] = useState<number | null>(null);
 
-  // Tick the next-scan countdown every second — anchored to engine's next_analysis_time
-  useEffect(() => {
-    const tick = () => {
-      const nextTs = botState?.multi?.next_analysis_time;
-      if (!nextTs) { setNextScanSecs(null); return; }
-      const remaining = Math.ceil((new Date(nextTs).getTime() - Date.now()) / 1000);
-      setNextScanSecs(remaining); // negative = overdue (scanning)
-    };
-    tick();
-    const t = setInterval(tick, 1000);
-    return () => clearInterval(t);
-  }, [botState?.multi?.next_analysis_time]);
-
   const fetchBotState = useCallback(async () => {
     try {
       setIsRefreshing(true);
@@ -118,6 +105,31 @@ export function DashboardClient({ user, stats, bots, recentTrades }: DashboardCl
       setIsRefreshing(false);
     }
   }, []);
+
+  // ─── Cycle-aware countdown & smart refresh ────────────────────────────────
+  // Ticks every second. When the engine's next_analysis_time passes (countdown
+  // crosses 0), immediately fetch fresh bot state — no waiting for the 15s poll.
+  useEffect(() => {
+    let alreadyTriggered = false; // prevent double-fire in the same countdown window
+    const tick = () => {
+      const nextTs = botState?.multi?.next_analysis_time;
+      if (!nextTs) { setNextScanSecs(null); return; }
+      const remaining = Math.ceil((new Date(nextTs).getTime() - Date.now()) / 1000);
+      setNextScanSecs(remaining);
+
+      // 💡 Sync point: fire immediately when cycle is due
+      if (remaining <= 0 && !alreadyTriggered) {
+        alreadyTriggered = true;
+        // Short delay to give engine time to write state, then fetch
+        setTimeout(() => fetchBotState(), 2500);
+      }
+      // Reset trigger when a new countdown starts (engine posted next_analysis_time)
+      if (remaining > 5) alreadyTriggered = false;
+    };
+    tick();
+    const t = setInterval(tick, 1000);
+    return () => clearInterval(t);
+  }, [botState?.multi?.next_analysis_time, fetchBotState]);
 
   useEffect(() => {
     setMounted(true);
