@@ -141,27 +141,9 @@ def open_trade(symbol, side, leverage, quantity, entry_price, atr,
             )
             return bot_existing[0]["trade_id"]
 
-    # Guard 2: same USER has this symbol active on ANY of THEIR bots — prevent cross-bot hedging.
-    # CRITICAL: only applies when BOTH the incoming user_id AND the existing trade's user_id are
-    # non-empty and match. Trades without a user_id stamp are NEVER compared against other users'
-    # trades — that would block multi-user SaaS trading the same coin.
-    if user_id:
-        user_existing = [t for t in book["trades"]
-                         if t["symbol"] == symbol
-                         and t.get("user_id", "")  # ← existing trade MUST have a user_id stamp
-                         and t.get("user_id", "") == user_id  # ← must be the SAME user
-                         and t["status"] in ("ACTIVE", "OPEN")]
-        if user_existing:
-            logger.warning(
-                "⚠️ Skipping trade for %s [user=%s] — another bot for this user already has ACTIVE trade %s",
-                symbol, user_id, user_existing[0]["trade_id"]
-            )
-            return user_existing[0]["trade_id"]
-
-    # NOTE: The legacy symbol-only fallback (block by symbol alone when bot_id+user_id are empty)
-    # has been intentionally removed. It caused all users to be blocked from trading a coin
-    # whenever any single user had it open — a critical multi-user isolation failure.
-    # Deduplication is now strictly per-bot (Guard 1) and per-user (Guard 2).
+    # Guard 2 (per-user cross-bot dedup) intentionally removed.
+    # It was blocking trades across different users who happened to trade the same coin.
+    # Per-bot dedup (Guard 1) is sufficient — each bot manages its own positions.
 
     trade_id = _next_id(book)
     position = "LONG" if side == "BUY" else "SHORT"
