@@ -205,6 +205,9 @@ class AlphaHMM:
             best_state = int(np.argmax(last_post))
             sorted_probs = np.sort(last_post)[::-1]
             margin = float(sorted_probs[0] - sorted_probs[1]) if len(sorted_probs) > 1 else 0.0
+            # Guard against NaN (can occur when HMM doesn't converge) — NaN is invalid JSON
+            if margin != margin:  # NaN check
+                margin = 0.0
 
             regime = self._state_map.get(best_state, REGIME_BULL)
             passes = margin >= ALPHA_REGIME_MARGIN
