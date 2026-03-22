@@ -1,2 +1,7 @@
+[build]
+# Only rebuild dashboard when Next.js files change — NOT on Python engine file pushes.
+watchPaths = ["sentinel-saas/**"]
+
 [deploy]
 startCommand = "sh -c 'npx prisma db push --skip-generate --accept-data-loss 2>&1; echo \"✅ Schema sync done\"; HOSTNAME=0.0.0.0 npx next start -p 8080'"
+

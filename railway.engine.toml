@@ -1,6 +1,14 @@
 [build]
 builder = "DOCKERFILE"
 dockerfilePath = "Dockerfile.engine"
+# Only rebuild engine when Python/engine files change — NOT on Next.js dashboard pushes.
+# This prevents the in-memory tradebook from resetting every time the UI is updated.
+watchPaths = [
+  "*.py",
+  "Dockerfile.engine",
+  "requirements*.txt",
+  "railway.engine.toml",
+]
 
 [deploy]
 startCommand = "python engine_api.py"
@@ -8,3 +16,4 @@ healthcheckPath = "/api/health"
 healthcheckTimeout = 600
 restartPolicyType = "ON_FAILURE"
 restartPolicyMaxRetries = 3
+
