@@ -51,8 +51,8 @@ def _require_key() -> None:
     """Abort with 401 if X-Alpha-Key header is missing or wrong."""
     if not ALPHA_INTERNAL_KEY:
         return   # no key configured — open in dev mode
-    key = request.headers.get("X-Alpha-Key", "")
-    if key != ALPHA_INTERNAL_KEY:
+    key = request.headers.get("X-Alpha-Key", "").strip()
+    if key != ALPHA_INTERNAL_KEY.strip():
         abort(401)
 
 

@@ -22,8 +22,8 @@ import path                 from 'path';
 export const dynamic = 'force-dynamic';
 
 // ── Config ────────────────────────────────────────────────────────────────────
-const ALPHA_ENGINE_URL  = process.env.ALPHA_ENGINE_URL  ?? '';   // e.g. https://alpha-xxx.railway.app
-const ALPHA_INTERNAL_KEY = process.env.ALPHA_INTERNAL_KEY ?? '';
+const ALPHA_ENGINE_URL   = (process.env.ALPHA_ENGINE_URL  ?? '').trim();
+const ALPHA_INTERNAL_KEY = (process.env.ALPHA_INTERNAL_KEY ?? '').trim();
 
 // Local fallback paths (used when ALPHA_ENGINE_URL is not set)
 const ALPHA_DATA_DIR = path.join(process.cwd(), '../../alpha/data');
