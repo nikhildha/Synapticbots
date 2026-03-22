@@ -1,0 +1,39 @@
+# ╔══════════════════════════════════════════════════════════════════════╗
+# ║  ALPHA MODULE — Dockerfile                                          ║
+# ║  Builds the standalone Alpha Python trading engine.                 ║
+# ║  Separate Railway service — never merged with the main engine.      ║
+# ║                                                                     ║
+# ║  Port: 5001 (ALPHA_PORT)                                            ║
+# ║  Healthcheck: GET /alpha/health                                     ║
+# ╚══════════════════════════════════════════════════════════════════════╝
+
+FROM python:3.12-slim
+
+# System deps for numpy/pandas/hmmlearn
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    gcc g++ && \
+    rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+# Install Python dependencies first (Docker layer cache)
+COPY alpha/requirements.alpha.txt ./requirements.alpha.txt
+RUN pip install --no-cache-dir -r requirements.alpha.txt
+
+# Copy Alpha module source
+COPY alpha/ ./alpha/
+
+# Copy shared tools (data_cache.py — read-only utility)
+COPY tools/ ./tools/
+
+# Persistent data directory (mount Railway Volume here)
+RUN mkdir -p /app/alpha/data
+
+ENV PYTHONUNBUFFERED=1
+ENV ALPHA_PORT=5001
+ENV ALPHA_PAPER_MODE=true
+
+EXPOSE 5001
+
+# Start: Flask HTTP server + 15-min trading loop
+CMD ["python", "-m", "alpha.run_alpha"]

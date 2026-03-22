@@ -17,6 +17,18 @@ tsconfig.tsbuildinfo
 # Data (runtime state — not in repo)
 data/
 
+# Alpha runtime state (tradebook, logs, state — persisted via Railway Volume)
+alpha/data/*.json
+alpha/data/*.log
+alpha/.env
+
+# Alpha data cache (large parquet files — regenerated at runtime)
+data_cache/
+
+# Experiment files (research only — not part of production)
+tools/experiment_entry*.py
+tools/experiment_entry*.txt
+
 # OS
 .DS_Store
 *.log

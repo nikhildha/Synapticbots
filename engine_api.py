@@ -1496,3 +1496,48 @@ if __name__ == "__main__":
     logger.info("🌐 Engine API listening on port %d", port)
     app.run(host="0.0.0.0", port=port, debug=False, use_reloader=False)
 
+
+# ─── Trade Journal: Exchange Health ──────────────────────────────────────────
+# Called by Next.js /api/journal/health every 15s.
+# Returns live exchange connectivity, balance, and open position count.
+# Paper engines return mode="paper" with no exchange call.
+
+@app.route("/api/exchange-health", methods=["GET"])
+def api_exchange_health():
+    """Live exchange health for Trade Journal page. Safe to call every 15s."""
+    if config.PAPER_TRADE:
+        return jsonify({
+            "mode": "paper",
+            "status": "n/a",
+            "exchange": None,
+            "balance": 0,
+            "openPositions": 0,
+            "checkedAt": datetime.utcnow().isoformat() + "Z",
+        })
+    try:
+        import coindcx_client as cdx
+        balance = cdx.get_usdt_balance()
+        try:
+            positions = cdx.list_positions()
+            pos_count = len(positions) if isinstance(positions, list) else 0
+        except Exception:
+            pos_count = -1  # -1 = could not fetch position count
+        return jsonify({
+            "mode": "live",
+            "status": "connected",
+            "exchange": config.EXCHANGE_LIVE or "coindcx",
+            "balance": balance,
+            "openPositions": pos_count,
+            "checkedAt": datetime.utcnow().isoformat() + "Z",
+        })
+    except Exception as e:
+        logger.warning("exchange-health: CoinDCX call failed: %s", e)
+        return jsonify({
+            "mode": "live",
+            "status": "failed",
+            "exchange": config.EXCHANGE_LIVE or "coindcx",
+            "balance": 0,
+            "openPositions": 0,
+            "error": str(e),
+            "checkedAt": datetime.utcnow().isoformat() + "Z",
+        })

@@ -1,0 +1,17 @@
+# Alpha Module — Python dependencies
+# Install: pip install -r alpha/requirements.alpha.txt
+
+# Core data / ML
+pandas>=2.0.0
+numpy>=1.24.0
+hmmlearn>=0.3.0
+pyarrow>=14.0.0          # parquet cache support
+
+# HTTP / exchange
+requests>=2.31.0
+
+# Flask HTTP server (exposes /alpha/data to NextJS)
+flask>=3.0.0
+
+# Config
+python-dotenv>=1.0.0

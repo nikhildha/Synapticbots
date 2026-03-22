@@ -1,0 +1,38 @@
+# ╔══════════════════════════════════════════════════════════════════════╗
+# ║  ALPHA MODULE — Railway service config                              ║
+# ║  Service: alpha-engine (separate from main engine + NextJS)         ║
+# ║                                                                     ║
+# ║  Required Railway env vars (set in Railway dashboard):             ║
+# ║    ALPHA_PAPER_MODE          true (flip to false for live trading)  ║
+# ║    ALPHA_PORT                5001                                   ║
+# ║    ALPHA_INTERNAL_KEY        <64-char hex secret>                   ║
+# ║    ALPHA_BYBIT_API_KEY       <Bybit API key>                        ║
+# ║    ALPHA_BYBIT_API_SECRET    <Bybit API secret>                     ║
+# ║    ALPHA_TELEGRAM_BOT_TOKEN  <dedicated Alpha Telegram bot token>   ║
+# ║    ALPHA_TELEGRAM_CHAT_ID    <Telegram chat/group ID>               ║
+# ║                                                                     ║
+# ║  Add in NextJS service (for UI dashboard):                          ║
+# ║    ALPHA_ENGINE_URL          https://alpha-xxx.up.railway.app       ║
+# ║    ALPHA_INTERNAL_KEY        <same 64-char hex secret>              ║
+# ║                                                                     ║
+# ║  Volume: mount Railway Volume at /app/alpha/data for persistence   ║
+# ╚══════════════════════════════════════════════════════════════════════╝
+
+[build]
+builder = "DOCKERFILE"
+dockerfilePath = "Dockerfile.alpha"
+# Only rebuild Alpha when alpha/ code or its Dockerfile changes.
+# Never rebuilds from main engine / NextJS changes.
+watchPaths = [
+  "alpha/**",
+  "tools/data_cache.py",
+  "Dockerfile.alpha",
+  "railway.alpha.toml",
+]
+
+[deploy]
+startCommand = "python -m alpha.run_alpha"
+healthcheckPath = "/alpha/health"
+healthcheckTimeout = 300
+restartPolicyType = "ON_FAILURE"
+restartPolicyMaxRetries = 5
