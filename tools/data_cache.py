@@ -34,9 +34,15 @@ import numpy as np
 import pandas as pd
 import requests
 
-import config
-from data_pipeline import _parse_klines_df
-from feature_engine import compute_all_features
+# Root modules — only available in the full local environment, not in Alpha Docker container
+try:
+    from data_pipeline import _parse_klines_df
+    from feature_engine import compute_all_features as _root_compute_features
+    _HAS_ROOT_MODULES = True
+except ImportError:
+    _HAS_ROOT_MODULES = False
+    _root_compute_features = None
+    _parse_klines_df = None
 
 CACHE_DIR       = Path(ROOT) / "data_cache"
 CACHE_MAX_AGE_H = 23
@@ -76,10 +82,11 @@ def _build_df(rows: list, ts_col=0, o_col=1, h_col=2, l_col=3,
     if not ascending:
         df = df.iloc[::-1].reset_index(drop=True)
     df = df.sort_values("timestamp").drop_duplicates("timestamp").reset_index(drop=True)
-    try:
-        df = compute_all_features(df).dropna().reset_index(drop=True)
-    except Exception as e:
-        print(f"    feature error: {e}"); return None
+    if _HAS_ROOT_MODULES:
+        try:
+            df = _root_compute_features(df).dropna().reset_index(drop=True)
+        except Exception as e:
+            print(f"    feature error: {e}"); return None
     return df
 
 
@@ -108,10 +115,11 @@ def _fetch_binance(symbol: str, tf: str) -> pd.DataFrame | None:
         except Exception as e:
             print(f"    binance {symbol}/{tf}: {e}"); break
     if not klines: return None
+    if not _HAS_ROOT_MODULES or _parse_klines_df is None: return None
     df_raw = _parse_klines_df(klines)
     if df_raw is None or df_raw.empty: return None
     try:
-        df = compute_all_features(df_raw).dropna().reset_index(drop=True)
+        df = _root_compute_features(df_raw).dropna().reset_index(drop=True)
     except Exception as e:
         print(f"    feature error {symbol}/{tf}: {e}"); return None
     if "timestamp" not in df.columns:
