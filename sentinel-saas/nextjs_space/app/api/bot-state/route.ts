@@ -82,35 +82,31 @@ export async function GET() {
                 orderBy: [{ isActive: 'desc' }, { updatedAt: 'desc' }],
             });
 
-            // Cache trades per engine URL to avoid duplicate fetches across bots
-            const engineTradeCache: Record<string, any[]> = {};
-            if (primaryUrl && engineData) engineTradeCache[primaryUrl] = engineData.tradebook?.trades || [];
-            if (secondaryUrl && paperEngineData) engineTradeCache[secondaryUrl] = paperEngineData.tradebook?.trades || [];
+            // ── MERGED ENGINE SYNC ────────────────────────────────────────────────
+            // PROBLEM: live engine (sentinelbot-engine-live-production) deploys paper trades
+            // into its own tradebook, but the dashboard was only syncing paper bots from
+            // ENGINE_API_URL_PAPER (paper-production) = a DIFFERENT empty tradebook.
+            //
+            // FIX: Collect trades from ALL engines, then sync each user bot against the
+            // full merged pool. allBotIds matching inside syncEngineTrades provides isolation
+            // (each trade is stamped with the bot_id of the deploying bot, so no cross-contamination).
+            const allEngineTrades: any[] = [
+                ...(engineData?.tradebook?.trades || []),
+                // Only add paper engine trades if it's a separate service (avoid duplicates)
+                ...(primaryUrl !== secondaryUrl && paperEngineData?.tradebook?.trades
+                    ? paperEngineData.tradebook.trades
+                    : []),
+            ];
 
             for (const ub of userBots) {
-                // Note: no startedAt guard — bots may have active trades without an explicit session
-                // (engine bulk-activates bots from DB without the dashboard Start flow)
-                const isLive = (ub.config?.mode || 'paper').toLowerCase().includes('live');
-                // FALLBACK FIX: If ENGINE_API_URL_PAPER is not set, fall back to primaryUrl.
-                // This handles single-engine deployments where ENGINE_API_URL IS the paper engine.
-                // Without fallback, paper bots get '' → silently skip → no sync ever.
-                const specificUrl = getEngineUrl(isLive ? 'live' : 'paper');
-                const botEngineUrl = specificUrl || primaryUrl;
-                if (!botEngineUrl) continue;
-
+                if (allEngineTrades.length === 0) continue;
                 try {
-                    if (!(botEngineUrl in engineTradeCache)) {
-                        const data = await fetchEngineData(botEngineUrl);
-                        engineTradeCache[botEngineUrl] = data?.tradebook?.trades || [];
-                    }
-                    const botTrades = engineTradeCache[botEngineUrl];
-                    if (botTrades.length > 0) {
-                        await syncEngineTrades(botTrades, ub.id, ub.startedAt, userId);
-                    }
+                    await syncEngineTrades(allEngineTrades, ub.id, ub.startedAt, userId);
                 } catch (err) {
                     console.error(`[bot-state] Trade sync failed for bot ${ub.id}:`, err);
                 }
             }
+
 
             try {
                 trades = await getUserTrades(userId);
