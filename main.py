@@ -1243,12 +1243,18 @@ class RegimeMasterBot:
                     if df_tf is not None and len(df_tf) >= 60:
                         df_tf_feat = compute_all_features(df_tf)
                         if tf_brain.needs_retrain():
+                            logger.info("🧠 [%s] Training %s TF brain (%d bars)...", symbol, tf, len(df_tf))
                             tf_brain.train(df_tf_feat)
                         if tf_brain.is_trained:
                             mtf_brain.set_brain(tf, tf_brain)
                             tf_data[tf] = df_tf_feat
+                        else:
+                            logger.warning("⚠️  [%s] %s TF brain failed to train", symbol, tf)
+                    else:
+                        logger.warning("⚠️  [%s] %s TF klines too short or None (got %s bars)",
+                                       symbol, tf, len(df_tf) if df_tf is not None else 0)
                 except Exception as e:
-                    logger.debug("Multi-TF %s fetch failed for %s: %s", tf, symbol, e)
+                    logger.warning("⚠️  [%s] %s TF failed: %s", symbol, tf, e, exc_info=True)
 
             # Check if enough models are ready
             # Build a compact tf_breakdown dict for Athena context
@@ -1261,6 +1267,9 @@ class RegimeMasterBot:
                     }
 
             if not mtf_brain.is_ready():
+                ready_tfs = list(mtf_brain._brains.keys())
+                logger.warning("⚠️  [%s] MTF not ready — only %d/%d TFs trained: %s",
+                               symbol, len(ready_tfs), len(config.MULTI_TF_TIMEFRAMES), ready_tfs)
                 self._coin_states[symbol] = {
                     "symbol": symbol, "regime": "N/A", "confidence": 0,
                     "price": 0, "action": "MTF_INSUFFICIENT_MODELS",
@@ -1272,6 +1281,15 @@ class RegimeMasterBot:
             mtf_brain.predict(tf_data)
             conviction, side, tf_agreement = mtf_brain.get_conviction()
             regime_summary = mtf_brain.get_regime_summary()
+            # Log per-coin MTF result for visibility
+            tf_detail = " | ".join(
+                f"{tf}={config.REGIME_NAMES.get(r,'?')}({m:.2f})"
+                for tf, (r, m) in mtf_brain._predictions.items()
+            )
+            logger.info("🔍 [%s] MTF: %s → conv=%.0f dir=%s agree=%d/%d",
+                        symbol, tf_detail, conviction, side or "–",
+                        tf_agreement, len(config.MULTI_TF_TIMEFRAMES))
+
 
             if side is None:
                 self._coin_states[symbol] = {
