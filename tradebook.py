@@ -800,11 +800,22 @@ def update_unrealized(prices=None, funding_rates=None):
                             break
 
         # ── EXIT CHECKS ──────────────────────────────────────────────
-        # For LIVE trades, CoinDCX handles SL/TP/MAX_LOSS via exchange
-        # orders. The heartbeat _sync_coindcx_positions() detects when
-        # exchange closes a position. We ONLY auto-close in tradebook
-        # for paper trades.
+        # For LIVE trades, CoinDCX handles SL/TP/MAX_LOSS via exchange.
+        # PAPER_TRADE override: if config.PAPER_TRADE=True the entire
+        # engine is simulated — always auto-close regardless of mode stamp.
         is_live = trade.get("mode") == "LIVE"
+        should_auto_close = (not is_live) or config.PAPER_TRADE
+
+        # Diagnostic: always log exit state so prod logs can validate
+        logger.debug(
+            "🔍 Exit check [%s]: mode=%s is_live=%s paper_override=%s "
+            "pnl=%.2f%% eff_sl=%.6f eff_tp=%.6f price=%.6f",
+            trade.get("trade_id"), trade.get("mode"), is_live, config.PAPER_TRADE,
+            pnl_pct,
+            trade.get("trailing_sl", trade.get("stop_loss", 0)),
+            trade.get("trailing_tp", trade.get("take_profit", 0)),
+            current,
+        )
 
         # HARD MAX LOSS GUARD (paper + live safety net)
         max_loss_limit = config.MAX_LOSS_PER_TRADE_PCT
@@ -887,8 +898,9 @@ def update_unrealized(prices=None, funding_rates=None):
                     changed = True
                     continue
 
-        # Use trailing values for SL hit checks (paper only — live SL handled by exchange)
-        if not is_live:
+        # Use trailing values for SL hit checks
+        # (paper mode override: always auto-close when config.PAPER_TRADE=True)
+        if should_auto_close:
             effective_sl = trade.get("trailing_sl", trade["stop_loss"])
 
             sl_hit = False
@@ -938,13 +950,13 @@ def update_unrealized(prices=None, funding_rates=None):
                     changed = True
                     continue
 
-        # ── TP OVERSHOOT SAFETY NET (paper only) ──────────────────────────
+        # ── TP OVERSHOOT SAFETY NET ──────────────────────────────────────
         # Fires when price GAPS THROUGH the TP level between heartbeats.
         # Checks PnL% directly — independent of price-based TP checks.
         # If the trade's current PnL% has exceeded what TP would give by ≥2%,
         # the trade must have passed its TP and should be closed.
-        # Example: BTC SHORT TP gives +73% at leverage, actual PnL is +99% → fire.
-        if not is_live:
+        # paper_override: also runs when config.PAPER_TRADE=True.
+        if should_auto_close:
             eff_tp = trade.get("trailing_tp", trade.get("take_profit", 0))
             lev_overshoot = trade.get("leverage", 1)
             if eff_tp and eff_tp > 0 and entry and entry > 0 and lev_overshoot > 0:
