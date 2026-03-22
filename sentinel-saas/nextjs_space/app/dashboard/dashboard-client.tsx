@@ -86,6 +86,22 @@ export function DashboardClient({ user, stats, bots, recentTrades }: DashboardCl
   const [pnlScope, setPnlScope] = useState<'session' | 'all'>('all');
   const [walletBalance, setWalletBalance] = useState<{ binance: number | null; coindcx: number | null }>({ binance: null, coindcx: null });
   const [livePrices, setLivePrices] = useState<Record<string, number>>({});
+  const [nextScanSecs, setNextScanSecs] = useState<number | null>(null);
+
+  // Tick the next-scan countdown every second
+  useEffect(() => {
+    const ANALYSIS_INTERVAL = 900; // seconds — must match config.ANALYSIS_INTERVAL_SECONDS
+    const tick = () => {
+      const ts = botState?.multi?.timestamp || botState?.state?.timestamp;
+      if (!ts) { setNextScanSecs(null); return; }
+      const elapsed = Math.floor((Date.now() - new Date(ts).getTime()) / 1000);
+      const remaining = ANALYSIS_INTERVAL - (elapsed % ANALYSIS_INTERVAL);
+      setNextScanSecs(remaining > 0 ? remaining : 0);
+    };
+    tick();
+    const t = setInterval(tick, 1000);
+    return () => clearInterval(t);
+  }, [botState?.multi?.timestamp, botState?.state?.timestamp]);
 
   const fetchBotState = useCallback(async () => {
     try {
@@ -577,6 +593,30 @@ export function DashboardClient({ user, stats, bots, recentTrades }: DashboardCl
                         </line>
                       ))}
                     </svg>
+
+                    {/* ── Next Scan Countdown ── */}
+                    <div style={{ marginTop: '-6px', textAlign: 'center' }}>
+                      {nextScanSecs !== null ? (
+                        <>
+                          <div style={{ fontSize: '10px', color: '#6B7280', letterSpacing: '2px', textTransform: 'uppercase', marginBottom: '2px' }}>
+                            Next Scan
+                          </div>
+                          <div style={{
+                            fontFamily: 'var(--font-mono, monospace)',
+                            fontSize: '22px',
+                            fontWeight: 700,
+                            color: nextScanSecs <= 60 ? '#10B981' : nextScanSecs <= 180 ? '#F59E0B' : bc,
+                            letterSpacing: '2px',
+                            textShadow: `0 0 10px ${nextScanSecs <= 60 ? '#10B981' : nextScanSecs <= 180 ? '#F59E0B' : bc}66`,
+                            transition: 'color 0.5s',
+                          }}>
+                            {`${Math.floor(nextScanSecs / 60)}:${String(nextScanSecs % 60).padStart(2, '0')}`}
+                          </div>
+                        </>
+                      ) : (
+                        <div style={{ fontSize: '11px', color: '#4B5563' }}>Engine offline</div>
+                      )}
+                    </div>
                   </div>
                 );
               })()}
