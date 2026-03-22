@@ -110,9 +110,13 @@ export async function GET(request: NextRequest) {
                 status: (t.status || '').toLowerCase(),
                 // Trailing SL fields — stored in tradebook per trade
                 trailingSl: t.trailing_sl ?? t.stop_loss ?? t.stopLoss ?? 0,
-                steppedLockLevel: t.stepped_lock_level ?? -1,   // -1=no step hit yet, 0-9=step index
-                trailSlCount: t.trail_sl_count ?? 0,             // how many times SL has moved
+                steppedLockLevel: t.stepped_lock_level ?? -1,
+                trailSlCount: t.trail_sl_count ?? 0,
                 trailingActive: t.trailing_active ?? false,
+                // Exit guard state — stamped every heartbeat
+                exitGuardActive: t.exit_guard_active ?? true,
+                exitCheckAt: t.exit_check_at ?? null,
+                exitCheckPrice: t.exit_check_price ?? null,
 
                 activePnl: t.unrealized_pnl || t.active_pnl || t.activePnl || 0,
                 activePnlPercent: t.unrealized_pnl_pct || t.activePnlPercent || 0,

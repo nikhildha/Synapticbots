@@ -806,11 +806,17 @@ def update_unrealized(prices=None, funding_rates=None):
         is_live = trade.get("mode") == "LIVE"
         should_auto_close = (not is_live) or config.PAPER_TRADE
 
-        # Diagnostic: always log exit state so prod logs can validate
-        logger.debug(
-            "🔍 Exit check [%s]: mode=%s is_live=%s paper_override=%s "
+        # ── Stamp exit guard state on trade (synced to DB + UI on next heartbeat) ──
+        from datetime import datetime as _dt
+        trade["exit_guard_active"] = should_auto_close
+        trade["exit_check_at"]    = _dt.utcnow().isoformat() + "Z"
+        trade["exit_check_price"] = round(float(current), 8)
+
+        # Diagnostic: promote to INFO so Railway logs show guard status without debug filter
+        logger.info(
+            "Exit check [%s]: mode=%s is_live=%s guard=%s "
             "pnl=%.2f%% eff_sl=%.6f eff_tp=%.6f price=%.6f",
-            trade.get("trade_id"), trade.get("mode"), is_live, config.PAPER_TRADE,
+            trade.get("trade_id"), trade.get("mode"), is_live, should_auto_close,
             pnl_pct,
             trade.get("trailing_sl", trade.get("stop_loss", 0)),
             trade.get("trailing_tp", trade.get("take_profit", 0)),

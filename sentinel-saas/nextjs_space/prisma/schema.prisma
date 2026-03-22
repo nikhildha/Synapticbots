@@ -150,6 +150,10 @@ model Trade {
   trailingActive          Boolean          @default(false)
   trailSlCount            Int              @default(0)
   steppedLockLevel        Int              @default(-1)
+  // Exit guard state — stamped every heartbeat by tradebook.update_unrealized()
+  exitGuardActive         Boolean          @default(true)   // matches should_auto_close in engine
+  exitCheckAt             DateTime?                          // UTC timestamp of last exit check run
+  exitCheckPrice          Float?                             // price used in that exit check
   capitalProtectionActive Boolean          @default(false)
   originalQty             Float?
   originalCapital         Float?

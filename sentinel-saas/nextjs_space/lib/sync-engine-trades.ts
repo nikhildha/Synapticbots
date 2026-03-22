@@ -183,6 +183,10 @@ export async function syncEngineTrades(
                     trailingActive: t.trailing_active ?? false,
                     trailSlCount: t.trail_sl_count ?? 0,
                     steppedLockLevel: t.stepped_lock_level ?? -1,
+                    // Exit guard state — stamped every heartbeat by tradebook.py
+                    exitGuardActive: t.exit_guard_active ?? true,
+                    exitCheckAt:     t.exit_check_at ? new Date(t.exit_check_at) : null,
+                    exitCheckPrice:  t.exit_check_price ?? null,
                     sessionId: activeSession?.id ?? null,
                 },
                 update: {
@@ -208,6 +212,10 @@ export async function syncEngineTrades(
                     trailingActive: t.trailing_active ?? false,
                     trailSlCount: t.trail_sl_count ?? 0,
                     steppedLockLevel: t.stepped_lock_level ?? -1,
+                    // Exit guard state — update every heartbeat
+                    exitGuardActive: t.exit_guard_active ?? true,
+                    exitCheckAt:     t.exit_check_at ? new Date(t.exit_check_at) : null,
+                    exitCheckPrice:  t.exit_check_price ?? null,
                 },
             });
 
@@ -260,8 +268,12 @@ export async function getUserTrades(userId: string, statusFilter?: string, botId
         t2Hit: t.t2Hit,
         trailing_sl: t.trailingSl,
         trailing_active: t.trailingActive,
-        trail_sl_count: t.trailSlCount,        // ← was missing: step count for SL Step column
-        stepped_lock_level: t.steppedLockLevel, // ← was missing: which step index is active
+        trail_sl_count: t.trailSlCount,
+        stepped_lock_level: t.steppedLockLevel,
+        // Exit guard fields
+        exit_guard_active: t.exitGuardActive,
+        exit_check_at:     t.exitCheckAt?.toISOString() ?? null,
+        exit_check_price:  t.exitCheckPrice ?? null,
         status: t.status.toUpperCase(),
         unrealized_pnl: t.activePnl,
         unrealized_pnl_pct: t.activePnlPercent,

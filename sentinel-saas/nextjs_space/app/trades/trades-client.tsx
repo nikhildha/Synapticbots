@@ -26,6 +26,10 @@ interface Trade {
   steppedLockLevel?: number;           // which step is active (-1=none, 0=step1…9=step10)
   trailSlCount?: number;               // how many times SL was ratcheted up
   trailingActive?: boolean;            // whether trailing has kicked in
+  // Exit guard fields
+  exitGuardActive?: boolean;           // should_auto_close — confirms exit checks are running
+  exitCheckAt?: string | null;         // ISO timestamp of last exit check heartbeat
+  exitCheckPrice?: number | null;      // price used in last exit check
 }
 
 /* ═══ Utilities ═══ */
@@ -144,11 +148,15 @@ function mapTrade(t: any): Trade {
     })(),
     botName: t.bot_name || t.botName || 'Unknown Bot',
     botId: t.bot_id || t.botId || null,
-    // Trailing SL — use trailingSl (from API) or fall back to raw trailing_sl field
+    // Trailing SL
     trailingSl: t.trailingSl ?? t.trailing_sl ?? null,
     steppedLockLevel: t.steppedLockLevel ?? t.stepped_lock_level ?? -1,
     trailSlCount: t.trailSlCount ?? t.trail_sl_count ?? 0,
     trailingActive: t.trailingActive ?? t.trailing_active ?? false,
+    // Exit guard
+    exitGuardActive: t.exitGuardActive ?? t.exit_guard_active ?? true,
+    exitCheckAt:     t.exitCheckAt     ?? t.exit_check_at     ?? null,
+    exitCheckPrice:  t.exitCheckPrice  ?? t.exit_check_price  ?? null,
   };
 }
 
@@ -623,7 +631,7 @@ export function TradesClient({ trades: initialTrades }: TradesClientProps) {
                   <table style={{ width: '100%', minWidth: '1300px', borderCollapse: 'collapse', fontSize: '17px' }}>
                     <thead>
                       <tr style={{ borderBottom: '2px solid rgba(255,255,255,0.10)' }}>
-                        {['Bot', 'Coin', 'Position', 'Leverage', 'Capital', 'Entry', 'LTP', 'Stop Loss', 'SL Step', 'Target Price', 'PnL', 'Fee', 'Net PnL', 'Exit', 'Action'].map(h => (
+                        {['Bot', 'Coin', 'Position', 'Leverage', 'Capital', 'Entry', 'LTP', 'Stop Loss', 'SL Step', 'Exit Guard', 'Target Price', 'PnL', 'Fee', 'Net PnL', 'Exit', 'Action'].map(h => (
                           <th key={h} style={{
                             padding: '12px 14px', textAlign: h === 'Bot' || h === 'Coin' ? 'left' : 'center',
                             fontSize: '13px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.8px',
@@ -730,6 +738,42 @@ export function TradesClient({ trades: initialTrades }: TradesClientProps) {
                                       Step {lvl + 1} · {stepLabels[lvl] ?? `+${(lvl + 1) * 5}%`}
                                     </span>
                                     <span style={{ fontSize: '11px', color: '#6B7280' }}>{count}× moved</span>
+                                  </div>
+                                );
+                              })() : <span style={{ fontSize: '12px', color: '#4B5563' }}>—</span>}
+                            </td>
+                            {/* Exit Guard — confirms exit checks are running for this trade */}
+                            <td style={{ padding: '12px 14px', textAlign: 'center' }}>
+                              {isActive ? (() => {
+                                const guarded = t.exitGuardActive !== false; // default true
+                                // Compute staleness in seconds from exitCheckAt
+                                let ageStr = '';
+                                if (t.exitCheckAt) {
+                                  const ageMs = Date.now() - new Date(t.exitCheckAt).getTime();
+                                  const ageSec = Math.round(ageMs / 1000);
+                                  ageStr = ageSec < 60 ? `${ageSec}s ago` : `${Math.round(ageSec / 60)}m ago`;
+                                }
+                                return (
+                                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px' }}>
+                                    <span style={{
+                                      fontSize: '11px', fontWeight: 700,
+                                      padding: '3px 9px', borderRadius: '6px',
+                                      background: guarded ? 'rgba(34,197,94,0.15)' : 'rgba(239,68,68,0.15)',
+                                      color: guarded ? '#22C55E' : '#EF4444',
+                                      border: `1px solid ${guarded ? 'rgba(34,197,94,0.3)' : 'rgba(239,68,68,0.3)'}`,
+                                    }}>
+                                      {guarded ? 'GUARDED' : 'SKIPPED'}
+                                    </span>
+                                    {ageStr && (
+                                      <span style={{ fontSize: '10px', color: ageStr.includes('m') ? '#F59E0B' : '#6B7280' }}>
+                                        {ageStr}
+                                      </span>
+                                    )}
+                                    {t.exitCheckPrice != null && (
+                                      <span style={{ fontSize: '10px', color: '#4B5563', fontFamily: 'monospace' }}>
+                                        @{t.exitCheckPrice.toFixed(4)}
+                                      </span>
+                                    )}
                                   </div>
                                 );
                               })() : <span style={{ fontSize: '12px', color: '#4B5563' }}>—</span>}
