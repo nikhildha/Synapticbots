@@ -241,8 +241,37 @@ export function DashboardClient({ user, stats, bots, recentTrades }: DashboardCl
   const formatCurrency = (value: number) => `$${value.toFixed(2)}`;
 
   const multi = botState?.multi;
-  // Prefer live trades from bot-state API; fall back to SSR Prisma trades
+  // Prefer Prisma-synced trades; fallback to raw engine trades; final fallback to SSR
   const apiTrades = botState?.tradebook?.trades || [];
+  const rawEngineActiveTrades = ((botState as any)?.tradebook?.rawTrades || []).map((t: any) => ({
+    // Normalize raw engine trade format to match getUserTrades output
+    id: `engine_${t.trade_id || t.id}`,
+    trade_id: t.trade_id || t.id,
+    symbol: t.symbol || t.coin || '',
+    coin: (t.symbol || t.coin || '').replace('USDT', ''),
+    side: (t.side || '').toUpperCase() === 'SELL' ? 'SELL' : 'BUY',
+    position: (t.side || '').toLowerCase() === 'sell' ? 'short' : 'long',
+    regime: t.regime || '',
+    confidence: t.confidence || 0,
+    mode: t.mode || 'paper',
+    leverage: t.leverage || 1,
+    capital: t.capital || 100,
+    entry_price: t.entry_price || t.entryPrice || 0,
+    current_price: t.current_price || t.currentPrice || null,
+    exit_price: t.exit_price || t.exitPrice || null,
+    stop_loss: t.stop_loss || t.stopLoss || 0,
+    take_profit: t.take_profit || t.takeProfit || 0,
+    status: 'ACTIVE',
+    unrealized_pnl: t.unrealized_pnl || 0,
+    unrealized_pnl_pct: t.unrealized_pnl_pct || 0,
+    pnl: 0,
+    entry_time: t.entry_timestamp || t.entry_time || new Date().toISOString(),
+    exit_time: null,
+    bot_name: t.bot_name || 'Synaptic',
+    bot_id: t.bot_id || '',
+    // source tag to distinguish from Prisma trades
+    _source: 'engine_raw',
+  }));
   const ssrTradesNormalized = (recentTrades || []).map((t: any) => ({
     ...t,
     symbol: t.coin || t.symbol || '',
@@ -258,7 +287,12 @@ export function DashboardClient({ user, stats, bots, recentTrades }: DashboardCl
     bot_name: 'Synaptic Adaptive',
     mode: t.mode || 'paper',
   }));
-  const trades = apiTrades.length > 0 ? apiTrades : ssrTradesNormalized;
+  // Priority: Prisma trades → raw engine trades → SSR trades
+  const trades = apiTrades.length > 0
+    ? apiTrades
+    : rawEngineActiveTrades.length > 0
+      ? rawEngineActiveTrades
+      : ssrTradesNormalized;
 
   // Extract BTC multi-timeframe data for regime card — prefer coin_states over stale state
   const btcState = multi?.coin_states?.['BTCUSDT'] || {};

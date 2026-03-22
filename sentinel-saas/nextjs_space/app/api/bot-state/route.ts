@@ -208,6 +208,12 @@ export async function GET() {
 
             tradebook: {
                 trades,
+                // RAW FALLBACK: direct engine trades for instant display (no Prisma round-trip needed)
+                // Dashboard uses these when Prisma is empty (e.g. after engine restart before first sync)
+                rawTrades: [
+                    ...(engineData?.tradebook?.trades || []),
+                    ...((primaryUrl !== secondaryUrl) ? (paperEngineData?.tradebook?.trades || []) : []),
+                ].filter((t: any) => (t.status || 'active').toLowerCase() === 'active'),
                 pending_orders: engineTrades.filter((t: any) =>
                     (t.status || '').toUpperCase() === 'OPEN' &&
                     (t.order_type || '').toUpperCase().includes('LIMIT')
