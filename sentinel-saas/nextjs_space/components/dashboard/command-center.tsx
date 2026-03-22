@@ -724,19 +724,35 @@ export function BrainExecutionSummary({ coinStates, multi, heatmap: heatmapProp,
     const getSegment = (symbol: string): string => {
         const coin = symbol.replace('USDT', '').toUpperCase();
         const map: Record<string, string> = {
+            // L1
             BTC: 'L1', ETH: 'L1', SOL: 'L1', BNB: 'L1', AVAX: 'L1', SUI: 'L1', XRP: 'L1', APT: 'L1',
-            MATIC: 'L2', ARB: 'L2', OP: 'L2', POL: 'L2', MNT: 'L2', STRK: 'L2', IMX: 'L2',
-            UNI: 'DeFi', AAVE: 'DeFi', DYDX: 'DeFi', CRV: 'DeFi', JUP: 'DeFi', RUNE: 'DeFi', LINK: 'DeFi', PENDLE: 'DeFi',
-            AXS: 'Gaming', SAND: 'Gaming', GALA: 'Gaming', PIXEL: 'Gaming', IOTX: 'Gaming', GLM: 'Gaming', ENJ: 'Gaming', YGG: 'Gaming',
-            FET: 'AI', RENDER: 'AI', WLD: 'AI', TAO: 'AI', INJ: 'AI', AKT: 'AI',
-            ONDO: 'RWA', TRU: 'RWA',
-            FIL: 'DePIN', AR: 'DePIN', HNT: 'DePIN',
-            DOGE: 'Meme', SHIB: 'Meme', PEPE: 'Meme', WIF: 'Meme', BONK: 'Meme',
-            TIA: 'Modular', DYM: 'Modular',
-            PYTH: 'Oracles',
+            ETC: 'L1', ADA: 'L1', DOT: 'L1', NEAR: 'L1', TRX: 'L1', BCH: 'L1', TON: 'L1', ICP: 'L1',
+            // L2
+            ARB: 'L2', OP: 'L2', POL: 'L2', MATIC: 'L2', STRK: 'L2', IMX: 'L2', RONIN: 'L2',
+            ZK: 'L2', MANTA: 'L2', METIS: 'L2', AXL: 'L2',
+            // DeFi
+            UNI: 'DeFi', AAVE: 'DeFi', CRV: 'DeFi', JUP: 'DeFi', RUNE: 'DeFi', PENDLE: 'DeFi',
+            LINK: 'DeFi', LDO: 'DeFi', GMX: 'DeFi', ENA: 'DeFi', SUSHI: 'DeFi', COMP: 'DeFi',
+            SNX: 'DeFi', CAKE: 'DeFi', GRT: 'DeFi',
+            // AI
+            TAO: 'AI', FET: 'AI', INJ: 'AI', WLD: 'AI', RENDER: 'AI', ARKM: 'AI',
+            // Meme
+            DOGE: 'Meme', SHIB: 'Meme', PEPE: 'Meme', BONK: 'Meme', NOT: 'Meme', MANA: 'Meme',
+            // RWA
+            ONDO: 'RWA', TRU: 'RWA', RSR: 'RWA',
+            // Gaming
+            AXS: 'Gaming', SAND: 'Gaming', PIXEL: 'Gaming', IOTX: 'Gaming', GALA: 'Gaming',
+            ENJ: 'Gaming', YGG: 'Gaming', GLM: 'Gaming',
+            // DePIN
+            AR: 'DePIN', IO: 'DePIN', JTO: 'DePIN',
+            // Modular
+            TIA: 'Modular', DYM: 'Modular', STX: 'Modular', QNT: 'Modular', ALT: 'Modular', EIGEN: 'Modular',
+            // Oracles
+            PYTH: 'Oracles', TRB: 'Oracles', API3: 'Oracles', HBAR: 'Oracles', BAND: 'Oracles',
         };
         return map[coin] || '—';
     };
+
 
     const segColors: Record<string, { bg: string; color: string }> = {
         L1: { bg: 'rgba(139,92,246,0.12)', color: '#A78BFA' },
