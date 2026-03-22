@@ -109,7 +109,7 @@ HMM_N_STATES = 3              # Bull, Chop, Bear (3-state — CRASH merged into 
 HMM_COVARIANCE = "full"       # Optimized: captures cross-feature correlations
 HMM_ITERATIONS = 100
 HMM_LOOKBACK = 250            # Candles used for training (reduced for speed)
-HMM_RETRAIN_HOURS = 24        # Retrain every N hours
+HMM_RETRAIN_HOURS = 10 / 60   # Retrain every 10 minutes (fresh model each 15-min cycle)
 
 # ─── Regime Labels (assigned post-training by sorting mean returns) ──────────
 REGIME_BULL = 0
