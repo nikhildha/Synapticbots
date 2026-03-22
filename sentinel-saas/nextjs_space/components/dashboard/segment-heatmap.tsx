@@ -42,7 +42,7 @@ export function SegmentHeatmap({ heatmapData, loading = false }: SegmentHeatmapP
               Segment Heatmap
               <span className="px-2 py-[2px] rounded text-[10px] font-bold bg-white/10 text-white/70 tracking-wider">LIVE</span>
             </h2>
-            <p className="text-[12px] text-gray-400 mt-0.5">4h Momentum × 1h Breadth — Top 4 Active Sectors</p>
+            <p className="text-[12px] text-gray-400 mt-0.5">4h Momentum × 1h Breadth — Top 2 Active Sectors</p>
           </div>
         </div>
         <div className="flex items-center justify-center h-24 rounded-xl border border-white/5 bg-white/[0.02]">
@@ -57,7 +57,7 @@ export function SegmentHeatmap({ heatmapData, loading = false }: SegmentHeatmapP
 
   // Top 4 by absolute score = the sectors the engine is actively scanning
   const absSorted = [...heatmapData.segments].sort((a, b) => b.abs_score - a.abs_score);
-  const top4Targets = absSorted.slice(0, 4).map((s) => s.segment);
+  const top2Targets = absSorted.slice(0, 2).map((s) => s.segment);
 
   return (
     <div className="mb-8 p-6 rounded-2xl border border-white/5" style={{ background: 'rgba(17, 24, 39, 0.6)', backdropFilter: 'blur(12px)' }}>
@@ -81,7 +81,7 @@ export function SegmentHeatmap({ heatmapData, loading = false }: SegmentHeatmapP
         <div className="text-right">
           <div className="text-[11px] text-gray-400 font-semibold tracking-wide uppercase mb-1">Active Scan Targets</div>
           <div className="flex items-center gap-2 flex-wrap justify-end">
-            {top4Targets.map((seg) => {
+            {top2Targets.map((seg) => {
               const segData = heatmapData.segments!.find(s => s.segment === seg);
               const isLong = segData?.direction === 'LONG';
               return (
@@ -98,7 +98,7 @@ export function SegmentHeatmap({ heatmapData, loading = false }: SegmentHeatmapP
       {/* Heatmap Grid */}
       <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
         {sortedSegments.map((seg, i) => {
-          const isHot = top4Targets.includes(seg.segment);
+          const isHot = top2Targets.includes(seg.segment);
           const isPositive = seg.blended_score >= 0;
 
           const magnitude = Math.min(Math.abs(seg.blended_score) / 3, 1);
