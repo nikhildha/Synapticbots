@@ -428,7 +428,7 @@ def get_active_bot_segment_pool(active_bots):
     """
     logger.info("🔍 Compiling segment scan pool for %d active bots...", len(active_bots))
 
-    segment_limit = getattr(config, "SEGMENT_SCAN_LIMIT", 4)
+    segment_limit = getattr(config, "SEGMENT_SCAN_LIMIT", 2)
     use_segment_filter = getattr(config, "USE_SEGMENT_FILTER", True)
 
     # ── FAST PATH: USE_SEGMENT_FILTER=True ───────────────────────────────────

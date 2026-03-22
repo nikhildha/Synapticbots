@@ -439,7 +439,7 @@ class RegimeMasterBot:
             # This keeps the dashboard heatmap live even when the pool is not being rebuilt
             try:
                 from coin_scanner import get_hottest_segments as _refresh_heatmap
-                _refresh_heatmap(getattr(config, "SEGMENT_SCAN_LIMIT", 3))
+                _refresh_heatmap(getattr(config, "SEGMENT_SCAN_LIMIT", 2))
             except Exception as _he:
                 logger.warning("⚠️  Heatmap refresh failed (non-fatal): %s", _he)
 
@@ -1173,8 +1173,13 @@ class RegimeMasterBot:
         Analyze a single coin. Returns a trade dict if eligible, else None.
         Uses multi-timeframe analysis: 1h (primary) + 4h (macro confirmation).
         """
-        # Fetch 1h data
+        # Fetch 1h data — with 1 retry + cache fallback for resilience
         df_1h = fetch_klines(symbol, config.TIMEFRAME_CONFIRMATION, limit=config.HMM_LOOKBACK)
+        if (df_1h is None or len(df_1h) < 60) and symbol == "BTCUSDT":
+            # Retry once after a short delay before declaring STALE
+            import time as _t
+            _t.sleep(2)
+            df_1h = fetch_klines(symbol, config.TIMEFRAME_CONFIRMATION, limit=config.HMM_LOOKBACK)
         if df_1h is None or len(df_1h) < 60:
             if symbol == "BTCUSDT":
                 logger.error("🚨 BTC 1h data fetch failed or too short — regime STALE")
