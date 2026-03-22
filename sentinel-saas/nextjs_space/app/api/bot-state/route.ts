@@ -91,7 +91,11 @@ export async function GET() {
                 // Note: no startedAt guard — bots may have active trades without an explicit session
                 // (engine bulk-activates bots from DB without the dashboard Start flow)
                 const isLive = (ub.config?.mode || 'paper').toLowerCase().includes('live');
-                const botEngineUrl = getEngineUrl(isLive ? 'live' : 'paper');
+                // FALLBACK FIX: If ENGINE_API_URL_PAPER is not set, fall back to primaryUrl.
+                // This handles single-engine deployments where ENGINE_API_URL IS the paper engine.
+                // Without fallback, paper bots get '' → silently skip → no sync ever.
+                const specificUrl = getEngineUrl(isLive ? 'live' : 'paper');
+                const botEngineUrl = specificUrl || primaryUrl;
                 if (!botEngineUrl) continue;
 
                 try {
@@ -210,9 +214,11 @@ export async function GET() {
                 trades,
                 // RAW FALLBACK: direct engine trades for instant display (no Prisma round-trip needed)
                 // Dashboard uses these when Prisma is empty (e.g. after engine restart before first sync)
+                // engineData is from primaryUrl (which may be the paper engine if PAPER_URL not set)
+                // paperEngineData may be null if secondary URL not configured
                 rawTrades: [
                     ...(engineData?.tradebook?.trades || []),
-                    ...((primaryUrl !== secondaryUrl) ? (paperEngineData?.tradebook?.trades || []) : []),
+                    ...((primaryUrl !== secondaryUrl && paperEngineData) ? (paperEngineData?.tradebook?.trades || []) : []),
                 ].filter((t: any) => (t.status || 'active').toLowerCase() === 'active'),
                 pending_orders: engineTrades.filter((t: any) =>
                     (t.status || '').toUpperCase() === 'OPEN' &&
