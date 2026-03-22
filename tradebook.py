@@ -852,7 +852,6 @@ def _update_single_trade(trade, book, prices, funding_rates):
             from execution_engine import ExecutionEngine
             ExecutionEngine.close_position_live(symbol)
         _close_trade_inline(trade, current, f"MAX_LOSS_{int(max_loss_limit)}%")
-        changed = True
         return
 
     # ── MULTI-TARGET EXIT CHECKS (paper + live) ──
@@ -919,7 +918,6 @@ def _update_single_trade(trade, book, prices, funding_rates):
                     from execution_engine import ExecutionEngine
                     ExecutionEngine.close_position_live(symbol)
                 _close_trade_inline(trade, current, "T3")
-                changed = True
                 return
 
     # Use trailing values for SL hit checks
@@ -956,8 +954,7 @@ def _update_single_trade(trade, book, prices, funding_rates):
             else:
                 reason = "FIXED_SL"
             _close_trade_inline(trade, current, reason)
-            changed = True
-            continue
+            return  # trade closed — stop processing this trade
 
         # Old TP hit (only when multi-target is NOT active for this trade)
         if not mt_enabled or t1_price is None:
@@ -971,7 +968,6 @@ def _update_single_trade(trade, book, prices, funding_rates):
                 ext = trade["tp_extensions"]
                 reason = f"TP_EXT_{ext}" if ext > 0 else "FIXED_TP"
                 _close_trade_inline(trade, current, reason)
-                changed = True
                 return
 
     # ── TP OVERSHOOT SAFETY NET ──────────────────────────────────────
@@ -995,7 +991,6 @@ def _update_single_trade(trade, book, prices, funding_rates):
                     trade["trade_id"], pnl_pct, expected_tp_pnl_pct, eff_tp,
                 )
                 _close_trade_inline(trade, current, "TP_OVERSHOOT")
-                changed = True
                 return
 
     changed = True
