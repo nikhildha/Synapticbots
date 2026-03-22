@@ -57,16 +57,15 @@ export async function GET(request: NextRequest) {
         // Paper bots get paper trades, live bots get live trades — no cross-contamination
         const engineTradeCache: Record<string, any[]> = {};
         for (const ub of userBots) {
-            // Note: no startedAt guard here — bots may have trades even without an active session
-            // (e.g., deployed by another process, or session cleared after engine restart)
             const botMode: EngineMode = ((ub.config as any)?.mode || 'paper').toLowerCase().includes('live') ? 'live' : 'paper';
             try {
                 if (!engineTradeCache[botMode]) {
                     engineTradeCache[botMode] = await fetchEngineTrades(botMode);
                 }
                 if (engineTradeCache[botMode].length > 0) {
-                    // Pass userId to allow orphaned-trade fallback matching (no bot_id on trade)
-                    await syncEngineTrades(engineTradeCache[botMode], ub.id, ub.startedAt, userId);
+                    // Epoch fallback: if startedAt is null, sync ALL trades (entryTime filter skipped)
+                    const syncFrom = ub.startedAt ?? new Date(0);
+                    await syncEngineTrades(engineTradeCache[botMode], ub.id, syncFrom, userId);
                 }
             } catch (err) {
                 console.error(`[trades] Sync failed for bot ${ub.id} (${botMode}):`, err);
