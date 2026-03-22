@@ -656,13 +656,6 @@ export function TradesClient({ trades: initialTrades }: TradesClientProps) {
                             <td style={{ padding: '12px 14px', color: '#0891B2', fontWeight: 600, fontSize: '14px' }}>
                               <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                                 {t.botName || 'Unknown Bot'}
-                                <span style={{
-                                  fontSize: '11px', fontWeight: 700, padding: '2px 7px', borderRadius: '4px',
-                                  background: isActive ? 'rgba(34,197,94,0.15)' : 'rgba(107,114,128,0.15)',
-                                  color: isActive ? '#22C55E' : '#9CA3AF',
-                                }}>
-                                  {isActive ? 'ACTIVE' : 'CLOSED'}
-                                </span>
                               </div>
                               {t.sessionId && (
                                 <div style={{ fontSize: '11px', color: '#6B7280', marginTop: '2px' }}>
