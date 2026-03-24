@@ -156,6 +156,12 @@ class RegimeMasterBot:
         self._pending_signals: dict = {}
         self._SIGNAL_QUEUE_TTL_SECONDS = 1800  # 30 min — 2 full 15-min cycles
 
+        # ── Veto Log ────────────────────────────────────────────────────────────
+        # Every Athena VETO is stored here with price, reason, side, conviction
+        # so the cockpit can retrospectively check what happened to the vetoed coin.
+        self._veto_log: list = []   # [{symbol, price, side, conviction, reason, ts}]
+        self._VETO_LOG_MAX = 50     # keep last 50 vetoes
+
         # ─── Coin pool configuration ─────────────────────────────────────────
         # Pool size matches config.TOP_COINS_LIMIT to scan all coins per cycle
         self._full_coin_pool: list = []
@@ -957,6 +963,19 @@ class RegimeMasterBot:
                     _bcast("ATHENA_VETO", self._cycle_count, bot_name, bot_id, sym,
                            top["side"], seg_name, top.get("confidence", 0),
                            f"Athena vetoed: {athena_decision.action} — {athena_decision.reasoning[:80]}")
+                    # ── Veto Log: record for retrospective analysis ─────────────────────────
+                    import datetime as _dt
+                    self._veto_log.append({
+                        "symbol":     sym,
+                        "price":      current_price,
+                        "side":       top.get("side", ""),
+                        "conviction": top.get("conviction", 0),
+                        "reason":     (athena_decision.reasoning or "")[:200],
+                        "action":     athena_decision.action,
+                        "ts":         _dt.datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ"),
+                    })
+                    if len(self._veto_log) > self._VETO_LOG_MAX:
+                        self._veto_log = self._veto_log[-self._VETO_LOG_MAX:]
                     continue
 
                 # ── Build trade dict ──────────────────────────────────────────────
@@ -2210,6 +2229,8 @@ class RegimeMasterBot:
             "active_bots":  [{"bot_id": b.get("bot_id"), "bot_name": b.get("bot_name"),
                               "segment": b.get("segment_filter", "ALL")}
                              for b in list(config.ENGINE_ACTIVE_BOTS)],
+            # Veto log — last 20 entries newest-first for cockpit Veto Log tab
+            "veto_log":     list(reversed(self._veto_log[-20:])),
         }
         try:
             with open(config.MULTI_STATE_FILE, "w") as f:

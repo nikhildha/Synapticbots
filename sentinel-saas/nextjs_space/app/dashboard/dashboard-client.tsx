@@ -47,6 +47,7 @@ interface BotState {
     timestamp: string | null;
     last_analysis_time?: string | null;
     next_analysis_time?: string | null;
+    veto_log?: any[];
   };
   tradebook: { trades: any[]; summary: any };
   engine?: {
@@ -713,6 +714,7 @@ export function DashboardClient({ user, stats, bots, recentTrades }: DashboardCl
                   athena={botState?.athena || { enabled: true, recent_decisions: [], model: 'gemini-2.5-flash' }}
                   coinStates={multi?.coin_states}
                   perBot={botState?.perBot || {}}
+                  vetoLog={multi?.veto_log || []}
                 />
               </div>
             </motion.div>
