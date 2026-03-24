@@ -154,7 +154,7 @@ class RegimeMasterBot:
         # Guard 4 blocked, max-cap hit, etc.). Re-attempted next cycle.
         # Format: {symbol → {result_dict, expires_at, queued_at, cycles_pending}}
         self._pending_signals: dict = {}
-        self._SIGNAL_QUEUE_TTL_SECONDS = 1440  # 24 min — 3 full 8-min cycles (ideal retry window)
+        self._SIGNAL_QUEUE_TTL_SECONDS = 480   # 8 min — 1 cycle TTL (entry lost after one retry)
 
         # ── Veto Log ────────────────────────────────────────────────────────────
         # Every Athena VETO is stored here with price, reason, side, conviction
