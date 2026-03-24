@@ -775,10 +775,13 @@ export function BrainExecutionSummary({ coinStates, multi, heatmap: heatmapProp,
         return '#6B7280';
     };
 
+    const queued = liveMulti?.pending_signals_count ?? 0;
+
     const funnelStages = [
         { label: 'SCANNED',   count: total,          color: '#9CA3AF' },
         { label: 'IN POOL',   count: inPool,         color: '#A78BFA' },
         { label: 'QUALIFIED', count: qualified,      color: '#22C55E' },
+        { label: 'QUEUED',    count: queued,         color: '#F59E0B', sub: queued > 0 ? 'next cycle' : undefined },
         { label: 'ATHENA',    count: athenaProcessed, color: '#F59E0B', sub: athenaVetoed > 0 ? `${athenaVetoed} vetoed` : undefined },
         { label: 'DEPLOYED',  count: deployed,       color: '#06B6D4' },
     ];

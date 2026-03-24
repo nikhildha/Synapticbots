@@ -2230,7 +2230,9 @@ class RegimeMasterBot:
                               "segment": b.get("segment_filter", "ALL")}
                              for b in list(config.ENGINE_ACTIVE_BOTS)],
             # Veto log — last 20 entries newest-first for cockpit Veto Log tab
-            "veto_log":     list(reversed(self._veto_log[-20:])),
+            "veto_log":              list(reversed(self._veto_log[-20:])),
+            # Signal queue depth — shown in Brain Execution Summary "QUEUED" counter
+            "pending_signals_count": len(self._pending_signals),
         }
         try:
             with open(config.MULTI_STATE_FILE, "w") as f:
