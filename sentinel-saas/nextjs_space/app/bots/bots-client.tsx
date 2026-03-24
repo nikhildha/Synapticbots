@@ -23,6 +23,8 @@ export function BotsClient({ bots: initialBots }: BotsClientProps) {
   const [stopAllLoading, setStopAllLoading] = useState(false);
   const [deleteAllLoading, setDeleteAllLoading] = useState(false);
   const [deleteAllConfirm, setDeleteAllConfirm] = useState(false);
+  const [purgeTradesLoading, setPurgeTradesLoading] = useState(false);
+  const [purgeTradesConfirm, setPurgeTradesConfirm] = useState(false);
 
   /* ── Live state ── */
   const [liveTradeCount, setLiveTradeCount] = useState(0);
@@ -179,6 +181,18 @@ export function BotsClient({ bots: initialBots }: BotsClientProps) {
     finally { setDeleteAllLoading(false); setDeleteAllConfirm(false); }
   };
 
+  const handlePurgeTrades = async () => {
+    if (!purgeTradesConfirm) { setPurgeTradesConfirm(true); setTimeout(() => setPurgeTradesConfirm(false), 4000); return; }
+    setPurgeTradesLoading(true);
+    try {
+      const res = await fetch('/api/admin/purge-trades', { method: 'POST' });
+      const d = await res.json();
+      if (res.ok) { setPurgeTradesConfirm(false); alert(`✅ Purged ${d.deleted} trades from the database.`); fetchLiveCount(); }
+      else { alert(d.error || 'Failed to purge trades'); }
+    } catch { alert('Failed to purge trades'); }
+    finally { setPurgeTradesLoading(false); setPurgeTradesConfirm(false); }
+  };
+
   const activeBots = bots.filter((b: any) => b?.status !== 'retired');
   const runningBots = activeBots.filter((b: any) => b?.isActive);
   const stoppedBots = activeBots.filter((b: any) => !b?.isActive);
@@ -245,6 +259,9 @@ export function BotsClient({ bots: initialBots }: BotsClientProps) {
                     {deleteAllLoading ? 'Deleting…' : deleteAllConfirm ? '⚠️ Confirm Delete All' : '🗑 Delete All'}
                   </button>
                 )}
+                <button onClick={handlePurgeTrades} disabled={purgeTradesLoading} className="btn-ghost" style={{ fontSize: 'var(--text-sm)', padding: '10px 16px', color: purgeTradesConfirm ? '#FCD34D' : '#9CA3AF', border: `1px solid ${purgeTradesConfirm ? 'rgba(252,211,77,0.5)' : 'rgba(156,163,175,0.2)'}`, opacity: purgeTradesLoading ? 0.6 : 1, transition: 'all 0.2s' }}>
+                  {purgeTradesLoading ? 'Purging…' : purgeTradesConfirm ? '⚠️ Confirm Purge Trades' : '🧹 Purge All Trades'}
+                </button>
                 <button onClick={() => setShowDeployModal(true)} className="btn-success" style={{ fontSize: 'var(--text-base)', padding: '11px 22px' }}>
                   <Rocket style={{ width: 16, height: 16 }} /> Deploy Launchpad
                 </button>

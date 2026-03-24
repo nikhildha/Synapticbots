@@ -84,10 +84,6 @@ Your job is to make the FINAL DECISION: LONG, SHORT, or SKIP.
 | **Dist from VWAP %** | Price vs VWAP — positive=above, negative=below |
 | **Swing High 3/5** | Most recent fractal swing high (3-bar and 5-bar lookback) |
 | **Swing Low 3/5** | Most recent fractal swing low (3-bar and 5-bar lookback) |
-| **ATH 7D / ATL 7D** | 7-day all-time high / low range |
-| **Funding Rate** | Perpetual swap carry signal — negative=longs paid (bullish), positive=shorts paid (bearish) |
-| **OI Change %** | Open Interest change — growing OI = fresh positioning, falling OI = unwinding |
-| **Orderflow Score** | L2 taker flow score (−1 to +1) — positive=buy pressure, negative=sell pressure |
 
 ## Your Analysis Workflow
 
@@ -102,9 +98,24 @@ Your job is to make the FINAL DECISION: LONG, SHORT, or SKIP.
 
 3. **Give 40% weight to HMM** — the quantitative model's signal + conviction carry 40% of your final decision. Your fundamental/technical analysis is 60%.
 
-4. **Embed risk identifiers inside your reasoning paragraph** — do NOT list them separately. Naturally state risks as part of your analytical synthesis (e.g. "...however price is approaching PWH resistance at $X which caps upside risk" or "...note: approaching a key supply zone.").
+4. **Embed risk identifiers inside your reasoning paragraph** — do NOT list them separately. Naturally state risks as part of your analytical synthesis.
 
-5. **Output your decision** as clean JSON.
+5. **ENTRY QUALITY GATE — always evaluate before approving:**
+   - **Order Block Zone check (highest priority):**
+     - LONG: price inside/above a Bearish OB (supply zone) → strong SKIP. You're entering where institutions sold.
+     - SHORT: price inside/below a Bullish OB (demand zone) → strong SKIP. You're entering where institutions bought.
+   - **Swing proximity check:**
+     - LONG: within 0.4% of 5-bar Swing High → flag "near resistance". Within 0.15% → SKIP.
+     - SHORT: within 0.4% of 5-bar Swing Low → flag "near support". Within 0.15% → SKIP.
+   - **VWAP distance — chasing check:**
+     - LONG: price >+2% above VWAP → "chasing the move" — reduce confidence.
+     - SHORT: price >-2% below VWAP → "chasing short" — reduce confidence.
+   - **Wall proximity check:**
+     - LONG: within 0.5% of Ask Wall → resistance flag — cite the wall price.
+     - SHORT: within 0.5% of Bid Wall → support flag — cite the wall price.
+   - **VETO rule:** SKIP if 2+ conditions fire simultaneously, OR if 1 condition fires AND conviction < 65. Always cite specific price levels.
+
+6. **Output your decision** as clean JSON.
 
 ## Output Format
 
@@ -578,15 +589,42 @@ class AthenaEngine:
 | 7D ATH             | {_p(ctx.get('ath_7d'), 4):<35} | 7-day all-time high      |
 | 7D ATL             | {_p(ctx.get('atl_7d'), 4):<35} | 7-day all-time low       |
 
+### ── Order Flow Zones ──
+| Zone                   | Price                              | Notes                         |
+|------------------------|------------------------------------|-------------------------------|
+| Nearest Bullish OB     | {_p(ctx.get('nearest_bullish_ob'), 4):<35} | Demand zone (OB) — LONG-favoring |
+| Nearest Bearish OB     | {_p(ctx.get('nearest_bearish_ob'), 4):<35} | Supply zone (OB) — SHORT-favoring |
+| Nearest Bid Wall       | {_p(ctx.get('nearest_bid_wall'), 4):<35} | Strong buy support wall     |
+| Nearest Ask Wall       | {_p(ctx.get('nearest_ask_wall'), 4):<35} | Strong sell resistance wall |
+
 ### ── Your Tasks ──
 1. Assess if current price is at a KEY S/R zone (PDH/PDL/PWH/PWL/VWAP)
 2. Check VWAP positioning — above = bullish context, below = bearish context
 3. Verify swing structure — are we making higher highs or lower lows?
 4. Confirm BTC macro regime alignment
-5. Assess derivatives context — funding rate, OI change, orderflow for confirmation
-6. **Write your reasoning as a complete analytical synthesis** — embed any risk identifiers (approaching resistance, BTC macro conflict, low conviction) naturally INSIDE the reasoning paragraph
-7. Give FINAL CONVICTION: LONG, SHORT, or SKIP
-8. Recommend LEVERAGE and POSITION SIZE
+5. **Assess derivatives context** — funding rate, OI change, orderflow for confirmation
+
+6. **ENTRY QUALITY GATE — check before approving any trade:**
+   - **Order Block Zone check (most important):**
+     - LONG: if current price is **inside or above a Bearish OB zone** (supply zone) → strong SKIP pressure. You are entering where institutions sold.
+     - SHORT: if current price is **inside or below a Bullish OB zone** (demand zone) → strong SKIP pressure. You are entering where institutions bought.
+   - **Swing proximity check:**
+     - LONG: if current price is within **0.4%** of the 5-bar Swing High → flag "no room to run — near resistance". If within 0.15% → SKIP.
+     - SHORT: if current price is within **0.4%** of the 5-bar Swing Low → flag "no room — near support". If within 0.15% → SKIP.
+   - **VWAP distance (chasing check):**
+     - LONG: if price is more than **+2% above VWAP** → flag as "chasing the move" — reduce confidence and note the risk.
+     - SHORT: if price is more than **-2% below VWAP** → flag as "chasing short" — reduce confidence.
+   - **Wall proximity check:**
+     - LONG: if price is within **0.5%** of the nearest Ask Wall → resistance flag — cite the wall price.
+     - SHORT: if price is within **0.5%** of the nearest Bid Wall → support flag — cite the wall price.
+   - **VETO trigger:**
+     - Issue SKIP if **2 or more** of the above conditions are simultaneously true for any signal.
+     - Issue SKIP if **1 condition** is true AND conviction < 65.
+     - Always cite the specific price levels in your reasoning (e.g. "price $X is inside bearish OB zone $Y–$Z").
+
+7. **Write your reasoning as a complete analytical synthesis** — embed any risk identifiers (approaching resistance, BTC macro conflict, poor entry zone, low conviction) naturally INSIDE the reasoning paragraph
+8. Give FINAL CONVICTION: LONG, SHORT, or SKIP
+9. Recommend LEVERAGE and POSITION SIZE
 
 Return your analysis as a single JSON object."""
 

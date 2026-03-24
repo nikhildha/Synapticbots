@@ -149,6 +149,13 @@ class RegimeMasterBot:
         self._live_prices = {}       # symbol → {ls, fr, ...} (fetched each cycle)
         self._BRAIN_CACHE_MAX = 5    # LRU eviction cap (down from 20) — strict limit protects Railway 300MB RAM tier from OOM kills
 
+        # ── Signal Queue ────────────────────────────────────────────────────────
+        # Stores HMM-qualified signals that couldn't deploy this cycle (no bots,
+        # Guard 4 blocked, max-cap hit, etc.). Re-attempted next cycle.
+        # Format: {symbol → {result_dict, expires_at, queued_at, cycles_pending}}
+        self._pending_signals: dict = {}
+        self._SIGNAL_QUEUE_TTL_SECONDS = 1800  # 30 min — 2 full 15-min cycles
+
         # ─── Coin pool configuration ─────────────────────────────────────────
         # Pool size matches config.TOP_COINS_LIMIT to scan all coins per cycle
         self._full_coin_pool: list = []
@@ -618,12 +625,6 @@ class RegimeMasterBot:
         # SOLE SOURCE OF TRUTH: tradebook active count
         tradebook_active = tradebook.get_active_trades()
         tradebook_active_count = len(tradebook_active)
-        # Build set of active (bot_id, symbol) to prevent a specific bot from duplicating a trade
-        active_bot_symbols = {(t.get('bot_id', ''), t['symbol']) for t in tradebook_active}
-        # Build set of active (user_id, symbol) to prevent a USER from duplicating a trade across multi bots
-        active_user_symbols = {(t.get('user_id', ''), t['symbol']) for t in tradebook_active}
-        # Tracks symbols deployed THIS tick to prevent double-deploying the same coin across bots
-        active_symbols: set = set()
         raw_results = []
 
         # Scan ALL symbols — do NOT skip based on other bots' deployed coins.
@@ -681,6 +682,45 @@ class RegimeMasterBot:
         # ── 5. Deploy: Top HMM coin per segment → Athena final call ────────────────
         # Sort by conviction desc so top_coins[:N] picks highest-conviction coin per segment
         raw_results.sort(key=lambda r: r.get("conviction", 0), reverse=True)
+
+        # ── Signal Queue: step 1 — evict expired signals ─────────────────────────
+        _now = time.time()
+        expired = [s for s, v in self._pending_signals.items() if v["expires_at"] < _now]
+        for s in expired:
+            logger.info("🗑️  Signal queue: evicting expired signal for %s (queued %.0f min ago)",
+                        s, (_now - self._pending_signals[s]["queued_at"]) / 60)
+            del self._pending_signals[s]
+
+        # ── Signal Queue: step 2 — enqueue this cycle's fresh qualified signals ──
+        # Any coin that passed HMM (in raw_results) updates or adds to the queue.
+        # Fresh HMM signal always overwrites a stale queued one for the same coin.
+        for _r in raw_results:
+            _sym = _r.get("symbol")
+            if not _sym:
+                continue
+            self._pending_signals[_sym] = {
+                "result":        _r,
+                "expires_at":    _now + self._SIGNAL_QUEUE_TTL_SECONDS,
+                "queued_at":     self._pending_signals.get(_sym, {}).get("queued_at", _now),
+                "cycles_pending": self._pending_signals.get(_sym, {}).get("cycles_pending", 0) + 1,
+            }
+
+        # ── Signal Queue: step 3 — merge queued-only signals into raw_results ───
+        # Coins that are queued from a previous cycle but NOT in this cycle's fresh
+        # HMM results are injected back so they get another shot at deployment.
+        fresh_syms = {r["symbol"] for r in raw_results}
+        reinjected = 0
+        for _sym, _entry in self._pending_signals.items():
+            if _sym not in fresh_syms and _entry["cycles_pending"] > 1:
+                # Mark as reinjected so dashboard can show it
+                _reinjected = dict(_entry["result"])
+                _reinjected["_queued"] = True
+                _reinjected["_cycles_pending"] = _entry["cycles_pending"]
+                raw_results.append(_reinjected)
+                reinjected += 1
+        if reinjected:
+            logger.info("📬 Signal queue: reinjected %d stale signal(s) into deploy pool", reinjected)
+            raw_results.sort(key=lambda r: r.get("conviction", 0), reverse=True)
         # For each registered segment bot:
         #   1. Find the best HMM coin in that bot's segment from raw_results
         #   2. Skip if bot already has that coin open (duplicate check)
@@ -699,6 +739,12 @@ class RegimeMasterBot:
         deployed_trades = []
         deployed = 0
         athena_calls_this_cycle = 0  # H4: track Athena calls to enforce LLM_MAX_CALLS_PER_CYCLE
+        # ── GUARD 4: Per-segment tick lock ──────────────────────────────
+        # Prevents the waterfall from cascading multiple DeFi coins across 10 bots
+        # in the same cycle (e.g. bot#1 gets COMP, bot#2 gets GMX, ..., bot#10 gets LINK).
+        # Once ANY bot deploys a coin from a segment, that segment is locked for this tick.
+        # Bots with segment_filter="ALL" are exempt (they don't share a named segment pool).
+        deployed_segments: set = set()  # segment names already served this cycle
 
         for target in _tick_active_bots:
             bot_id   = target.get("bot_id", config.ENGINE_BOT_ID)
@@ -744,6 +790,19 @@ class RegimeMasterBot:
             deploys_this_bot = 0  # counter: how many trades deployed this cycle for this bot
             max_deploys_bot = getattr(config, "MAX_DEPLOYS_PER_BOT_PER_CYCLE", 3)
 
+            # ── GUARD 4: Segment tick lock ────────────────────────────────────
+            # If this bot's named segment was already served this cycle, skip the
+            # entire waterfall. This prevents 10 bots all in "DeFi" from each
+            # deploying a different DeFi coin via the waterfall in the same tick.
+            if bot_segment_filter not in ("ALL", None) and bot_segment_filter in deployed_segments:
+                logger.info(
+                    "🔒 [%s] Segment '%s' already deployed this cycle — skip (Guard 4)",
+                    bot_name, bot_segment_filter,
+                )
+                for _cs in self._coin_states.values():
+                    _cs.get("bot_deploy_statuses", {}).setdefault(bot_id, "FILTERED: segment already served this cycle")
+                continue  # skip this bot entirely this cycle
+
             for _wf_idx, top in enumerate(waterfall_candidates):
                 if deploys_this_bot >= max_deploys_bot:
                     break  # hit max deploys for this bot this cycle
@@ -767,38 +826,6 @@ class RegimeMasterBot:
                     self._coin_states.setdefault(sym, {}).setdefault("bot_deploy_statuses", {})[bot_id] = (
                         f"FILTERED: low conviction ({conviction:.0f} < {min_conv:.0f})"
                     )
-                    continue
-
-                # ── DEDUP GUARD 1: Same bot, same coin (direction-agnostic) ──────────
-                # active_bot_symbols was built from tradebook snapshot + updated live this cycle.
-                # Catches: same bot opening same coin twice (SAND×2 bug).
-                if (bot_id, sym) in active_bot_symbols:
-                    logger.info("🔄 [%s] %s already active for THIS bot — skip (dedup guard)", bot_name, sym)
-                    self._coin_states.setdefault(sym, {}).setdefault("bot_deploy_statuses", {})[bot_id] = "FILTERED: this bot already has an active trade for this coin"
-                    _bcast("FILTERED_DUPLICATE", self._cycle_count, bot_name, bot_id, sym,
-                           top.get("side", ""), seg_name, top.get("confidence", 0),
-                           "same bot already has this coin open — skipping regardless of direction")
-                    continue
-
-                # ── DEDUP GUARD 2: Same user, any bot, same coin (direction-agnostic) ─
-                # Prevents user from holding contradictory positions across multiple bots.
-                # NOTE: only blocks if user_id is non-empty. Legacy trades with blank user_id
-                # are NOT blocked here — they are handled by DEDUP GUARD 1 above.
-                if user_id and (user_id, sym) in active_user_symbols:
-                    logger.info("🔄 [%s] %s already open for user %s (another bot) — skip", bot_name, sym, user_id)
-                    self._coin_states.setdefault(sym, {}).setdefault("bot_deploy_statuses", {})[bot_id] = "FILTERED: another bot for this user already has this coin open"
-                    _bcast("FILTERED_DUPLICATE", self._cycle_count, bot_name, bot_id, sym,
-                           top.get("side", ""), seg_name, top.get("confidence", 0),
-                           "user already trading this coin on another bot — skipping")
-                    continue
-
-                # ── DEDUP GUARD 3: Intra-tick symbol lock ────────────────────────────
-                # active_symbols is updated immediately after each successful deployment.
-                # This catches the race window where two bots both pass guards 1+2 before
-                # either trade lands in tradebook (happens when user_ids differ or are blank).
-                if sym in active_symbols:
-                    logger.info("🔒 [%s] %s already deployed THIS tick by another bot — skip (intra-tick lock)", bot_name, sym)
-                    self._coin_states.setdefault(sym, {}).setdefault("bot_deploy_statuses", {})[bot_id] = "FILTERED: coin already deployed this tick"
                     continue
 
                 # ── C4 Fix: Enforce MAX_OPEN_TRADES cap ──────────────────────────
@@ -891,6 +918,11 @@ class RegimeMasterBot:
                             "swing_low_5":     mkt_struct.get("swing_low_5"),
                             "ath_7d":          mkt_struct.get("ath_7d"),
                             "atl_7d":          mkt_struct.get("atl_7d"),
+                            # ── Entry quality: OB zones + order walls ────
+                            "nearest_bullish_ob": top.get("nearest_bullish_ob"),  # demand zone
+                            "nearest_bearish_ob": top.get("nearest_bearish_ob"),  # supply zone
+                            "nearest_bid_wall":   top.get("nearest_bid_wall"),    # bid wall price
+                            "nearest_ask_wall":   top.get("nearest_ask_wall"),    # ask wall price
                         }
                         athena_decision = self._athena.validate_signal(llm_ctx)
                         # Only count REAL Gemini API calls — cached decisions are free.
@@ -1084,9 +1116,14 @@ class RegimeMasterBot:
                     "entry_price": entry_price,
                     "quantity": fill_qty,
                 }
-                active_symbols.add(sym)
-                active_user_symbols.add((user_id, sym))
-                active_bot_symbols.add((bot_id, sym))  # keep live — blocks intra-cycle same-bot dupe
+                # Guard 4: lock this segment for the rest of the cycle
+                if bot_segment_filter not in ("ALL", None):
+                    deployed_segments.add(bot_segment_filter)
+                # Signal Queue: step 4 — dequeue successfully deployed coin
+                if sym in self._pending_signals:
+                    logger.info("✅ Signal queue: dequeuing %s (deployed after %d cycle(s) pending)",
+                                sym, self._pending_signals[sym].get("cycles_pending", 1))
+                    del self._pending_signals[sym]
 
                 self._trade_count += 1
                 deployed += 1
@@ -1701,6 +1738,10 @@ class RegimeMasterBot:
         # 3. 5m momentum filter + order flow (fetch df_5m once for both)
         df_5m = None
         orderflow_score = None
+        nearest_bullish_ob = None
+        nearest_bearish_ob = None
+        nearest_bid_wall   = None
+        nearest_ask_wall   = None
         try:
             df_5m = fetch_klines(symbol, config.TIMEFRAME_EXECUTION, limit=50)
             if df_5m is not None and len(df_5m) >= 5:
@@ -1715,6 +1756,10 @@ class RegimeMasterBot:
                 of_sig = self._orderflow.get_signal(symbol, df_5m)
                 if of_sig is not None:
                     orderflow_score = of_sig.score
+                    nearest_bullish_ob = of_sig.nearest_bullish_ob
+                    nearest_bearish_ob = of_sig.nearest_bearish_ob
+                    nearest_bid_wall   = of_sig.nearest_bid_wall
+                    nearest_ask_wall   = of_sig.nearest_ask_wall
                     # Export detailed metrics for dashboard (v2 — multi-exchange + OB)
                     self._coin_states[symbol]["orderflow_details"] = {
                         "score": round(of_sig.score, 2),
@@ -1795,6 +1840,11 @@ class RegimeMasterBot:
             "funding_rate": round(funding, 6) if funding is not None else None,
             "oi_change":    round(oi_chg, 4)  if oi_chg  is not None else None,
             "orderflow_score": round(orderflow_score, 3) if orderflow_score is not None else None,
+            # ── Entry quality context for Athena ─────────────────────────────
+            "nearest_bullish_ob": nearest_bullish_ob,  # Demand zone from OB detector
+            "nearest_bearish_ob": nearest_bearish_ob,  # Supply zone from OB detector
+            "nearest_bid_wall":   nearest_bid_wall,    # Closest bid wall price (support)
+            "nearest_ask_wall":   nearest_ask_wall,    # Closest ask wall price (resistance)
             "tf_breakdown":    tf_breakdown,   # ← passed to Athena context
             "tf_agreement":    tf_agreement,
             "reason": f"Trend {regime_name} | conf={conf:.0%} | conv={conviction:.1f}{of_note}",

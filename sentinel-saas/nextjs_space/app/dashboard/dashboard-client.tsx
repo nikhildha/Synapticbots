@@ -434,7 +434,7 @@ export function DashboardClient({ user, stats, bots, recentTrades }: DashboardCl
 
   const liveStats = {
     activeBots: stats?.activeBots ?? (bots?.filter((b: any) => b?.isActive)?.length ?? 0),
-    activeTrades: liveActiveTrades.length || stats?.activeTrades || 0,
+    activeTrades: bots.length === 0 ? 0 : (liveActiveTrades.length || stats?.activeTrades || 0),
     totalPnl: paperTotalPnl + liveTotalModePnl, // from tradebook, not recalculated
     paperTotalPnl,
     paperPnlPct,
