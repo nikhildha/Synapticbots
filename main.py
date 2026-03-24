@@ -1004,6 +1004,26 @@ class RegimeMasterBot:
                         del self._pending_signals[sym]
                     continue
 
+                # ── Athena EXECUTE: fire Telegram signal alert ────────────────────
+                # SL/TP from Athena suggested values (will be refined during deploy)
+                _a_sl = getattr(athena_decision, "suggested_sl", 0) or 0
+                _a_tp = getattr(athena_decision, "suggested_tp", 0) or 0
+                try:
+                    import telegram as _tg
+                    _tg.notify_athena_signal(
+                        sym=sym,
+                        side=top.get("side", ""),
+                        conviction_pct=athena_decision.adjusted_confidence * 100,
+                        entry_price=current_price,
+                        sl=_a_sl,
+                        tp=_a_tp,
+                        segment=seg_name,
+                        reasoning=athena_decision.reasoning or "",
+                        bot_name=bot_name,
+                    )
+                except Exception:
+                    pass  # Never block deploy on notification failure
+
                 # ── Build trade dict ──────────────────────────────────────────────
                 capital     = target.get("capital_per_trade") or getattr(config, "CAPITAL_PER_TRADE", 100.0)
                 qty         = (capital * lev) / max(current_price, 0.0001)
@@ -1230,6 +1250,9 @@ class RegimeMasterBot:
             # Collect per-coin scan results from _coin_states
             coin_results = []
             for sym, state in self._coin_states.items():
+                # Stamp segment onto state (single source of truth from config.CRYPTO_SEGMENTS)
+                if "segment" not in state:
+                    state["segment"] = get_segment_for_coin(sym)
                 coin_results.append({
                     "symbol":        sym,
                     "regime":        state.get("regime"),

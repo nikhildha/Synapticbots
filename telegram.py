@@ -140,6 +140,47 @@ def notify_batch_entries(trades):
     send_message_async(msg)
 
 
+def notify_athena_signal(sym, side, conviction_pct, entry_price, sl, tp, segment, reasoning, bot_name=""):
+    """
+    Fire when Athena approves a coin — before the trade actually deploys.
+    This is the 'signal' alert; notify_batch_entries fires on confirmed deploy.
+    """
+    if not _read_env_val("TELEGRAM_NOTIFY_TRADES", "true").lower() == "true":
+        return
+
+    emoji = "🟢" if side in ("BUY", "LONG") else "🔴"
+    dir_label = "LONG ↑" if side in ("BUY", "LONG") else "SHORT ↓"
+
+    # Shorten reasoning to first sentence / 120 chars
+    short_reason = (reasoning or "").split(".")[0].strip()
+    if len(short_reason) > 120:
+        short_reason = short_reason[:117] + "…"
+
+    # Format prices — use 6dp for small prices, 2dp for large
+    def fmt(p):
+        if p and p > 0:
+            return f"{p:.6f}" if p < 10 else f"{p:.2f}"
+        return "N/A"
+
+    sl_pct = abs((sl - entry_price) / entry_price * 100) if entry_price and sl else 0
+    tp_pct = abs((tp - entry_price) / entry_price * 100) if entry_price and tp else 0
+
+    msg = (
+        f"🏛️ <b>ATHENA SIGNAL</b> — {segment}\n"
+        f"━━━━━━━━━━━━━━━━━━\n"
+        f"{emoji} <b>{sym.replace('USDT','')}</b> · {dir_label} · <b>{conviction_pct:.0f}% conviction</b>\n"
+        f"\n"
+        f"📍 Entry:  <code>{fmt(entry_price)}</code>\n"
+        f"🛑 SL:     <code>{fmt(sl)}</code>  <i>(-{sl_pct:.1f}%)</i>\n"
+        f"🎯 TP:     <code>{fmt(tp)}</code>  <i>(+{tp_pct:.1f}%)</i>\n"
+        f"\n"
+        f"💡 <i>{short_reason}</i>\n"
+        f"{'🤖 ' + bot_name if bot_name else ''}"
+        f"🕐 {datetime.utcnow().strftime('%H:%M:%S UTC')}"
+    )
+    send_message_async(msg)
+
+
 def notify_trade_close(trade):
     """Send notification when a trade is closed."""
     if not config.TELEGRAM_NOTIFY_TRADES:
