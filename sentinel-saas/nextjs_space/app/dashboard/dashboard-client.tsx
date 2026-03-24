@@ -48,6 +48,8 @@ interface BotState {
     last_analysis_time?: string | null;
     next_analysis_time?: string | null;
     veto_log?: any[];
+    pending_signals_count?: number;
+    pending_signals_detail?: { symbol: string; queue_reason: string; cycles_pending: number; conviction: number; side: string; expires_in_sec: number }[];
   };
   tradebook: { trades: any[]; summary: any };
   engine?: {
@@ -804,7 +806,7 @@ export function DashboardClient({ user, stats, bots, recentTrades }: DashboardCl
             transition={{ delay: 0.35 }}
             className="mt-8"
           >
-            <BrainExecutionSummary coinStates={multi?.coin_states || {}} multi={multi} heatmap={botState?.heatmap || null} botId={bots.find(b => b.isActive)?.id || bots[0]?.id} />
+            <BrainExecutionSummary coinStates={multi?.coin_states || {}} multi={multi} heatmap={botState?.heatmap || null} botId={bots.find(b => b.isActive)?.id || bots[0]?.id} pendingSignals={multi?.pending_signals_detail || []} />
           </motion.div>
 
         </div>

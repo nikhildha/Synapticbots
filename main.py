@@ -2257,8 +2257,19 @@ class RegimeMasterBot:
                              for b in list(config.ENGINE_ACTIVE_BOTS)],
             # Veto log — last 20 entries newest-first for cockpit Veto Log tab
             "veto_log":              list(reversed(self._veto_log[-20:])),
-            # Signal queue depth — shown in Brain Execution Summary "QUEUED" counter
+            # Signal queue — count + detail for Brain Execution Summary
             "pending_signals_count": len(self._pending_signals),
+            "pending_signals_detail": [
+                {
+                    "symbol":         sym,
+                    "queue_reason":   entry.get("queue_reason", "unknown"),
+                    "cycles_pending": entry.get("cycles_pending", 1),
+                    "conviction":     entry.get("result", {}).get("conviction", 0),
+                    "side":           entry.get("result", {}).get("side", ""),
+                    "expires_in_sec": max(0, round(entry.get("expires_at", 0) - time.time())),
+                }
+                for sym, entry in self._pending_signals.items()
+            ],
         }
         try:
             with open(config.MULTI_STATE_FILE, "w") as f:

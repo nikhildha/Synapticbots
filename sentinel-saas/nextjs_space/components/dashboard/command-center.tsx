@@ -598,9 +598,10 @@ interface BrainExecutionProps {
     multi?: any;
     heatmap?: any;
     botId?: string;
+    pendingSignals?: { symbol: string; queue_reason: string; cycles_pending: number; conviction: number; side: string; expires_in_sec: number }[];
 }
 
-export function BrainExecutionSummary({ coinStates, multi, heatmap: heatmapProp, botId }: BrainExecutionProps) {
+export function BrainExecutionSummary({ coinStates, multi, heatmap: heatmapProp, botId, pendingSignals = [] }: BrainExecutionProps) {
     const [expandedCoin, setExpandedCoin] = useState<string | null>(null);
     const [liveMulti, setLiveMulti] = useState<any>(multi);
     const [liveCoinStates, setLiveCoinStates] = useState<Record<string, any>>(coinStates || {});
@@ -800,6 +801,63 @@ export function BrainExecutionSummary({ coinStates, multi, heatmap: heatmapProp,
                     Full pipeline visibility — Segment → HMM → Athena → Deploy
                 </p>
             </div>
+
+            {/* ═══ Signal Queue Panel ══════════════════════════════════════ */}
+            {pendingSignals.length > 0 && (
+                <div style={{
+                    marginBottom: '16px', padding: '14px 16px',
+                    background: 'rgba(245,158,11,0.05)',
+                    border: '1px solid rgba(245,158,11,0.2)',
+                    borderRadius: '12px',
+                    display: 'flex', flexDirection: 'column', gap: 10,
+                }}>
+                    <div style={{ fontSize: '11px', fontWeight: 700, color: '#F59E0B', letterSpacing: '1.5px', textTransform: 'uppercase' }}>
+                        📥 Signal Queue — Athena-Approved, Awaiting Deploy
+                    </div>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                        {pendingSignals.map((s: any) => { // Assuming 'any' type for pendingSignals items as the interface is not provided
+                            const isLong = s.side === 'BUY' || s.side === 'LONG';
+                            const reasonLabel = s.queue_reason === 'guard4_segment_locked'
+                                ? 'Guard 4'
+                                : s.queue_reason === 'no_bots'
+                                ? 'No Bots'
+                                : s.queue_reason;
+                            const ttlMin = Math.ceil(s.expires_in_sec / 60);
+                            return (
+                                <div key={s.symbol} style={{
+                                    display: 'flex', alignItems: 'center', gap: 8,
+                                    background: 'rgba(245,158,11,0.08)',
+                                    border: '1px solid rgba(245,158,11,0.25)',
+                                    borderRadius: 8, padding: '6px 12px',
+                                }}>
+                                    <span style={{ fontWeight: 800, color: '#E8EDF5', fontFamily: 'monospace', fontSize: 13 }}>
+                                        {s.symbol.replace('USDT', '')}
+                                    </span>
+                                    <span style={{
+                                        fontSize: 10, fontWeight: 700,
+                                        color: isLong ? '#00FF88' : '#FF3B5C',
+                                        background: isLong ? 'rgba(0,255,136,0.08)' : 'rgba(255,59,92,0.08)',
+                                        padding: '2px 6px', borderRadius: 4,
+                                    }}>
+                                        {isLong ? 'LONG' : 'SHORT'}
+                                    </span>
+                                    <span style={{ fontSize: 10, color: '#9CA3AF' }}>
+                                        Conv: <strong style={{ color: '#F59E0B' }}>{s.conviction?.toFixed(0)}%</strong>
+                                    </span>
+                                    <span style={{
+                                        fontSize: 10, color: '#6B7280',
+                                        background: 'rgba(255,255,255,0.05)',
+                                        padding: '2px 6px', borderRadius: 4,
+                                    }}>
+                                        {reasonLabel}
+                                    </span>
+                                    <span style={{ fontSize: 10, color: '#4B5563' }}>TTL {ttlMin}m</span>
+                                </div>
+                            );
+                        })}
+                    </div>
+                </div>
+            )}
 
             {/* ── Pipeline Funnel ──────────────────────────────────────── */}
             <div style={{
