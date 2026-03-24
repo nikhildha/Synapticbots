@@ -697,35 +697,36 @@ class RegimeMasterBot:
                         s, (_now - self._pending_signals[s]["queued_at"]) / 60)
             del self._pending_signals[s]
 
-        # ── Signal Queue: step 2 — enqueue this cycle's fresh qualified signals ──
-        # Any coin that passed HMM (in raw_results) updates or adds to the queue.
-        # Fresh HMM signal always overwrites a stale queued one for the same coin.
-        for _r in raw_results:
-            _sym = _r.get("symbol")
-            if not _sym:
-                continue
-            self._pending_signals[_sym] = {
-                "result":        _r,
-                "expires_at":    _now + self._SIGNAL_QUEUE_TTL_SECONDS,
-                "queued_at":     self._pending_signals.get(_sym, {}).get("queued_at", _now),
-                "cycles_pending": self._pending_signals.get(_sym, {}).get("cycles_pending", 0) + 1,
-            }
+        # ── Signal Queue: step 2 — if NO bots registered, queue all fresh HMM signals ──
+        # (Bot loop won't run at all, so Athena can't evaluate them — safe to pre-queue)
+        if not _tick_active_bots:
+            for _r in raw_results:
+                _sym = _r.get("symbol")
+                if not _sym:
+                    continue
+                self._pending_signals[_sym] = {
+                    "result":         _r,
+                    "expires_at":     _now + self._SIGNAL_QUEUE_TTL_SECONDS,
+                    "queued_at":      self._pending_signals.get(_sym, {}).get("queued_at", _now),
+                    "cycles_pending": self._pending_signals.get(_sym, {}).get("cycles_pending", 0) + 1,
+                    "queue_reason":   "no_bots",
+                }
+            if raw_results:
+                logger.info("📥 Signal queue: pre-queued %d HMM signals (no bots registered)", len(raw_results))
 
-        # ── Signal Queue: step 3 — merge queued-only signals into raw_results ───
-        # Coins that are queued from a previous cycle but NOT in this cycle's fresh
-        # HMM results are injected back so they get another shot at deployment.
+        # ── Signal Queue: step 3 — reinject queued signals from previous cycle into deploy pool ──
+        # Only coins that were Athena-approved-but-blocked (not vetoed) land here.
         fresh_syms = {r["symbol"] for r in raw_results}
         reinjected = 0
-        for _sym, _entry in self._pending_signals.items():
-            if _sym not in fresh_syms and _entry["cycles_pending"] > 1:
-                # Mark as reinjected so dashboard can show it
+        for _sym, _entry in list(self._pending_signals.items()):
+            if _sym not in fresh_syms and _entry["cycles_pending"] >= 1:
                 _reinjected = dict(_entry["result"])
                 _reinjected["_queued"] = True
                 _reinjected["_cycles_pending"] = _entry["cycles_pending"]
                 raw_results.append(_reinjected)
                 reinjected += 1
         if reinjected:
-            logger.info("📬 Signal queue: reinjected %d stale signal(s) into deploy pool", reinjected)
+            logger.info("📬 Signal queue: reinjected %d Athena-approved signal(s) from last cycle", reinjected)
             raw_results.sort(key=lambda r: r.get("conviction", 0), reverse=True)
         # For each registered segment bot:
         #   1. Find the best HMM coin in that bot's segment from raw_results
@@ -807,6 +808,24 @@ class RegimeMasterBot:
                 )
                 for _cs in self._coin_states.values():
                     _cs.get("bot_deploy_statuses", {}).setdefault(bot_id, "FILTERED: segment already served this cycle")
+                # ── Signal Queue: queue top Athena-approved coin in this segment that got Guard-4-blocked ──
+                # We don't have Athena output yet (loop skipped), so queue the top HMM result
+                # for this bot's segment so it retries next cycle when the segment lock resets.
+                _seg_candidates = [r for r in raw_results if r.get("symbol") in (bot_allowed_coins or set())]
+                if not _seg_candidates and bot_allowed_coins is None:
+                    _seg_candidates = raw_results
+                if _seg_candidates:
+                    _top_blocked = _seg_candidates[0]
+                    _bsym = _top_blocked.get("symbol")
+                    if _bsym and _bsym not in self._pending_signals:
+                        self._pending_signals[_bsym] = {
+                            "result":         _top_blocked,
+                            "expires_at":     _now + self._SIGNAL_QUEUE_TTL_SECONDS,
+                            "queued_at":      _now,
+                            "cycles_pending": 1,
+                            "queue_reason":   "guard4_segment_locked",
+                        }
+                        logger.info("📥 Signal queue: queued %s (Guard 4 blocked segment %s)", _bsym, bot_segment_filter)
                 continue  # skip this bot entirely this cycle
 
             for _wf_idx, top in enumerate(waterfall_candidates):
