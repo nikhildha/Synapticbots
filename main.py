@@ -699,7 +699,7 @@ class RegimeMasterBot:
 
         # ── Signal Queue: step 2 — if NO bots registered, queue all fresh HMM signals ──
         # (Bot loop won't run at all, so Athena can't evaluate them — safe to pre-queue)
-        if not _tick_active_bots:
+        if not config.ENGINE_ACTIVE_BOTS:
             for _r in raw_results:
                 _sym = _r.get("symbol")
                 if not _sym:
