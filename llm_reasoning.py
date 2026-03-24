@@ -100,20 +100,27 @@ Your job is to make the FINAL DECISION: LONG, SHORT, or SKIP.
 
 4. **Embed risk identifiers inside your reasoning paragraph** — do NOT list them separately. Naturally state risks as part of your analytical synthesis.
 
-5. **ENTRY QUALITY GATE — always evaluate before approving:**
-   - **Order Block Zone check (highest priority):**
-     - LONG: price inside/above a Bearish OB (supply zone) → strong SKIP. You're entering where institutions sold.
-     - SHORT: price inside/below a Bullish OB (demand zone) → strong SKIP. You're entering where institutions bought.
-   - **Swing proximity check:**
-     - LONG: within 0.4% of 5-bar Swing High → flag "near resistance". Within 0.15% → SKIP.
-     - SHORT: within 0.4% of 5-bar Swing Low → flag "near support". Within 0.15% → SKIP.
-   - **VWAP distance — chasing check:**
-     - LONG: price >+2% above VWAP → "chasing the move" — reduce confidence.
-     - SHORT: price >-2% below VWAP → "chasing short" — reduce confidence.
-   - **Wall proximity check:**
-     - LONG: within 0.5% of Ask Wall → resistance flag — cite the wall price.
-     - SHORT: within 0.5% of Bid Wall → support flag — cite the wall price.
-   - **VETO rule:** SKIP if 2+ conditions fire simultaneously, OR if 1 condition fires AND conviction < 65. Always cite specific price levels.
+5. **ENTRY QUALITY GATE — Tiered Check (always run before approving):**
+
+   **Tier 1 — Order Block Zones (use when OB data is available, i.e. not N/A):**
+   - LONG: price inside/above a Bearish OB (supply zone) → strong SKIP. You're entering where institutions sold.
+   - SHORT: price inside/below a Bullish OB (demand zone) → strong SKIP. You're entering where institutions bought.
+   - If both Bullish OB and Bearish OB are N/A → skip Tier 1 entirely, proceed to Tier 2.
+
+   **Tier 2 — Swing High/Low Proximity (always available, primary fallback when OB is N/A):**
+   - LONG: within 0.4% of 5-bar Swing High → flag "near resistance — no room to run". Within 0.15% → SKIP.
+   - SHORT: within 0.4% of 5-bar Swing Low → flag "near support — no room to fall". Within 0.15% → SKIP.
+   - LONG: within 0.3% of PDH or PWH → flag "entering at daily/weekly resistance zone".
+   - SHORT: within 0.3% of PDL or PWL → flag "entering at daily/weekly support zone".
+
+   **Tier 3 — VWAP & Wall Checks (always run):**
+   - LONG: price >+2% above VWAP → "chasing the move" — reduce confidence.
+   - SHORT: price >-2% below VWAP → "chasing short" — reduce confidence.
+   - LONG: within 0.5% of Ask Wall → resistance flag — cite wall price.
+   - SHORT: within 0.5% of Bid Wall → support flag — cite wall price.
+
+   **VETO rule:** SKIP if 2+ conditions fire simultaneously across any tiers, OR if 1 condition fires AND conviction < 65.
+   Always cite specific price levels. Never approve without completing all applicable tiers.
 
 6. **Output your decision** as clean JSON.
 
@@ -604,23 +611,28 @@ class AthenaEngine:
 4. Confirm BTC macro regime alignment
 5. **Assess derivatives context** — funding rate, OI change, orderflow for confirmation
 
-6. **ENTRY QUALITY GATE — check before approving any trade:**
-   - **Order Block Zone check (most important):**
-     - LONG: if current price is **inside or above a Bearish OB zone** (supply zone) → strong SKIP pressure. You are entering where institutions sold.
-     - SHORT: if current price is **inside or below a Bullish OB zone** (demand zone) → strong SKIP pressure. You are entering where institutions bought.
-   - **Swing proximity check:**
-     - LONG: if current price is within **0.4%** of the 5-bar Swing High → flag "no room to run — near resistance". If within 0.15% → SKIP.
-     - SHORT: if current price is within **0.4%** of the 5-bar Swing Low → flag "no room — near support". If within 0.15% → SKIP.
-   - **VWAP distance (chasing check):**
-     - LONG: if price is more than **+2% above VWAP** → flag as "chasing the move" — reduce confidence and note the risk.
-     - SHORT: if price is more than **-2% below VWAP** → flag as "chasing short" — reduce confidence.
-   - **Wall proximity check:**
-     - LONG: if price is within **0.5%** of the nearest Ask Wall → resistance flag — cite the wall price.
-     - SHORT: if price is within **0.5%** of the nearest Bid Wall → support flag — cite the wall price.
-   - **VETO trigger:**
-     - Issue SKIP if **2 or more** of the above conditions are simultaneously true for any signal.
-     - Issue SKIP if **1 condition** is true AND conviction < 65.
-     - Always cite the specific price levels in your reasoning (e.g. "price $X is inside bearish OB zone $Y–$Z").
+6. **ENTRY QUALITY GATE — Tiered entry check (mandatory before any LONG/SHORT approval):**
+
+   **→ Tier 1: Order Block Zones** *(only if OB data is NOT N/A)*
+   - LONG: price inside or above the **Bearish OB** (supply zone) → strong SKIP. Entering where institutions sold.
+   - SHORT: price inside or below the **Bullish OB** (demand zone) → strong SKIP. Entering where institutions bought.
+   - If both OBs are N/A → skip Tier 1, move directly to Tier 2.
+
+   **→ Tier 2: Swing High/Low + Key S/R Proximity** *(always run — primary fallback when OB is N/A)*
+   - LONG: current price within **0.4%** of 5-bar Swing High → flag "near resistance, no room to run". Within **0.15%** → SKIP.
+   - SHORT: current price within **0.4%** of 5-bar Swing Low → flag "near support, no room to fall". Within **0.15%** → SKIP.
+   - LONG: price within **0.3%** of PDH or PWH → flag "approaching daily/weekly resistance".
+   - SHORT: price within **0.3%** of PDL or PWL → flag "approaching daily/weekly support".
+   - If Swing Highs/Lows are also N/A, use PDH/PDL/PWH/PWL as the sole S/R reference.
+
+   **→ Tier 3: VWAP & Orderbook Walls** *(always run)*
+   - LONG: price more than **+2% above VWAP** → flag "chasing the move" — reduce confidence.
+   - SHORT: price more than **-2% below VWAP** → flag "chasing short" — reduce confidence.
+   - LONG: within **0.5%** of Ask Wall → resistance flag. Cite wall price.
+   - SHORT: within **0.5%** of Bid Wall → support flag. Cite wall price.
+
+   **VETO trigger:** Issue SKIP if **2 or more** conditions fire across any tiers simultaneously, OR if **1 condition** fires AND conviction < 65.
+   Always cite the specific price levels that triggered each condition.
 
 7. **Write your reasoning as a complete analytical synthesis** — embed any risk identifiers (approaching resistance, BTC macro conflict, poor entry zone, low conviction) naturally INSIDE the reasoning paragraph
 8. Give FINAL CONVICTION: LONG, SHORT, or SKIP
