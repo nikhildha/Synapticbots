@@ -156,6 +156,23 @@ class RegimeMasterBot:
         self._pending_signals: dict = {}
         self._SIGNAL_QUEUE_TTL_SECONDS = 480   # 8 min — 1 cycle TTL (entry lost after one retry)
 
+        # ── Startup: wipe stale signal queue from persisted state file ─────────
+        # Without this, the dashboard shows ghost signals from the previous crash
+        # for up to 2 minutes until the first cycle completes and overwrites state.
+        try:
+            _state_path = getattr(config, "MULTI_STATE_FILE", None)
+            if _state_path and os.path.exists(_state_path):
+                import json as _json_tmp
+                with open(_state_path, "r") as _f:
+                    _stale = _json_tmp.load(_f)
+                _stale["pending_signals_count"] = 0
+                _stale["pending_signals_detail"] = []
+                with open(_state_path, "w") as _f:
+                    _json_tmp.dump(_stale, _f, indent=2)
+                logger.info("🧹 Startup: cleared stale signal queue from persisted state")
+        except Exception:
+            pass  # Non-fatal — state will be overwritten after first cycle anyway
+
         # ── Veto Log ────────────────────────────────────────────────────────────
         # Every Athena VETO is stored here with price, reason, side, conviction
         # so the cockpit can retrospectively check what happened to the vetoed coin.
