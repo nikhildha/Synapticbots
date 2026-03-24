@@ -999,6 +999,28 @@ class RegimeMasterBot:
                         # Per-TF HMM predictions — passed from _analyze_coin via top dict
                         tf_summary = top.get("tf_breakdown", {})
 
+                        # ── BTC Correlation ───────────────────────────────────────────────
+                        # Pearson corr of 1h log-returns (last 100 bars). Gives Athena a
+                        # quantitative basis to decide how much BTC macro should matter.
+                        # High-β coins (≥0.85): BTC regime is very relevant.
+                        # Low-β coins (≤0.50): trade on own signal, BTC less relevant.
+                        _btc_correlation = None
+                        try:
+                            from data_pipeline import fetch_klines as _fk
+                            _c_df  = _fk(sym,      "1h", 100)
+                            _b_df  = _fk("BTCUSDT", "1h", 100)
+                            if _c_df is not None and _b_df is not None and len(_c_df) >= 20 and len(_b_df) >= 20:
+                                import numpy as _np
+                                _c_ret = _c_df["close"].pct_change().dropna()
+                                _b_ret = _b_df["close"].pct_change().dropna()
+                                _n = min(len(_c_ret), len(_b_ret))
+                                _btc_correlation = round(float(_np.corrcoef(
+                                    _c_ret.iloc[-_n:].values,
+                                    _b_ret.iloc[-_n:].values
+                                )[0, 1]), 3)
+                        except Exception:
+                            pass  # Non-fatal — Athena will see N/A
+
                         llm_ctx = {
                             # ── Core signal ──────────────────────────────
                             "ticker":          sym,
@@ -1019,6 +1041,7 @@ class RegimeMasterBot:
                             # ── BTC macro ────────────────────────────────
                             "btc_regime":      self._coin_states.get("BTCUSDT", {}).get("regime", "UNKNOWN"),
                             "btc_margin":      self._coin_states.get("BTCUSDT", {}).get("confidence", 0),
+                            "btc_correlation": _btc_correlation,   # Pearson 1h/100bar (None=unavailable)
                             # ── Derivatives context (from conviction score) ────
                             "funding_rate":    top.get("funding_rate"),   # float or None
                             "oi_change":       top.get("oi_change"),      # % OI change

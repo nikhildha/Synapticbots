@@ -576,6 +576,7 @@ class AthenaEngine:
 ### ── BTC Macro Context ──
 - BTC Regime       : {ctx.get('btc_regime', 'N/A')}
 - BTC HMM Margin   : {ctx.get('btc_margin', 0):.3f}
+- BTC Correlation  : {f"{ctx['btc_correlation']:.3f}  ({'HIGH β — BTC regime is very relevant' if ctx['btc_correlation'] >= 0.75 else 'MEDIUM β — partial BTC influence' if ctx['btc_correlation'] >= 0.45 else 'LOW β — coin trades on own merit'})" if ctx.get('btc_correlation') is not None else 'N/A'}
 
 ### ── Derivatives Context ──
 {derivatives_block}
