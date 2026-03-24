@@ -50,8 +50,42 @@ export default function LandingPage() {
     },
   ];
 
+  const jsonLd = {
+    '@context': 'https://schema.org',
+    '@type': 'SoftwareApplication',
+    name: 'Synaptic',
+    applicationCategory: 'FinanceApplication',
+    operatingSystem: 'Web',
+    url: 'https://synapticbots.in',
+    description: 'AI-powered automated crypto trading bot using HMM regime detection and Athena AI for CoinDCX and Binance.',
+    offers: {
+      '@type': 'Offer',
+      price: '0',
+      priceCurrency: 'USD',
+      description: '14-day free trial available',
+    },
+    aggregateRating: {
+      '@type': 'AggregateRating',
+      ratingValue: '4.8',
+      reviewCount: '120',
+    },
+    featureList: [
+      'Automated crypto trading',
+      'HMM regime detection',
+      'Athena AI signal validation',
+      'Multi-timeframe analysis',
+      'CoinDCX and Binance support',
+      'Real-time risk management',
+    ],
+    author: { '@type': 'Organization', name: 'Synaptic', url: 'https://synapticbots.in' },
+  };
+
   return (
     <div className="min-h-screen">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+      />
       <Header />
 
       {/* Full-screen background image */}

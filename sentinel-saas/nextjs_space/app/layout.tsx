@@ -10,17 +10,44 @@ const inter = Inter({ subsets: ['latin'] });
 export const dynamic = 'force-dynamic';
 
 export const metadata: Metadata = {
-  title: 'Synaptic - Premium Crypto Trading Bot',
-  description: 'Advanced automated cryptocurrency trading platform for CoinDCX and Binance exchanges',
-  metadataBase: new URL(process.env.NEXTAUTH_URL || 'https://synaptic.ai'),
+  metadataBase: new URL('https://synapticbots.in'),
+  title: {
+    default: 'Synaptic — AI-Powered Crypto Trading Bot | CoinDCX & Binance',
+    template: '%s | Synaptic',
+  },
+  description: 'Synaptic is an AI-powered automated crypto trading bot using HMM regime detection and Athena AI. Trade smarter on CoinDCX and Binance with real-time signals, multi-timeframe analysis, and risk management.',
+  keywords: [
+    'crypto trading bot', 'automated cryptocurrency trading', 'AI trading bot',
+    'CoinDCX bot', 'Binance trading bot', 'HMM trading', 'algorithmic trading India',
+    'crypto bot India', 'Synaptic trading', 'automated crypto trading platform',
+  ],
+  authors: [{ name: 'Synaptic', url: 'https://synapticbots.in' }],
+  creator: 'Synaptic',
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: { index: true, follow: true, 'max-image-preview': 'large' },
+  },
   icons: {
     icon: '/favicon.svg',
     shortcut: '/favicon.svg',
   },
   openGraph: {
-    title: 'Synaptic - Premium Crypto Trading Bot',
-    description: 'Advanced automated cryptocurrency trading platform',
+    type: 'website',
+    url: 'https://synapticbots.in',
+    siteName: 'Synaptic',
+    title: 'Synaptic — AI-Powered Crypto Trading Bot',
+    description: 'Automated crypto trading with HMM-based regime detection and Athena AI signals. Built for CoinDCX and Binance.',
+    images: [{ url: '/og-image.png', width: 1200, height: 630, alt: 'Synaptic AI Trading Bot' }],
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'Synaptic — AI-Powered Crypto Trading Bot',
+    description: 'Automated crypto trading with HMM-based regime detection and Athena AI signals.',
     images: ['/og-image.png'],
+  },
+  alternates: {
+    canonical: 'https://synapticbots.in',
   },
 };
 
