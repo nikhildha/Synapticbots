@@ -32,7 +32,7 @@ from typing import Optional
 from alpha.alpha_config import (
     ALPHA_COINS, ALPHA_CANDLE_BUFFER_S,
     ALPHA_TELEGRAM_SUMMARY_H, ALPHA_PAPER_MODE, ALPHA_STATE_FILE,
-    ALPHA_AUDIT_LOG_FILE, DEPLOYMENT_LOCKED, ALPHA_VOL_THRESH,
+    ALPHA_AUDIT_LOG_FILE, DEPLOYMENT_LOCKED,
 )
 from alpha.alpha_logger    import get_logger
 from alpha.alpha_data      import get_all_alpha_data, get_latest_price
@@ -184,8 +184,8 @@ class AlphaEngine:
             if not signal["signal"]:
                 vz_last = signal.get("vol_zscore_last", float("nan"))
                 vz_prev = signal.get("vol_zscore_prev", float("nan"))
-                logger.info("%s: no signal | vol_z last=%.2f prev=%.2f (need >%.1f on both)",
-                            sym, vz_last, vz_prev, ALPHA_VOL_THRESH)
+                logger.info("%s: no signal | vol_z last=%.2f prev=%.2f | reason: %s",
+                            sym, vz_last, vz_prev, signal.get("reason", "?"))
                 continue
 
             # ── Open trade ────────────────────────────────────────────────────
