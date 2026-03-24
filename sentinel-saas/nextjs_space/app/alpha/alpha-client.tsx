@@ -367,15 +367,15 @@ export function AlphaClient({ userName }: { userName: string }) {
             </div>
           </div>
 
-          {/* ── Engine not started notice ── */}
-          {!loading && !engineRunning && (
+          {/* ── Engine not connected notice ── */}
+          {!loading && !error && !engineRunning && (
             <div style={{
               display: 'flex', alignItems: 'center', gap: 10, padding: '12px 16px',
               background: 'rgba(240,185,11,0.05)', border: '1px solid rgba(240,185,11,0.2)',
               borderRadius: 10, marginBottom: 24, fontSize: 13, color: '#D1D5DB',
             }}>
               <AlertTriangle size={16} color="#F0B90B" />
-              Engine not running locally. Start it with: <code style={{ background: '#111827', padding: '2px 8px', borderRadius: 4, color: '#00E5FF', fontSize: 12 }}>python alpha/run_alpha.py</code>
+              Alpha engine has not run in the last 30 minutes — waiting for next cycle.
             </div>
           )}
 

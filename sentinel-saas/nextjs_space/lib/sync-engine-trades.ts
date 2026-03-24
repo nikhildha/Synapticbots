@@ -68,31 +68,9 @@ export async function syncEngineTrades(
                 if (!isNaN(d.getTime())) exitTime = d;
             }
 
-            // STRICT BOT ISOLATION: Only sync trades that belong to THIS bot.
-            // Check all_bot_ids first (multi-bot engine feature), then fallback to primary bot_id.
-            const allBotIds = Array.isArray(t.all_bot_ids) && t.all_bot_ids.length > 0 ? t.all_bot_ids : [];
-            const tradeBotId = (t.bot_id || '').trim();
-
-            if (allBotIds.length > 0) {
-                if (!allBotIds.includes(botId)) {
-                    continue;
-                }
-            } else {
-                if (tradeBotId && tradeBotId !== botId) {
-                    continue;
-                }
-                // Allow AUTO_SYNCED/orphaned trades (no bot_id) if user_id matches —
-                // happens when engine restarts and places trade before re-registration
-                if (!tradeBotId) {
-                    const tradeUserId = (t.user_id || '').trim();
-                    if (!tradeUserId || !userId || tradeUserId !== userId) {
-                        continue;
-                    }
-                    // falls through — associate this orphaned trade with the current bot
-                }
-            }
-
-            const resolvedBotId = botId;
+            // BROADCAST MODE: All engine trades are synced to every bot.
+            // Each bot gets its own Prisma row via the upsert key engine_${tradeId}_${botId}.
+            // User isolation is enforced at READ time by getUserTrades(userId).
 
             // ── SL/TP Sanity Check (fixes engine-side cross-contamination bug) ──
             // Engine's tradebook.json has SL/TP AND atr_at_entry from wrong trades.
@@ -141,11 +119,11 @@ export async function syncEngineTrades(
             // Upsert: create if not exists, update PNL/status if exists
             await prisma.trade.upsert({
                 where: {
-                    id: `engine_${engineTradeId}_${resolvedBotId}`,
+                    id: `engine_${engineTradeId}_${botId}`,
                 },
                 create: {
-                    id: `engine_${engineTradeId}_${resolvedBotId}`,
-                    botId: resolvedBotId,
+                    id: `engine_${engineTradeId}_${botId}`,
+                    botId: botId,
                     coin: t.symbol || t.coin || '',
                     position: side === 'buy' || side === 'long' ? 'long' : 'short',
                     regime: t.regime || '',
@@ -165,18 +143,18 @@ export async function syncEngineTrades(
                     activePnl: t.unrealized_pnl || t.active_pnl || 0,
                     activePnlPercent: t.unrealized_pnl_pct || t.activePnlPercent || 0,
                     totalPnl: status === 'closed'
-                        ? (t.pnl || t.realized_pnl || t.total_pnl || 0)
-                        : 0,  // BUG-13: active trades have no realized PnL yet
-                    totalPnlPercent: t.pnl_pct || t.totalPnlPercent || 0,
+                        ? (t.realized_pnl || t.pnl || t.total_pnl || 0)
+                        : 0,  // Active trades start with 0 realized PnL (set on close)
+                    totalPnlPercent: status === 'closed' ? (t.realized_pnl_pct || t.pnl_pct || 0) : 0,
                     exitReason: t.exit_reason || t.exitReason || null,
                     exitPercent: t.exit_percent || null,
                     exchangeOrderId: String(engineTradeId),
                     entryTime,
                     exitTime,
-                    // Multi-target fields
-                    t1Price: t.targets?.t1 || null,
-                    t2Price: t.targets?.t2 || null,
-                    t3Price: t.targets?.t3 || null,
+                    // Multi-target fields (engine stores flat: t1_price, t2_price, t3_price)
+                    t1Price: t.t1_price || null,
+                    t2Price: t.t2_price || null,
+                    t3Price: t.t3_price || null,
                     t1Hit: t.t1_hit || false,
                     t2Hit: t.t2_hit || false,
                     trailingSl: rawTrailingSl,
@@ -197,10 +175,13 @@ export async function syncEngineTrades(
                     exitPrice: t.exit_price || t.exitPrice || null,
                     activePnl: t.unrealized_pnl || t.active_pnl || 0,
                     activePnlPercent: t.unrealized_pnl_pct || t.activePnlPercent || 0,
-                    totalPnl: status === 'closed'
-                        ? (t.pnl || t.realized_pnl || t.total_pnl || 0)
-                        : 0,  // BUG-13: active trades have no realized PnL yet
-                    totalPnlPercent: t.pnl_pct || t.totalPnlPercent || 0,
+                    // BUG-1 FIX: Only overwrite totalPnl when engine reports closed.
+                    // If active, leave Prisma value untouched (undefined = no-op) so a race
+                    // condition between close-tick and active-tick doesn't wipe realized PnL.
+                    ...(status === 'closed' ? {
+                        totalPnl: t.realized_pnl || t.pnl || t.total_pnl || 0,
+                        totalPnlPercent: t.realized_pnl_pct || t.pnl_pct || 0,
+                    } : {}),
                     exitReason: t.exit_reason || t.exitReason || null,
                     exitTime,
                     stopLoss: recalcSl,

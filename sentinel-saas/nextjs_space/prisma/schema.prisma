@@ -54,10 +54,10 @@ model ExchangeApiKey {
   apiKey       String
   apiSecret    String
   encryptionIv String?
-  label        String?
   isActive     Boolean  @default(true)
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
+  label        String?
   user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([userId, exchange])
@@ -149,11 +149,6 @@ model Trade {
   trailingTp              Float?
   trailingActive          Boolean          @default(false)
   trailSlCount            Int              @default(0)
-  steppedLockLevel        Int              @default(-1)
-  // Exit guard state — stamped every heartbeat by tradebook.update_unrealized()
-  exitGuardActive         Boolean          @default(true)   // matches should_auto_close in engine
-  exitCheckAt             DateTime?                          // UTC timestamp of last exit check run
-  exitCheckPrice          Float?                             // price used in that exit check
   capitalProtectionActive Boolean          @default(false)
   originalQty             Float?
   originalCapital         Float?
@@ -171,6 +166,10 @@ model Trade {
   exitTime                DateTime?
   createdAt               DateTime         @default(now())
   updatedAt               DateTime         @updatedAt
+  steppedLockLevel        Int              @default(-1)
+  exitCheckAt             DateTime?
+  exitCheckPrice          Float?
+  exitGuardActive         Boolean          @default(true)
   partialBookings         PartialBooking[]
   bot                     Bot              @relation(fields: [botId], references: [id], onDelete: Cascade)
   session                 BotSession?      @relation(fields: [sessionId], references: [id])
@@ -347,43 +346,32 @@ model AuditLog {
 }
 
 model AthenaDecisionLog {
-  id            String    @id @default(cuid())
-
-  // ── When & Where ──
-  timestamp     DateTime  @default(now())
-  cycle         Int
-
-  // ── Coin Context ──
-  symbol        String
-  segment       String?
-  regime        String?
-  conviction    Float?
-
-  // ── Athena Decision ──
-  action        String                         // EXECUTE, VETO, REDUCE_SIZE, SKIP
-  side          String?                        // LONG / SHORT (athena_direction)
-  confidence    Float?                         // Athena 0.0–1.0 confidence
-  reasoning     String?
-  riskFlags     String?                        // JSON array
-  model         String?
-  latencyMs     Int?
-  suggestedSl   Float?
-  suggestedTp   Float?
-  entryPrice    Float?
-
-  // ── Deployment Outcome ──
-  deployed      Boolean   @default(false)
-  deployReason  String?
-
-  // ── Trade Outcome (backfilled on close) ──
-  tradeId       String?                        // soft FK to Trade
-  pnl           Float?
-  pnlPct        Float?
-  exitPrice     Float?
-  tradeStatus   String?                        // ACTIVE / CLOSED
-  closedAt      DateTime?
-
-  createdAt     DateTime  @default(now())
+  id           String    @id @default(cuid())
+  timestamp    DateTime  @default(now())
+  cycle        Int
+  symbol       String
+  segment      String?
+  regime       String?
+  conviction   Float?
+  action       String
+  side         String?
+  confidence   Float?
+  reasoning    String?
+  riskFlags    String?
+  model        String?
+  latencyMs    Int?
+  suggestedSl  Float?
+  suggestedTp  Float?
+  entryPrice   Float?
+  deployed     Boolean   @default(false)
+  deployReason String?
+  tradeId      String?
+  pnl          Float?
+  pnlPct       Float?
+  exitPrice    Float?
+  tradeStatus  String?
+  closedAt     DateTime?
+  createdAt    DateTime  @default(now())
 
   @@index([symbol])
   @@index([timestamp])
@@ -393,15 +381,12 @@ model AthenaDecisionLog {
   @@index([deployed])
 }
 
-// ─── Trade Journal: Reconciliation Log ────────────────────────────────────────
-// Stores engine-vs-exchange health check results for the Live Journal tab.
-// Written by /api/journal/health — read-only by all other routes.
 model ReconciliationLog {
   id            String   @id @default(cuid())
   userId        String
   botId         String?
-  checkType     String   // "trade_count" | "balance_match" | "duplicate_order"
-  status        String   // "pass" | "fail" | "warning"
+  checkType     String
+  status        String
   engineCount   Int?
   exchangeCount Int?
   delta         Float?

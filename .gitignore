@@ -15,7 +15,7 @@ node_modules/
 tsconfig.tsbuildinfo
 
 # Data (runtime state — not in repo)
-data/
+/data/
 
 # Alpha runtime state (tradebook, logs, state — persisted via Railway Volume)
 alpha/data/*.json
