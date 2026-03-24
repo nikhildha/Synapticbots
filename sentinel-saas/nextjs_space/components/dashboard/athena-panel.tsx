@@ -71,12 +71,41 @@ function timeSince(ts: string): string {
 export function AthenaPanel({ athena, vetoLog = [] }: Props) {
     const [activeTab, setActiveTab] = useState<'decisions' | 'vetolog'>('decisions');
     const [retroPrices, setRetroPrices] = useState<Record<string, number>>({});
+    const [logHistory, setLogHistory] = useState<any[]>([]);
     const enabled = !!athena?.enabled;
 
-    // Deduplicate decisions by symbol — keep latest
+    // Fetch persistent decision history from /api/athena-log (JSONL backend)
+    useEffect(() => {
+        const ENGINE_URL = process.env.NEXT_PUBLIC_ENGINE_URL || '';
+        const load = () => {
+            fetch(`${ENGINE_URL}/api/athena-log?limit=100`, { signal: AbortSignal.timeout(5000) })
+                .then(r => r.ok ? r.json() : null)
+                .then(data => { if (data?.rows) setLogHistory(data.rows); })
+                .catch(() => {});
+        };
+        load();
+        const id = setInterval(load, 30_000);
+        return () => clearInterval(id);
+    }, []);
+
+    // Merge persistent log + in-memory recent_decisions, deduplicate by symbol (latest wins)
     const rawDecisions = (athena?.recent_decisions || []).slice().reverse();
+    // Map in-memory decisions to logHistory shape for display
+    const inMemoryMapped = rawDecisions.map((d: any) => ({
+        ts: d.time,
+        symbol: d.symbol,
+        side: d.side || '',
+        decision: d.action === 'EXECUTE' ? 'EXECUTE' : 'VETO',
+        conviction: Math.round((d.adjusted_confidence || 0) * 100),
+        summary: d.reasoning || '',
+        risk_flags: d.risk_flags || [],
+        model: d.model || '',
+    }));
+    // Merge: log history first (oldest), then in-memory (newest)
+    const merged = [...logHistory, ...inMemoryMapped];
+    // Deduplicate by symbol keeping last entry
     const seenSymbols = new Set<string>();
-    const decisions = rawDecisions.filter((d) => {
+    const decisions = [...merged].reverse().filter((d) => {
         if (seenSymbols.has(d.symbol)) return false;
         seenSymbols.add(d.symbol);
         return true;
@@ -213,9 +242,14 @@ export function AthenaPanel({ athena, vetoLog = [] }: Props) {
                         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(400px, 1fr))', gap: 16 }}>
                             <AnimatePresence>
                                 {decisions.map((d, i) => {
-                                    const theme = ACTION_THEMES[d.action] || ACTION_THEMES.EXECUTE;
-                                    const parsed = parseReasoning(d.reasoning || '');
-                                    const confPct = Math.round(d.adjusted_confidence * 100);
+                                    // Normalize field names — support both in-memory and log-history shapes
+                                    const action = d.action || d.decision || 'VETO';
+                                    const reasoning = d.reasoning || d.summary || '';
+                                    const confRaw = d.adjusted_confidence != null ? d.adjusted_confidence : (d.conviction != null ? d.conviction / 100 : 0);
+                                    const timestamp = d.time || d.ts || '';
+                                    const theme = ACTION_THEMES[action] || ACTION_THEMES.VETO;
+                                    const parsed = parseReasoning(reasoning);
+                                    const confPct = Math.round(confRaw * 100);
                                     const isLong = d.side === 'BUY' || d.side === 'LONG';
                                     const isShort = d.side === 'SELL' || d.side === 'SHORT';
 
@@ -299,7 +333,7 @@ export function AthenaPanel({ athena, vetoLog = [] }: Props) {
                                                         <ShieldAlert size={12} /> Risk Identifiers
                                                     </div>
                                                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-                                                        {d.risk_flags.map((flag, idx) => (
+                                                        {(d.risk_flags as string[] || []).map((flag: string, idx: number) => (
                                                             <div key={idx} style={{
                                                                 fontSize: 11, padding: '4px 10px', borderRadius: 4,
                                                                 background: 'rgba(255,179,0,0.1)', color: '#FFB300',

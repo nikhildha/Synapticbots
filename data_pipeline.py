@@ -19,6 +19,14 @@ logger = logging.getLogger("DataPipeline")
 _binance_client = None
 _binance_ban_until = 0  # epoch-ms when IP ban expires (0 = no ban)
 
+# ── Concurrency guard: cap simultaneous Binance REST calls ─────────────────────
+# 50 coins × 3 TFs × 2 engines = ~300 concurrent requests without this —
+# instantly depletes the 6000 weight/min budget and triggers IP bans.
+# Allowing max 5 concurrent calls keeps well under the rate limit.
+import threading as _threading
+_binance_request_semaphore = _threading.Semaphore(5)
+
+
 
 def _get_binance_client():
     """Lazy-init the Binance client (paper trading only).
@@ -249,8 +257,11 @@ def _fetch_klines_binance(symbol, interval, limit=500):
 
     binance_interval = _get_binance_interval(interval)
     try:
-        client = _get_binance_client()  # may raise RuntimeError if IP-banned
-        klines = client.get_klines(symbol=symbol, interval=binance_interval, limit=limit)
+        # ── Rate-limit guard: max 5 concurrent Binance REST calls ──
+        with _binance_request_semaphore:
+            import time as _t; _t.sleep(0.05)  # 50ms jitter — spreads burst
+            client = _get_binance_client()  # may raise RuntimeError if IP-banned
+            klines = client.get_klines(symbol=symbol, interval=binance_interval, limit=limit)
     except RuntimeError as e:
         # IP ban still active — log and return None
         logger.warning("⛔ Skipping %s %s kline fetch — %s", symbol, interval, e)
