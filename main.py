@@ -154,7 +154,7 @@ class RegimeMasterBot:
         # Guard 4 blocked, max-cap hit, etc.). Re-attempted next cycle.
         # Format: {symbol → {result_dict, expires_at, queued_at, cycles_pending}}
         self._pending_signals: dict = {}
-        self._SIGNAL_QUEUE_TTL_SECONDS = 480   # 8 min — 1 cycle TTL (entry lost after one retry)
+        self._SIGNAL_QUEUE_TTL_SECONDS = 300   # 5 min — 1 cycle TTL
 
         # ── Startup: wipe stale signal queue from persisted state file ─────────
         # Without this, the dashboard shows ghost signals from the previous crash
