@@ -976,6 +976,13 @@ class RegimeMasterBot:
                     })
                     if len(self._veto_log) > self._VETO_LOG_MAX:
                         self._veto_log = self._veto_log[-self._VETO_LOG_MAX:]
+                    # ── Signal Queue: dequeue Athena-vetoed coin ──────────────────────
+                    # Athena said NO — don't re-queue for next cycle. Only Guard-4-blocked
+                    # or cap-blocked coins deserve a retry. Athena vetos are final.
+                    if sym in self._pending_signals:
+                        logger.info("🚫 Signal queue: removing %s — Athena vetoed (%s), no retry",
+                                    sym, athena_decision.action)
+                        del self._pending_signals[sym]
                     continue
 
                 # ── Build trade dict ──────────────────────────────────────────────
