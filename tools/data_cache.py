@@ -47,7 +47,7 @@ except ImportError:
 CACHE_DIR         = Path(ROOT) / "data_cache"
 CACHE_MAX_AGE_H   = 23
 CACHE_INCR_AGE_M  = 12        # incremental refresh if cache older than 12 min (< 15m cycle)
-TOTAL_MONTHS      = 15        # 3 warmup + 12 test
+TOTAL_MONTHS      = 3         # 3 months is enough for HMM warmup + regime coverage (was 15 for backtests)
 TFS             = ["4h", "1h", "15m"]
 
 DEFAULT_SYMBOLS  = ["AAVEUSDT", "BNBUSDT", "COMPUSDT", "SNXUSDT"]
