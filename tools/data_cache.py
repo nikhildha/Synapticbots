@@ -167,7 +167,7 @@ def _fetch_bybit(symbol: str, tf: str) -> pd.DataFrame | None:
             next_start = newest_ts + mins_per_bar * 60 * 1000
             if next_start >= now_ms or len(batch) < 1000: break
             cur_start = next_start
-            time.sleep(0.05)
+            time.sleep(0.3)
         except Exception as e:
             print(f"    bybit {symbol}/{tf}: {e}"); break
 
@@ -220,7 +220,7 @@ def _bybit_append_new_bars(symbol: str, tf: str, existing_df: pd.DataFrame) -> p
             if next_start >= now_ms or len(batch) < 1000:
                 break
             cur_start = next_start
-            time.sleep(0.05)
+            time.sleep(0.3)
         except Exception as e:
             print(f"    bybit incremental {symbol}/{tf}: {e}")
             break
@@ -275,6 +275,7 @@ def load_all_tf_incremental(symbol: str, exchange: str = DEFAULT_EXCHANGE) -> di
             if len(updated) > len(df):
                 updated.to_parquet(p, index=False)
                 df = updated
+            time.sleep(0.5)  # rate-limit guard between timeframes
 
         dfs[tf] = df.reset_index(drop=True)
 
