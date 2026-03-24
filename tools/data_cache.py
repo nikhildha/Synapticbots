@@ -48,6 +48,11 @@ CACHE_DIR         = Path(ROOT) / "data_cache"
 CACHE_MAX_AGE_H   = 23
 CACHE_INCR_AGE_M  = 12        # incremental refresh if cache older than 12 min (< 15m cycle)
 TOTAL_MONTHS      = 3         # 3 months is enough for HMM warmup + regime coverage (was 15 for backtests)
+
+# Rate-limit sleeps — 15-min cycle = 900s budget, be generous
+_SLEEP_PAGE_S  = 2.0   # between pagination pages (full & incremental fetch)
+_SLEEP_TF_S    = 5.0   # between timeframes (full fetch: 4 coins × 3 TFs = 60s max)
+_SLEEP_INCR_S  = 3.0   # between timeframes (incremental fetch: ~36s max)
 TFS             = ["4h", "1h", "15m"]
 
 DEFAULT_SYMBOLS  = ["AAVEUSDT", "BNBUSDT", "COMPUSDT", "SNXUSDT"]
@@ -167,7 +172,7 @@ def _fetch_bybit(symbol: str, tf: str) -> pd.DataFrame | None:
             next_start = newest_ts + mins_per_bar * 60 * 1000
             if next_start >= now_ms or len(batch) < 1000: break
             cur_start = next_start
-            time.sleep(0.3)
+            time.sleep(_SLEEP_PAGE_S)
         except Exception as e:
             print(f"    bybit {symbol}/{tf}: {e}"); break
 
@@ -220,7 +225,7 @@ def _bybit_append_new_bars(symbol: str, tf: str, existing_df: pd.DataFrame) -> p
             if next_start >= now_ms or len(batch) < 1000:
                 break
             cur_start = next_start
-            time.sleep(0.3)
+            time.sleep(_SLEEP_PAGE_S)
         except Exception as e:
             print(f"    bybit incremental {symbol}/{tf}: {e}")
             break
@@ -275,7 +280,7 @@ def load_all_tf_incremental(symbol: str, exchange: str = DEFAULT_EXCHANGE) -> di
             if len(updated) > len(df):
                 updated.to_parquet(p, index=False)
                 df = updated
-            time.sleep(0.5)  # rate-limit guard between timeframes
+            time.sleep(_SLEEP_INCR_S)
 
         dfs[tf] = df.reset_index(drop=True)
 
@@ -389,7 +394,7 @@ def load_all_tf(symbol: str, exchange: str = DEFAULT_EXCHANGE,
         dfs[tf] = df
         CACHE_DIR.mkdir(exist_ok=True)
         df.to_parquet(_cache_path(symbol, tf, exchange), index=False)
-        time.sleep(1.0)  # 1s between TFs on full fetch — avoids rate limits across 4 coins × 3 TFs
+        time.sleep(_SLEEP_TF_S)
     return dfs
 
 
