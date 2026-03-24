@@ -389,7 +389,7 @@ def load_all_tf(symbol: str, exchange: str = DEFAULT_EXCHANGE,
         dfs[tf] = df
         CACHE_DIR.mkdir(exist_ok=True)
         df.to_parquet(_cache_path(symbol, tf, exchange), index=False)
-        time.sleep(0.1)
+        time.sleep(1.0)  # 1s between TFs on full fetch — avoids rate limits across 4 coins × 3 TFs
     return dfs
 
 
