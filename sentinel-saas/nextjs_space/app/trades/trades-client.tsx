@@ -202,9 +202,31 @@ export function TradesClient({ trades: initialTrades }: TradesClientProps) {
   const [confirmingClear, setConfirmingClear] = useState(false);
   const clearPauseRef = useRef(false);
 
+  // ── Athena Decision History ───────────────────────────────────────────────
+  const [athenaLog, setAthenaLog] = useState<any[]>([]);
+  const [athenaLoading, setAthenaLoading] = useState(true);
+  const [athenaExpandedRow, setAthenaExpandedRow] = useState<number | null>(null);
+  const [athenaFilters, setAthenaFilters] = useState<{
+    coin: string; decision: 'all' | 'EXECUTE' | 'VETO'; date: 'all' | 'today' | '7d';
+  }>({ coin: '', decision: 'all', date: 'all' });
+
+
   useEffect(() => { setMounted(true); }, []);
 
-  // Auto-refresh from Prisma (user-scoped) every 15s.
+  // ── Fetch Athena Decision Log from engine API ────────────────────────────
+  useEffect(() => {
+    const ENGINE = process.env.NEXT_PUBLIC_ENGINE_URL || '';
+    const load = async () => {
+      try {
+        const res = await fetch(`${ENGINE}/api/athena-log?limit=500`, { signal: AbortSignal.timeout(6000) });
+        if (res.ok) { const d = await res.json(); if (d?.rows) setAthenaLog(d.rows); }
+      } catch { /* silent */ } finally { setAthenaLoading(false); }
+    };
+    load();
+    const id = setInterval(load, 60_000);
+    return () => clearInterval(id);
+  }, []);
+
   // Previously: called /api/bot-state → engine JSON → ALL users' trades (bug).
   // Now: calls /api/trades → Prisma → only this user's trades, user-isolated.
   const refreshTrades = useCallback(async () => {
@@ -967,6 +989,276 @@ export function TradesClient({ trades: initialTrades }: TradesClientProps) {
                       <line x1={PADL} y1={PADT + chartH} x2={W - PADR} y2={PADT + chartH} stroke="rgba(255,255,255,0.06)" />
                     </svg>
                   </div>
+                </div>
+              </motion.div>
+            );
+          })()}
+
+          {/* ═══════════════════════════════════════════════════════════════
+              ATHENA DECISION HISTORY LOG
+          ═══════════════════════════════════════════════════════════════ */}
+          {(() => {
+            // ── Apply filters ──
+            const now = Date.now();
+            const filtered = athenaLog.filter(r => {
+              if (athenaFilters.coin && !r.symbol?.toLowerCase().includes(athenaFilters.coin.toLowerCase())) return false;
+              if (athenaFilters.decision !== 'all' && r.decision !== athenaFilters.decision) return false;
+              if (athenaFilters.date === 'today') {
+                const d = new Date(r.ts); const n = new Date();
+                if (d.getFullYear() !== n.getFullYear() || d.getMonth() !== n.getMonth() || d.getDate() !== n.getDate()) return false;
+              }
+              if (athenaFilters.date === '7d' && now - new Date(r.ts).getTime() > 7 * 86400_000) return false;
+              return true;
+            });
+
+            return (
+              <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }} className="mt-8">
+                <div style={{
+                  background: 'linear-gradient(135deg, rgba(17,24,39,0.95) 0%, rgba(10,15,30,0.98) 100%)',
+                  backdropFilter: 'blur(20px)',
+                  border: '1px solid rgba(0,229,255,0.12)',
+                  borderRadius: '20px',
+                  overflow: 'hidden',
+                }}>
+                  {/* ── Section Header ── */}
+                  <div style={{
+                    padding: '20px 24px', display: 'flex', alignItems: 'center',
+                    justifyContent: 'space-between', borderBottom: '1px solid rgba(0,229,255,0.08)',
+                    background: 'rgba(0,229,255,0.02)',
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                      <div style={{
+                        width: 36, height: 36, borderRadius: '50%',
+                        background: 'rgba(0,229,255,0.1)', display: 'flex',
+                        alignItems: 'center', justifyContent: 'center',
+                        boxShadow: '0 0 12px rgba(0,229,255,0.2)',
+                      }}>
+                        <span style={{ fontSize: 18 }}>🧠</span>
+                      </div>
+                      <div>
+                        <div style={{ fontSize: 13, fontWeight: 800, letterSpacing: '2px', color: '#00E5FF', textTransform: 'uppercase' as const }}>
+                          Athena Decision Log
+                        </div>
+                        <div style={{ fontSize: 11, color: '#6B7280', marginTop: 2 }}>
+                          Persistent AI decision history across all engine cycles
+                        </div>
+                      </div>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                      {athenaLoading && (
+                        <span style={{ fontSize: 11, color: '#6B7280', fontStyle: 'italic' }}>loading…</span>
+                      )}
+                      <div style={{
+                        padding: '4px 12px', borderRadius: 20,
+                        background: 'rgba(0,229,255,0.08)', border: '1px solid rgba(0,229,255,0.2)',
+                        fontSize: 12, fontWeight: 700, color: '#00E5FF',
+                      }}>
+                        {filtered.length.toLocaleString()} records
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* ── Filter Bar ── */}
+                  <div style={{
+                    padding: '14px 24px', display: 'flex', gap: 10, flexWrap: 'wrap' as const,
+                    alignItems: 'center', borderBottom: '1px solid rgba(255,255,255,0.05)',
+                    background: 'rgba(0,0,0,0.2)',
+                  }}>
+                    {/* Coin search */}
+                    <div style={{ position: 'relative' }}>
+                      <span style={{ position: 'absolute', left: 9, top: '50%', transform: 'translateY(-50%)', fontSize: 12, color: '#6B7280' }}>🔍</span>
+                      <input
+                        value={athenaFilters.coin}
+                        onChange={e => setAthenaFilters(f => ({ ...f, coin: e.target.value }))}
+                        placeholder="Coin…"
+                        style={{
+                          padding: '6px 10px 6px 28px', borderRadius: 8,
+                          border: '1px solid rgba(255,255,255,0.1)',
+                          background: 'rgba(255,255,255,0.04)', color: '#D1D5DB',
+                          fontSize: 13, width: 130, outline: 'none',
+                        }}
+                      />
+                    </div>
+
+                    {/* Decision filter */}
+                    <div style={{ display: 'flex', borderRadius: 8, overflow: 'hidden', border: '1px solid rgba(255,255,255,0.1)' }}>
+                      {(['all', 'EXECUTE', 'VETO'] as const).map(d => (
+                        <button key={d} onClick={() => setAthenaFilters(f => ({ ...f, decision: d }))} style={{
+                          padding: '6px 14px', border: 'none', cursor: 'pointer',
+                          fontSize: 12, fontWeight: 700,
+                          background: athenaFilters.decision === d
+                            ? d === 'EXECUTE' ? 'rgba(34,197,94,0.25)' : d === 'VETO' ? 'rgba(239,68,68,0.25)' : 'rgba(0,229,255,0.15)'
+                            : 'transparent',
+                          color: athenaFilters.decision === d
+                            ? d === 'EXECUTE' ? '#22C55E' : d === 'VETO' ? '#EF4444' : '#00E5FF'
+                            : '#6B7280',
+                          borderRight: d !== 'VETO' ? '1px solid rgba(255,255,255,0.08)' : 'none',
+                          transition: 'all 0.2s',
+                        }}>
+                          {d === 'all' ? 'All' : d === 'EXECUTE' ? '✅ Execute' : '🚫 Veto'}
+                        </button>
+                      ))}
+                    </div>
+
+                    {/* Date range filter */}
+                    <div style={{ display: 'flex', borderRadius: 8, overflow: 'hidden', border: '1px solid rgba(255,255,255,0.1)' }}>
+                      {([['all', 'All Time'], ['today', 'Today'], ['7d', 'Last 7d']] as [string, string][]).map(([val, label]) => (
+                        <button key={val} onClick={() => setAthenaFilters(f => ({ ...f, date: val as any }))} style={{
+                          padding: '6px 14px', border: 'none', cursor: 'pointer',
+                          fontSize: 12, fontWeight: 700,
+                          background: athenaFilters.date === val ? 'rgba(139,92,246,0.2)' : 'transparent',
+                          color: athenaFilters.date === val ? '#A78BFA' : '#6B7280',
+                          borderRight: val !== '7d' ? '1px solid rgba(255,255,255,0.08)' : 'none',
+                          transition: 'all 0.2s',
+                        }}>
+                          {label}
+                        </button>
+                      ))}
+                    </div>
+
+                    {/* Clear filters */}
+                    {(athenaFilters.coin || athenaFilters.decision !== 'all' || athenaFilters.date !== 'all') && (
+                      <button onClick={() => setAthenaFilters({ coin: '', decision: 'all', date: 'all' })} style={{
+                        padding: '6px 12px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.1)',
+                        background: 'transparent', color: '#6B7280', fontSize: 12, cursor: 'pointer',
+                      }}>
+                        ✕ Clear
+                      </button>
+                    )}
+                  </div>
+
+                  {/* ── Table ── */}
+                  {!athenaLoading && filtered.length === 0 ? (
+                    <div style={{ padding: '60px 0', textAlign: 'center' }}>
+                      <div style={{ fontSize: 40, marginBottom: 12 }}>🧠</div>
+                      <div style={{ fontSize: 16, fontWeight: 600, color: '#4B5563', marginBottom: 6 }}>
+                        {athenaLog.length === 0 ? 'No decisions logged yet' : 'No results match filters'}
+                      </div>
+                      <div style={{ fontSize: 13, color: '#374151' }}>
+                        {athenaLog.length === 0
+                          ? 'Decisions appear once the engine completes a full scan cycle.'
+                          : 'Try adjusting the coin, decision type, or date filters.'}
+                      </div>
+                    </div>
+                  ) : (
+                    <div style={{ overflowX: 'auto', maxHeight: 520, overflowY: 'auto' }}>
+                      <table style={{ width: '100%', minWidth: 1100, borderCollapse: 'collapse', fontSize: 13 }}>
+                        <thead>
+                          <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
+                            {['Time', 'Coin', 'Side', 'Decision', 'Conviction', 'BTC Corr', 'Regime', 'Summary', 'Risk Flags'].map(h => (
+                              <th key={h} style={{
+                                padding: '12px 14px', textAlign: h === 'Summary' || h === 'Risk Flags' ? 'left' : 'center',
+                                fontSize: 11, fontWeight: 700, textTransform: 'uppercase' as const,
+                                letterSpacing: '0.8px', color: '#6B7280',
+                                position: 'sticky', top: 0,
+                                background: 'rgba(10,15,30,0.98)',
+                              }}>{h}</th>
+                            ))}
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {filtered.slice().reverse().map((r, i) => {
+                            const isExec = r.decision === 'EXECUTE';
+                            const isExpanded = athenaExpandedRow === i;
+                            const corr = parseFloat(r.btc_corr ?? r.btc_correlation ?? 'NaN');
+                            const corrLabel = isNaN(corr) ? '—' : corr > 0.7 ? 'HIGH' : corr > 0.4 ? 'MED' : 'LOW';
+                            const corrColor = isNaN(corr) ? '#4B5563' : corr > 0.7 ? '#EF4444' : corr > 0.4 ? '#F59E0B' : '#22C55E';
+                            const convPct = r.conviction != null ? r.conviction : Math.round((r.adjusted_confidence || 0) * 100);
+                            const ts = new Date(r.ts || r.time || '');
+                            const timeStr = isNaN(ts.getTime()) ? '—' : `${ts.getHours().toString().padStart(2,'0')}:${ts.getMinutes().toString().padStart(2,'0')} ${ts.getDate()}/${ts.getMonth()+1}`;
+                            const summary = r.summary || r.reasoning || '';
+                            const flags: string[] = r.risk_flags || [];
+                            const isLong = ['BUY','LONG'].includes((r.side||'').toUpperCase());
+
+                            return (
+                              <tr key={i} onClick={() => setAthenaExpandedRow(isExpanded ? null : i)}
+                                style={{
+                                  borderBottom: '1px solid rgba(255,255,255,0.04)',
+                                  cursor: 'pointer',
+                                  background: isExpanded ? 'rgba(0,229,255,0.03)' : 'transparent',
+                                  transition: 'background 0.2s',
+                                }}>
+                                {/* Time */}
+                                <td style={{ padding: '10px 14px', textAlign: 'center', fontFamily: 'monospace', color: '#6B7280', fontSize: 12, whiteSpace: 'nowrap' as const }}>
+                                  {timeStr}
+                                </td>
+                                {/* Coin */}
+                                <td style={{ padding: '10px 14px', textAlign: 'center', fontWeight: 800, color: '#E8EDF5', fontSize: 14 }}>
+                                  {(r.symbol || '').replace('USDT', '')}
+                                </td>
+                                {/* Side */}
+                                <td style={{ padding: '10px 14px', textAlign: 'center' }}>
+                                  <span style={{
+                                    padding: '3px 9px', borderRadius: 6, fontSize: 11, fontWeight: 700,
+                                    color: isLong ? '#22C55E' : '#EF4444',
+                                    background: isLong ? 'rgba(34,197,94,0.12)' : 'rgba(239,68,68,0.12)',
+                                  }}>{isLong ? 'LONG' : 'SHORT'}</span>
+                                </td>
+                                {/* Decision */}
+                                <td style={{ padding: '10px 14px', textAlign: 'center' }}>
+                                  <span style={{
+                                    padding: '3px 10px', borderRadius: 6, fontSize: 11, fontWeight: 800,
+                                    letterSpacing: '0.5px',
+                                    color: isExec ? '#22C55E' : '#EF4444',
+                                    background: isExec ? 'rgba(34,197,94,0.12)' : 'rgba(239,68,68,0.12)',
+                                    border: `1px solid ${isExec ? 'rgba(34,197,94,0.25)' : 'rgba(239,68,68,0.25)'}`,
+                                  }}>{isExec ? '✅ EXECUTE' : '🚫 VETO'}</span>
+                                </td>
+                                {/* Conviction bar */}
+                                <td style={{ padding: '10px 14px', textAlign: 'center', minWidth: 90 }}>
+                                  <div style={{ display: 'flex', flexDirection: 'column' as const, alignItems: 'center', gap: 3 }}>
+                                    <span style={{ fontSize: 12, fontWeight: 700, color: convPct >= 70 ? '#22C55E' : convPct >= 50 ? '#F59E0B' : '#EF4444' }}>
+                                      {convPct}%
+                                    </span>
+                                    <div style={{ width: 60, height: 4, background: 'rgba(255,255,255,0.08)', borderRadius: 2, overflow: 'hidden' }}>
+                                      <div style={{ width: `${Math.min(convPct, 100)}%`, height: '100%', background: convPct >= 70 ? '#22C55E' : convPct >= 50 ? '#F59E0B' : '#EF4444', borderRadius: 2 }} />
+                                    </div>
+                                  </div>
+                                </td>
+                                {/* BTC Corr */}
+                                <td style={{ padding: '10px 14px', textAlign: 'center' }}>
+                                  <span style={{
+                                    fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 5,
+                                    color: corrColor,
+                                    background: `${corrColor}18`,
+                                  }}>
+                                    {isNaN(corr) ? '—' : `${corr.toFixed(2)} ${corrLabel}`}
+                                  </span>
+                                </td>
+                                {/* Regime */}
+                                <td style={{ padding: '10px 14px', textAlign: 'center', fontSize: 11, color: '#9CA3AF', fontFamily: 'monospace' }}>
+                                  {r.regime || '—'}
+                                </td>
+                                {/* Summary (expandable) */}
+                                <td style={{ padding: '10px 14px', maxWidth: 340, fontSize: 12, color: '#9CA3AF', lineHeight: '1.5' }}>
+                                  {isExpanded ? summary : (summary.length > 110 ? summary.slice(0, 110) + '…' : summary)}
+                                  {summary.length > 110 && (
+                                    <span style={{ color: '#00E5FF', fontSize: 11, marginLeft: 4 }}>
+                                      {isExpanded ? ' ▲ less' : ' ▼ more'}
+                                    </span>
+                                  )}
+                                </td>
+                                {/* Risk Flags */}
+                                <td style={{ padding: '10px 14px' }}>
+                                  <div style={{ display: 'flex', flexWrap: 'wrap' as const, gap: 4 }}>
+                                    {flags.length === 0 ? (
+                                      <span style={{ fontSize: 11, color: '#374151' }}>—</span>
+                                    ) : flags.map((f: string, fi: number) => (
+                                      <span key={fi} style={{
+                                        fontSize: 10, padding: '2px 7px', borderRadius: 4,
+                                        background: 'rgba(245,158,11,0.1)', color: '#F59E0B',
+                                        border: '1px solid rgba(245,158,11,0.2)',
+                                      }}>{f}</span>
+                                    ))}
+                                  </div>
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
                 </div>
               </motion.div>
             );
