@@ -19,7 +19,6 @@
 ╚══════════════════════════════════════════════════════════════════════════════╝
 """
 
-import json
 import threading
 from datetime import datetime, timezone
 
@@ -129,6 +128,13 @@ def start_server_thread() -> threading.Thread:
         engine.run()   # blocks main thread
     """
     def _run():
+        try:
+            from waitress import serve as _waitress_serve
+            logger.info("Alpha HTTP server starting (waitress) on port %d", ALPHA_PORT)
+            _waitress_serve(app, host="0.0.0.0", port=ALPHA_PORT, threads=4)
+            return
+        except ImportError:
+            pass
         logger.info("Alpha HTTP server starting on port %d", ALPHA_PORT)
         # use_reloader=False is critical — reloader forks and breaks the engine
         app.run(host="0.0.0.0", port=ALPHA_PORT, use_reloader=False, threaded=True)

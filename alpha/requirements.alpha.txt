@@ -12,6 +12,7 @@ requests>=2.31.0
 
 # Flask HTTP server (exposes /alpha/data to NextJS)
 flask>=3.0.0
+waitress>=3.0.0          # production WSGI server (replaces Flask dev server)
 
 # Config
 python-dotenv>=1.0.0
