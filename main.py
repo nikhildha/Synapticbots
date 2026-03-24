@@ -179,6 +179,23 @@ class RegimeMasterBot:
         self._veto_log: list = []   # [{symbol, price, side, conviction, reason, ts}]
         self._VETO_LOG_MAX = 50     # keep last 50 vetoes
 
+        # ── Startup: restore veto log from persisted state ──────────────────────
+        # Without this, every restart wipes the veto history shown in the cockpit.
+        try:
+            _vl_path = getattr(config, "MULTI_STATE_FILE", None)
+            if _vl_path and os.path.exists(_vl_path):
+                import json as _jvl
+                with open(_vl_path, "r") as _fv:
+                    _persisted = _jvl.load(_fv)
+                _saved_vetoes = _persisted.get("veto_log", [])
+                if _saved_vetoes:
+                    # State file stores newest-first (reversed); restore to oldest-first for append
+                    self._veto_log = list(reversed(_saved_vetoes))[-self._VETO_LOG_MAX:]
+                    logger.info("🔁 Restored %d veto log entries from previous session", len(self._veto_log))
+        except Exception:
+            pass  # Non-fatal — clean veto log is acceptable fallback
+
+
         # ─── Coin pool configuration ─────────────────────────────────────────
         # Pool size matches config.TOP_COINS_LIMIT to scan all coins per cycle
         self._full_coin_pool: list = []
