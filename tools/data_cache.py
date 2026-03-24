@@ -44,9 +44,10 @@ except ImportError:
     _root_compute_features = None
     _parse_klines_df = None
 
-CACHE_DIR       = Path(ROOT) / "data_cache"
-CACHE_MAX_AGE_H = 23
-TOTAL_MONTHS    = 15          # 3 warmup + 12 test
+CACHE_DIR         = Path(ROOT) / "data_cache"
+CACHE_MAX_AGE_H   = 23
+CACHE_INCR_AGE_M  = 12        # incremental refresh if cache older than 12 min (< 15m cycle)
+TOTAL_MONTHS      = 15        # 3 warmup + 12 test
 TFS             = ["4h", "1h", "15m"]
 
 DEFAULT_SYMBOLS  = ["AAVEUSDT", "BNBUSDT", "COMPUSDT", "SNXUSDT"]
@@ -176,6 +177,108 @@ def _fetch_bybit(symbol: str, tf: str) -> pd.DataFrame | None:
     # cols: [ts_ms, open, high, low, close, volume, turnover]
     return _build_df(all_rows, ts_col=0, o_col=1, h_col=2, l_col=3,
                      c_col=4, v_col=5, ascending=True)
+
+
+# ─── Bybit incremental updater ────────────────────────────────────────────────
+
+def _bybit_append_new_bars(symbol: str, tf: str, existing_df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Fetch only bars newer than the last row in existing_df and append them.
+    Returns the updated DataFrame (or existing_df unchanged on failure).
+    Fast — typically only a handful of new bars per call.
+    """
+    interval     = BYBIT_INTERVALS[tf]
+    mins_map     = {"4h": 240, "1h": 60, "15m": 15}
+    mins_per_bar = mins_map[tf]
+
+    last_ts_ms = int(existing_df["timestamp"].iloc[-1].timestamp() * 1000)
+    # Start one bar after the last cached bar
+    start_ms = last_ts_ms + mins_per_bar * 60 * 1000
+    now_ms   = int(datetime.now(timezone.utc).timestamp() * 1000)
+
+    if start_ms >= now_ms:
+        return existing_df  # already up to date
+
+    all_rows = []
+    cur_start = start_ms
+    while True:
+        try:
+            r = requests.get(
+                "https://api.bybit.com/v5/market/kline",
+                params={"category": "linear", "symbol": symbol,
+                        "interval": interval, "start": cur_start, "limit": 1000},
+                timeout=20)
+            d = r.json()
+            if r.status_code != 200 or d.get("retCode") != 0:
+                break
+            batch = d["result"]["list"]
+            if not batch:
+                break
+            all_rows.extend(batch)
+            newest_ts = int(batch[0][0])
+            next_start = newest_ts + mins_per_bar * 60 * 1000
+            if next_start >= now_ms or len(batch) < 1000:
+                break
+            cur_start = next_start
+            time.sleep(0.05)
+        except Exception as e:
+            print(f"    bybit incremental {symbol}/{tf}: {e}")
+            break
+
+    if not all_rows:
+        return existing_df
+
+    all_rows.sort(key=lambda x: int(x[0]))
+    new_df = _build_df(all_rows, ts_col=0, o_col=1, h_col=2, l_col=3,
+                       c_col=4, v_col=5, ascending=True)
+    if new_df is None or new_df.empty:
+        return existing_df
+
+    combined = pd.concat([existing_df, new_df], ignore_index=True)
+    combined["timestamp"] = pd.to_datetime(combined["timestamp"])
+    combined = combined.drop_duplicates("timestamp").sort_values("timestamp").reset_index(drop=True)
+    return combined
+
+
+def load_all_tf_incremental(symbol: str, exchange: str = DEFAULT_EXCHANGE) -> dict | None:
+    """
+    Like load_all_tf() but does a fast incremental update each call:
+      - If cache missing or > CACHE_MAX_AGE_H old → full re-fetch (slow, first run only)
+      - If cache exists but > CACHE_INCR_AGE_M minutes old → append new bars only (fast)
+      - If cache is fresh (< CACHE_INCR_AGE_M min) → read from disk as-is
+
+    Use this from the Alpha engine so every 15-min cycle gets the latest bars.
+    """
+    if exchange != "bybit":
+        # Incremental only implemented for Bybit; fall back for others
+        return load_all_tf(symbol, exchange=exchange)
+
+    needs_full_fetch = any(
+        _cache_age_h(symbol, tf, exchange) > CACHE_MAX_AGE_H for tf in TFS
+    )
+    if needs_full_fetch:
+        return load_all_tf(symbol, exchange=exchange, force_refresh=True)
+
+    dfs = {}
+    for tf in TFS:
+        p = _cache_path(symbol, tf, exchange)
+        try:
+            df = pd.read_parquet(p)
+            df["timestamp"] = pd.to_datetime(df["timestamp"])
+        except Exception as e:
+            print(f"    cache read error ({exchange} {symbol}/{tf}): {e}")
+            return load_all_tf(symbol, exchange=exchange, force_refresh=True)
+
+        age_m = _cache_age_h(symbol, tf, exchange) * 60
+        if age_m > CACHE_INCR_AGE_M:
+            updated = _bybit_append_new_bars(symbol, tf, df)
+            if len(updated) > len(df):
+                updated.to_parquet(p, index=False)
+                df = updated
+
+        dfs[tf] = df.reset_index(drop=True)
+
+    return dfs
 
 
 # ─── OKX fetcher ─────────────────────────────────────────────────────────────

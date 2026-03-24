@@ -24,7 +24,7 @@ from typing import Optional
 
 # Add project root to path so we can import tools.data_cache (read-only utility)
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from tools.data_cache import load_all_tf  # noqa: E402 — read-only, no side effects
+from tools.data_cache import load_all_tf_incremental  # noqa: E402 — read-only, no side effects
 
 from alpha.alpha_config import (
     ALPHA_COINS, ALPHA_EXCHANGE,
@@ -36,7 +36,7 @@ from alpha.alpha_logger import get_logger
 logger = get_logger("data")
 
 
-def get_data(symbol: str, force_refresh: bool = False) -> Optional[dict[str, pd.DataFrame]]:
+def get_data(symbol: str) -> Optional[dict[str, pd.DataFrame]]:
     """
     Fetch and enrich OHLCV data for a single Alpha coin.
 
@@ -48,7 +48,7 @@ def get_data(symbol: str, force_refresh: bool = False) -> Optional[dict[str, pd.
     Exchange: bybit only — never binance.
     """
     try:
-        raw = load_all_tf(symbol, exchange=ALPHA_EXCHANGE, force_refresh=force_refresh)
+        raw = load_all_tf_incremental(symbol, exchange=ALPHA_EXCHANGE)
         if raw is None:
             logger.warning("No data returned for %s from cache", symbol)
             return None
@@ -68,7 +68,7 @@ def get_data(symbol: str, force_refresh: bool = False) -> Optional[dict[str, pd.
         return None
 
 
-def get_all_alpha_data(force_refresh: bool = False) -> dict[str, Optional[dict[str, pd.DataFrame]]]:
+def get_all_alpha_data() -> dict[str, Optional[dict[str, pd.DataFrame]]]:
     """
     Fetch enriched data for all ALPHA_COINS.
 
@@ -77,10 +77,11 @@ def get_all_alpha_data(force_refresh: bool = False) -> dict[str, Optional[dict[s
         Missing/failed coins are excluded (not None — just absent from dict).
 
     Skips failures gracefully so one bad coin never blocks the others.
+    Uses incremental refresh — appends only new Bybit bars each call.
     """
     result = {}
     for symbol in ALPHA_COINS:
-        data = get_data(symbol, force_refresh=force_refresh)
+        data = get_data(symbol)
         if data is not None:
             result[symbol] = data
         else:

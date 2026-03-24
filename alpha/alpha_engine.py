@@ -128,7 +128,7 @@ class AlphaEngine:
         }
 
         # ── Step 1: Fetch data ─────────────────────────────────────────────────
-        data = get_all_alpha_data(force_refresh=False)
+        data = get_all_alpha_data()
         for sym in ALPHA_COINS:
             if sym in data:
                 result["data_ok"].append(sym)
