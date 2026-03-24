@@ -1309,7 +1309,64 @@ def api_force_signal():
         return jsonify({"success": False, "error": str(e)}), 500
 
 
+@app.route("/api/athena-log", methods=["GET"])
+def api_athena_log():
+    """Return Athena decision history from athena_decisions.jsonl.
+
+    Query params (all optional):
+      limit    — max rows to return (default 100, max 500)
+      symbol   — filter by coin e.g. BTCUSDT
+      decision — filter by EXECUTE | VETO
+      side     — filter by BUY | SELL
+      from     — ISO date string e.g. 2026-03-20 (inclusive)
+    """
+    try:
+        limit    = min(int(request.args.get("limit", 100)), 500)
+        symbol   = (request.args.get("symbol", "") or "").upper()
+        decision = (request.args.get("decision", "") or "").upper()
+        side     = (request.args.get("side", "") or "").upper()
+        from_str = request.args.get("from", "")
+
+        log_path = os.path.join(config.DATA_DIR, "athena_decisions.jsonl")
+        if not os.path.exists(log_path):
+            return jsonify({"rows": [], "total": 0, "message": "No Athena decisions logged yet"})
+
+        with open(log_path, "r", encoding="utf-8") as f:
+            lines = f.readlines()
+
+        rows = []
+        for ln in reversed(lines):  # newest first
+            ln = ln.strip()
+            if not ln:
+                continue
+            try:
+                rec = json.loads(ln)
+            except Exception:
+                continue
+            if symbol   and rec.get("symbol", "") != symbol:
+                continue
+            if decision and rec.get("decision", "").upper() != decision:
+                continue
+            if side     and rec.get("side", "").upper() != side:
+                continue
+            if from_str:
+                try:
+                    if rec.get("ts", "")[:10] < from_str[:10]:
+                        continue
+                except Exception:
+                    pass
+            rows.append(rec)
+            if len(rows) >= limit:
+                break
+
+        return jsonify({"rows": rows, "total": len(lines), "showing": len(rows)})
+    except Exception as e:
+        logger.error("athena-log error: %s", e)
+        return jsonify({"error": str(e)}), 500
+
+
 @app.route("/api/broadcast-log", methods=["GET"])
+
 def api_broadcast_log():
     """Return last N lines of signal_broadcast.log as structured JSON.
     Supports optional ?bot_ids=id1,id2,... to filter to specific bots only (user-scoping).

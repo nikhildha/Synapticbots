@@ -71,6 +71,65 @@ def _bcast(event: str, cycle: int, bot_name: str, bot_id: str, sym: str, side: s
 
 
 
+_ATHENA_LOG_FILE = getattr(config, "LLM_LOG_FILE", "").replace(".json", ".jsonl") or os.path.join(
+    getattr(config, "DATA_DIR", "data"), "athena_decisions.jsonl"
+)
+
+def _log_athena_decision(
+    cycle: int, symbol: str, segment: str, side: str,
+    decision: str, conviction: float,
+    price: float, sl: float, tp: float, summary: str,
+) -> None:
+    """Append one JSONL record to the Athena decision history log."""
+    import json as _jl, datetime as _dl
+    record = {
+        "ts":         _dl.datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "cycle":      cycle,
+        "symbol":     symbol,
+        "segment":    segment,
+        "side":       side,
+        "decision":   decision,
+        "conviction": round(conviction, 4),
+        "price":      price,
+        "sl":         sl,
+        "tp":         tp,
+        "summary":    (summary or "")[:150],
+    }
+    try:
+        os.makedirs(os.path.dirname(_ATHENA_LOG_FILE) or ".", exist_ok=True)
+        with open(_ATHENA_LOG_FILE, "a", encoding="utf-8") as _af:
+            _af.write(_jl.dumps(record) + "\n")
+    except Exception:
+        pass  # Never block engine on log write failure
+
+
+def _purge_old_athena_log(days: int = 30) -> None:
+    """Remove entries older than `days` from the Athena decision JSONL on startup."""
+    import json as _jp, datetime as _dp
+    if not os.path.exists(_ATHENA_LOG_FILE):
+        return
+    cutoff = _dp.datetime.utcnow() - _dp.timedelta(days=days)
+    try:
+        with open(_ATHENA_LOG_FILE, "r", encoding="utf-8") as _f:
+            lines = _f.readlines()
+        kept = []
+        for ln in lines:
+            try:
+                ts_str = _jp.loads(ln).get("ts", "")
+                if ts_str and _dp.datetime.strptime(ts_str, "%Y-%m-%dT%H:%M:%SZ") >= cutoff:
+                    kept.append(ln)
+            except Exception:
+                kept.append(ln)  # Keep malformed lines rather than lose data
+        if len(kept) < len(lines):
+            with open(_ATHENA_LOG_FILE, "w", encoding="utf-8") as _f:
+                _f.writelines(kept)
+    except Exception:
+        pass
+
+
+_purge_old_athena_log()  # Run once at module load
+
+
 # ─── Bot name → segment mapping (fallback when segment_filter not in ENGINE_ACTIVE_BOTS) ──
 # Handles engine restart case where bots haven't been re-registered via toggle
 def _infer_segment_from_name(bot_name: str) -> str:
@@ -1029,6 +1088,15 @@ class RegimeMasterBot:
                     })
                     if len(self._veto_log) > self._VETO_LOG_MAX:
                         self._veto_log = self._veto_log[-self._VETO_LOG_MAX:]
+                    # ── Athena Decision Log (persistent JSONL) ─────────────────────────
+                    _log_athena_decision(
+                        cycle=self._cycle_count, symbol=sym, segment=seg_name,
+                        side=top.get("side", ""), decision=athena_decision.action,
+                        conviction=top.get("conviction", 0), price=current_price,
+                        sl=getattr(athena_decision, "suggested_sl", 0) or 0,
+                        tp=getattr(athena_decision, "suggested_tp", 0) or 0,
+                        summary=athena_decision.reasoning or "",
+                    )
                     # ── Signal Queue: dequeue Athena-vetoed coin ──────────────────────
                     # Athena said NO — don't re-queue for next cycle. Only Guard-4-blocked
                     # or cap-blocked coins deserve a retry. Athena vetos are final.
@@ -1057,6 +1125,16 @@ class RegimeMasterBot:
                     )
                 except Exception:
                     pass  # Never block deploy on notification failure
+
+                # ── Athena Decision Log (EXECUTE) ─────────────────────────────────
+                _log_athena_decision(
+                    cycle=self._cycle_count, symbol=sym, segment=seg_name,
+                    side=top.get("side", ""), decision="EXECUTE",
+                    conviction=athena_decision.adjusted_confidence if athena_decision else top.get("conviction", 0),
+                    price=current_price,
+                    sl=_a_sl, tp=_a_tp,
+                    summary=(athena_decision.reasoning if athena_decision else "") or "",
+                )
 
                 # ── Build trade dict ──────────────────────────────────────────────
                 capital     = target.get("capital_per_trade") or getattr(config, "CAPITAL_PER_TRADE", 100.0)
