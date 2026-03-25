@@ -36,7 +36,7 @@ interface Trade {
 const fmt$ = (v: number) => (v >= 0 ? '+' : '') + v.toFixed(2);
 const fmtPct = (v: number) => (v >= 0 ? '+' : '') + v.toFixed(1) + '%';
 const fmtPrice = (v: number) => v.toFixed(4);
-const pnlColor = (v: number) => v > 0 ? '#22C55E' : v < 0 ? '#EF4444' : '#6B7280';
+const pnlColor = (v: number) => v > 0 ? '#16A34A' : v < 0 ? '#DC2626' : '#6B7280';
 
 // Shared helpers — eliminate repeated inline logic
 const tradeSym = (t: any) => (t.symbol || (t.coin || '') + 'USDT').toUpperCase();
@@ -164,8 +164,11 @@ function mapTrade(t: any): Trade {
 function Card({ children, className = '' }: { children: React.ReactNode; className?: string }) {
   return (
     <div className={className} style={{
-      background: 'rgba(17, 24, 39, 0.8)', backdropFilter: 'blur(12px)',
-      border: '1px solid rgba(255,255,255,0.06)', borderRadius: '16px', padding: '20px',
+      background: '#FFFFFF',
+      border: '1px solid rgba(0,0,0,0.08)',
+      borderRadius: '16px',
+      padding: '20px',
+      boxShadow: '0 2px 12px rgba(0,0,0,0.06)',
     }}>{children}</div>
   );
 }
@@ -173,9 +176,9 @@ function Card({ children, className = '' }: { children: React.ReactNode; classNa
 function StatCard({ label, value, sub, color }: { label: string; value: string; sub?: string; color?: string }) {
   return (
     <Card>
-      <div style={{ fontSize: '10px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '1px', color: '#6B7280', marginBottom: '6px' }}>{label}</div>
-      <div style={{ fontSize: '22px', fontWeight: 700, color: color || '#F0F4F8' }}>{value}</div>
-      {sub && <div style={{ fontSize: '11px', color: '#6B7280', marginTop: '4px' }}>{sub}</div>}
+      <div style={{ fontSize: '10px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '1px', color: '#9CA3AF', marginBottom: '6px' }}>{label}</div>
+      <div style={{ fontSize: '22px', fontWeight: 800, color: color || '#1A1A1A' }}>{value}</div>
+      {sub && <div style={{ fontSize: '11px', color: '#9CA3AF', marginTop: '4px' }}>{sub}</div>}
     </Card>
   );
 }
@@ -191,41 +194,22 @@ export function TradesClient({ trades: initialTrades }: TradesClientProps) {
   const [trades, setTrades] = useState<Trade[]>(initialTrades);
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'closed'>('active');
 
-  const [livePrices, setLivePrices] = useState<Record<string, number>>({});
   const [posFilter, setPosFilter] = useState<string>('all');
   const [coinSearch, setCoinSearch] = useState('');
   const [pnlFilter, setPnlFilter] = useState<'all' | 'profit' | 'loss'>('all');
-  const [modeFilter, setModeFilter] = useState<'all' | 'paper' | 'live'>('all');
+  const [modeFilter, setModeFilter] = useState<'all' | 'paper' | 'live'>('paper');
   const [sessionFilter, setSessionFilter] = useState<string>('all');
   const [isClearing, setIsClearing] = useState(false);
   const [clearSuccess, setClearSuccess] = useState<string | null>(null);
   const [confirmingClear, setConfirmingClear] = useState(false);
   const clearPauseRef = useRef(false);
 
-  // ── Athena Decision History ───────────────────────────────────────────────
-  const [athenaLog, setAthenaLog] = useState<any[]>([]);
-  const [athenaLoading, setAthenaLoading] = useState(true);
-  const [athenaExpandedRow, setAthenaExpandedRow] = useState<number | null>(null);
-  const [athenaFilters, setAthenaFilters] = useState<{
-    coin: string; decision: 'all' | 'EXECUTE' | 'VETO'; date: 'all' | 'today' | '7d';
-  }>({ coin: '', decision: 'all', date: 'all' });
+
 
 
   useEffect(() => { setMounted(true); }, []);
 
-  // ── Fetch Athena Decision Log from engine API ────────────────────────────
-  useEffect(() => {
-    const ENGINE = process.env.NEXT_PUBLIC_ENGINE_URL || '';
-    const load = async () => {
-      try {
-        const res = await fetch(`${ENGINE}/api/athena-log?limit=500`, { signal: AbortSignal.timeout(6000) });
-        if (res.ok) { const d = await res.json(); if (d?.rows) setAthenaLog(d.rows); }
-      } catch { /* silent */ } finally { setAthenaLoading(false); }
-    };
-    load();
-    const id = setInterval(load, 60_000);
-    return () => clearInterval(id);
-  }, []);
+
 
   // Previously: called /api/bot-state → engine JSON → ALL users' trades (bug).
   // Now: calls /api/trades → Prisma → only this user's trades, user-isolated.
@@ -241,43 +225,6 @@ export function TradesClient({ trades: initialTrades }: TradesClientProps) {
   }, []);
 
 
-  // Live price polling from Binance REST every 3s for active trade symbols
-  // Uses Binance /api/v3/ticker/price directly — reliable, no pair-name confusion
-  useEffect(() => {
-    async function fetchLivePrices() {
-      const activeTrades = (trades ?? []).filter(t => (t.status || '').toLowerCase() === 'active');
-      const activeSymbols = [...new Set(activeTrades.map(tradeSym).filter(Boolean))];
-      if (activeSymbols.length === 0) return;
-
-      const entryPriceBySymbol: Record<string, number> = {};
-      activeTrades.forEach(t => { entryPriceBySymbol[tradeSym(t)] = t.entryPrice || 0; });
-
-      try {
-        // Fetch all active symbols in one batch request (max 100 in Binance batch)
-        const symbolsParam = encodeURIComponent(JSON.stringify(activeSymbols));
-        const res = await fetch(
-          `https://api.binance.com/api/v3/ticker/price?symbols=${symbolsParam}`,
-          { cache: 'no-store', signal: AbortSignal.timeout(4000) }
-        );
-        if (res.ok) {
-          const data: { symbol: string; price: string }[] = await res.json();
-          const map: Record<string, number> = {};
-          data.forEach(({ symbol, price }) => {
-            const p = parseFloat(price);
-            const entry = entryPriceBySymbol[symbol] || 0;
-            // Sanity check: price must be > 0 and within 5x of entry (catches wrong-pair maps)
-            if (p > 0 && (entry === 0 || (p > entry * 0.01 && p < entry * 10))) {
-              map[symbol] = p;
-            }
-          });
-          if (Object.keys(map).length > 0) setLivePrices(map);
-        }
-      } catch { /* silent — keep last known prices */ }
-    }
-    fetchLivePrices();
-    const timer = setInterval(fetchLivePrices, 1000);
-    return () => clearInterval(timer);
-  }, [trades]);
 
   useEffect(() => {
     refreshTrades(); // initial fetch
@@ -331,13 +278,13 @@ export function TradesClient({ trades: initialTrades }: TradesClientProps) {
     const realizedPnl = closed.reduce((s, t) => s + (t.totalPnl || 0), 0);
     // Recalculate unrealized PnL from live prices (matches table P&L formula)
     const unrealizedPnl = active.reduce((s, t) => {
-      const cp = livePrices[tradeSym(t)] || t.currentPrice || t.entryPrice;
+      const cp = t.currentPrice || t.entryPrice;
       return s + calcLivePnl(t, cp).pnl;
     }, 0);
     const combinedPnl = realizedPnl + unrealizedPnl;
 
     const activePnlPcts = active.map(t => {
-      const cp = livePrices[tradeSym(t)] || t.currentPrice || t.entryPrice;
+      const cp = t.currentPrice || t.entryPrice;
       return calcLivePnl(t, cp).pnlPct;
     });
     const allPnlPcts = [
@@ -376,10 +323,13 @@ export function TradesClient({ trades: initialTrades }: TradesClientProps) {
       total: all.length, active: active.length, closed: closed.length,
       wins: wins.length, losses: losses.length, winRate,
       realizedPnl, unrealizedPnl, combinedPnl,
+      totalFees: closed.reduce((s, t) => s + (t.fee || 0), 0),
+      realizedPnlAfterFees: realizedPnl - closed.reduce((s, t) => s + (t.fee || 0), 0),
       bestTrade, worstTrade,
       maxDD, maxDDPct, profitFactor, riskReward,
     };
-  }, [modeFiltered, livePrices]);
+  }, [modeFiltered]);
+
 
   /* ── CSV Export (all trades, respects mode filter only) ── */
   const exportCSV = () => {
@@ -460,27 +410,27 @@ export function TradesClient({ trades: initialTrades }: TradesClientProps) {
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="mb-6">
             <div className="flex items-center justify-between">
               <div>
-                <h1 className="text-3xl font-bold mb-1">Trade Journal</h1>
+                <h1 className="text-3xl font-bold mb-1" style={{ color: '#1A1A1A' }}>Trade Journal</h1>
                 {clearSuccess && <p className="text-sm" style={{ color: '#22C55E', fontWeight: 600 }}>{clearSuccess}</p>}
               </div>
               <div style={{ display: 'flex', gap: '8px' }}>
                 <button onClick={exportCSV} style={{
                   display: 'flex', alignItems: 'center', gap: '6px',
-                  padding: '10px 14px', borderRadius: '12px', border: 'none',
-                  background: 'rgba(8, 145, 178, 0.15)', color: '#0EA5E9',
-                  fontSize: '13px', fontWeight: 600, cursor: 'pointer',
+                  padding: '10px 16px', borderRadius: '10px', border: '1.5px solid #F0B90B',
+                  background: '#F0B90B', color: '#1A1A1A',
+                  fontSize: '13px', fontWeight: 700, cursor: 'pointer',
                 }}>
                   <Download size={14} /> Export CSV
                 </button>
 
                 <button onClick={clearAllTrades} disabled={isClearing} style={{
                   display: 'flex', alignItems: 'center', gap: '6px',
-                  padding: '10px 14px', borderRadius: '12px', border: 'none',
-                  background: confirmingClear ? 'rgba(239,68,68,0.3)' : 'rgba(239,68,68,0.1)',
-                  color: '#EF4444',
-                  fontSize: '13px', fontWeight: 600, cursor: 'pointer',
+                  padding: '10px 16px', borderRadius: '10px',
+                  border: confirmingClear ? '1.5px solid #DC2626' : '1.5px solid rgba(220,38,38,0.4)',
+                  background: confirmingClear ? 'rgba(220,38,38,0.1)' : 'transparent',
+                  color: '#DC2626',
+                  fontSize: '13px', fontWeight: 700, cursor: 'pointer',
                   opacity: isClearing ? 0.5 : 1,
-                  ...(confirmingClear ? { animation: 'pulse 1s infinite', border: '1px solid #EF4444' } : {}),
                 }}>
                   <Trash2 size={14} /> {isClearing ? 'Clearing...' : confirmingClear ? '⚠️ Click again to confirm' : 'Clear Trades'}
                 </button>
@@ -492,12 +442,11 @@ export function TradesClient({ trades: initialTrades }: TradesClientProps) {
 
           {/* ═══ Portfolio Summary Stats ═══ */}
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.05 }} className="mb-6">
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: '12px' }}>
-              <StatCard label="Total Trades" value={String(stats.total)} sub={`${stats.active} active · ${stats.closed} closed`} />
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '12px' }}>
+              <StatCard label="Active Trades" value={String(stats.active)} sub={`${stats.total} total · ${stats.closed} closed`} color="#00E5FF" />
+              <StatCard label="Total PNL" value={'$' + fmt$(stats.combinedPnl)} sub={`Realized (net): $${fmt$(stats.realizedPnlAfterFees)} · Active: $${fmt$(stats.unrealizedPnl)}`} color={pnlColor(stats.combinedPnl)} />
+              <StatCard label="Realized PNL (net fees)" value={'$' + fmt$(stats.realizedPnlAfterFees)} sub={`Gross: $${fmt$(stats.realizedPnl)} · Fees: $${stats.totalFees.toFixed(2)}`} color={pnlColor(stats.realizedPnlAfterFees)} />
               <StatCard label="Win Rate" value={stats.winRate.toFixed(1) + '%'} sub={`${stats.wins}W / ${stats.losses}L`} color={stats.winRate >= 50 ? '#22C55E' : '#EF4444'} />
-              <StatCard label="Total PNL" value={'$' + fmt$(stats.combinedPnl)} sub={`Realized: $${fmt$(stats.realizedPnl)} · Active: $${fmt$(stats.unrealizedPnl)}`} color={pnlColor(stats.combinedPnl)} />
-              <StatCard label="Active PNL" value={'$' + fmt$(stats.unrealizedPnl)} sub={`${stats.active} open positions`} color={pnlColor(stats.unrealizedPnl)} />
-              <StatCard label="Best / Worst" value={fmtPct(stats.bestTrade)} sub={fmtPct(stats.worstTrade) + ' worst'} color={pnlColor(stats.bestTrade)} />
               <StatCard label="Max Drawdown" value={stats.maxDDPct.toFixed(2) + '%'} sub={`$${stats.maxDD.toFixed(2)} · PF: ${stats.profitFactor === Infinity ? '∞' : stats.profitFactor.toFixed(2)}`} color="#EF4444" />
             </div>
           </motion.div>
@@ -513,10 +462,10 @@ export function TradesClient({ trades: initialTrades }: TradesClientProps) {
               <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '12px' }}>
                 {(['all', 'active', 'closed'] as const).map(s => (
                   <button key={s} onClick={() => setStatusFilter(s)} style={{
-                    padding: '6px 14px', borderRadius: '8px', border: 'none', cursor: 'pointer',
+                    padding: '6px 14px', borderRadius: '8px', border: statusFilter === s ? '1.5px solid #F0B90B' : '1.5px solid rgba(0,0,0,0.10)', cursor: 'pointer',
                     fontSize: '13px', fontWeight: 600,
-                    background: statusFilter === s ? '#0891B2' : 'rgba(255,255,255,0.05)',
-                    color: statusFilter === s ? '#fff' : '#9CA3AF',
+                    background: statusFilter === s ? '#F0B90B' : '#FFFFFF',
+                    color: statusFilter === s ? '#1A1A1A' : '#6B7280',
                     transition: 'all 0.2s',
                   }}>
                     {s === 'all' ? `All (${stats.total})` : s === 'active' ? `Active (${stats.active})` : `Closed (${stats.closed})`}
@@ -528,8 +477,8 @@ export function TradesClient({ trades: initialTrades }: TradesClientProps) {
                 {/* Session filter — only shown when multiple sessions exist */}
                 {uniqueSessions.length > 1 && (
                   <select value={sessionFilter} onChange={e => setSessionFilter(e.target.value)} style={{
-                    padding: '6px 10px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.1)',
-                    background: 'rgba(255,255,255,0.04)', color: '#D1D5DB', fontSize: '13px',
+                    padding: '6px 10px', borderRadius: '8px', border: '1px solid rgba(0,0,0,0.10)',
+                    background: '#FFFFFF', color: '#4B5563', fontSize: '13px',
                   }}>
                     <option value="all">All Sessions</option>
                     {uniqueSessions.map((sid, i) => (
@@ -539,8 +488,8 @@ export function TradesClient({ trades: initialTrades }: TradesClientProps) {
                 )}
 
                 <select value={posFilter} onChange={e => setPosFilter(e.target.value)} style={{
-                  padding: '6px 10px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.1)',
-                  background: 'rgba(255,255,255,0.04)', color: '#D1D5DB', fontSize: '13px',
+                  padding: '6px 10px', borderRadius: '8px', border: '1px solid rgba(0,0,0,0.10)',
+                  background: '#FFFFFF', color: '#4B5563', fontSize: '13px',
                 }}>
                   <option value="all">All Positions</option>
                   <option value="long">Long / Buy</option>
@@ -550,40 +499,23 @@ export function TradesClient({ trades: initialTrades }: TradesClientProps) {
 
 
                 <select value={pnlFilter} onChange={e => setPnlFilter(e.target.value as any)} style={{
-                  padding: '6px 10px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.1)',
-                  background: 'rgba(255,255,255,0.04)', color: '#D1D5DB', fontSize: '13px',
+                  padding: '6px 10px', borderRadius: '8px', border: '1px solid rgba(0,0,0,0.10)',
+                  background: '#FFFFFF', color: '#4B5563', fontSize: '13px',
                 }}>
                   <option value="all">All P&L</option>
                   <option value="profit">Profit Only</option>
                   <option value="loss">Loss Only</option>
                 </select>
 
-                <div style={{ display: 'inline-flex', gap: '0', borderRadius: '8px', overflow: 'hidden', border: '1px solid rgba(255,255,255,0.1)' }}>
-                  {(['paper', 'live'] as const).map(m => (
-                    <button key={m} onClick={() => setModeFilter(prev => prev === m ? 'all' : m)} style={{
-                      padding: '6px 14px', border: 'none', cursor: 'pointer',
-                      fontSize: '12px', fontWeight: 600,
-                      background: modeFilter === m
-                        ? m === 'paper' ? 'rgba(34,197,94,0.2)' : 'rgba(239,68,68,0.2)'
-                        : 'transparent',
-                      color: modeFilter === m
-                        ? m === 'paper' ? '#22C55E' : '#EF4444'
-                        : '#6B7280',
-                      borderRight: m === 'paper' ? '1px solid rgba(255,255,255,0.08)' : 'none',
-                      transition: 'all 0.2s',
-                    }}>
-                      {m === 'paper' ? '🟢 Paper' : '🔴 Live'}
-                    </button>
-                  ))}
-                </div>
+
 
                 <div style={{ marginLeft: 'auto', position: 'relative' }}>
-                  <Search size={14} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: '#6B7280' }} />
+                  <Search size={14} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: '#9CA3AF' }} />
                   <input value={coinSearch} onChange={e => setCoinSearch(e.target.value)}
                     placeholder="Search coin..."
                     style={{
-                      padding: '6px 10px 6px 30px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.1)',
-                      background: 'rgba(255,255,255,0.04)', color: '#D1D5DB', fontSize: '13px', width: '150px',
+                      padding: '6px 10px 6px 30px', borderRadius: '8px', border: '1px solid rgba(0,0,0,0.10)',
+                      background: '#FFFFFF', color: '#1A1A1A', fontSize: '13px', width: '150px',
                     }} />
                   {coinSearch && (
                     <X size={12} onClick={() => setCoinSearch('')}
@@ -603,14 +535,14 @@ export function TradesClient({ trades: initialTrades }: TradesClientProps) {
             {filtered.length > 0 ? (
               <Card>
                 <div style={{ overflowX: 'auto', maxHeight: '600px', overflowY: 'auto' }}>
-                  <table style={{ width: '100%', minWidth: '1300px', borderCollapse: 'collapse', fontSize: '17px' }}>
+                  <table style={{ width: '100%', minWidth: '1300px', borderCollapse: 'collapse', fontSize: '13px' }}>
                     <thead>
-                      <tr style={{ borderBottom: '2px solid rgba(255,255,255,0.10)' }}>
-                        {['Bot', 'Coin', 'Position', 'Leverage', 'Capital', 'Entry', 'LTP', 'Stop Loss', 'SL Step', 'Exit Guard', 'Target Price', 'PnL', 'Fee', 'Net PnL', 'Exit'].map(h => (
+                      <tr style={{ borderBottom: '2px solid rgba(0,0,0,0.08)' }}>
+                        {['Bot', 'Coin', 'Position', 'Leverage', 'Capital', 'Entry', 'Stop Loss', 'SL Step', 'Exit Guard', 'Target Price', 'PnL', 'Fee', 'Net PnL', 'Exit'].map(h => (
                           <th key={h} style={{
                             padding: '12px 14px', textAlign: h === 'Bot' || h === 'Coin' ? 'left' : 'center',
-                            fontSize: '13px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.8px',
-                            color: '#9CA3AF', position: 'sticky', top: 0, background: 'rgba(17, 24, 39, 0.95)',
+                            fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.8px',
+                            color: '#9CA3AF', position: 'sticky', top: 0, background: '#FFFFFF',
                           }}>{h}</th>
                         ))}
                       </tr>
@@ -619,16 +551,15 @@ export function TradesClient({ trades: initialTrades }: TradesClientProps) {
                       {filtered.map(t => {
                         const isActive = (t.status || '').toLowerCase() === 'active';
                         const sym = tradeSym(t);
-                        const livePrice = livePrices[sym];
-                        const currentPrice = isActive ? (livePrice || t.currentPrice || t.entryPrice) : null;
+                        const currentPrice = isActive ? (t.currentPrice || t.entryPrice) : null;
                         const isLong = tradeIsLong(t);
                         const { pnl, pnlPct } = isActive && currentPrice
                           ? calcLivePnl(t, currentPrice)
                           : { pnl: t.totalPnl, pnlPct: t.totalPnlPercent };
 
                         return (
-                          <tr key={t.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-                            <td style={{ padding: '12px 14px', color: '#0891B2', fontWeight: 600, fontSize: '14px' }}>
+                          <tr key={t.id} style={{ borderBottom: '1px solid rgba(0,0,0,0.05)', background: isActive ? 'rgba(240,185,11,0.03)' : 'transparent' }}>
+                            <td style={{ padding: '12px 14px', color: '#F0B90B', fontWeight: 700, fontSize: '13px' }}>
                               <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                                 {t.botName || 'Unknown Bot'}
                               </div>
@@ -641,7 +572,7 @@ export function TradesClient({ trades: initialTrades }: TradesClientProps) {
                                 </div>
                               )}
                             </td>
-                            <td style={{ padding: '12px 14px', fontWeight: 700, color: '#F0F4F8', fontSize: '14px' }}>
+                            <td style={{ padding: '12px 14px', fontWeight: 700, color: '#1A1A1A', fontSize: '13px' }}>
                               {t.coin.replace('USDT', '')}
                             </td>
                             <td style={{ padding: '12px 14px', textAlign: 'center' }}>
@@ -653,17 +584,10 @@ export function TradesClient({ trades: initialTrades }: TradesClientProps) {
                                 {isLong ? 'LONG' : 'SHORT'}
                               </span>
                             </td>
-                            <td style={{ padding: '12px 14px', textAlign: 'center', color: '#E5E7EB', fontSize: '14px' }}>{t.leverage}×</td>
-                            <td style={{ padding: '12px 14px', textAlign: 'center', color: '#E5E7EB', fontSize: '14px' }}>${t.capital}</td>
-                            <td style={{ padding: '12px 14px', textAlign: 'center', color: '#E5E7EB', fontFamily: 'monospace', fontSize: '14px' }}>{fmtPrice(t.entryPrice)}</td>
-                            <td style={{ padding: '12px 14px', textAlign: 'center', fontFamily: 'monospace', fontSize: '14px' }}>
-                              {isActive && currentPrice ? (
-                                <span style={{ color: livePrice ? '#22C55E' : '#9CA3AF', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px' }}>
-                                  {livePrice && <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#22C55E', animation: 'pulse 2s infinite', display: 'inline-block' }} />}
-                                  {fmtPrice(currentPrice)}
-                                </span>
-                              ) : <span style={{ color: '#6B7280' }}>—</span>}
-                            </td>
+                            <td style={{ padding: '12px 14px', textAlign: 'center', color: '#4B5563', fontSize: '13px' }}>{t.leverage}×</td>
+                            <td style={{ padding: '12px 14px', textAlign: 'center', color: '#4B5563', fontSize: '13px' }}>${t.capital}</td>
+                            <td style={{ padding: '12px 14px', textAlign: 'center', color: '#4B5563', fontFamily: 'monospace', fontSize: '13px' }}>{fmtPrice(t.entryPrice)}</td>
+
                             {/* Stop Loss — shows trailing_sl for active trades (updates live as SL ratchets up) */}
                             <td style={{ padding: '12px 14px', textAlign: 'center', fontFamily: 'monospace', fontSize: '14px' }}>
                               {(() => {
@@ -671,7 +595,7 @@ export function TradesClient({ trades: initialTrades }: TradesClientProps) {
                                 const isTrailing = isActive && t.trailingActive;
                                 return (
                                   <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px' }}>
-                                    <span style={{ color: isTrailing ? '#F59E0B' : '#EF4444' }}>
+                                    <span style={{ color: isTrailing ? '#D97706' : '#DC2626' }}>
                                       {isTrailing && <span style={{ marginRight: '3px' }}>🔒</span>}
                                       {fmtPrice(liveSl)}
                                     </span>
@@ -769,7 +693,7 @@ export function TradesClient({ trades: initialTrades }: TradesClientProps) {
                     </tbody>
                   </table>
                 </div>
-                <div style={{ marginTop: '12px', fontSize: '12px', color: '#6B7280', textAlign: 'right' }}>
+                <div style={{ marginTop: '12px', fontSize: '12px', color: '#9CA3AF', textAlign: 'right' }}>
                   Showing {filtered.length} of {trades.length} trades
                 </div>
               </Card>
@@ -994,275 +918,7 @@ export function TradesClient({ trades: initialTrades }: TradesClientProps) {
             );
           })()}
 
-          {/* ═══════════════════════════════════════════════════════════════
-              ATHENA DECISION HISTORY LOG
-          ═══════════════════════════════════════════════════════════════ */}
-          {(() => {
-            // ── Apply filters ──
-            const now = Date.now();
-            const filtered = athenaLog.filter(r => {
-              if (athenaFilters.coin && !r.symbol?.toLowerCase().includes(athenaFilters.coin.toLowerCase())) return false;
-              if (athenaFilters.decision !== 'all' && r.decision !== athenaFilters.decision) return false;
-              if (athenaFilters.date === 'today') {
-                const d = new Date(r.ts); const n = new Date();
-                if (d.getFullYear() !== n.getFullYear() || d.getMonth() !== n.getMonth() || d.getDate() !== n.getDate()) return false;
-              }
-              if (athenaFilters.date === '7d' && now - new Date(r.ts).getTime() > 7 * 86400_000) return false;
-              return true;
-            });
 
-            return (
-              <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }} className="mt-8">
-                <div style={{
-                  background: 'linear-gradient(135deg, rgba(17,24,39,0.95) 0%, rgba(10,15,30,0.98) 100%)',
-                  backdropFilter: 'blur(20px)',
-                  border: '1px solid rgba(0,229,255,0.12)',
-                  borderRadius: '20px',
-                  overflow: 'hidden',
-                }}>
-                  {/* ── Section Header ── */}
-                  <div style={{
-                    padding: '20px 24px', display: 'flex', alignItems: 'center',
-                    justifyContent: 'space-between', borderBottom: '1px solid rgba(0,229,255,0.08)',
-                    background: 'rgba(0,229,255,0.02)',
-                  }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                      <div style={{
-                        width: 36, height: 36, borderRadius: '50%',
-                        background: 'rgba(0,229,255,0.1)', display: 'flex',
-                        alignItems: 'center', justifyContent: 'center',
-                        boxShadow: '0 0 12px rgba(0,229,255,0.2)',
-                      }}>
-                        <span style={{ fontSize: 18 }}>🧠</span>
-                      </div>
-                      <div>
-                        <div style={{ fontSize: 13, fontWeight: 800, letterSpacing: '2px', color: '#00E5FF', textTransform: 'uppercase' as const }}>
-                          Athena Decision Log
-                        </div>
-                        <div style={{ fontSize: 11, color: '#6B7280', marginTop: 2 }}>
-                          Persistent AI decision history across all engine cycles
-                        </div>
-                      </div>
-                    </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                      {athenaLoading && (
-                        <span style={{ fontSize: 11, color: '#6B7280', fontStyle: 'italic' }}>loading…</span>
-                      )}
-                      <div style={{
-                        padding: '4px 12px', borderRadius: 20,
-                        background: 'rgba(0,229,255,0.08)', border: '1px solid rgba(0,229,255,0.2)',
-                        fontSize: 12, fontWeight: 700, color: '#00E5FF',
-                      }}>
-                        {filtered.length.toLocaleString()} records
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* ── Filter Bar ── */}
-                  <div style={{
-                    padding: '14px 24px', display: 'flex', gap: 10, flexWrap: 'wrap' as const,
-                    alignItems: 'center', borderBottom: '1px solid rgba(255,255,255,0.05)',
-                    background: 'rgba(0,0,0,0.2)',
-                  }}>
-                    {/* Coin search */}
-                    <div style={{ position: 'relative' }}>
-                      <span style={{ position: 'absolute', left: 9, top: '50%', transform: 'translateY(-50%)', fontSize: 12, color: '#6B7280' }}>🔍</span>
-                      <input
-                        value={athenaFilters.coin}
-                        onChange={e => setAthenaFilters(f => ({ ...f, coin: e.target.value }))}
-                        placeholder="Coin…"
-                        style={{
-                          padding: '6px 10px 6px 28px', borderRadius: 8,
-                          border: '1px solid rgba(255,255,255,0.1)',
-                          background: 'rgba(255,255,255,0.04)', color: '#D1D5DB',
-                          fontSize: 13, width: 130, outline: 'none',
-                        }}
-                      />
-                    </div>
-
-                    {/* Decision filter */}
-                    <div style={{ display: 'flex', borderRadius: 8, overflow: 'hidden', border: '1px solid rgba(255,255,255,0.1)' }}>
-                      {(['all', 'EXECUTE', 'VETO'] as const).map(d => (
-                        <button key={d} onClick={() => setAthenaFilters(f => ({ ...f, decision: d }))} style={{
-                          padding: '6px 14px', border: 'none', cursor: 'pointer',
-                          fontSize: 12, fontWeight: 700,
-                          background: athenaFilters.decision === d
-                            ? d === 'EXECUTE' ? 'rgba(34,197,94,0.25)' : d === 'VETO' ? 'rgba(239,68,68,0.25)' : 'rgba(0,229,255,0.15)'
-                            : 'transparent',
-                          color: athenaFilters.decision === d
-                            ? d === 'EXECUTE' ? '#22C55E' : d === 'VETO' ? '#EF4444' : '#00E5FF'
-                            : '#6B7280',
-                          borderRight: d !== 'VETO' ? '1px solid rgba(255,255,255,0.08)' : 'none',
-                          transition: 'all 0.2s',
-                        }}>
-                          {d === 'all' ? 'All' : d === 'EXECUTE' ? '✅ Execute' : '🚫 Veto'}
-                        </button>
-                      ))}
-                    </div>
-
-                    {/* Date range filter */}
-                    <div style={{ display: 'flex', borderRadius: 8, overflow: 'hidden', border: '1px solid rgba(255,255,255,0.1)' }}>
-                      {([['all', 'All Time'], ['today', 'Today'], ['7d', 'Last 7d']] as [string, string][]).map(([val, label]) => (
-                        <button key={val} onClick={() => setAthenaFilters(f => ({ ...f, date: val as any }))} style={{
-                          padding: '6px 14px', border: 'none', cursor: 'pointer',
-                          fontSize: 12, fontWeight: 700,
-                          background: athenaFilters.date === val ? 'rgba(139,92,246,0.2)' : 'transparent',
-                          color: athenaFilters.date === val ? '#A78BFA' : '#6B7280',
-                          borderRight: val !== '7d' ? '1px solid rgba(255,255,255,0.08)' : 'none',
-                          transition: 'all 0.2s',
-                        }}>
-                          {label}
-                        </button>
-                      ))}
-                    </div>
-
-                    {/* Clear filters */}
-                    {(athenaFilters.coin || athenaFilters.decision !== 'all' || athenaFilters.date !== 'all') && (
-                      <button onClick={() => setAthenaFilters({ coin: '', decision: 'all', date: 'all' })} style={{
-                        padding: '6px 12px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.1)',
-                        background: 'transparent', color: '#6B7280', fontSize: 12, cursor: 'pointer',
-                      }}>
-                        ✕ Clear
-                      </button>
-                    )}
-                  </div>
-
-                  {/* ── Table ── */}
-                  {!athenaLoading && filtered.length === 0 ? (
-                    <div style={{ padding: '60px 0', textAlign: 'center' }}>
-                      <div style={{ fontSize: 40, marginBottom: 12 }}>🧠</div>
-                      <div style={{ fontSize: 16, fontWeight: 600, color: '#4B5563', marginBottom: 6 }}>
-                        {athenaLog.length === 0 ? 'No decisions logged yet' : 'No results match filters'}
-                      </div>
-                      <div style={{ fontSize: 13, color: '#374151' }}>
-                        {athenaLog.length === 0
-                          ? 'Decisions appear once the engine completes a full scan cycle.'
-                          : 'Try adjusting the coin, decision type, or date filters.'}
-                      </div>
-                    </div>
-                  ) : (
-                    <div style={{ overflowX: 'auto', maxHeight: 520, overflowY: 'auto' }}>
-                      <table style={{ width: '100%', minWidth: 1100, borderCollapse: 'collapse', fontSize: 13 }}>
-                        <thead>
-                          <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
-                            {['Time', 'Coin', 'Side', 'Decision', 'Conviction', 'BTC Corr', 'Regime', 'Summary', 'Risk Flags'].map(h => (
-                              <th key={h} style={{
-                                padding: '12px 14px', textAlign: h === 'Summary' || h === 'Risk Flags' ? 'left' : 'center',
-                                fontSize: 11, fontWeight: 700, textTransform: 'uppercase' as const,
-                                letterSpacing: '0.8px', color: '#6B7280',
-                                position: 'sticky', top: 0,
-                                background: 'rgba(10,15,30,0.98)',
-                              }}>{h}</th>
-                            ))}
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {filtered.slice().reverse().map((r, i) => {
-                            const isExec = r.decision === 'EXECUTE';
-                            const isExpanded = athenaExpandedRow === i;
-                            const corr = parseFloat(r.btc_corr ?? r.btc_correlation ?? 'NaN');
-                            const corrLabel = isNaN(corr) ? '—' : corr > 0.7 ? 'HIGH' : corr > 0.4 ? 'MED' : 'LOW';
-                            const corrColor = isNaN(corr) ? '#4B5563' : corr > 0.7 ? '#EF4444' : corr > 0.4 ? '#F59E0B' : '#22C55E';
-                            const convPct = r.conviction != null ? r.conviction : Math.round((r.adjusted_confidence || 0) * 100);
-                            const ts = new Date(r.ts || r.time || '');
-                            const timeStr = isNaN(ts.getTime()) ? '—' : `${ts.getHours().toString().padStart(2,'0')}:${ts.getMinutes().toString().padStart(2,'0')} ${ts.getDate()}/${ts.getMonth()+1}`;
-                            const summary = r.summary || r.reasoning || '';
-                            const flags: string[] = r.risk_flags || [];
-                            const isLong = ['BUY','LONG'].includes((r.side||'').toUpperCase());
-
-                            return (
-                              <tr key={i} onClick={() => setAthenaExpandedRow(isExpanded ? null : i)}
-                                style={{
-                                  borderBottom: '1px solid rgba(255,255,255,0.04)',
-                                  cursor: 'pointer',
-                                  background: isExpanded ? 'rgba(0,229,255,0.03)' : 'transparent',
-                                  transition: 'background 0.2s',
-                                }}>
-                                {/* Time */}
-                                <td style={{ padding: '10px 14px', textAlign: 'center', fontFamily: 'monospace', color: '#6B7280', fontSize: 12, whiteSpace: 'nowrap' as const }}>
-                                  {timeStr}
-                                </td>
-                                {/* Coin */}
-                                <td style={{ padding: '10px 14px', textAlign: 'center', fontWeight: 800, color: '#E8EDF5', fontSize: 14 }}>
-                                  {(r.symbol || '').replace('USDT', '')}
-                                </td>
-                                {/* Side */}
-                                <td style={{ padding: '10px 14px', textAlign: 'center' }}>
-                                  <span style={{
-                                    padding: '3px 9px', borderRadius: 6, fontSize: 11, fontWeight: 700,
-                                    color: isLong ? '#22C55E' : '#EF4444',
-                                    background: isLong ? 'rgba(34,197,94,0.12)' : 'rgba(239,68,68,0.12)',
-                                  }}>{isLong ? 'LONG' : 'SHORT'}</span>
-                                </td>
-                                {/* Decision */}
-                                <td style={{ padding: '10px 14px', textAlign: 'center' }}>
-                                  <span style={{
-                                    padding: '3px 10px', borderRadius: 6, fontSize: 11, fontWeight: 800,
-                                    letterSpacing: '0.5px',
-                                    color: isExec ? '#22C55E' : '#EF4444',
-                                    background: isExec ? 'rgba(34,197,94,0.12)' : 'rgba(239,68,68,0.12)',
-                                    border: `1px solid ${isExec ? 'rgba(34,197,94,0.25)' : 'rgba(239,68,68,0.25)'}`,
-                                  }}>{isExec ? '✅ EXECUTE' : '🚫 VETO'}</span>
-                                </td>
-                                {/* Conviction bar */}
-                                <td style={{ padding: '10px 14px', textAlign: 'center', minWidth: 90 }}>
-                                  <div style={{ display: 'flex', flexDirection: 'column' as const, alignItems: 'center', gap: 3 }}>
-                                    <span style={{ fontSize: 12, fontWeight: 700, color: convPct >= 70 ? '#22C55E' : convPct >= 50 ? '#F59E0B' : '#EF4444' }}>
-                                      {convPct}%
-                                    </span>
-                                    <div style={{ width: 60, height: 4, background: 'rgba(255,255,255,0.08)', borderRadius: 2, overflow: 'hidden' }}>
-                                      <div style={{ width: `${Math.min(convPct, 100)}%`, height: '100%', background: convPct >= 70 ? '#22C55E' : convPct >= 50 ? '#F59E0B' : '#EF4444', borderRadius: 2 }} />
-                                    </div>
-                                  </div>
-                                </td>
-                                {/* BTC Corr */}
-                                <td style={{ padding: '10px 14px', textAlign: 'center' }}>
-                                  <span style={{
-                                    fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 5,
-                                    color: corrColor,
-                                    background: `${corrColor}18`,
-                                  }}>
-                                    {isNaN(corr) ? '—' : `${corr.toFixed(2)} ${corrLabel}`}
-                                  </span>
-                                </td>
-                                {/* Regime */}
-                                <td style={{ padding: '10px 14px', textAlign: 'center', fontSize: 11, color: '#9CA3AF', fontFamily: 'monospace' }}>
-                                  {r.regime || '—'}
-                                </td>
-                                {/* Summary (expandable) */}
-                                <td style={{ padding: '10px 14px', maxWidth: 340, fontSize: 12, color: '#9CA3AF', lineHeight: '1.5' }}>
-                                  {isExpanded ? summary : (summary.length > 110 ? summary.slice(0, 110) + '…' : summary)}
-                                  {summary.length > 110 && (
-                                    <span style={{ color: '#00E5FF', fontSize: 11, marginLeft: 4 }}>
-                                      {isExpanded ? ' ▲ less' : ' ▼ more'}
-                                    </span>
-                                  )}
-                                </td>
-                                {/* Risk Flags */}
-                                <td style={{ padding: '10px 14px' }}>
-                                  <div style={{ display: 'flex', flexWrap: 'wrap' as const, gap: 4 }}>
-                                    {flags.length === 0 ? (
-                                      <span style={{ fontSize: 11, color: '#374151' }}>—</span>
-                                    ) : flags.map((f: string, fi: number) => (
-                                      <span key={fi} style={{
-                                        fontSize: 10, padding: '2px 7px', borderRadius: 4,
-                                        background: 'rgba(245,158,11,0.1)', color: '#F59E0B',
-                                        border: '1px solid rgba(245,158,11,0.2)',
-                                      }}>{f}</span>
-                                    ))}
-                                  </div>
-                                </td>
-                              </tr>
-                            );
-                          })}
-                        </tbody>
-                      </table>
-                    </div>
-                  )}
-                </div>
-              </motion.div>
-            );
-          })()}
 
         </div>
       </main>

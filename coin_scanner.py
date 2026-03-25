@@ -27,7 +27,7 @@ SCANNER_STATE_FILE = os.path.join(config.DATA_DIR, "scanner_state.json")
 COIN_EXCLUDE = {
     "EURUSDT", "WBTCUSDT", "USDCUSDT", "TUSDUSDT", "BUSDUSDT",
     "USTUSDT", "DAIUSDT", "FDUSDUSDT", "CVCUSDT", "USD1USDT",
-    "POLYXUSDT",
+    "POLYXUSDT", "TRUUSDT",
 }
 
 # ─── Minimum 24h quote volume to qualify (reduces from 50 → 15 high-liquid coins) ─

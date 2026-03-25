@@ -46,14 +46,14 @@ export function Header() {
 
   return (
     <>
-      <header className="fixed top-[38px] left-0 right-0 z-50 bg-[var(--color-surface)]/80 backdrop-blur-md border-b border-[var(--color-surface-light)]">
+      <header className="fixed top-[38px] left-0 right-0 z-50" style={{ background: '#FFFFFF', borderBottom: '1px solid rgba(0,0,0,0.08)', boxShadow: '0 1px 8px rgba(0,0,0,0.06)' }}>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
             <Link href={session ? '/dashboard' : '/'} className="flex items-center space-x-2 hover:opacity-80 transition-opacity">
               <Shield className="w-7 h-7 text-[var(--color-primary)]" />
               <div>
-                <span className="text-2xl font-bold" style={{ color: '#00E5FF', textShadow: '0 0 12px rgba(0,229,255,0.4)' }}>Synaptic</span>
-                <div style={{ fontSize: '8px', fontWeight: 700, letterSpacing: '2.5px', textTransform: 'uppercase', color: '#F0B90B', marginTop: '-2px', animation: 'blink 2.5s ease-in-out infinite' }}>AI · Crypto · Bots</div>
+                <span className="text-2xl font-bold" style={{ color: '#1A1A1A' }}>Synaptic</span>
+                <div style={{ fontSize: '8px', fontWeight: 700, letterSpacing: '2.5px', textTransform: 'uppercase', color: '#F0B90B', marginTop: '-2px' }}>AI · Crypto · Bots</div>
               </div>
             </Link>
 
@@ -61,27 +61,25 @@ export function Header() {
             <nav className="hidden md:flex items-center space-x-6">
               {session ? (
                 <>
-                  <Link href="/dashboard" className="text-[17px] font-medium text-[var(--color-text-secondary)] hover:text-[var(--color-primary)] transition-colors">
+                  <Link href="/dashboard" className="text-[15px] font-medium transition-colors" style={{ color: '#4B5563' }} onMouseEnter={e => (e.currentTarget.style.color='#F0B90B')} onMouseLeave={e => (e.currentTarget.style.color='#4B5563')}>
                     Cockpit
                   </Link>
-                  <Link href="/bots" className="text-[17px] font-medium text-[var(--color-text-secondary)] hover:text-[var(--color-primary)] transition-colors">
+                  <Link href="/bots" className="text-[15px] font-medium transition-colors" style={{ color: '#4B5563' }} onMouseEnter={e => (e.currentTarget.style.color='#F0B90B')} onMouseLeave={e => (e.currentTarget.style.color='#4B5563')}>
                     Deploy
                   </Link>
-                  <Link href="/trades" className="text-[17px] font-medium text-[var(--color-text-secondary)] hover:text-[var(--color-primary)] transition-colors">
+                  <Link href="/trades" className="text-[15px] font-medium transition-colors" style={{ color: '#4B5563' }} onMouseEnter={e => (e.currentTarget.style.color='#F0B90B')} onMouseLeave={e => (e.currentTarget.style.color='#4B5563')}>
                     Trade Book
                   </Link>
-                  <Link href="/journal" className="text-[17px] font-medium text-[var(--color-text-secondary)] hover:text-[var(--color-primary)] transition-colors">
-                    Journal
-                  </Link>
-                  <Link href="/account" className="text-[17px] font-medium text-[var(--color-text-secondary)] hover:text-[var(--color-primary)] transition-colors">
+
+                  <Link href="/account" className="text-[15px] font-medium transition-colors" style={{ color: '#4B5563' }} onMouseEnter={e => (e.currentTarget.style.color='#F0B90B')} onMouseLeave={e => (e.currentTarget.style.color='#4B5563')}>
                     Account
                   </Link>
                   {/* Alpha — standalone quant engine, do not merge with main engine */}
-                  <Link href="/alpha" className="text-[17px] font-semibold transition-colors" style={{ color: '#F0B90B', textShadow: '0 0 8px rgba(240,185,11,0.4)' }}>
+                  <Link href="/alpha" className="text-[15px] font-semibold" style={{ color: '#F0B90B', fontWeight: 800 }}>
                     α Alpha
                   </Link>
                   {(session.user as any)?.role === 'admin' && (
-                    <Link href="/admin" className="text-amber-400 hover:text-amber-300 transition-colors">
+                    <Link href="/admin" style={{ color: '#F0B90B', fontSize: '15px', fontWeight: 600 }}>
                       Admin
                     </Link>
                   )}
@@ -101,7 +99,7 @@ export function Header() {
                         <span style={{
                           position: 'absolute', top: -2, right: -2,
                           minWidth: 16, height: 16, borderRadius: 10,
-                          background: '#00E5FF', color: '#050A14',
+                          background: '#F0B90B', color: '#1A1A1A',
                           fontSize: '10px', fontWeight: 700,
                           display: 'flex', alignItems: 'center', justifyContent: 'center',
                           padding: '0 3px',
@@ -111,15 +109,15 @@ export function Header() {
                   )}
                   {session && (
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginLeft: '12px' }}>
-                      <span style={{ fontSize: '13px', fontWeight: 600, color: '#00E5FF' }}>
+                      <span style={{ fontSize: '13px', fontWeight: 700, color: '#1A1A1A' }}>
                         {(session.user as any)?.name || 'User'} {((session.user as any)?.role === 'admin') ? '(Admin)' : ''}
                       </span>
                       <button
                         onClick={handleSignOut}
-                        className="p-2 text-[var(--color-text-secondary)] hover:text-[var(--color-primary)] hover:bg-[var(--color-primary)]/10 rounded-lg transition-all"
+                        style={{ padding: '6px 14px', borderRadius: '8px', border: '1.5px solid #F0B90B', background: 'transparent', color: '#1A1A1A', fontSize: '12px', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}
                         title="Logout"
                       >
-                        <LogOut size={18} />
+                        <LogOut size={14} /> Logout
                       </button>
                     </div>
                   )}
@@ -161,9 +159,7 @@ export function Header() {
                   <Link href="/trades" className="block text-[var(--color-text-secondary)] hover:text-[var(--color-primary)] transition-colors">
                     Trade Book
                   </Link>
-                  <Link href="/journal" className="block text-[var(--color-text-secondary)] hover:text-[var(--color-primary)] transition-colors">
-                    Journal
-                  </Link>
+
                   <Link href="/account" className="block text-[var(--color-text-secondary)] hover:text-[var(--color-primary)] transition-colors">
                     Account
                   </Link>
