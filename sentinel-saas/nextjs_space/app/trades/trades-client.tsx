@@ -401,18 +401,18 @@ export function TradesClient({ trades: initialTrades }: TradesClientProps) {
     }
   };
 
-  const deleteTrade = async (tradeId: string) => {
-    if (confirmDeleteId !== tradeId) {
-      setConfirmDeleteId(tradeId);
+  const deleteTrade = async (uiKey: string, dbId: string) => {
+    if (confirmDeleteId !== uiKey) {
+      setConfirmDeleteId(uiKey);
       setTimeout(() => setConfirmDeleteId(null), 4000);
       return;
     }
     setConfirmDeleteId(null);
-    setDeletingTradeId(tradeId);
+    setDeletingTradeId(uiKey);
     try {
-      const res = await fetch(`/api/trades?id=${encodeURIComponent(tradeId)}`, { method: 'DELETE' });
+      const res = await fetch(`/api/trades?id=${encodeURIComponent(dbId)}`, { method: 'DELETE' });
       if (res.ok) {
-        setTrades(prev => prev.filter(t => t.id !== tradeId));
+        setTrades(prev => prev.filter(t => t.id !== uiKey && t.dbId !== dbId));
         showMsg('🗑️ Trade deleted', 4000);
       } else {
         const err = await res.json();
@@ -718,7 +718,7 @@ export function TradesClient({ trades: initialTrades }: TradesClientProps) {
                             {/* Per-trade delete button */}
                             <td style={{ padding: '8px 6px', textAlign: 'center' }}>
                               <button
-                                onClick={() => deleteTrade(t.dbId || t.id)}
+                                onClick={() => deleteTrade(t.id, t.dbId || t.id)}
                                 disabled={deletingTradeId === t.id}
                                 title={confirmDeleteId === t.id ? 'Click again to confirm delete' : 'Delete this trade'}
                                 style={{

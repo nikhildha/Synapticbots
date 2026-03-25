@@ -239,7 +239,7 @@ export function AthenaPanel({ athena, vetoLog = [] }: Props) {
                             </div>
                         </div>
                     ) : (
-                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(400px, 1fr))', gap: 16 }}>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                             <AnimatePresence>
                                 {decisions.map((d, i) => {
                                     // Normalize field names — support both in-memory and log-history shapes
@@ -249,100 +249,100 @@ export function AthenaPanel({ athena, vetoLog = [] }: Props) {
                                     const timestamp = d.time || d.ts || '';
                                     const theme = ACTION_THEMES[action] || ACTION_THEMES.VETO;
                                     const parsed = parseReasoning(reasoning);
-                                    const confPct = Math.round(confRaw * 100);
                                     const isLong = d.side === 'BUY' || d.side === 'LONG';
                                     const isShort = d.side === 'SELL' || d.side === 'SHORT';
+
+                                    // Extract Entry / SL / Target from reasoning parts if present
+                                    const reasonParts = reasoning.split(' | ');
+                                    let entryPrice = '', slPrice = '', targetPrice = '';
+                                    for (const p of reasonParts) {
+                                        if (p.startsWith('Entry:')) entryPrice = p.replace('Entry:', '').trim();
+                                        else if (p.startsWith('SL:') || p.startsWith('StopLoss:')) slPrice = p.replace(/StopLoss:|SL:/, '').trim();
+                                        else if (p.startsWith('Target:') || p.startsWith('TP:')) targetPrice = p.replace(/Target:|TP:/, '').trim();
+                                    }
 
                                     return (
                                         <motion.div
                                             key={d.symbol + d.time}
-                                            initial={{ opacity: 0, y: 20, scale: 0.95 }}
-                                            animate={{ opacity: 1, y: 0, scale: 1 }}
-                                            transition={{ duration: 0.4, delay: i * 0.1 }}
+                                            initial={{ opacity: 0, x: -20 }}
+                                            animate={{ opacity: 1, x: 0 }}
+                                            transition={{ duration: 0.3, delay: i * 0.06 }}
                                             style={{
                                                 background: 'rgba(15,20,30,0.6)',
                                                 border: `1px solid ${theme.glow}`,
-                                                borderRadius: 16,
-                                                padding: 20,
+                                                borderLeft: `4px solid ${theme.color}`,
+                                                borderRadius: 12,
+                                                padding: '14px 18px',
                                                 position: 'relative',
-                                                overflow: 'hidden'
+                                                overflow: 'hidden',
                                             }}
                                         >
-                                            <div style={{ position: 'absolute', top: -50, right: -50, width: 100, height: 100, background: theme.color, filter: 'blur(60px)', opacity: 0.15 }} />
+                                            <div style={{ position: 'absolute', top: -40, right: -40, width: 80, height: 80, background: theme.color, filter: 'blur(50px)', opacity: 0.1 }} />
 
-                                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-                                                <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-                                                    <div style={{ fontSize: 22, fontWeight: 900, color: '#E8EDF5', letterSpacing: '1px' }}>
+                                            {/* ── Top row: coin + direction + entry/sl/tp + verdict ── */}
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', justifyContent: 'space-between' }}>
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+                                                    {/* Coin name */}
+                                                    <span style={{ fontSize: 18, fontWeight: 900, color: '#E8EDF5', letterSpacing: '1px', fontFamily: 'monospace' }}>
                                                         {d.symbol.replace('USDT', '')}
-                                                    </div>
-                                                    <div style={{
-                                                        padding: '4px 10px', borderRadius: 6,
-                                                        background: isLong ? 'rgba(0,255,136,0.1)' : isShort ? 'rgba(255,59,92,0.1)' : 'transparent',
+                                                    </span>
+                                                    {/* Long/Short badge */}
+                                                    <span style={{
+                                                        padding: '3px 10px', borderRadius: 6,
+                                                        background: isLong ? 'rgba(0,255,136,0.12)' : isShort ? 'rgba(255,59,92,0.12)' : 'transparent',
                                                         color: isLong ? '#00FF88' : isShort ? '#FF3B5C' : '#6B7280',
-                                                        fontSize: 12, fontWeight: 800, letterSpacing: '1px'
+                                                        fontSize: 11, fontWeight: 800, letterSpacing: '1px',
                                                     }}>
                                                         {isLong ? 'LONG' : isShort ? 'SHORT' : d.side}
-                                                    </div>
-                                                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginLeft: 4 }}>
-                                                        <div style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, color: '#E8EDF5', background: 'rgba(255,255,255,0.05)', padding: '4px 8px', borderRadius: 4 }}>
-                                                            <span style={{ color: 'var(--color-text-muted)' }}>Conf:</span> <strong style={{ color: theme.color }}>{confPct}%</strong>
+                                                    </span>
+                                                    {/* Entry / SL / Target inline */}
+                                                    {(entryPrice || slPrice || targetPrice) && (
+                                                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, fontFamily: 'monospace' }}>
+                                                            {entryPrice && <span style={{ color: '#6B7280' }}>Entry <strong style={{ color: '#E8EDF5' }}>{entryPrice}</strong></span>}
+                                                            {entryPrice && (slPrice || targetPrice) && <span style={{ color: '#374151' }}>·</span>}
+                                                            {slPrice && <span style={{ color: '#6B7280' }}>SL <strong style={{ color: '#FF3B5C' }}>{slPrice}</strong></span>}
+                                                            {slPrice && targetPrice && <span style={{ color: '#374151' }}>·</span>}
+                                                            {targetPrice && <span style={{ color: '#6B7280' }}>Target <strong style={{ color: '#00FF88' }}>{targetPrice}</strong></span>}
                                                         </div>
-                                                        {parsed.leverage && (
-                                                            <div style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, color: '#E8EDF5', background: 'rgba(255,255,255,0.05)', padding: '4px 8px', borderRadius: 4 }}>
-                                                                <Zap size={10} color="#00E5FF" /> Lev: <strong style={{ color: '#00E5FF' }}>{parsed.leverage}</strong>
-                                                            </div>
-                                                        )}
-                                                        {parsed.size && (
-                                                            <div style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, color: '#E8EDF5', background: 'rgba(255,255,255,0.05)', padding: '4px 8px', borderRadius: 4 }}>
-                                                                <Lock size={10} color="#00FF88" /> Size: <strong style={{ color: '#00FF88' }}>{parsed.size}</strong>
-                                                            </div>
-                                                        )}
-                                                        {parsed.support && (
-                                                            <div style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, color: '#E8EDF5', background: 'rgba(255,255,255,0.05)', padding: '4px 8px', borderRadius: 4 }}>
-                                                                <Eye size={10} color="#FFB300" /> S/R: <strong style={{ color: '#FFB300' }}>{parsed.support.split(',')[0]}</strong>
-                                                            </div>
-                                                        )}
-                                                    </div>
+                                                    )}
+                                                    {/* Timestamp */}
+                                                    {timestamp && (
+                                                        <span style={{ fontSize: 10, color: '#4B5563', fontFamily: 'monospace' }}>{timeSince(timestamp)}</span>
+                                                    )}
                                                 </div>
+                                                {/* Verdict badge */}
                                                 <div style={{
-                                                    padding: '4px 10px', borderRadius: 6,
-                                                    background: `rgba(${parseInt(theme.color.slice(1,3), 16)},${parseInt(theme.color.slice(3,5), 16)},${parseInt(theme.color.slice(5,7), 16)},0.1)`,
+                                                    padding: '4px 12px', borderRadius: 6,
+                                                    background: `rgba(${parseInt(theme.color.slice(1,3), 16)},${parseInt(theme.color.slice(3,5), 16)},${parseInt(theme.color.slice(5,7), 16)},0.12)`,
                                                     border: `1px solid ${theme.color}40`,
-                                                    color: theme.color, fontSize: 12, fontWeight: 800, letterSpacing: '1px',
-                                                    boxShadow: `0 0 10px ${theme.glow}`
+                                                    color: theme.color, fontSize: 11, fontWeight: 800, letterSpacing: '1px',
+                                                    boxShadow: `0 0 8px ${theme.glow}`,
+                                                    whiteSpace: 'nowrap',
                                                 }}>
                                                     {theme.label}
                                                 </div>
                                             </div>
 
-                                            <div style={{ position: 'relative', marginTop: 12 }}>
-                                                <div style={{ fontSize: 10, color: '#A78BFA', letterSpacing: '2px', textTransform: 'uppercase', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
-                                                    <Activity size={12} /> Analytical Synthesis
-                                                </div>
-                                                <p style={{
-                                                    fontSize: 13, color: '#9CA3AF', lineHeight: '1.6', margin: 0,
-                                                    paddingLeft: 12, borderLeft: '2px solid rgba(167,139,250,0.3)'
-                                                }}>
-                                                    {parsed.main}
-                                                </p>
-                                            </div>
+                                            {/* ── Reasoning ── */}
+                                            <p style={{
+                                                fontSize: 12, color: '#9CA3AF', lineHeight: '1.55', margin: '10px 0 0 0',
+                                                paddingLeft: 10, borderLeft: '2px solid rgba(167,139,250,0.25)',
+                                            }}>
+                                                {parsed.main}
+                                            </p>
 
+                                            {/* ── Risk Flags ── */}
                                             {d.risk_flags && d.risk_flags.length > 0 && (
-                                                <div style={{ marginTop: 16, paddingTop: 16, borderTop: '1px dashed rgba(255,255,255,0.1)' }}>
-                                                    <div style={{ fontSize: 10, color: '#FFB300', letterSpacing: '2px', textTransform: 'uppercase', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
-                                                        <ShieldAlert size={12} /> Risk Identifiers
-                                                    </div>
-                                                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-                                                        {(d.risk_flags as string[] || []).map((flag: string, idx: number) => (
-                                                            <div key={idx} style={{
-                                                                fontSize: 11, padding: '4px 10px', borderRadius: 4,
-                                                                background: 'rgba(255,179,0,0.1)', color: '#FFB300',
-                                                                border: '1px solid rgba(255,179,0,0.2)'
-                                                            }}>
-                                                                {flag}
-                                                            </div>
-                                                        ))}
-                                                    </div>
+                                                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 10 }}>
+                                                    {(d.risk_flags as string[]).map((flag: string, idx: number) => (
+                                                        <span key={idx} style={{
+                                                            fontSize: 10, padding: '3px 8px', borderRadius: 4,
+                                                            background: 'rgba(255,179,0,0.08)', color: '#FFB300',
+                                                            border: '1px solid rgba(255,179,0,0.18)',
+                                                        }}>
+                                                            {flag}
+                                                        </span>
+                                                    ))}
                                                 </div>
                                             )}
                                         </motion.div>
@@ -350,6 +350,7 @@ export function AthenaPanel({ athena, vetoLog = [] }: Props) {
                                 })}
                             </AnimatePresence>
                         </div>
+
                     )
                 )}
 
