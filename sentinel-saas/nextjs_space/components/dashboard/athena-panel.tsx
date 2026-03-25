@@ -100,6 +100,10 @@ export function AthenaPanel({ athena, vetoLog = [] }: Props) {
         summary: d.reasoning || '',
         risk_flags: d.risk_flags || [],
         model: d.model || '',
+        // Price levels from LLM output — passed through for card header display
+        entry_price: d.entry_price ?? null,
+        stop_loss: d.stop_loss ?? null,
+        target: d.target ?? null,
     }));
     // Merge: log history first (oldest), then in-memory (newest)
     const merged = [...logHistory, ...inMemoryMapped];
