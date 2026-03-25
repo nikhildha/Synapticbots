@@ -8,7 +8,7 @@ import { motion } from 'framer-motion';
 
 /* ═══ Types ═══ */
 interface Trade {
-  id: string; coin: string; symbol?: string; position: string; regime: string;
+  id: string; dbId?: string; coin: string; symbol?: string; position: string; regime: string;
   confidence: number; leverage: number; capital: number;
   entryPrice: number; currentPrice?: number | null;
   exitPrice?: number | null; stopLoss: number; takeProfit: number;
@@ -318,12 +318,16 @@ export function TradesClient({ trades: initialTrades }: TradesClientProps) {
     const avgLoss = losses.length > 0 ? grossLoss / losses.length : 1;
     const riskReward = avgLoss > 0 ? avgWin / avgLoss : 0;
 
+    // totalPnl is ALREADY net-of-commission (engine subtracts fees at close).
+    // Do NOT subtract t.fee again — that double-counts it.
+    const totalFees = closed.reduce((s: number, t: any) => s + (t.fee || 0), 0);
+    const realizedPnlAfterFees = realizedPnl; // same as realizedPnl — fees already baked in
+
     return {
       total: all.length, active: active.length, closed: closed.length,
       wins: wins.length, losses: losses.length, winRate,
       realizedPnl, unrealizedPnl, combinedPnl,
-      totalFees: closed.reduce((s, t) => s + (t.fee || 0), 0),
-      realizedPnlAfterFees: realizedPnl - closed.reduce((s, t) => s + (t.fee || 0), 0),
+      totalFees, realizedPnlAfterFees,
       bestTrade, worstTrade,
       maxDD, maxDDPct, profitFactor, riskReward,
     };
@@ -714,7 +718,7 @@ export function TradesClient({ trades: initialTrades }: TradesClientProps) {
                             {/* Per-trade delete button */}
                             <td style={{ padding: '8px 6px', textAlign: 'center' }}>
                               <button
-                                onClick={() => deleteTrade(t.id)}
+                                onClick={() => deleteTrade(t.dbId || t.id)}
                                 disabled={deletingTradeId === t.id}
                                 title={confirmDeleteId === t.id ? 'Click again to confirm delete' : 'Delete this trade'}
                                 style={{

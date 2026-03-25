@@ -96,6 +96,7 @@ export async function GET(request: NextRequest) {
         return NextResponse.json({
             trades: paged.map((t: any) => ({
                 id: t.trade_id || `T-${Math.random().toString(36).slice(2, 8)}`,
+                dbId: t.id,  // Prisma row ID — used for delete operations
                 coin: (t.symbol || t.coin || '').replace('USDT', ''),
                 symbol: t.symbol || t.coin || '',
                 position: (t.side || t.position || '').toLowerCase(),
@@ -153,10 +154,11 @@ export async function DELETE(request: Request) {
 
         const userId = (session.user as any).id;
         const { searchParams } = new URL(request.url);
-        const tradeId = searchParams.get('id');
+        // Accept either `id` (Prisma dbId) or legacy `trade_id`
+        const tradeId = searchParams.get('id') || searchParams.get('dbId');
 
         if (!tradeId) {
-            return NextResponse.json({ error: 'Missing ?id= param' }, { status: 400 });
+            return NextResponse.json({ error: 'Missing ?id= param (use dbId from trade row)' }, { status: 400 });
         }
 
         // Verify ownership: trade must belong to one of this user's bots
@@ -165,12 +167,20 @@ export async function DELETE(request: Request) {
         });
 
         if (!trade) {
-            return NextResponse.json({ error: 'Trade not found or not yours' }, { status: 404 });
+            // Also try matching by exchangeOrderId (engine trade_id) as fallback
+            const byEngineId = await prisma.trade.findFirst({
+                where: { exchangeOrderId: tradeId, bot: { userId } },
+            });
+            if (!byEngineId) {
+                return NextResponse.json({ error: 'Trade not found or not yours' }, { status: 404 });
+            }
+            await prisma.trade.delete({ where: { id: byEngineId.id } });
+            console.log(`[trades] Deleted trade by engineId ${tradeId} (prismaId: ${byEngineId.id}) for user ${userId}`);
+            return NextResponse.json({ success: true, deleted: byEngineId.id });
         }
 
         await prisma.trade.delete({ where: { id: tradeId } });
-
-        console.log(`[trades] Deleted garbage trade ${tradeId} for user ${userId}`);
+        console.log(`[trades] Deleted trade ${tradeId} for user ${userId}`);
         return NextResponse.json({ success: true, deleted: tradeId });
 
     } catch (error: any) {
