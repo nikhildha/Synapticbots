@@ -215,10 +215,21 @@ export async function GET() {
                 // Dashboard uses these when Prisma is empty (e.g. after engine restart before first sync)
                 // engineData is from primaryUrl (which may be the paper engine if PAPER_URL not set)
                 // paperEngineData may be null if secondary URL not configured
-                rawTrades: [
-                    ...(engineData?.tradebook?.trades || []),
-                    ...((primaryUrl !== secondaryUrl && paperEngineData) ? (paperEngineData?.tradebook?.trades || []) : []),
-                ].filter((t: any) => (t.status || 'active').toLowerCase() === 'active'),
+                rawTrades: (() => {
+                    // Only show engine trades belonging to THIS user's bots.
+                    // rawTrades is a fallback for instant display before Prisma syncs,
+                    // but must never leak other users' trades.
+                    const userBotIds = new Set(userBots.map((b: any) => b.id));
+                    if (userBotIds.size === 0) return []; // user has no bots → no raw trades
+                    const allRaw = [
+                        ...(engineData?.tradebook?.trades || []),
+                        ...((primaryUrl !== secondaryUrl && paperEngineData) ? (paperEngineData?.tradebook?.trades || []) : []),
+                    ];
+                    return allRaw.filter((t: any) =>
+                        (t.status || 'active').toLowerCase() === 'active' &&
+                        userBotIds.has(t.bot_id || t.botId)
+                    );
+                })(),
                 pending_orders: engineTrades.filter((t: any) =>
                     (t.status || '').toUpperCase() === 'OPEN' &&
                     (t.order_type || '').toUpperCase().includes('LIMIT')
