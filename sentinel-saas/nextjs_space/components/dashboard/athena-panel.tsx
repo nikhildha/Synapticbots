@@ -252,13 +252,19 @@ export function AthenaPanel({ athena, vetoLog = [] }: Props) {
                                     const isLong = d.side === 'BUY' || d.side === 'LONG';
                                     const isShort = d.side === 'SELL' || d.side === 'SHORT';
 
-                                    // Extract Entry / SL / Target from reasoning parts if present
-                                    const reasonParts = reasoning.split(' | ');
-                                    let entryPrice = '', slPrice = '', targetPrice = '';
-                                    for (const p of reasonParts) {
-                                        if (p.startsWith('Entry:')) entryPrice = p.replace('Entry:', '').trim();
-                                        else if (p.startsWith('SL:') || p.startsWith('StopLoss:')) slPrice = p.replace(/StopLoss:|SL:/, '').trim();
-                                        else if (p.startsWith('Target:') || p.startsWith('TP:')) targetPrice = p.replace(/Target:|TP:/, '').trim();
+                                    // Extract Entry / SL / Target — prefer direct log fields, fallback to reasoning string parse
+                                    const fmtP = (v: any) => v && v > 0 ? `$${Number(v).toFixed(4)}` : '';
+                                    let entryPrice = fmtP(d.entry_price);
+                                    let slPrice    = fmtP(d.stop_loss);
+                                    let targetPrice = fmtP(d.target);
+                                    // Fallback: parse from reasoning string if log fields missing
+                                    if (!entryPrice || !slPrice || !targetPrice) {
+                                        const reasonParts = reasoning.split(' | ');
+                                        for (const p of reasonParts) {
+                                            if (!entryPrice && p.startsWith('Entry:')) entryPrice = p.replace('Entry:', '').trim();
+                                            if (!slPrice && (p.startsWith('SL:') || p.startsWith('StopLoss:'))) slPrice = p.replace(/StopLoss:|SL:/, '').trim();
+                                            if (!targetPrice && (p.startsWith('Target:') || p.startsWith('TP:'))) targetPrice = p.replace(/Target:|TP:/, '').trim();
+                                        }
                                     }
 
                                     return (

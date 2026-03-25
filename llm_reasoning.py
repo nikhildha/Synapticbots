@@ -511,6 +511,9 @@ class AthenaEngine:
             suggested_sl=suggested_sl,
             suggested_tp=suggested_tp,
         )
+        # Store entry price for logging/display
+        suggested_entry = _parse_price(data.get("entry_price"))
+        decision.suggested_entry = suggested_entry
 
         # Cache and log
         self._set_cache(symbol, decision)
@@ -849,6 +852,9 @@ Return your analysis as a single JSON object."""
             "risk_flags": decision.risk_flags,
             "model": decision.model,
             "latency_ms": decision.latency_ms,
+            "entry_price": getattr(decision, "suggested_entry", None),
+            "stop_loss": getattr(decision, "suggested_sl", None),
+            "target": getattr(decision, "suggested_tp", None),
         }
 
         # In-memory buffer
