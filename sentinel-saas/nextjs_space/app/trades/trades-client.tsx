@@ -200,7 +200,6 @@ export function TradesClient({ trades: initialTrades }: TradesClientProps) {
   const [clearSuccess, setClearSuccess] = useState<string | null>(null);
   const [confirmingClear, setConfirmingClear] = useState(false);
   const [deletingTradeId, setDeletingTradeId] = useState<string | null>(null);
-  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const clearPauseRef = useRef(false);
 
 
@@ -402,23 +401,22 @@ export function TradesClient({ trades: initialTrades }: TradesClientProps) {
   };
 
   const deleteTrade = async (uiKey: string, dbId: string) => {
-    if (confirmDeleteId !== uiKey) {
-      setConfirmDeleteId(uiKey);
-      setTimeout(() => setConfirmDeleteId(null), 4000);
-      return;
-    }
-    setConfirmDeleteId(null);
+    if (!window.confirm('Delete this trade from the database?')) return;
     setDeletingTradeId(uiKey);
+    console.log('[deleteTrade] Deleting trade', { uiKey, dbId });
     try {
       const res = await fetch(`/api/trades?id=${encodeURIComponent(dbId)}`, { method: 'DELETE' });
+      const data = await res.json();
+      console.log('[deleteTrade] Response:', res.status, data);
       if (res.ok) {
         setTrades(prev => prev.filter(t => t.id !== uiKey && t.dbId !== dbId));
         showMsg('🗑️ Trade deleted', 4000);
       } else {
-        const err = await res.json();
-        showMsg(`❌ ${err.error || 'Failed to delete trade'}`);
+        console.error('[deleteTrade] Error:', data);
+        showMsg(`❌ ${data.error || 'Failed to delete trade'}`);
       }
-    } catch {
+    } catch (err) {
+      console.error('[deleteTrade] Network error:', err);
       showMsg('❌ Network error');
     } finally {
       setDeletingTradeId(null);
@@ -720,17 +718,17 @@ export function TradesClient({ trades: initialTrades }: TradesClientProps) {
                               <button
                                 onClick={() => deleteTrade(t.id, t.dbId || t.id)}
                                 disabled={deletingTradeId === t.id}
-                                title={confirmDeleteId === t.id ? 'Click again to confirm delete' : 'Delete this trade'}
+                                title="Delete this trade from DB"
                                 style={{
-                                  background: confirmDeleteId === t.id ? 'rgba(239,68,68,0.25)' : 'rgba(255,255,255,0.04)',
-                                  border: `1px solid ${confirmDeleteId === t.id ? 'rgba(239,68,68,0.5)' : 'rgba(255,255,255,0.08)'}`,
-                                  borderRadius: '6px', padding: '4px 6px', cursor: 'pointer',
-                                  color: confirmDeleteId === t.id ? '#EF4444' : '#6B7280',
+                                  background: 'rgba(239,68,68,0.08)',
+                                  border: '1px solid rgba(239,68,68,0.25)',
+                                  borderRadius: '6px', padding: '4px 8px', cursor: 'pointer',
+                                  color: '#EF4444',
                                   fontSize: '13px', lineHeight: 1,
-                                  transition: 'all 0.15s',
+                                  opacity: deletingTradeId === t.id ? 0.5 : 1,
                                 }}
                               >
-                                {deletingTradeId === t.id ? '…' : confirmDeleteId === t.id ? '⚠️' : '🗑️'}
+                                {deletingTradeId === t.id ? '…' : '🗑️'}
                               </button>
                             </td>
 
