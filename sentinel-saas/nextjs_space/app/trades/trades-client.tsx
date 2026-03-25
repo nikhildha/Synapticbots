@@ -439,10 +439,11 @@ export function TradesClient({ trades: initialTrades }: TradesClientProps) {
 
           {/* ═══ Portfolio Summary Stats ═══ */}
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.05 }} className="mb-6">
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '12px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: '12px' }}>
               <StatCard label="Active Trades" value={String(stats.active)} sub={`${stats.total} total · ${stats.closed} closed`} color="#00E5FF" />
               <StatCard label="Total PNL" value={'$' + fmt$(stats.combinedPnl)} sub={`Realized (net): $${fmt$(stats.realizedPnlAfterFees)} · Active: $${fmt$(stats.unrealizedPnl)}`} color={pnlColor(stats.combinedPnl)} />
               <StatCard label="Realized PNL (net fees)" value={'$' + fmt$(stats.realizedPnlAfterFees)} sub={`Gross: $${fmt$(stats.realizedPnl)} · Fees: $${stats.totalFees.toFixed(2)}`} color={pnlColor(stats.realizedPnlAfterFees)} />
+              <StatCard label="Unrealized PNL" value={'$' + fmt$(stats.unrealizedPnl)} sub={`${stats.active} active position${stats.active !== 1 ? 's' : ''}`} color={pnlColor(stats.unrealizedPnl)} />
               <StatCard label="Win Rate" value={stats.winRate.toFixed(1) + '%'} sub={`${stats.wins}W / ${stats.losses}L`} color={stats.winRate >= 50 ? '#22C55E' : '#EF4444'} />
               <StatCard label="Max Drawdown" value={stats.maxDDPct.toFixed(2) + '%'} sub={`$${stats.maxDD.toFixed(2)} · PF: ${stats.profitFactor === Infinity ? '∞' : stats.profitFactor.toFixed(2)}`} color="#EF4444" />
             </div>
