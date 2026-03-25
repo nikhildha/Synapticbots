@@ -84,7 +84,8 @@ export async function POST(request: Request) {
                     }
                 }
                 if (engineTradeCache[botMode].length > 0) {
-                    const count = await syncEngineTrades(engineTradeCache[botMode], ub.id, ub.startedAt, userId);
+                    const botSegment = (ub.config as any)?.segment || 'ALL';
+                    const count = await syncEngineTrades(engineTradeCache[botMode], ub.id, ub.startedAt, userId, botSegment);
                     tradesSynced += count;
                 }
             } catch (err) {

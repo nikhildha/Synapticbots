@@ -5,6 +5,22 @@ import { getActiveBotSession } from '@/lib/bot-session';
 const _lastSyncTime: Record<string, number> = {};
 const SYNC_THROTTLE_MS = 5_000;   // 5s throttle — safe at 25+ users (200 bots). 1s would cause ~200 upserts/sec on Railway.
 
+// ── Segment pool filter — mirrors config.py CRYPTO_SEGMENTS ─────────────────
+// Used to prevent cross-segment trade pollution (e.g. BTC trade written to Gaming bot).
+// When BotConfig.segment === 'ALL' (or unknown), all coins are allowed.
+const SEGMENT_POOLS: Record<string, string[]> = {
+    L1:      ['BTCUSDT','ETHUSDT','SOLUSDT','BNBUSDT','AVAXUSDT','SUIUSDT','XRPUSDT','APTUSDT','ETCUSDT','ADAUSDT','DOTUSDT','NEARUSDT','TRXUSDT','BCHUSDT','TONUSDT','ICPUSDT'],
+    L2:      ['ARBUSDT','OPUSDT','POLUSDT','STRKUSDT','IMXUSDT','RONINUSDT','ZKUSDT','MANTAUSDT','METISUSDT','AXLUSDT'],
+    DeFi:    ['UNIUSDT','AAVEUSDT','CRVUSDT','JUPUSDT','RUNEUSDT','PENDLEUSDT','LINKUSDT','LDOUSDT','GMXUSDT','ENAUSDT','SUSHIUSDT','COMPUSDT','SNXUSDT','CAKEUSDT','GRTUSDT'],
+    AI:      ['TAOUSDT','FETUSDT','INJUSDT','WLDUSDT','AKTUSDT','RENDERUSDT','ARKMUSDT'],
+    Meme:    ['DOGEUSDT','SHIBUSDT','PEPEUSDT','WIFUSDT','BONKUSDT','NOTUSDT','MANAUSDT'],
+    RWA:     ['ONDOUSDT','POLYXUSDT','TRUUSDT','RSRUSDT'],
+    Gaming:  ['AXSUSDT','SANDUSDT','PIXELUSDT','IOTXUSDT','GALAUSDT','ENJUSDT','YGGUSDT','GLMUSDT'],
+    DePIN:   ['FILUSDT','ARUSDT','IOUSDT','JTOUSDT'],
+    Modular: ['TIAUSDT','DYMUSDT','STXUSDT','QNTUSDT','ALTUSDT','EIGENUSDT'],
+    Oracles: ['PYTHUSDT','TRBUSDT','API3USDT','HBARUSDT','BANDUSDT','DIAUSDT'],
+};
+
 /**
  * Sync engine trades into Prisma, scoped to a specific bot.
  * Only syncs trades whose entry_time >= bot.startedAt.
@@ -19,7 +35,8 @@ export async function syncEngineTrades(
     engineTrades: any[],
     botId: string,
     botStartedAt: Date | null,
-    userId?: string
+    userId?: string,
+    botSegment?: string           // e.g. 'L1', 'Gaming', 'ALL' — from BotConfig.segment
 ): Promise<number> {
     if (!engineTrades || engineTrades.length === 0) return 0;
 
@@ -68,9 +85,14 @@ export async function syncEngineTrades(
                 if (!isNaN(d.getTime())) exitTime = d;
             }
 
-            // BROADCAST MODE: All engine trades are synced to every bot.
-            // Each bot gets its own Prisma row via the upsert key engine_${tradeId}_${botId}.
-            // User isolation is enforced at READ time by getUserTrades(userId).
+            // SEGMENT FILTER: Only sync trades whose coin belongs to this bot's segment pool.
+            // Prevents BTC/L1 trades from appearing in Gaming, Meme, DeFi bots etc.
+            // Bots with segment 'ALL' or no segment bypass this check (backward compat).
+            if (botSegment && botSegment !== 'ALL') {
+                const pool = SEGMENT_POOLS[botSegment] || [];
+                const tradeCoin = (t.symbol || t.coin || '').toUpperCase();
+                if (pool.length > 0 && !pool.includes(tradeCoin)) continue;
+            }
 
             // ── SL/TP Sanity Check (fixes engine-side cross-contamination bug) ──
             // Engine's tradebook.json has SL/TP AND atr_at_entry from wrong trades.
