@@ -764,6 +764,11 @@ class RegimeMasterBot:
             try:
                 result = self._analyze_coin(symbol, balance, btc_flash_crash=btc_flash_crash)
                 if result:
+                    # ── Stamp segment onto every result at scan time ──────────
+                    # This is the single source of truth for which segment a coin
+                    # belongs to. Downstream seg_results filter + waterfall guard
+                    # both rely on this field to enforce bot-segment isolation.
+                    result["segment"] = get_segment_for_coin(result["symbol"])
                     raw_results.append(result)
             except Exception as e:
                 if symbol == "BTCUSDT":
@@ -816,6 +821,10 @@ class RegimeMasterBot:
                 _reinjected = dict(_entry["result"])
                 _reinjected["_queued"] = True
                 _reinjected["_cycles_pending"] = _entry["cycles_pending"]
+                # Preserve the segment tag from when the signal was originally queued.
+                # If missing (old queue entry), re-derive it now.
+                if "segment" not in _reinjected:
+                    _reinjected["segment"] = get_segment_for_coin(_reinjected.get("symbol", ""))
                 raw_results.append(_reinjected)
                 reinjected += 1
         if reinjected:
@@ -865,9 +874,16 @@ class RegimeMasterBot:
             else:
                 bot_allowed_coins = set(config.CRYPTO_SEGMENTS.get(bot_segment_filter, []))
 
-            # Filter raw_results to this bot's segment
+            # Filter raw_results to this bot's segment using the stamped segment field.
+            # Coins that have no matching segment tag (or BTCUSDT macro ref) are excluded.
             if bot_allowed_coins is not None:
-                seg_results = [r for r in raw_results if r["symbol"] in bot_allowed_coins]
+                seg_results = [
+                    r for r in raw_results
+                    if r["symbol"] in bot_allowed_coins
+                    # Hard segment field check: result must declare the same segment.
+                    # Prevents stale CRYPTO_SEGMENTS lists from leaking cross-segment.
+                    and r.get("segment", bot_segment_filter) == bot_segment_filter
+                ]
             else:
                 seg_results = list(raw_results)
 
@@ -879,7 +895,18 @@ class RegimeMasterBot:
             waterfall_candidates = seg_results[:waterfall_depth]
 
             if not waterfall_candidates:
-                logger.info("🔍 [%s] No HMM signals for segment %s this cycle", bot_name, bot_segment_filter)
+                _all_syms = [r["symbol"] for r in raw_results]
+                _seg_mismatch = [
+                    f"{r['symbol']}({r.get('segment','?')})"
+                    for r in raw_results
+                    if r["symbol"] not in (bot_allowed_coins or set())
+                ][:5]
+                logger.info(
+                    "🔍 [%s] No HMM signals for segment '%s' this cycle | "
+                    "Total raw: %d | Segment mismatches (not shown): %s",
+                    bot_name, bot_segment_filter, len(_all_syms),
+                    _seg_mismatch or "none",
+                )
                 continue
 
             # Mark coins beyond the waterfall window as excluded (never evaluated)
@@ -927,7 +954,33 @@ class RegimeMasterBot:
 
                 sym      = top["symbol"]
                 pos_key  = f"{bot_id}:{sym}"
-                seg_name = get_segment_for_coin(sym)
+                seg_name = top.get("segment") or get_segment_for_coin(sym)
+
+                # ── SEGMENT GUARD: hard-validate coin segment vs bot segment ──
+                # Even though seg_results was pre-filtered, reinjected or waterfall
+                # candidates could slip through if CRYPTO_SEGMENTS is stale.
+                # This is the final enforcement gate — mismatched coins are skipped.
+                if bot_segment_filter not in ("ALL", None):
+                    if seg_name != bot_segment_filter:
+                        logger.warning(
+                            "🚫 SEGMENT MISMATCH [%s]: coin=%s segment=%s bot_segment=%s — skipping",
+                            bot_name, sym, seg_name, bot_segment_filter
+                        )
+                        self._coin_states.setdefault(sym, {}).setdefault("bot_deploy_statuses", {})[bot_id] = (
+                            f"FILTERED: segment mismatch ({seg_name} ≠ {bot_segment_filter})"
+                        )
+                        continue
+
+                # ── DUPLICATE GUARD: skip if this bot already has this coin active ──
+                if pos_key in self._active_positions:
+                    logger.debug(
+                        "⏭️  [%s] %s already active (pos_key=%s) — skip duplicate",
+                        bot_name, sym, pos_key
+                    )
+                    self._coin_states.setdefault(sym, {}).setdefault("bot_deploy_statuses", {})[bot_id] = (
+                        "FILTERED: already active position"
+                    )
+                    continue
 
                 if _wf_idx > 0:
                     logger.info("⬇️  WATERFALL [%s] candidate #%d: %s (prev vetoed/skipped)",
