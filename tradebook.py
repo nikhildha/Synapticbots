@@ -1086,9 +1086,9 @@ def sync_live_tpsl():
 
     for trade in book["trades"]:
         if trade["status"] != "ACTIVE":
-            return
+            continue   # BUG FIX: was `return` — exited entire loop on first non-active trade
         if trade.get("mode") != "LIVE":
-            return
+            continue   # BUG FIX: was `return` — exited entire loop on first non-live trade
 
         symbol = trade["symbol"]
         trailing_sl = trade.get("trailing_sl", trade["stop_loss"])
