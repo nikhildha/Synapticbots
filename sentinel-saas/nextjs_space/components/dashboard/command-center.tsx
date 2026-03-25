@@ -377,168 +377,141 @@ export function RegimeCard({ regime, confidence, symbol, macroRegime, trend15m, 
     );
 }
 
-interface PnlCardProps {
-    trades: any[];
-    coinDcxBalance?: number | null;
+// ─── Shared mini-cell styles ─────────────────────────────────────────────────
+const cellStyle = (bg: string, border: string): React.CSSProperties => ({
+    padding: '10px 12px', borderRadius: 12,
+    background: bg, border: `1px solid ${border}`,
+    display: 'flex', flexDirection: 'column',
+    justifyContent: 'space-between', gap: 2,
+});
+const cellLabel: React.CSSProperties = { fontSize: '9px', fontWeight: 700, color: '#4B6080', letterSpacing: '1px', textTransform: 'uppercase' };
+const cellValue = (color: string, size = '20px'): React.CSSProperties => ({ fontSize: size, fontWeight: 800, fontFamily: 'var(--font-mono, monospace)', color, lineHeight: 1 });
+
+// ─── Paper Trades Card (Left) ────────────────────────────────────────────────
+interface TradesCardProps {
+    activeBots: number;
+    deployedCapital: number;
+    pnl: number;
+    pnlPct: number;
+    segmentsScanned: number;
+    totalTrades: number;
+    wins: number;
+    losses: number;
+    // Live-only extras
     binanceBalance?: number | null;
-    paperPnl?: number;
-    livePnl?: number;
-    paperPct?: number;
-    livePct?: number;
-    activeBots?: number | string;
-    activeTrades?: number | string;
+    coinDcxBalance?: number | null;
 }
 
-export function PnlCard({ trades, coinDcxBalance, binanceBalance, paperPnl = 0, livePnl = 0, paperPct = 0, livePct = 0, activeBots = 0, activeTrades = 0 }: PnlCardProps) {
-    const totalBalance = (binanceBalance ?? 0) + (coinDcxBalance ?? 0);
+function _TradesCard({ title, accent, activeBots, deployedCapital, pnl, pnlPct, segmentsScanned, totalTrades, wins, losses, binanceBalance, coinDcxBalance }: TradesCardProps & { title: string; accent: string }) {
     const pSign = (v: number) => v >= 0 ? '+' : '';
     const pnlColor = (v: number) => v >= 0 ? '#00FF88' : '#FF3B5C';
-    const pnlShadow = (v: number) => v >= 0 ? '0 0 10px rgba(0,255,136,0.4)' : '0 0 10px rgba(255,59,92,0.4)';
     const fmtAmt = (v: number) => `${pSign(v)}$${Math.abs(v).toFixed(2)}`;
+    const showWallet = binanceBalance != null || coinDcxBalance != null;
 
     return (
         <div style={{
             background: 'linear-gradient(160deg, rgba(8,14,26,0.97) 0%, rgba(4,8,16,0.99) 100%)',
             backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)',
-            border: '1px solid rgba(0,229,255,0.1)',
+            border: `1px solid ${accent}22`,
             borderRadius: 22, padding: '14px 16px 16px',
-            position: 'relative' as const, overflow: 'hidden',
+            position: 'relative', overflow: 'hidden',
             boxShadow: '0 0 40px rgba(0,0,0,0.8), inset 0 1px 0 rgba(255,255,255,0.04)',
             display: 'flex', flexDirection: 'column' as const,
         }}>
             {/* Top accent */}
-            <div style={{
-                position: 'absolute' as const, top: 0, left: 0, right: 0, height: '1px',
-                background: 'linear-gradient(90deg, transparent, rgba(0,229,255,0.5), transparent)',
-            }} />
+            <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '1px', background: `linear-gradient(90deg, transparent, ${accent}88, transparent)` }} />
 
             {/* Header */}
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
-                <div style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase' as const, letterSpacing: '2.5px', color: '#4B6080' }}>
-                    Wallet Balance
+            <div style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase' as const, letterSpacing: '2.5px', color: accent, marginBottom: 10 }}>
+                {title}
+            </div>
+
+            {/* 2×3 grid of metrics */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, flex: 1 }}>
+                {/* 1. Active Bots */}
+                <div style={cellStyle('rgba(0,229,255,0.04)', 'rgba(0,229,255,0.08)')}>
+                    <div style={cellLabel}>Active Bots</div>
+                    <div style={cellValue('#00E5FF', '24px')}>{activeBots}</div>
+                </div>
+
+                {/* 2. Deployed Capital */}
+                <div style={cellStyle('rgba(139,92,246,0.04)', 'rgba(139,92,246,0.10)')}>
+                    <div style={cellLabel}>Deployed Capital</div>
+                    <div style={cellValue('#A78BFA', '20px')}>${deployedCapital.toFixed(0)}</div>
+                </div>
+
+                {/* 3. PnL */}
+                <div style={cellStyle(pnl >= 0 ? 'rgba(0,255,136,0.04)' : 'rgba(255,59,92,0.04)', pnl >= 0 ? 'rgba(0,255,136,0.10)' : 'rgba(255,59,92,0.10)')}>
+                    <div style={cellLabel}>PnL</div>
+                    <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, flexWrap: 'wrap' as const }}>
+                        <div style={{ ...cellValue(pnlColor(pnl), '20px'), textShadow: pnl >= 0 ? '0 0 10px rgba(0,255,136,0.4)' : '0 0 10px rgba(255,59,92,0.4)' }}>
+                            {fmtAmt(pnl)}
+                        </div>
+                        <div style={{ fontSize: '11px', fontWeight: 700, color: pnlColor(pnl) }}>
+                            {pSign(pnlPct)}{Math.abs(pnlPct).toFixed(1)}%
+                        </div>
+                    </div>
+                </div>
+
+                {/* 4. Segments Scanned */}
+                <div style={cellStyle('rgba(245,158,11,0.04)', 'rgba(245,158,11,0.10)')}>
+                    <div style={cellLabel}>Segments Scanned</div>
+                    <div style={cellValue('#F59E0B', '24px')}>{segmentsScanned}</div>
+                </div>
+
+                {/* 5. Total Trades */}
+                <div style={cellStyle('rgba(6,182,212,0.04)', 'rgba(6,182,212,0.10)')}>
+                    <div style={cellLabel}>Total Trades</div>
+                    <div style={cellValue('#06B6D4', '24px')}>{totalTrades}</div>
+                </div>
+
+                {/* 6. Wins / Losses */}
+                <div style={cellStyle('rgba(34,197,94,0.04)', 'rgba(34,197,94,0.10)')}>
+                    <div style={cellLabel}>Wins / Losses</div>
+                    <div style={{ display: 'flex', alignItems: 'baseline', gap: 4 }}>
+                        <span style={{ fontSize: '22px', fontWeight: 800, fontFamily: 'var(--font-mono, monospace)', color: '#22C55E', lineHeight: 1 }}>{wins}</span>
+                        <span style={{ fontSize: '14px', color: '#4B6080', fontWeight: 700 }}>/</span>
+                        <span style={{ fontSize: '22px', fontWeight: 800, fontFamily: 'var(--font-mono, monospace)', color: '#EF4444', lineHeight: 1 }}>{losses}</span>
+                    </div>
                 </div>
             </div>
 
-            {/* Grid: exchange row | partition | pnl row | bots row */}
-            <div style={{
-                display: 'grid',
-                gridTemplateColumns: '1fr 1fr',
-                gridTemplateRows: '1fr auto 1fr 1fr',
-                gap: 8,
-                flex: 1,
-            }}>
-                {/* Row 1: Binance | CoinDCX */}
-                <div style={{
-                    padding: '10px 12px', borderRadius: 12,
-                    background: 'rgba(240,185,11,0.05)',
-                    border: '1px solid rgba(240,185,11,0.15)',
-                    display: 'flex', flexDirection: 'column' as const,
-                    justifyContent: 'space-between',
-                }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-                        <span style={{ fontSize: 12 }}>🔶</span>
-                        <span style={{ fontSize: '9px', fontWeight: 700, color: '#F0B90B', letterSpacing: '1px' }}>BINANCE</span>
-                        {binanceBalance != null && <span style={{ fontSize: 9 }}>🔒</span>}
-                    </div>
-                    <div style={{ fontSize: '17px', fontWeight: 800, fontFamily: 'var(--font-mono, monospace)', color: '#E8EDF5', lineHeight: 1 }}>
-                        {binanceBalance != null ? `$${binanceBalance.toFixed(2)}` : <span style={{ fontSize: 11, color: '#3D4F63', fontStyle: 'italic' }}>—</span>}
-                        {binanceBalance != null && <span style={{ fontSize: 9, color: '#4B6080', marginLeft: 3 }}>USDT</span>}
-                    </div>
-                </div>
-
-                <div style={{
-                    padding: '10px 12px', borderRadius: 12,
-                    background: 'rgba(14,165,233,0.05)',
-                    border: '1px solid rgba(14,165,233,0.15)',
-                    display: 'flex', flexDirection: 'column' as const,
-                    justifyContent: 'space-between',
-                }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-                        <span style={{ fontSize: 12 }}>🇮🇳</span>
-                        <span style={{ fontSize: '9px', fontWeight: 700, color: '#0EA5E9', letterSpacing: '1px' }}>COINDCX</span>
-                        {coinDcxBalance != null && <span style={{ fontSize: 9 }}>🔒</span>}
-                    </div>
-                    <div style={{ fontSize: '17px', fontWeight: 800, fontFamily: 'var(--font-mono, monospace)', color: '#E8EDF5', lineHeight: 1 }}>
-                        {coinDcxBalance != null ? `$${coinDcxBalance.toFixed(2)}` : <span style={{ fontSize: 11, color: '#3D4F63', fontStyle: 'italic' }}>—</span>}
-                        {coinDcxBalance != null && <span style={{ fontSize: 9, color: '#4B6080', marginLeft: 3 }}>USDT</span>}
-                    </div>
-                </div>
-
-                {/* Partition — auto height, spans both columns */}
-                <div style={{
-                    gridColumn: '1 / -1',
-                    height: 1,
-                    background: 'linear-gradient(90deg, transparent, rgba(0,229,255,0.12), transparent)',
-                    margin: '0 2px',
-                    alignSelf: 'center' as const,
-                }} />
-
-                {/* Row 2: Paper PnL | Live PnL */}
-                <div style={{
-                    padding: '10px 12px', borderRadius: 12,
-                    background: 'rgba(0,255,136,0.04)',
-                    border: '1px solid rgba(0,255,136,0.1)',
-                    display: 'flex', flexDirection: 'column' as const,
-                    justifyContent: 'space-between',
-                }}>
-                    <div style={{ fontSize: '9px', fontWeight: 700, color: '#4B6080', letterSpacing: '1px', textTransform: 'uppercase' as const }}>Paper PnL</div>
-                    <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, flexWrap: 'wrap' as const }}>
-                        <div style={{ fontSize: '22px', fontWeight: 800, fontFamily: 'var(--font-mono, monospace)', color: pnlColor(paperPnl), textShadow: pnlShadow(paperPnl), lineHeight: 1 }}>
-                            {fmtAmt(paperPnl)}
+            {/* Wallet row — only for Live card */}
+            {showWallet && (
+                <>
+                    <div style={{ height: 1, background: 'linear-gradient(90deg, transparent, rgba(0,229,255,0.12), transparent)', margin: '10px 2px 8px' }} />
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                        <div style={cellStyle('rgba(240,185,11,0.05)', 'rgba(240,185,11,0.15)')}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                                <span style={{ fontSize: 12 }}>🔶</span>
+                                <span style={{ fontSize: '9px', fontWeight: 700, color: '#F0B90B', letterSpacing: '1px' }}>BINANCE</span>
+                            </div>
+                            <div style={{ fontSize: '16px', fontWeight: 800, fontFamily: 'var(--font-mono, monospace)', color: '#E8EDF5', lineHeight: 1 }}>
+                                {binanceBalance != null ? `$${binanceBalance.toFixed(2)}` : <span style={{ fontSize: 11, color: '#3D4F63' }}>—</span>}
+                            </div>
                         </div>
-                        <div style={{ fontSize: '11px', fontWeight: 700, color: pnlColor(paperPnl) }}>
-                            {pSign(paperPct)}{Math.abs(paperPct).toFixed(1)}%
+                        <div style={cellStyle('rgba(14,165,233,0.05)', 'rgba(14,165,233,0.15)')}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                                <span style={{ fontSize: 12 }}>🇮🇳</span>
+                                <span style={{ fontSize: '9px', fontWeight: 700, color: '#0EA5E9', letterSpacing: '1px' }}>COINDCX</span>
+                            </div>
+                            <div style={{ fontSize: '16px', fontWeight: 800, fontFamily: 'var(--font-mono, monospace)', color: '#E8EDF5', lineHeight: 1 }}>
+                                {coinDcxBalance != null ? `$${coinDcxBalance.toFixed(2)}` : <span style={{ fontSize: 11, color: '#3D4F63' }}>—</span>}
+                            </div>
                         </div>
                     </div>
-                </div>
-
-                <div style={{
-                    padding: '10px 12px', borderRadius: 12,
-                    background: 'rgba(255,184,0,0.04)',
-                    border: '1px solid rgba(255,184,0,0.1)',
-                    display: 'flex', flexDirection: 'column' as const,
-                    justifyContent: 'space-between',
-                }}>
-                    <div style={{ fontSize: '9px', fontWeight: 700, color: '#4B6080', letterSpacing: '1px', textTransform: 'uppercase' as const }}>Live PnL</div>
-                    <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, flexWrap: 'wrap' as const }}>
-                        <div style={{ fontSize: '22px', fontWeight: 800, fontFamily: 'var(--font-mono, monospace)', color: pnlColor(livePnl), textShadow: pnlShadow(livePnl), lineHeight: 1 }}>
-                            {fmtAmt(livePnl)}
-                        </div>
-                        <div style={{ fontSize: '11px', fontWeight: 700, color: pnlColor(livePnl) }}>
-                            {pSign(livePct)}{Math.abs(livePct).toFixed(1)}%
-                        </div>
-                    </div>
-                </div>
-
-                {/* Row 3: Active Bots | Active Trades (no icons) */}
-                <div style={{
-                    padding: '10px 12px', borderRadius: 12,
-                    background: 'rgba(0,229,255,0.04)',
-                    border: '1px solid rgba(0,229,255,0.08)',
-                    display: 'flex', flexDirection: 'column' as const,
-                    justifyContent: 'space-between',
-                }}>
-                    <div style={{ fontSize: '9px', color: '#4B6080', fontWeight: 700, letterSpacing: '1px', textTransform: 'uppercase' as const }}>Active Bots</div>
-                    <div style={{ fontSize: '28px', fontWeight: 800, color: '#00E5FF', fontFamily: 'var(--font-mono)', lineHeight: 1 }}>
-                        {activeBots}
-                    </div>
-                </div>
-
-                <div style={{
-                    padding: '10px 12px', borderRadius: 12,
-                    background: 'rgba(0,229,255,0.04)',
-                    border: '1px solid rgba(0,229,255,0.08)',
-                    display: 'flex', flexDirection: 'column' as const,
-                    justifyContent: 'space-between',
-                }}>
-                    <div style={{ fontSize: '9px', color: '#4B6080', fontWeight: 700, letterSpacing: '1px', textTransform: 'uppercase' as const }}>Active Trades</div>
-                    <div style={{ fontSize: '28px', fontWeight: 800, color: '#00E5FF', fontFamily: 'var(--font-mono)', lineHeight: 1 }}>
-                        {activeTrades}
-                    </div>
-                </div>
-            </div>
+                </>
+            )}
         </div>
     );
+}
+
+export function PaperTradesCard(props: Omit<TradesCardProps, 'binanceBalance' | 'coinDcxBalance'>) {
+    return <_TradesCard title="Paper Trades" accent="#06B6D4" {...props} />;
+}
+
+export function LiveTradesCard(props: TradesCardProps) {
+    return <_TradesCard title="Live Trades" accent="#EF4444" {...props} />;
 }
 
 interface ActivePositionsProps {

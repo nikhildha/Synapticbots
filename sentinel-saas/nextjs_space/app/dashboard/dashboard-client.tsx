@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { Header } from '@/components/header';
 import { StatsCard } from '@/components/stats-card';
 import { BotCard } from '@/components/bot-card';
-import { RegimeCard, PnlCard, ActivePositionsCard, BrainExecutionSummary } from '@/components/dashboard/command-center';
+import { RegimeCard, PaperTradesCard, LiveTradesCard, ActivePositionsCard, BrainExecutionSummary } from '@/components/dashboard/command-center';
 
 import { AthenaPanel } from '@/components/dashboard/athena-panel';
 
@@ -451,6 +451,17 @@ export function DashboardClient({ user, stats, bots, recentTrades }: DashboardCl
     liveMaxCapital,
   };
 
+  // Per-mode stat breakdowns for the new cards
+  const paperBots = bots.filter((b: any) => !(b?.config?.mode || 'paper').toLowerCase().includes('live')).filter((b: any) => b?.isActive).length;
+  const liveBots = bots.filter((b: any) => (b?.config?.mode || '').toLowerCase().includes('live')).filter((b: any) => b?.isActive).length;
+  const paperWins = paperClosedTrades.filter((t: any) => (parseFloat(t.realized_pnl) || parseFloat(t.totalPnl) || parseFloat(t.pnl) || 0) > 0).length;
+  const paperLosses = paperClosedTrades.length - paperWins;
+  const liveWins = liveClosedModeTrades.filter((t: any) => (parseFloat(t.realized_pnl) || parseFloat(t.totalPnl) || parseFloat(t.pnl) || 0) > 0).length;
+  const liveLosses = liveClosedModeTrades.length - liveWins;
+  const paperTotalTrades = paperActiveTrades.length + paperClosedTrades.length;
+  const liveTotalTrades = liveModeTrades.length + liveClosedModeTrades.length;
+  const segmentsScanned = botState?.multi?.coins_scanned || 0;
+
   return (
     <div className="min-h-screen">
       <Header />
@@ -525,17 +536,16 @@ export function DashboardClient({ user, stats, bots, recentTrades }: DashboardCl
               gridTemplateColumns: '1fr 0.5fr 1fr',
               gap: '20px',
             }}>
-              {/* Wallet Balance Card (left) — duplicate of right card */}
-              <PnlCard
-                trades={trades}
-                binanceBalance={walletBalance.binance}
-                coinDcxBalance={walletBalance.coindcx}
-                paperPnl={liveStats.paperTotalPnl}
-                livePnl={liveStats.liveTotalPnl}
-                paperPct={liveStats.paperPnlPct}
-                livePct={liveStats.livePnlPct}
-                activeBots={liveStats.activeBots}
-                activeTrades={liveStats.activeTrades}
+              {/* Paper Trades Card (left) */}
+              <PaperTradesCard
+                activeBots={paperBots}
+                deployedCapital={liveStats.paperCapitalDeployed}
+                pnl={liveStats.paperTotalPnl}
+                pnlPct={liveStats.paperPnlPct}
+                segmentsScanned={segmentsScanned}
+                totalTrades={paperTotalTrades}
+                wins={paperWins}
+                losses={paperLosses}
               />
 
               {/* ═══ Synaptic Core Brain — Engine Status ═══ */}
@@ -687,16 +697,18 @@ export function DashboardClient({ user, stats, bots, recentTrades }: DashboardCl
                 );
               })()}
 
-              <PnlCard
-                trades={trades}
+              {/* Live Trades Card (right) */}
+              <LiveTradesCard
+                activeBots={liveBots}
+                deployedCapital={liveStats.liveCapitalDeployed}
+                pnl={liveStats.liveTotalPnl}
+                pnlPct={liveStats.livePnlPct}
+                segmentsScanned={segmentsScanned}
+                totalTrades={liveTotalTrades}
+                wins={liveWins}
+                losses={liveLosses}
                 binanceBalance={walletBalance.binance}
                 coinDcxBalance={walletBalance.coindcx}
-                paperPnl={liveStats.paperTotalPnl}
-                livePnl={liveStats.liveTotalPnl}
-                paperPct={liveStats.paperPnlPct}
-                livePct={liveStats.livePnlPct}
-                activeBots={liveStats.activeBots}
-                activeTrades={liveStats.activeTrades}
               />
             </div>
           </motion.div>
