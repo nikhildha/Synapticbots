@@ -1178,6 +1178,18 @@ class RegimeMasterBot:
                         logger.info("🚫 Signal queue: removing %s — Athena vetoed (%s), no retry",
                                     sym, athena_decision.action)
                         del self._pending_signals[sym]
+                    # ── Telegram VETO alert ────────────────────────────────────────
+                    try:
+                        import telegram as _tg
+                        _tg.notify_athena_veto(
+                            sym=sym,
+                            side=top.get("side", ""),
+                            conviction_pct=athena_decision.adjusted_confidence * 100,
+                            reasoning=athena_decision.reasoning or "",
+                            segment=seg_name,
+                        )
+                    except Exception as _ve:
+                        logger.debug("Athena VETO telegram failed: %s", _ve)
                     continue
 
                 # ── Athena EXECUTE: fire Telegram signal alert ────────────────────
@@ -1197,8 +1209,8 @@ class RegimeMasterBot:
                         reasoning=athena_decision.reasoning or "",
                         bot_name=bot_name,
                     )
-                except Exception:
-                    pass  # Never block deploy on notification failure
+                except Exception as _tg_err:
+                    logger.warning("⚠️ Athena EXECUTE telegram failed: %s", _tg_err)
 
                 # ── Athena Decision Log (EXECUTE) ─────────────────────────────────
                 _log_athena_decision(

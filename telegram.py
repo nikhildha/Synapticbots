@@ -181,6 +181,28 @@ def notify_athena_signal(sym, side, conviction_pct, entry_price, sl, tp, segment
     send_message_async(msg)
 
 
+def notify_athena_veto(sym, side, conviction_pct, reasoning, segment):
+    """Fire when Athena vetoes a coin — trade blocked."""
+    if not _read_env_val("TELEGRAM_NOTIFY_TRADES", "true").lower() == "true":
+        return
+
+    emoji = "🟢" if side in ("BUY", "LONG") else "🔴"
+    dir_label = "LONG ↑" if side in ("BUY", "LONG") else "SHORT ↓"
+    short_reason = (reasoning or "").split(".")[0].strip()
+    if len(short_reason) > 120:
+        short_reason = short_reason[:117] + "…"
+
+    msg = (
+        f"🚫 <b>ATHENA VETO</b> — {segment}\n"
+        f"━━━━━━━━━━━━━━━━━━\n"
+        f"{emoji} <b>{sym.replace('USDT','')}</b> · {dir_label} · <b>{conviction_pct:.0f}% conf</b>\n"
+        f"\n"
+        f"❌ <i>{short_reason}</i>\n"
+        f"🕐 {datetime.utcnow().strftime('%H:%M:%S UTC')}"
+    )
+    send_message_async(msg)
+
+
 def notify_trade_close(trade):
     """Send notification when a trade is closed."""
     if not config.TELEGRAM_NOTIFY_TRADES:
