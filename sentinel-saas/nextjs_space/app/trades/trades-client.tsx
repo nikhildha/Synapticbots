@@ -36,7 +36,7 @@ interface Trade {
 const fmt$ = (v: number) => (v >= 0 ? '+' : '') + v.toFixed(2);
 const fmtPct = (v: number) => (v >= 0 ? '+' : '') + v.toFixed(1) + '%';
 const fmtPrice = (v: number) => v.toFixed(4);
-const pnlColor = (v: number) => v > 0 ? '#16A34A' : v < 0 ? '#DC2626' : '#6B7280';
+const pnlColor = (v: number) => v > 0 ? '#22C55E' : v < 0 ? '#EF4444' : '#6B7280';
 
 // Shared helpers — eliminate repeated inline logic
 const tradeSym = (t: any) => (t.symbol || (t.coin || '') + 'USDT').toUpperCase();
@@ -164,11 +164,8 @@ function mapTrade(t: any): Trade {
 function Card({ children, className = '' }: { children: React.ReactNode; className?: string }) {
   return (
     <div className={className} style={{
-      background: '#FFFFFF',
-      border: '1px solid rgba(0,0,0,0.08)',
-      borderRadius: '16px',
-      padding: '20px',
-      boxShadow: '0 2px 12px rgba(0,0,0,0.06)',
+      background: 'rgba(17, 24, 39, 0.8)', backdropFilter: 'blur(12px)',
+      border: '1px solid rgba(255,255,255,0.06)', borderRadius: '16px', padding: '20px',
     }}>{children}</div>
   );
 }
@@ -176,9 +173,9 @@ function Card({ children, className = '' }: { children: React.ReactNode; classNa
 function StatCard({ label, value, sub, color }: { label: string; value: string; sub?: string; color?: string }) {
   return (
     <Card>
-      <div style={{ fontSize: '10px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '1px', color: '#9CA3AF', marginBottom: '6px' }}>{label}</div>
-      <div style={{ fontSize: '22px', fontWeight: 800, color: color || '#1A1A1A' }}>{value}</div>
-      {sub && <div style={{ fontSize: '11px', color: '#9CA3AF', marginTop: '4px' }}>{sub}</div>}
+      <div style={{ fontSize: '10px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '1px', color: '#6B7280', marginBottom: '6px' }}>{label}</div>
+      <div style={{ fontSize: '22px', fontWeight: 700, color: color || '#F0F4F8' }}>{value}</div>
+      {sub && <div style={{ fontSize: '11px', color: '#6B7280', marginTop: '4px' }}>{sub}</div>}
     </Card>
   );
 }
@@ -410,27 +407,27 @@ export function TradesClient({ trades: initialTrades }: TradesClientProps) {
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="mb-6">
             <div className="flex items-center justify-between">
               <div>
-                <h1 className="text-3xl font-bold mb-1" style={{ color: '#1A1A1A' }}>Trade Journal</h1>
+                <h1 className="text-3xl font-bold mb-1">Trade Journal</h1>
                 {clearSuccess && <p className="text-sm" style={{ color: '#22C55E', fontWeight: 600 }}>{clearSuccess}</p>}
               </div>
               <div style={{ display: 'flex', gap: '8px' }}>
                 <button onClick={exportCSV} style={{
                   display: 'flex', alignItems: 'center', gap: '6px',
-                  padding: '10px 16px', borderRadius: '10px', border: '1.5px solid #F0B90B',
-                  background: '#F0B90B', color: '#1A1A1A',
-                  fontSize: '13px', fontWeight: 700, cursor: 'pointer',
+                  padding: '10px 14px', borderRadius: '12px', border: 'none',
+                  background: 'rgba(8, 145, 178, 0.15)', color: '#0EA5E9',
+                  fontSize: '13px', fontWeight: 600, cursor: 'pointer',
                 }}>
                   <Download size={14} /> Export CSV
                 </button>
 
                 <button onClick={clearAllTrades} disabled={isClearing} style={{
                   display: 'flex', alignItems: 'center', gap: '6px',
-                  padding: '10px 16px', borderRadius: '10px',
-                  border: confirmingClear ? '1.5px solid #DC2626' : '1.5px solid rgba(220,38,38,0.4)',
-                  background: confirmingClear ? 'rgba(220,38,38,0.1)' : 'transparent',
-                  color: '#DC2626',
-                  fontSize: '13px', fontWeight: 700, cursor: 'pointer',
+                  padding: '10px 14px', borderRadius: '12px', border: 'none',
+                  background: confirmingClear ? 'rgba(239,68,68,0.3)' : 'rgba(239,68,68,0.1)',
+                  color: '#EF4444',
+                  fontSize: '13px', fontWeight: 600, cursor: 'pointer',
                   opacity: isClearing ? 0.5 : 1,
+                  ...(confirmingClear ? { animation: 'pulse 1s infinite', border: '1px solid #EF4444' } : {}),
                 }}>
                   <Trash2 size={14} /> {isClearing ? 'Clearing...' : confirmingClear ? '⚠️ Click again to confirm' : 'Clear Trades'}
                 </button>
@@ -462,10 +459,10 @@ export function TradesClient({ trades: initialTrades }: TradesClientProps) {
               <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '12px' }}>
                 {(['all', 'active', 'closed'] as const).map(s => (
                   <button key={s} onClick={() => setStatusFilter(s)} style={{
-                    padding: '6px 14px', borderRadius: '8px', border: statusFilter === s ? '1.5px solid #F0B90B' : '1.5px solid rgba(0,0,0,0.10)', cursor: 'pointer',
+                    padding: '6px 14px', borderRadius: '8px', border: 'none', cursor: 'pointer',
                     fontSize: '13px', fontWeight: 600,
-                    background: statusFilter === s ? '#F0B90B' : '#FFFFFF',
-                    color: statusFilter === s ? '#1A1A1A' : '#6B7280',
+                    background: statusFilter === s ? '#0891B2' : 'rgba(255,255,255,0.05)',
+                    color: statusFilter === s ? '#fff' : '#9CA3AF',
                     transition: 'all 0.2s',
                   }}>
                     {s === 'all' ? `All (${stats.total})` : s === 'active' ? `Active (${stats.active})` : `Closed (${stats.closed})`}
@@ -477,8 +474,8 @@ export function TradesClient({ trades: initialTrades }: TradesClientProps) {
                 {/* Session filter — only shown when multiple sessions exist */}
                 {uniqueSessions.length > 1 && (
                   <select value={sessionFilter} onChange={e => setSessionFilter(e.target.value)} style={{
-                    padding: '6px 10px', borderRadius: '8px', border: '1px solid rgba(0,0,0,0.10)',
-                    background: '#FFFFFF', color: '#4B5563', fontSize: '13px',
+                    padding: '6px 10px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.1)',
+                    background: 'rgba(255,255,255,0.04)', color: '#D1D5DB', fontSize: '13px',
                   }}>
                     <option value="all">All Sessions</option>
                     {uniqueSessions.map((sid, i) => (
@@ -488,8 +485,8 @@ export function TradesClient({ trades: initialTrades }: TradesClientProps) {
                 )}
 
                 <select value={posFilter} onChange={e => setPosFilter(e.target.value)} style={{
-                  padding: '6px 10px', borderRadius: '8px', border: '1px solid rgba(0,0,0,0.10)',
-                  background: '#FFFFFF', color: '#4B5563', fontSize: '13px',
+                  padding: '6px 10px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.1)',
+                  background: 'rgba(255,255,255,0.04)', color: '#D1D5DB', fontSize: '13px',
                 }}>
                   <option value="all">All Positions</option>
                   <option value="long">Long / Buy</option>
@@ -499,8 +496,8 @@ export function TradesClient({ trades: initialTrades }: TradesClientProps) {
 
 
                 <select value={pnlFilter} onChange={e => setPnlFilter(e.target.value as any)} style={{
-                  padding: '6px 10px', borderRadius: '8px', border: '1px solid rgba(0,0,0,0.10)',
-                  background: '#FFFFFF', color: '#4B5563', fontSize: '13px',
+                  padding: '6px 10px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.1)',
+                  background: 'rgba(255,255,255,0.04)', color: '#D1D5DB', fontSize: '13px',
                 }}>
                   <option value="all">All P&L</option>
                   <option value="profit">Profit Only</option>
@@ -510,12 +507,12 @@ export function TradesClient({ trades: initialTrades }: TradesClientProps) {
 
 
                 <div style={{ marginLeft: 'auto', position: 'relative' }}>
-                  <Search size={14} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: '#9CA3AF' }} />
+                  <Search size={14} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: '#6B7280' }} />
                   <input value={coinSearch} onChange={e => setCoinSearch(e.target.value)}
                     placeholder="Search coin..."
                     style={{
-                      padding: '6px 10px 6px 30px', borderRadius: '8px', border: '1px solid rgba(0,0,0,0.10)',
-                      background: '#FFFFFF', color: '#1A1A1A', fontSize: '13px', width: '150px',
+                      padding: '6px 10px 6px 30px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.1)',
+                      background: 'rgba(255,255,255,0.04)', color: '#D1D5DB', fontSize: '13px', width: '150px',
                     }} />
                   {coinSearch && (
                     <X size={12} onClick={() => setCoinSearch('')}
@@ -535,14 +532,14 @@ export function TradesClient({ trades: initialTrades }: TradesClientProps) {
             {filtered.length > 0 ? (
               <Card>
                 <div style={{ overflowX: 'auto', maxHeight: '600px', overflowY: 'auto' }}>
-                  <table style={{ width: '100%', minWidth: '1300px', borderCollapse: 'collapse', fontSize: '13px' }}>
+                  <table style={{ width: '100%', minWidth: '1300px', borderCollapse: 'collapse', fontSize: '17px' }}>
                     <thead>
-                      <tr style={{ borderBottom: '2px solid rgba(0,0,0,0.08)' }}>
+                      <tr style={{ borderBottom: '2px solid rgba(255,255,255,0.10)' }}>
                         {['Bot', 'Coin', 'Position', 'Leverage', 'Capital', 'Entry', 'Stop Loss', 'SL Step', 'Exit Guard', 'Target Price', 'PnL', 'Fee', 'Net PnL', 'Exit'].map(h => (
                           <th key={h} style={{
                             padding: '12px 14px', textAlign: h === 'Bot' || h === 'Coin' ? 'left' : 'center',
-                            fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.8px',
-                            color: '#9CA3AF', position: 'sticky', top: 0, background: '#FFFFFF',
+                            fontSize: '13px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.8px',
+                            color: '#9CA3AF', position: 'sticky', top: 0, background: 'rgba(17, 24, 39, 0.95)',
                           }}>{h}</th>
                         ))}
                       </tr>
@@ -558,8 +555,8 @@ export function TradesClient({ trades: initialTrades }: TradesClientProps) {
                           : { pnl: t.totalPnl, pnlPct: t.totalPnlPercent };
 
                         return (
-                          <tr key={t.id} style={{ borderBottom: '1px solid rgba(0,0,0,0.05)', background: isActive ? 'rgba(240,185,11,0.03)' : 'transparent' }}>
-                            <td style={{ padding: '12px 14px', color: '#F0B90B', fontWeight: 700, fontSize: '13px' }}>
+                          <tr key={t.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                            <td style={{ padding: '12px 14px', color: '#0891B2', fontWeight: 600, fontSize: '14px' }}>
                               <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                                 {t.botName || 'Unknown Bot'}
                               </div>
@@ -572,7 +569,7 @@ export function TradesClient({ trades: initialTrades }: TradesClientProps) {
                                 </div>
                               )}
                             </td>
-                            <td style={{ padding: '12px 14px', fontWeight: 700, color: '#1A1A1A', fontSize: '13px' }}>
+                            <td style={{ padding: '12px 14px', fontWeight: 700, color: '#F0F4F8', fontSize: '14px' }}>
                               {t.coin.replace('USDT', '')}
                             </td>
                             <td style={{ padding: '12px 14px', textAlign: 'center' }}>
@@ -584,9 +581,9 @@ export function TradesClient({ trades: initialTrades }: TradesClientProps) {
                                 {isLong ? 'LONG' : 'SHORT'}
                               </span>
                             </td>
-                            <td style={{ padding: '12px 14px', textAlign: 'center', color: '#4B5563', fontSize: '13px' }}>{t.leverage}×</td>
-                            <td style={{ padding: '12px 14px', textAlign: 'center', color: '#4B5563', fontSize: '13px' }}>${t.capital}</td>
-                            <td style={{ padding: '12px 14px', textAlign: 'center', color: '#4B5563', fontFamily: 'monospace', fontSize: '13px' }}>{fmtPrice(t.entryPrice)}</td>
+                            <td style={{ padding: '12px 14px', textAlign: 'center', color: '#E5E7EB', fontSize: '14px' }}>{t.leverage}×</td>
+                            <td style={{ padding: '12px 14px', textAlign: 'center', color: '#E5E7EB', fontSize: '14px' }}>${t.capital}</td>
+                            <td style={{ padding: '12px 14px', textAlign: 'center', color: '#E5E7EB', fontFamily: 'monospace', fontSize: '14px' }}>{fmtPrice(t.entryPrice)}</td>
 
                             {/* Stop Loss — shows trailing_sl for active trades (updates live as SL ratchets up) */}
                             <td style={{ padding: '12px 14px', textAlign: 'center', fontFamily: 'monospace', fontSize: '14px' }}>
@@ -595,7 +592,7 @@ export function TradesClient({ trades: initialTrades }: TradesClientProps) {
                                 const isTrailing = isActive && t.trailingActive;
                                 return (
                                   <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px' }}>
-                                    <span style={{ color: isTrailing ? '#D97706' : '#DC2626' }}>
+                                    <span style={{ color: isTrailing ? '#F59E0B' : '#EF4444' }}>
                                       {isTrailing && <span style={{ marginRight: '3px' }}>🔒</span>}
                                       {fmtPrice(liveSl)}
                                     </span>
@@ -693,7 +690,7 @@ export function TradesClient({ trades: initialTrades }: TradesClientProps) {
                     </tbody>
                   </table>
                 </div>
-                <div style={{ marginTop: '12px', fontSize: '12px', color: '#9CA3AF', textAlign: 'right' }}>
+                <div style={{ marginTop: '12px', fontSize: '12px', color: '#6B7280', textAlign: 'right' }}>
                   Showing {filtered.length} of {trades.length} trades
                 </div>
               </Card>

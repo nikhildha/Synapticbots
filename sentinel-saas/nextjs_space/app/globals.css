@@ -7,55 +7,47 @@
 
 @layer base {
   :root {
-    /* ── SYNAPTIC LIGHT — White/Binance-Yellow Palette ── */
-    --color-background: #F5F5F5;
-    --color-surface: #FFFFFF;
-    --color-surface-2: #F9F9F9;
-    --color-surface-3: #F0F0F0;
-    --color-surface-light: #E8E8E8;
-    --color-border: rgba(0, 0, 0, 0.08);
-    --color-border-subtle: rgba(0, 0, 0, 0.04);
+    /* ── CYBERPUNK PALETTE ── */
+    --color-background: #050505;
+    --color-surface: #0A0F1A;
+    --color-surface-2: #0D1520;
+    --color-surface-3: #111D2E;
+    --color-surface-light: #162238;
+    --color-border: rgba(0, 229, 255, 0.08);
+    --color-border-subtle: rgba(255, 255, 255, 0.04);
 
-    /* ── YELLOW ACCENT PALETTE (Binance-inspired) ── */
-    --yellow: #F0B90B;
-    --yellow-dark: #C99A08;
-    --yellow-light: #FDD835;
-    --yellow-glow: rgba(240, 185, 11, 0.30);
-    --yellow-bg: rgba(240, 185, 11, 0.10);
-    --yellow-border: rgba(240, 185, 11, 0.30);
-
-    /* ── Keep semantic color names ── */
-    --cyan: #F0B90B;
-    --cyan-dim: #C99A08;
-    --cyan-glow: rgba(240, 185, 11, 0.30);
-    --amber: #F0B90B;
-    --amber-dim: #C99A08;
-    --amber-glow: rgba(240, 185, 11, 0.30);
-    --emerald: #16A34A;
-    --emerald-dim: #15803D;
-    --emerald-glow: rgba(22, 163, 74, 0.25);
-    --danger: #DC2626;
-    --danger-glow: rgba(220, 38, 38, 0.25);
-    --violet: #7C3AED;
-    --violet-glow: rgba(124, 58, 237, 0.25);
+    /* ── NEON ACCENTS ── */
+    --cyan: #00E5FF;
+    --cyan-dim: #00B8CC;
+    --cyan-glow: rgba(0, 229, 255, 0.35);
+    --amber: #FFB300;
+    --amber-dim: #CC8F00;
+    --amber-glow: rgba(255, 179, 0, 0.35);
+    --emerald: #00FF88;
+    --emerald-dim: #00CC6A;
+    --emerald-glow: rgba(0, 255, 136, 0.35);
+    --danger: #FF3B5C;
+    --danger-glow: rgba(255, 59, 92, 0.35);
+    --violet: #A78BFA;
+    --violet-glow: rgba(167, 139, 250, 0.35);
 
     /* ── Legacy compat vars ── */
-    --color-primary: var(--yellow);
-    --color-primary-dark: var(--yellow-dark);
-    --color-primary-light: var(--yellow-light);
-    --color-accent: var(--yellow);
-    --color-text: #1A1A1A;
-    --color-text-secondary: #4B5563;
-    --color-text-muted: #9CA3AF;
-    --color-text-dim: #D1D5DB;
+    --color-primary: var(--cyan);
+    --color-primary-dark: var(--cyan-dim);
+    --color-primary-light: var(--cyan);
+    --color-accent: var(--cyan);
+    --color-text: #E8EDF5;
+    --color-text-secondary: #7A8BA0;
+    --color-text-muted: #3D4F63;
+    --color-text-dim: #243040;
     --color-success: var(--emerald);
-    --color-success-bg: rgba(22, 163, 74, 0.08);
+    --color-success-bg: rgba(0, 255, 136, 0.08);
     --color-danger: var(--danger);
-    --color-danger-bg: rgba(220, 38, 38, 0.08);
-    --color-warning: var(--yellow);
-    --color-warning-bg: rgba(240, 185, 11, 0.10);
-    --color-info: var(--yellow);
-    --color-info-bg: rgba(240, 185, 11, 0.08);
+    --color-danger-bg: rgba(255, 59, 92, 0.08);
+    --color-warning: var(--amber);
+    --color-warning-bg: rgba(255, 179, 0, 0.08);
+    --color-info: var(--cyan);
+    --color-info-bg: rgba(0, 229, 255, 0.08);
 
     /* ── Typography Scale ── */
     --text-xs: 11px;
@@ -75,15 +67,15 @@
     --radius-lg: 14px;
     --radius-xl: 20px;
 
-    /* ── Light card effects ── */
-    --glass-bg: rgba(255, 255, 255, 0.90);
-    --glass-border: rgba(240, 185, 11, 0.15);
+    /* ── Glass effects ── */
+    --glass-bg: rgba(10, 15, 26, 0.75);
+    --glass-border: rgba(0, 229, 255, 0.10);
     --glass-blur: blur(14px);
-    --glass-inner-glow: inset 0 0 0 transparent;
-    --shadow-card: 0 2px 12px rgba(0, 0, 0, 0.07), 0 1px 3px rgba(0, 0, 0, 0.05);
-    --shadow-glow-cyan: 0 0 20px rgba(240, 185, 11, 0.20);
-    --shadow-glow-emerald: 0 0 16px rgba(22, 163, 74, 0.20);
-    --shadow-glow-amber: 0 0 16px rgba(240, 185, 11, 0.25);
+    --glass-inner-glow: inset 0 0 14px rgba(0, 229, 255, 0.04);
+    --shadow-card: 0 8px 32px rgba(0, 0, 0, 0.6);
+    --shadow-glow-cyan: 0 0 24px rgba(0, 229, 255, 0.25);
+    --shadow-glow-emerald: 0 0 20px rgba(0, 255, 136, 0.3);
+    --shadow-glow-amber: 0 0 20px rgba(255, 179, 0, 0.3);
   }
 
   * {
