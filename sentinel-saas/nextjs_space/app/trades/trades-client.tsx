@@ -189,6 +189,9 @@ interface TradesClientProps { trades: Trade[]; }
 export function TradesClient({ trades: initialTrades }: TradesClientProps) {
   const [mounted, setMounted] = useState(false);
   const [trades, setTrades] = useState<Trade[]>(initialTrades);
+  // ── Live LTP via Binance WebSocket ──────────────────────────────────────
+  // Streams !miniTicker@arr (all symbols, ~1s cadence) and extracts active coins.
+  const [ltpPrices, setLtpPrices] = useState<Record<string, number>>({});
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'closed'>('active');
 
   const [posFilter, setPosFilter] = useState<string>('all');
@@ -202,7 +205,28 @@ export function TradesClient({ trades: initialTrades }: TradesClientProps) {
   const [deletingTradeId, setDeletingTradeId] = useState<string | null>(null);
   const clearPauseRef = useRef(false);
 
-
+  // ── Binance combined stream WebSocket for LTP ─────────────────────────
+  useEffect(() => {
+    const activeTrades = trades.filter(t => (t.status || '').toLowerCase() === 'active');
+    const symbols = [...new Set(activeTrades.map(t => (t.symbol || t.coin + 'USDT').toLowerCase()))];
+    if (symbols.length === 0) return;
+    // Build combined stream: btcusdt@miniTicker/ethusdt@miniTicker/...
+    const streams = symbols.map(s => `${s}@miniTicker`).join('/');
+    const ws = new WebSocket(`wss://stream.binance.com:9443/stream?streams=${streams}`);
+    ws.onmessage = (ev) => {
+      try {
+        const msg = JSON.parse(ev.data);
+        const d = msg.data;
+        if (d && d.s && d.c) {
+          setLtpPrices(prev => ({ ...prev, [d.s]: parseFloat(d.c) }));
+        }
+      } catch {}
+    };
+    ws.onerror = () => ws.close();
+    return () => ws.close();
+  // Re-subscribe when active trades change (new trade opened/closed)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [trades.filter(t => (t.status||'').toLowerCase()==='active').map(t=>t.symbol||t.coin).join(',')]);
 
 
   useEffect(() => { setMounted(true); }, []);
@@ -565,7 +589,7 @@ export function TradesClient({ trades: initialTrades }: TradesClientProps) {
                   <table style={{ width: '100%', minWidth: '1300px', borderCollapse: 'collapse', fontSize: '17px' }}>
                     <thead>
                       <tr style={{ borderBottom: '2px solid rgba(255,255,255,0.10)' }}>
-                        {['Bot', 'Coin', 'Position', 'Leverage', 'Capital', 'Entry', 'Stop Loss', 'SL Step', 'Exit Guard', 'Target Price', 'PnL', 'Fee', 'Net PnL', 'Exit'].map(h => (
+                         {['Bot', 'Coin', 'Position', 'Leverage', 'Capital', 'Entry', 'LTP', 'Stop Loss', 'SL Step', 'Target Price', 'PnL', 'Fee', 'Net PnL', 'Exit', ''].map(h => (
                           <th key={h} style={{
                             padding: '12px 14px', textAlign: h === 'Bot' || h === 'Coin' ? 'left' : 'center',
                             fontSize: '13px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.8px',
@@ -613,7 +637,25 @@ export function TradesClient({ trades: initialTrades }: TradesClientProps) {
                             </td>
                             <td style={{ padding: '12px 14px', textAlign: 'center', color: '#E5E7EB', fontSize: '14px' }}>{t.leverage}×</td>
                             <td style={{ padding: '12px 14px', textAlign: 'center', color: '#E5E7EB', fontSize: '14px' }}>${t.capital}</td>
-                            <td style={{ padding: '12px 14px', textAlign: 'center', color: '#E5E7EB', fontFamily: 'monospace', fontSize: '14px' }}>{fmtPrice(t.entryPrice)}</td>
+                             <td style={{ padding: '12px 14px', textAlign: 'center', color: '#E5E7EB', fontFamily: 'monospace', fontSize: '14px' }}>{fmtPrice(t.entryPrice)}</td>
+
+                             {/* LTP — live last traded price from Binance WebSocket */}
+                             <td style={{ padding: '12px 14px', textAlign: 'center', fontFamily: 'monospace', fontSize: '14px' }}>
+                               {(() => {
+                                 const sym = (t.symbol || t.coin + 'USDT').toUpperCase();
+                                 const ltp = ltpPrices[sym] ?? (isActive ? t.currentPrice : null);
+                                 if (!ltp) return <span style={{ color: '#4B5563' }}>—</span>;
+                                 const up = ltp >= t.entryPrice;
+                                 return (
+                                   <span style={{
+                                     color: up ? '#22C55E' : '#EF4444',
+                                     fontWeight: 700,
+                                   }}>
+                                     {fmtPrice(ltp)}
+                                   </span>
+                                 );
+                               })()}
+                             </td>
 
                             {/* Stop Loss — shows trailing_sl for active trades (updates live as SL ratchets up) */}
                             <td style={{ padding: '12px 14px', textAlign: 'center', fontFamily: 'monospace', fontSize: '14px' }}>
@@ -657,42 +699,6 @@ export function TradesClient({ trades: initialTrades }: TradesClientProps) {
                                       Step {lvl + 1} · {stepLabels[lvl] ?? `+${(lvl + 1) * 5}%`}
                                     </span>
                                     <span style={{ fontSize: '11px', color: '#6B7280' }}>{count}× moved</span>
-                                  </div>
-                                );
-                              })() : <span style={{ fontSize: '12px', color: '#4B5563' }}>—</span>}
-                            </td>
-                            {/* Exit Guard — confirms exit checks are running for this trade */}
-                            <td style={{ padding: '12px 14px', textAlign: 'center' }}>
-                              {isActive ? (() => {
-                                const guarded = t.exitGuardActive !== false; // default true
-                                // Compute staleness in seconds from exitCheckAt
-                                let ageStr = '';
-                                if (t.exitCheckAt) {
-                                  const ageMs = Date.now() - new Date(t.exitCheckAt).getTime();
-                                  const ageSec = Math.round(ageMs / 1000);
-                                  ageStr = ageSec < 60 ? `${ageSec}s ago` : `${Math.round(ageSec / 60)}m ago`;
-                                }
-                                return (
-                                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px' }}>
-                                    <span style={{
-                                      fontSize: '11px', fontWeight: 700,
-                                      padding: '3px 9px', borderRadius: '6px',
-                                      background: guarded ? 'rgba(34,197,94,0.15)' : 'rgba(239,68,68,0.15)',
-                                      color: guarded ? '#22C55E' : '#EF4444',
-                                      border: `1px solid ${guarded ? 'rgba(34,197,94,0.3)' : 'rgba(239,68,68,0.3)'}`,
-                                    }}>
-                                      {guarded ? 'GUARDED' : 'SKIPPED'}
-                                    </span>
-                                    {ageStr && (
-                                      <span style={{ fontSize: '10px', color: ageStr.includes('m') ? '#F59E0B' : '#6B7280' }}>
-                                        {ageStr}
-                                      </span>
-                                    )}
-                                    {t.exitCheckPrice != null && (
-                                      <span style={{ fontSize: '10px', color: '#4B5563', fontFamily: 'monospace' }}>
-                                        @{t.exitCheckPrice.toFixed(4)}
-                                      </span>
-                                    )}
                                   </div>
                                 );
                               })() : <span style={{ fontSize: '12px', color: '#4B5563' }}>—</span>}
