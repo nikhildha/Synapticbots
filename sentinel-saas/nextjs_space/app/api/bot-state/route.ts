@@ -103,7 +103,8 @@ export async function GET() {
                 try {
                     // Fall back to epoch so newly-created bots (startedAt=null) sync all trades
                     const syncFrom = ub.startedAt ?? new Date(0);
-                    await syncEngineTrades(allEngineTrades, ub.id, syncFrom, userId);
+                    const botSegment = (ub.config as any)?.segment || 'ALL';
+                    await syncEngineTrades(allEngineTrades, ub.id, syncFrom, userId, botSegment);
                 } catch (err) {
                     console.error(`[bot-state] Trade sync failed for bot ${ub.id}:`, err);
                 }

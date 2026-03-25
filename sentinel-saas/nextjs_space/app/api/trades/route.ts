@@ -65,7 +65,8 @@ export async function GET(request: NextRequest) {
                 if (engineTradeCache[botMode].length > 0) {
                     // Epoch fallback: if startedAt is null, sync ALL trades (entryTime filter skipped)
                     const syncFrom = ub.startedAt ?? new Date(0);
-                    await syncEngineTrades(engineTradeCache[botMode], ub.id, syncFrom, userId);
+                    const botSegment = (ub.config as any)?.segment || 'ALL';
+                    await syncEngineTrades(engineTradeCache[botMode], ub.id, syncFrom, userId, botSegment);
                 }
             } catch (err) {
                 console.error(`[trades] Sync failed for bot ${ub.id} (${botMode}):`, err);
