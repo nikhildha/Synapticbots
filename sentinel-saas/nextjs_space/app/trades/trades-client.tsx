@@ -199,6 +199,8 @@ export function TradesClient({ trades: initialTrades }: TradesClientProps) {
   const [isClearing, setIsClearing] = useState(false);
   const [clearSuccess, setClearSuccess] = useState<string | null>(null);
   const [confirmingClear, setConfirmingClear] = useState(false);
+  const [deletingTradeId, setDeletingTradeId] = useState<string | null>(null);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const clearPauseRef = useRef(false);
 
 
@@ -395,7 +397,32 @@ export function TradesClient({ trades: initialTrades }: TradesClientProps) {
     }
   };
 
+  const deleteTrade = async (tradeId: string) => {
+    if (confirmDeleteId !== tradeId) {
+      setConfirmDeleteId(tradeId);
+      setTimeout(() => setConfirmDeleteId(null), 4000);
+      return;
+    }
+    setConfirmDeleteId(null);
+    setDeletingTradeId(tradeId);
+    try {
+      const res = await fetch(`/api/trades?id=${encodeURIComponent(tradeId)}`, { method: 'DELETE' });
+      if (res.ok) {
+        setTrades(prev => prev.filter(t => t.id !== tradeId));
+        showMsg('🗑️ Trade deleted', 4000);
+      } else {
+        const err = await res.json();
+        showMsg(`❌ ${err.error || 'Failed to delete trade'}`);
+      }
+    } catch {
+      showMsg('❌ Network error');
+    } finally {
+      setDeletingTradeId(null);
+    }
+  };
+
   if (!mounted) return null;
+
 
   return (
     <div className="min-h-screen">
@@ -684,6 +711,24 @@ export function TradesClient({ trades: initialTrades }: TradesClientProps) {
                               {!isActive && t.exitPrice ? fmtPrice(t.exitPrice) : '—'}
                             </td>
 
+                            {/* Per-trade delete button */}
+                            <td style={{ padding: '8px 6px', textAlign: 'center' }}>
+                              <button
+                                onClick={() => deleteTrade(t.id)}
+                                disabled={deletingTradeId === t.id}
+                                title={confirmDeleteId === t.id ? 'Click again to confirm delete' : 'Delete this trade'}
+                                style={{
+                                  background: confirmDeleteId === t.id ? 'rgba(239,68,68,0.25)' : 'rgba(255,255,255,0.04)',
+                                  border: `1px solid ${confirmDeleteId === t.id ? 'rgba(239,68,68,0.5)' : 'rgba(255,255,255,0.08)'}`,
+                                  borderRadius: '6px', padding: '4px 6px', cursor: 'pointer',
+                                  color: confirmDeleteId === t.id ? '#EF4444' : '#6B7280',
+                                  fontSize: '13px', lineHeight: 1,
+                                  transition: 'all 0.15s',
+                                }}
+                              >
+                                {deletingTradeId === t.id ? '…' : confirmDeleteId === t.id ? '⚠️' : '🗑️'}
+                              </button>
+                            </td>
 
                           </tr>
                         );

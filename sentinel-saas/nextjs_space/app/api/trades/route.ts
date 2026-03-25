@@ -150,8 +150,29 @@ export async function DELETE(request: Request) {
         if (!session?.user) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
         }
-        // For now, trades from JSON are read-only
-        return NextResponse.json({ error: 'Use /api/reset-trades to clear your trades' }, { status: 400 });
+
+        const userId = (session.user as any).id;
+        const { searchParams } = new URL(request.url);
+        const tradeId = searchParams.get('id');
+
+        if (!tradeId) {
+            return NextResponse.json({ error: 'Missing ?id= param' }, { status: 400 });
+        }
+
+        // Verify ownership: trade must belong to one of this user's bots
+        const trade = await prisma.trade.findFirst({
+            where: { id: tradeId, bot: { userId } },
+        });
+
+        if (!trade) {
+            return NextResponse.json({ error: 'Trade not found or not yours' }, { status: 404 });
+        }
+
+        await prisma.trade.delete({ where: { id: tradeId } });
+
+        console.log(`[trades] Deleted garbage trade ${tradeId} for user ${userId}`);
+        return NextResponse.json({ success: true, deleted: tradeId });
+
     } catch (error: any) {
         console.error('Tradebook DELETE error:', error);
         return NextResponse.json({ error: 'Failed to delete trade' }, { status: 500 });

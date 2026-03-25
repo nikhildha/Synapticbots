@@ -270,6 +270,12 @@ export async function getUserTrades(userId: string, statusFilter?: string, botId
 
     return trades
         .filter((t: any) => !COIN_EXCLUDE.has((t.coin || '').toUpperCase()))
+        // PnL sanity: active trades with |unrealizedPnl%| > 999 have garbage quantity data
+        .filter((t: any) => {
+            if (t.status !== 'active') return true; // always show closed trades
+            const pct = Math.abs(t.activePnlPercent || 0);
+            return pct <= 999;
+        })
         .map(t => ({
         id: t.id,
         trade_id: t.exchangeOrderId || t.id,
