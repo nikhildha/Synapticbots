@@ -11,7 +11,7 @@ const SYNC_THROTTLE_MS = 5_000;   // 5s throttle — safe at 25+ users (200 bots
 const COIN_EXCLUDE = new Set([
     'EURUSDT', 'WBTCUSDT', 'USDCUSDT', 'TUSDUSDT', 'BUSDUSDT',
     'USTUSDT', 'DAIUSDT', 'FDUSDUSDT', 'CVCUSDT', 'USD1USDT',
-    'POLYXUSDT', 'TRUUSDT',
+    'POLYXUSDT', 'TRUUSDT', 'QNTUSDT',
 ]);
 
 // Used to prevent cross-segment trade pollution (e.g. BTC trade written to Gaming bot).
