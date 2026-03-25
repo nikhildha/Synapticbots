@@ -5,7 +5,15 @@ import { getActiveBotSession } from '@/lib/bot-session';
 const _lastSyncTime: Record<string, number> = {};
 const SYNC_THROTTLE_MS = 5_000;   // 5s throttle — safe at 25+ users (200 bots). 1s would cause ~200 upserts/sec on Railway.
 
-// ── Segment pool filter — mirrors config.py CRYPTO_SEGMENTS ─────────────────
+// ── Static coin exclusion list — mirrors config.py COIN_EXCLUDE ──────────────
+// Trades for these symbols are NEVER synced into Prisma, even if the engine
+// still has them in its in-memory tradebook from before the exclusion was added.
+const COIN_EXCLUDE = new Set([
+    'EURUSDT', 'WBTCUSDT', 'USDCUSDT', 'TUSDUSDT', 'BUSDUSDT',
+    'USTUSDT', 'DAIUSDT', 'FDUSDUSDT', 'CVCUSDT', 'USD1USDT',
+    'POLYXUSDT', 'TRUUSDT',
+]);
+
 // Used to prevent cross-segment trade pollution (e.g. BTC trade written to Gaming bot).
 // When BotConfig.segment === 'ALL' (or unknown), all coins are allowed.
 const SEGMENT_POOLS: Record<string, string[]> = {
@@ -72,6 +80,10 @@ export async function syncEngineTrades(
 
             const engineTradeId = t.trade_id || t.id;
             if (!engineTradeId) continue;
+
+            // ── Excluded coin guard ──────────────────────────────────────────
+            const tradeCoinRaw = (t.symbol || t.coin || '').toUpperCase();
+            if (COIN_EXCLUDE.has(tradeCoinRaw)) continue;
 
             const status = (t.status || 'active').toLowerCase();
             const side = (t.side || t.position || '').toLowerCase();
@@ -256,7 +268,9 @@ export async function getUserTrades(userId: string, statusFilter?: string, botId
         },
     });
 
-    return trades.map(t => ({
+    return trades
+        .filter((t: any) => !COIN_EXCLUDE.has((t.coin || '').toUpperCase()))
+        .map(t => ({
         id: t.id,
         trade_id: t.exchangeOrderId || t.id,
         symbol: t.coin,
