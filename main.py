@@ -843,8 +843,6 @@ class RegimeMasterBot:
         if not _tick_active_bots:
             logger.warning("⚠️  No bots registered in ENGINE_ACTIVE_BOTS — skipping deploy step")
 
-        from segment_features import get_segment_for_coin
-
         deployed_trades = []
         deployed = 0
         athena_calls_this_cycle = 0  # H4: track Athena calls to enforce LLM_MAX_CALLS_PER_CYCLE
