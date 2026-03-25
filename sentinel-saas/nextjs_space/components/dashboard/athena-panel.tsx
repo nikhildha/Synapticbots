@@ -69,7 +69,6 @@ function timeSince(ts: string): string {
 }
 
 export function AthenaPanel({ athena, vetoLog = [] }: Props) {
-    const [activeTab, setActiveTab] = useState<'decisions' | 'vetolog'>('decisions');
     const [retroPrices, setRetroPrices] = useState<Record<string, number>>({});
     const [logHistory, setLogHistory] = useState<any[]>([]);
     const enabled = !!athena?.enabled;
@@ -114,24 +113,8 @@ export function AthenaPanel({ athena, vetoLog = [] }: Props) {
         seenSymbols.add(d.symbol);
         return true;
     });
-    const hasData = decisions.length > 0;
-    const vetoCount = vetoLog.length;
 
-    // Fetch current prices for vetoed coins (retrospective check)
-    useEffect(() => {
-        if (activeTab !== 'vetolog' || vetoLog.length === 0) return;
-        const symbols = [...new Set(vetoLog.map(v => v.symbol))];
-        if (symbols.length === 0) return;
-        const symbolsParam = encodeURIComponent(JSON.stringify(symbols));
-        fetch(`https://api.binance.com/api/v3/ticker/price?symbols=${symbolsParam}`, { signal: AbortSignal.timeout(4000) })
-            .then(r => r.json())
-            .then((data: { symbol: string; price: string }[]) => {
-                const map: Record<string, number> = {};
-                data.forEach(({ symbol, price }) => { map[symbol] = parseFloat(price); });
-                setRetroPrices(map);
-            })
-            .catch(() => {});
-    }, [activeTab, vetoLog]);
+    const hasData = decisions.length > 0;
 
     return (
         <div style={{
@@ -190,36 +173,24 @@ export function AthenaPanel({ athena, vetoLog = [] }: Props) {
                 </div>
             </div>
 
-            {/* ── Tab Bar ── */}
+            {/* ── Tab Label ── */}
             <div style={{
                 display: 'flex', borderBottom: '1px solid rgba(0,229,255,0.08)',
                 padding: '0 24px', gap: 4,
             }}>
-                {[
-                    { id: 'decisions', label: 'Decisions' },
-                    { id: 'vetolog', label: `Veto Log${vetoCount > 0 ? ` (${vetoCount})` : ''}` },
-                ].map(tab => (
-                    <button
-                        key={tab.id}
-                        onClick={() => setActiveTab(tab.id as any)}
-                        style={{
-                            padding: '10px 16px', fontSize: 12, fontWeight: 700, letterSpacing: '0.5px',
-                            background: 'transparent', border: 'none', cursor: 'pointer',
-                            color: activeTab === tab.id ? '#00E5FF' : '#6B7280',
-                            borderBottom: `2px solid ${activeTab === tab.id ? '#00E5FF' : 'transparent'}`,
-                            transition: 'all 0.2s', marginBottom: -1,
-                        }}
-                    >
-                        {tab.label}
-                    </button>
-                ))}
+                <div style={{
+                    padding: '10px 16px', fontSize: 12, fontWeight: 700, letterSpacing: '0.5px',
+                    color: '#00E5FF', borderBottom: '2px solid #00E5FF', marginBottom: -1,
+                }}>
+                    Decisions
+                </div>
             </div>
 
             {/* ── Content Area ── */}
             <div style={{ flex: 1, display: 'flex', flexDirection: 'column', padding: '20px 24px', gap: 20 }}>
 
                 {/* ═══ DECISIONS TAB ═══ */}
-                {activeTab === 'decisions' && (
+                {(
                     !hasData ? (
                         <div style={{
                             height: 300, display: 'flex', flexDirection: 'column',
@@ -364,105 +335,6 @@ export function AthenaPanel({ athena, vetoLog = [] }: Props) {
                     )
                 )}
 
-                {/* ═══ VETO LOG TAB ═══ */}
-                {activeTab === 'vetolog' && (
-                    vetoLog.length === 0 ? (
-                        <div style={{ height: 200, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 12 }}>
-                            <XCircle size={40} color="rgba(255,59,92,0.3)" />
-                            <div style={{ fontSize: 14, color: '#6B7280' }}>No vetoes recorded yet this session.</div>
-                            <div style={{ fontSize: 12, color: '#4B5563' }}>Athena vetoes will appear here with retrospective price data.</div>
-                        </div>
-                    ) : (
-                        <div style={{ overflowX: 'auto' }}>
-                            {/* Legend */}
-                            <div style={{ display: 'flex', gap: 16, marginBottom: 12, fontSize: 11, color: '#6B7280' }}>
-                                <span style={{ color: '#10B981' }}>▲ Green = went up after veto (missed opportunity)</span>
-                                <span style={{ color: '#EF4444' }}>▼ Red = went down after veto (good call)</span>
-                            </div>
-                            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
-                                <thead>
-                                    <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
-                                        {['Coin', 'Dir', 'Conv%', 'Veto @', 'Current', 'Move', 'When', 'Reason'].map(h => (
-                                            <th key={h} style={{ padding: '8px 12px', textAlign: 'left', color: '#6B7280', fontWeight: 700, letterSpacing: '0.5px', whiteSpace: 'nowrap' }}>{h}</th>
-                                        ))}
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {vetoLog.map((v, i) => {
-                                        const current = retroPrices[v.symbol];
-                                        const movePct = current && v.price ? ((current - v.price) / v.price * 100) : null;
-                                        const isLong = v.side === 'BUY' || v.side === 'LONG';
-                                        // For a long veto: went up = missed (bad veto), went down = good veto
-                                        // For a short veto: went down = missed (bad veto), went up = good veto
-                                        const missedOpp = movePct !== null && (
-                                            (isLong && movePct > 1) || (!isLong && movePct < -1)
-                                        );
-                                        const goodCall = movePct !== null && (
-                                            (isLong && movePct < -1) || (!isLong && movePct > 1)
-                                        );
-
-                                        return (
-                                            <tr key={i} style={{
-                                                borderBottom: '1px solid rgba(255,255,255,0.04)',
-                                                background: i % 2 === 0 ? 'rgba(255,255,255,0.01)' : 'transparent',
-                                            }}>
-                                                <td style={{ padding: '10px 12px', fontWeight: 800, color: '#E8EDF5', fontFamily: 'monospace' }}>
-                                                    {v.symbol.replace('USDT', '')}
-                                                </td>
-                                                <td style={{ padding: '10px 12px' }}>
-                                                    <span style={{
-                                                        padding: '2px 8px', borderRadius: 4, fontSize: 11, fontWeight: 700,
-                                                        background: isLong ? 'rgba(0,255,136,0.1)' : 'rgba(255,59,92,0.1)',
-                                                        color: isLong ? '#00FF88' : '#FF3B5C',
-                                                    }}>
-                                                        {isLong ? 'LONG' : 'SHORT'}
-                                                    </span>
-                                                </td>
-                                                <td style={{ padding: '10px 12px', color: '#FFB300', fontFamily: 'monospace', fontWeight: 700 }}>
-                                                    {v.conviction?.toFixed(0) ?? '—'}
-                                                </td>
-                                                <td style={{ padding: '10px 12px', color: '#9CA3AF', fontFamily: 'monospace' }}>
-                                                    ${v.price?.toFixed(4) ?? '—'}
-                                                </td>
-                                                <td style={{ padding: '10px 12px', color: '#E8EDF5', fontFamily: 'monospace' }}>
-                                                    {current ? `$${current.toFixed(4)}` : <span style={{ color: '#4B5563' }}>—</span>}
-                                                </td>
-                                                <td style={{ padding: '10px 12px' }}>
-                                                    {movePct !== null ? (
-                                                        <span style={{
-                                                            display: 'flex', alignItems: 'center', gap: 4,
-                                                            color: missedOpp ? '#10B981' : goodCall ? '#EF4444' : '#9CA3AF',
-                                                            fontWeight: 700, fontFamily: 'monospace',
-                                                        }}>
-                                                            {movePct > 0 ? <TrendingUp size={14} /> : <TrendingDown size={14} />}
-                                                            {movePct > 0 ? '+' : ''}{movePct.toFixed(2)}%
-                                                            {missedOpp && <span style={{ fontSize: 10, marginLeft: 2 }}>❌</span>}
-                                                            {goodCall && <span style={{ fontSize: 10, marginLeft: 2 }}>✅</span>}
-                                                        </span>
-                                                    ) : (
-                                                        <span style={{ color: '#4B5563', fontSize: 11 }}>loading…</span>
-                                                    )}
-                                                </td>
-                                                <td style={{ padding: '10px 12px', color: '#6B7280', whiteSpace: 'nowrap' }}>
-                                                    {timeSince(v.ts)}
-                                                </td>
-                                                <td style={{ padding: '10px 12px', color: '#9CA3AF', maxWidth: 280 }}>
-                                                    <span title={v.reason} style={{
-                                                        display: '-webkit-box', WebkitLineClamp: 2,
-                                                        WebkitBoxOrient: 'vertical', overflow: 'hidden',
-                                                        lineHeight: 1.4,
-                                                    }}>
-                                                        {v.reason}
-                                                    </span>
-                                                </td>
-                                            </tr>
-                                        );
-                                    })}
-                                </tbody>
-                            </table>
-                        </div>
-                    )
-                )}
             </div>
         </div>
     );

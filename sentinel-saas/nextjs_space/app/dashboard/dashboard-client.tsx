@@ -522,21 +522,20 @@ export function DashboardClient({ user, stats, bots, recentTrades }: DashboardCl
           >
             <div style={{
               display: 'grid',
-              gridTemplateColumns: '1.4fr 0.5fr 1.4fr',
+              gridTemplateColumns: '1fr 0.5fr 1fr',
               gap: '20px',
             }}>
-              <RegimeCard
-                regime={regime}
-                confidence={confidence}
-                symbol={symbol}
-                macroRegime={macroRegime}
-                trend15m={trend15m}
-                coinStates={multi?.coin_states}
-                macro={{
-                  btc_action: multi?.coin_states?.BTCUSDT?.deploy_status || 'WAITING',
-                  btc_regime_name: multi?.coin_states?.BTCUSDT?.regime || regime,
-                  confidence: multi?.coin_states?.BTCUSDT?.confidence || 0,
-                }}
+              {/* Wallet Balance Card (left) — duplicate of right card */}
+              <PnlCard
+                trades={trades}
+                binanceBalance={walletBalance.binance}
+                coinDcxBalance={walletBalance.coindcx}
+                paperPnl={liveStats.paperTotalPnl}
+                livePnl={liveStats.liveTotalPnl}
+                paperPct={liveStats.paperPnlPct}
+                livePct={liveStats.livePnlPct}
+                activeBots={liveStats.activeBots}
+                activeTrades={liveStats.activeTrades}
               />
 
               {/* ═══ Synaptic Core Brain — Engine Status ═══ */}
