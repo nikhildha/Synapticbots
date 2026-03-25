@@ -85,13 +85,20 @@ export async function syncEngineTrades(
                 if (!isNaN(d.getTime())) exitTime = d;
             }
 
-            // SEGMENT FILTER: Only sync trades whose coin belongs to this bot's segment pool.
-            // Prevents BTC/L1 trades from appearing in Gaming, Meme, DeFi bots etc.
-            // Bots with segment 'ALL' or no segment bypass this check (backward compat).
-            if (botSegment && botSegment !== 'ALL') {
-                const pool = SEGMENT_POOLS[botSegment] || [];
-                const tradeCoin = (t.symbol || t.coin || '').toUpperCase();
-                if (pool.length > 0 && !pool.includes(tradeCoin)) continue;
+            // ── PRIMARY FILTER: bot_id ownership ─────────────────────────────────
+            // Engine stamps bot_id on every trade at deploy time (tradebook.py line 242).
+            // Only sync this trade to the bot that actually deployed it.
+            // If bot_id is missing (legacy trades before multi-bot), fall through to segment filter.
+            const tradeBotId = (t.bot_id || t.botId || '').trim();
+            if (tradeBotId) {
+                if (tradeBotId !== botId) continue;   // belongs to a different bot — skip
+            } else {
+                // ── FALLBACK: segment filter for legacy trades without bot_id ─────
+                if (botSegment && botSegment !== 'ALL') {
+                    const pool = SEGMENT_POOLS[botSegment] || [];
+                    const tradeCoin = (t.symbol || t.coin || '').toUpperCase();
+                    if (pool.length > 0 && !pool.includes(tradeCoin)) continue;
+                }
             }
 
             // ── SL/TP Sanity Check (fixes engine-side cross-contamination bug) ──
