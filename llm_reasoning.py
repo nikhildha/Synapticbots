@@ -140,9 +140,9 @@ Your job is to make the FINAL DECISION: LONG, SHORT, or SKIP.
    - Price is breaking recent 5-bar Swing High (LONG) or 5-bar Swing Low (SHORT)
 
    Then activate MOMENTUM OVERRIDE:
-   - Ignore up to 2 Tier-2 proximity warnings
+   - Ignore up to 1 Tier-2 proximity warning
    - Allow trade even if price is near PDH/PWH (LONG) or PDL/PWL (SHORT)
-   - When MOMENTUM OVERRIDE is active, VETO requires **4+ conditions** (not 3), OR **3 conditions including at least 1 Tier-3 extreme risk**
+   - When MOMENTUM OVERRIDE is active, VETO requires **3+ conditions** (not 2), OR **2 conditions including at least 1 Tier-3 extreme risk**
    - This captures breakouts, continuations, and trend acceleration
 
 7. **ENTRY QUALITY GATE — Tiered Check (run after adaptive logic and momentum override):**
@@ -195,8 +195,8 @@ Your job is to make the FINAL DECISION: LONG, SHORT, or SKIP.
    - Structure is clearly invalid (price in dead zone, no viable S/R framework)
 
    **Momentum Override VETO:** Issue SKIP only if ONE of:
-   - **4 or more** conditions (across all buckets)
-   - **3 conditions** including at least 1 Tier-3 extreme risk
+   - **3 or more** conditions (across all buckets)
+   - **2 conditions** including at least 1 Tier-3 extreme risk
 
    For all other imperfect setups: reduce size (30–50%), reduce leverage, lower confidence score — but EXECUTE the trade.
    Always cite specific price levels that triggered each condition.
@@ -205,7 +205,7 @@ Your job is to make the FINAL DECISION: LONG, SHORT, or SKIP.
 
     - Perfect setup: full size, recommended leverage, confidence = 0.85–1.0
     - 1 minor condition fired: reduce size 20%, confidence = 0.65–0.84
-    - 2 conditions fired (but conviction strong): reduce size 40–50%, halve leverage, confidence = 0.45–0.64
+    - 2 conditions fired (but conviction strong): reduce size 40–50%, halve leverage, confidence = 0.50–0.64
     - 3+ **distinct bucket** conditions OR weak conviction: SKIP
 
 11. **Execution Bias Rule (default to action, not inaction):**
@@ -214,8 +214,9 @@ Your job is to make the FINAL DECISION: LONG, SHORT, or SKIP.
     - HMM Confidence ≥ 0.60
     - Multi-TF Conviction ≥ 65
 
-    Then: **prefer EXECUTION over SKIP** unless VETO conditions are clearly and explicitly met.
-    The burden of proof is on SKIP — not on EXECUTE.
+    Then: **execute only if the setup has a clear edge**. If the trade has no obvious
+    catalyst, no clean structure, and no momentum — SKIP. Do not deploy just because
+    signals pass minimum thresholds. Quality over quantity.
 
     **Clustered condition handling:** If 3 conditions are present BUT they are clustered (e.g. swing high + PDH = structural cluster, plus VWAP stretch), count them as **2 distinct conditions** → reduce size 40–50% and EXECUTE. Only SKIP when conditions are structurally independent AND clearly invalid.
 
@@ -234,7 +235,14 @@ Your job is to make the FINAL DECISION: LONG, SHORT, or SKIP.
     **Clamp final adjusted_confidence between 0.30 and 0.95.**
     Do not output values outside this range.
 
-13. **Output your decision** as clean JSON.
+13. **DRAWDOWN GUARDRAIL (absolute):**
+    If the portfolio context or recent signals suggest a losing streak (multiple
+    recent VETO/losing signals), automatically raise your veto sensitivity:
+    - Reduce all confidence scores by an additional -0.10
+    - SKIP any trade with adjusted_confidence < 0.55 (regardless of other rules)
+    This prevents snowball losses during adverse regimes.
+
+14. **Output your decision** as clean JSON.
 
 ## Output Format
 
