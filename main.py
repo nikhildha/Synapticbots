@@ -1192,6 +1192,55 @@ class RegimeMasterBot:
                         logger.debug("Athena VETO telegram failed: %s", _ve)
                     continue
 
+                # ── Gate 4: BTC Macro Direction Filter ────────────────────────────
+                # If BTC BEARISH → LONG trades need higher Athena confidence to pass
+                # If BTC BULLISH → SHORT trades need higher Athena confidence to pass
+                # If BTC SIDEWAYS → no restriction
+                if athena_decision and athena_decision.action in ("EXECUTE", "LONG", "SHORT"):
+                    btc_regime = self._coin_states.get("BTCUSDT", {}).get("regime", "UNKNOWN")
+                    trade_side = top["side"]
+                    btc_counter_threshold = getattr(config, "BTC_MACRO_COUNTER_THRESHOLD", 0.80)
+
+                    is_counter_macro = (
+                        (btc_regime == "BEARISH" and trade_side == "BUY") or
+                        (btc_regime == "BULLISH" and trade_side == "SELL")
+                    )
+
+                    if is_counter_macro and athena_decision.adjusted_confidence < btc_counter_threshold:
+                        _direction = "LONG" if trade_side == "BUY" else "SHORT"
+                        logger.info(
+                            "🚫 BTC MACRO VETO [%s] %s — %s in %s BTC (conf=%.0f%% < macro threshold %.0f%%)",
+                            bot_name, sym, _direction, btc_regime,
+                            athena_decision.adjusted_confidence * 100, btc_counter_threshold * 100
+                        )
+                        self._coin_states.setdefault(sym, {}).setdefault("bot_deploy_statuses", {})[bot_id] = (
+                            f"FILTERED: BTC {btc_regime} vs {_direction} (conf {athena_decision.adjusted_confidence*100:.0f}% < {btc_counter_threshold*100:.0f}%)"
+                        )
+                        # Update athena_state to reflect the macro veto
+                        self._coin_states.setdefault(sym, {})["athena_state"] = {
+                            "action":     "VETO",
+                            "confidence": athena_decision.adjusted_confidence,
+                            "reasoning":  f"BTC MACRO VETO: {_direction} blocked — BTC is {btc_regime}, needs ≥{btc_counter_threshold*100:.0f}% for counter-macro",
+                            "risk_flags": [f"counter_macro_{btc_regime.lower()}"],
+                            "model":      getattr(athena_decision, "model", "unknown"),
+                            "latency_ms": getattr(athena_decision, "latency_ms", 0),
+                            "side":       trade_side,
+                            "suggested_sl": getattr(athena_decision, "suggested_sl", 0),
+                            "suggested_tp": getattr(athena_decision, "suggested_tp", 0),
+                        }
+                        try:
+                            import telegram as _tg
+                            _tg.notify_athena_veto(
+                                sym=sym,
+                                side=trade_side,
+                                conviction_pct=athena_decision.adjusted_confidence * 100,
+                                reasoning=f"BTC MACRO VETO: {_direction} blocked — BTC is {btc_regime}, needs ≥{btc_counter_threshold*100:.0f}%",
+                                segment=seg_name,
+                            )
+                        except Exception:
+                            pass
+                        continue
+
                 # ── Athena EXECUTE: fire Telegram signal alert ────────────────────
                 # SL/TP from Athena suggested values (will be refined during deploy)
                 _a_sl = getattr(athena_decision, "suggested_sl", 0) or 0
