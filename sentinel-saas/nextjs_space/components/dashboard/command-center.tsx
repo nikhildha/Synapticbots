@@ -724,13 +724,12 @@ export function BrainExecutionSummary({ coinStates, multi, heatmap: heatmapProp,
     const queued = liveMulti?.pending_signals_count ?? 0;
 
     const funnelStages = [
-        { label: 'SCANNED',   count: total,          color: '#9CA3AF' },
-        { label: 'IN POOL',   count: inPool,         color: '#A78BFA' },
-        { label: 'QUALIFIED', count: qualified,      color: '#22C55E' },
-        { label: 'QUEUED',    count: queued,         color: '#F59E0B', sub: queued > 0 ? 'next cycle' : undefined },
-        { label: 'ATHENA',    count: athenaProcessed, color: '#F59E0B', sub: athenaVetoed > 0 ? `${athenaVetoed} vetoed` : undefined },
-        { label: 'DEPLOYED',  count: deployed,       color: '#06B6D4' },
+        { label: 'SCANNED',   count: total,     color: '#9CA3AF' },
+        { label: 'IN POOL',   count: inPool,    color: '#A78BFA' },
+        { label: 'QUALIFIED', count: qualified, color: '#22C55E' },
+        { label: 'QUEUED',    count: queued,    color: '#F59E0B', sub: queued > 0 ? 'next cycle' : undefined },
     ];
+
 
     return (
         <div>
@@ -747,62 +746,7 @@ export function BrainExecutionSummary({ coinStates, multi, heatmap: heatmapProp,
                 </p>
             </div>
 
-            {/* ═══ Signal Queue Panel ══════════════════════════════════════ */}
-            {pendingSignals.length > 0 && (
-                <div style={{
-                    marginBottom: '16px', padding: '14px 16px',
-                    background: 'rgba(245,158,11,0.05)',
-                    border: '1px solid rgba(245,158,11,0.2)',
-                    borderRadius: '12px',
-                    display: 'flex', flexDirection: 'column', gap: 10,
-                }}>
-                    <div style={{ fontSize: '11px', fontWeight: 700, color: '#F59E0B', letterSpacing: '1.5px', textTransform: 'uppercase' }}>
-                        📥 Signal Queue — Athena-Approved, Awaiting Deploy
-                    </div>
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-                        {pendingSignals.map((s: any) => { // Assuming 'any' type for pendingSignals items as the interface is not provided
-                            const isLong = s.side === 'BUY' || s.side === 'LONG';
-                            const reasonLabel = s.queue_reason === 'guard4_segment_locked'
-                                ? 'Guard 4'
-                                : s.queue_reason === 'no_bots'
-                                ? 'No Bots'
-                                : s.queue_reason;
-                            const ttlMin = Math.ceil(s.expires_in_sec / 60);
-                            return (
-                                <div key={s.symbol} style={{
-                                    display: 'flex', alignItems: 'center', gap: 8,
-                                    background: 'rgba(245,158,11,0.08)',
-                                    border: '1px solid rgba(245,158,11,0.25)',
-                                    borderRadius: 8, padding: '6px 12px',
-                                }}>
-                                    <span style={{ fontWeight: 800, color: '#E8EDF5', fontFamily: 'monospace', fontSize: 13 }}>
-                                        {s.symbol.replace('USDT', '')}
-                                    </span>
-                                    <span style={{
-                                        fontSize: 10, fontWeight: 700,
-                                        color: isLong ? '#00FF88' : '#FF3B5C',
-                                        background: isLong ? 'rgba(0,255,136,0.08)' : 'rgba(255,59,92,0.08)',
-                                        padding: '2px 6px', borderRadius: 4,
-                                    }}>
-                                        {isLong ? 'LONG' : 'SHORT'}
-                                    </span>
-                                    <span style={{ fontSize: 10, color: '#9CA3AF' }}>
-                                        Conv: <strong style={{ color: '#F59E0B' }}>{s.conviction?.toFixed(0)}%</strong>
-                                    </span>
-                                    <span style={{
-                                        fontSize: 10, color: '#6B7280',
-                                        background: 'rgba(255,255,255,0.05)',
-                                        padding: '2px 6px', borderRadius: 4,
-                                    }}>
-                                        {reasonLabel}
-                                    </span>
-                                    <span style={{ fontSize: 10, color: '#4B5563' }}>TTL {ttlMin}m</span>
-                                </div>
-                            );
-                        })}
-                    </div>
-                </div>
-            )}
+
 
             {/* ── Pipeline Funnel ──────────────────────────────────────── */}
             <div style={{
@@ -837,162 +781,182 @@ export function BrainExecutionSummary({ coinStates, multi, heatmap: heatmapProp,
                 ))}
             </div>
 
-            {/* ── Per-Coin Detail Table ────────────────────────────────── */}
-            <div className="card-gradient rounded-xl overflow-hidden">
-                <div style={{ overflowX: 'auto', maxHeight: '520px', overflowY: 'auto' }}>
-                    <table style={{ width: '100%', minWidth: '900px', borderCollapse: 'collapse', fontSize: '13px' }}>
-                        <thead>
-                            <tr style={{ borderBottom: '2px solid rgba(255,255,255,0.08)' }}>
-                                {['#', 'Coin', 'Segment', 'Pool', 'HMM Regime', 'Conv %', 'Athena', 'Result', 'Reason'].map(h => (
-                                    <th key={h} style={{
-                                        padding: '12px 8px', textAlign: h === '#' || h === 'Coin' || h === 'Reason' ? 'left' : 'center',
-                                        fontSize: '10px', fontWeight: 700, textTransform: 'uppercase' as const, letterSpacing: '1px', color: '#6B7280',
-                                        position: 'sticky' as const, top: 0, background: 'var(--color-surface, rgba(17,24,39,0.98))',
-                                    }}>{h}</th>
-                                ))}
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {sorted.map((c: any, idx: number) => {
-                                const regime = c.regime || '—';
-                                const conv = c.conviction != null ? Number(c.conviction) : (c.confidence != null ? (c.confidence <= 1 ? c.confidence * 100 : c.confidence) : 0);
-                                const isExpanded = expandedCoin === c.symbol;
-                                const athena = c.athena_state;
-                                const seg = getSegment(c.symbol || '', c);
-                                const sc = segColors[seg] || { bg: 'rgba(107,114,128,0.10)', color: '#9CA3AF' };
-                                const isDeployed = c.stageNum === 5;
-                                const inSegPool = c.stageNum >= 2;
+            {/* ── Table + Signal Queue side by side ─────────────────────── */}
+            <div style={{ display: 'flex', gap: 16, alignItems: 'flex-start' }}>
 
-                                return (
-                                    <React.Fragment key={c.symbol}>
-                                        <tr
-                                            style={{
-                                                borderBottom: '1px solid rgba(255,255,255,0.04)',
-                                                background: isDeployed ? 'rgba(6,182,212,0.04)' : 'transparent',
-                                                cursor: athena ? 'pointer' : 'default',
-                                                transition: 'background 0.2s',
-                                            }}
-                                            onClick={() => athena && setExpandedCoin(isExpanded ? null : c.symbol)}
-                                            onMouseEnter={e => (e.currentTarget.style.background = isDeployed ? 'rgba(6,182,212,0.07)' : 'rgba(255,255,255,0.03)')}
-                                            onMouseLeave={e => (e.currentTarget.style.background = isDeployed ? 'rgba(6,182,212,0.04)' : 'transparent')}
-                                        >
-                                            {/* # */}
-                                            <td style={{ padding: '10px 8px', color: 'rgba(156,163,175,0.4)', fontSize: '10px', fontWeight: 600, fontFamily: 'monospace' }}>{idx + 1}</td>
-                                            {/* Coin */}
-                                            <td style={{ padding: '10px 8px' }}>
-                                                <div style={{ fontWeight: 800, color: '#E8EDF5', fontSize: '14px', fontFamily: 'var(--font-mono, monospace)', letterSpacing: '-0.3px' }}>
-                                                    {(c.symbol || '').replace('USDT', '')}
-                                                    {athena && <span style={{ fontSize: '9px', marginLeft: '5px', color: '#6B7280' }}>{isExpanded ? '▼' : '▶'}</span>}
-                                                </div>
-                                            </td>
-                                            {/* Segment */}
-                                            <td style={{ padding: '10px 8px', textAlign: 'center' }}>
-                                                <span style={{ background: sc.bg, color: sc.color, padding: '3px 9px', borderRadius: '8px', fontSize: '10px', fontWeight: 700 }}>{seg}</span>
-                                            </td>
-                                            {/* Pool */}
-                                            <td style={{ padding: '10px 8px', textAlign: 'center' }}>
-                                                <span style={{
-                                                    padding: '3px 8px', borderRadius: '8px', fontSize: '10px', fontWeight: 700,
-                                                    background: inSegPool ? 'rgba(34,197,94,0.1)' : 'rgba(107,114,128,0.08)',
-                                                    color: inSegPool ? '#22C55E' : '#6B7280',
-                                                }}>{inSegPool ? '✅ IN' : '⛔ OUT'}</span>
-                                            </td>
-                                            {/* HMM Regime */}
-                                            <td style={{ padding: '10px 8px', textAlign: 'center' }}>
-                                                {inSegPool ? (
-                                                    <span style={{
-                                                        background: regime.includes('BULL') ? 'rgba(34,197,94,0.12)' : regime.includes('BEAR') ? 'rgba(239,68,68,0.12)' : 'rgba(107,114,128,0.10)',
-                                                        color: regColor(regime), padding: '3px 10px', borderRadius: '10px', fontSize: '10px', fontWeight: 700,
-                                                    }}>{regime}</span>
-                                                ) : <span style={{ color: '#374151' }}>—</span>}
-                                            </td>
-                                            {/* Conv % */}
-                                            <td style={{
-                                                padding: '10px 8px', textAlign: 'center', fontWeight: 800, fontSize: '14px', fontFamily: 'monospace',
-                                                color: conv > 80 ? '#00FF88' : conv > 60 ? '#06B6D4' : conv > 40 ? '#F59E0B' : '#4B5563',
-                                            }}>
-                                                {inSegPool && conv > 0 ? `${conv.toFixed(0)}%` : <span style={{ color: '#374151' }}>—</span>}
-                                            </td>
-                                            {/* Athena */}
-                                            <td style={{ padding: '10px 8px', textAlign: 'center' }}>
-                                                {athena ? (
-                                                    <span style={{
-                                                        padding: '3px 10px', borderRadius: '10px', fontSize: '10px', fontWeight: 700,
-                                                        background: athena.action === 'EXECUTE' || athena.action === 'LONG' || athena.action === 'SHORT'
-                                                            ? 'rgba(34,197,94,0.12)' : 'rgba(239,68,68,0.12)',
-                                                        color: athena.action === 'EXECUTE' || athena.action === 'LONG' || athena.action === 'SHORT'
-                                                            ? '#22C55E' : '#EF4444',
-                                                    }}>
-                                                        {athena.action === 'EXECUTE' || athena.action === 'LONG' || athena.action === 'SHORT'
-                                                            ? `✅ ${Math.round((athena.confidence || 0) * 100)}%`
-                                                            : `🚫 ${athena.action}`}
-                                                    </span>
-                                                ) : <span style={{ color: '#374151' }}>—</span>}
-                                            </td>
-                                            {/* Result */}
-                                            <td style={{ padding: '10px 8px', textAlign: 'center' }}>
-                                                <span style={{
-                                                    padding: '4px 10px', borderRadius: '10px', fontSize: '10px', fontWeight: 700,
-                                                    background: `${c.color}15`,
-                                                    color: c.color,
-                                                }}>{c.stage}</span>
-                                            </td>
-                                            {/* Reason */}
-                                            <td style={{ padding: '10px 8px', fontSize: '11px', color: 'rgba(180,200,220,0.55)', maxWidth: '220px' }}>
-                                                {c.reason}
-                                            </td>
-                                        </tr>
+                {/* Left: Per-Coin Detail Table (75%) */}
+                <div style={{ flex: '0 0 75%' }}>
+                    <div className="card-gradient rounded-xl overflow-hidden">
+                        <div style={{ overflowX: 'auto', maxHeight: '520px', overflowY: 'auto' }}>
+                            <table style={{ width: '100%', minWidth: '680px', borderCollapse: 'collapse', fontSize: '13px' }}>
+                                <thead>
+                                    <tr style={{ borderBottom: '2px solid rgba(255,255,255,0.08)' }}>
+                                        {['#', 'Coin', 'Segment', 'HMM Regime', 'Conv %', 'Result', 'Reason'].map(h => (
+                                            <th key={h} style={{
+                                                padding: '12px 8px', textAlign: h === '#' || h === 'Coin' || h === 'Reason' ? 'left' : 'center',
+                                                fontSize: '10px', fontWeight: 700, textTransform: 'uppercase' as const, letterSpacing: '1px', color: '#6B7280',
+                                                position: 'sticky' as const, top: 0, background: 'var(--color-surface, rgba(17,24,39,0.98))',
+                                            }}>{h}</th>
+                                        ))}
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {sorted.map((c: any, idx: number) => {
+                                        const regime = c.regime || '—';
+                                        const conv = c.conviction != null ? Number(c.conviction) : (c.confidence != null ? (c.confidence <= 1 ? c.confidence * 100 : c.confidence) : 0);
+                                        const isExpanded = expandedCoin === c.symbol;
+                                        const athena = c.athena_state;
+                                        const seg = getSegment(c.symbol || '', c);
+                                        const sc = segColors[seg] || { bg: 'rgba(107,114,128,0.10)', color: '#9CA3AF' };
+                                        const isDeployed = c.stageNum === 5;
+                                        const inSegPool = c.stageNum >= 2;
 
-                                        {/* ── Expanded Athena Detail Row ── */}
-                                        {isExpanded && athena && (
-                                            <tr>
-                                                <td colSpan={9} style={{ padding: 0 }}>
-                                                    <div style={{
-                                                        background: 'rgba(139,92,246,0.04)', borderLeft: '3px solid #A78BFA',
-                                                        padding: '14px 20px', margin: '0',
+                                        return (
+                                            <React.Fragment key={c.symbol}>
+                                                <tr
+                                                    style={{
+                                                        borderBottom: '1px solid rgba(255,255,255,0.04)',
+                                                        background: isDeployed ? 'rgba(6,182,212,0.04)' : 'transparent',
+                                                        cursor: athena ? 'pointer' : 'default',
+                                                        transition: 'background 0.2s',
+                                                    }}
+                                                    onClick={() => athena && setExpandedCoin(isExpanded ? null : c.symbol)}
+                                                    onMouseEnter={e => (e.currentTarget.style.background = isDeployed ? 'rgba(6,182,212,0.07)' : 'rgba(255,255,255,0.03)')}
+                                                    onMouseLeave={e => (e.currentTarget.style.background = isDeployed ? 'rgba(6,182,212,0.04)' : 'transparent')}
+                                                >
+                                                    <td style={{ padding: '10px 8px', color: 'rgba(156,163,175,0.4)', fontSize: '10px', fontWeight: 600, fontFamily: 'monospace' }}>{idx + 1}</td>
+                                                    <td style={{ padding: '10px 8px' }}>
+                                                        <div style={{ fontWeight: 800, color: '#E8EDF5', fontSize: '14px', fontFamily: 'var(--font-mono, monospace)', letterSpacing: '-0.3px' }}>
+                                                            {(c.symbol || '').replace('USDT', '')}
+                                                            {athena && <span style={{ fontSize: '9px', marginLeft: '5px', color: '#6B7280' }}>{isExpanded ? '▼' : '▶'}</span>}
+                                                        </div>
+                                                    </td>
+                                                    <td style={{ padding: '10px 8px', textAlign: 'center' }}>
+                                                        <span style={{ background: sc.bg, color: sc.color, padding: '3px 9px', borderRadius: '8px', fontSize: '10px', fontWeight: 700 }}>{seg}</span>
+                                                    </td>
+                                                    <td style={{ padding: '10px 8px', textAlign: 'center' }}>
+                                                        {inSegPool ? (
+                                                            <span style={{
+                                                                background: regime.includes('BULL') ? 'rgba(34,197,94,0.12)' : regime.includes('BEAR') ? 'rgba(239,68,68,0.12)' : 'rgba(107,114,128,0.10)',
+                                                                color: regColor(regime), padding: '3px 10px', borderRadius: '10px', fontSize: '10px', fontWeight: 700,
+                                                            }}>{regime}</span>
+                                                        ) : <span style={{ color: '#374151' }}>—</span>}
+                                                    </td>
+                                                    <td style={{
+                                                        padding: '10px 8px', textAlign: 'center', fontWeight: 800, fontSize: '14px', fontFamily: 'monospace',
+                                                        color: conv > 80 ? '#00FF88' : conv > 60 ? '#06B6D4' : conv > 40 ? '#F59E0B' : '#4B5563',
                                                     }}>
-                                                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '14px', marginBottom: '10px' }}>
-                                                            <div>
-                                                                <div style={{ fontSize: '9px', color: '#6B7280', textTransform: 'uppercase' as const, letterSpacing: '1px', marginBottom: '4px' }}>Athena Decision</div>
-                                                                <div style={{ fontSize: '13px', fontWeight: 700, color: athena.action === 'EXECUTE' ? '#22C55E' : '#EF4444' }}>
-                                                                    {athena.action} ({Math.round((athena.confidence || 0) * 100)}%)
+                                                        {inSegPool && conv > 0 ? `${conv.toFixed(0)}%` : <span style={{ color: '#374151' }}>—</span>}
+                                                    </td>
+                                                    <td style={{ padding: '10px 8px', textAlign: 'center' }}>
+                                                        <span style={{
+                                                            padding: '4px 10px', borderRadius: '10px', fontSize: '10px', fontWeight: 700,
+                                                            background: `${c.color}15`,
+                                                            color: c.color,
+                                                        }}>{c.stage}</span>
+                                                    </td>
+                                                    <td style={{ padding: '10px 8px', fontSize: '11px', color: 'rgba(180,200,220,0.55)', maxWidth: '220px' }}>
+                                                        {c.reason}
+                                                    </td>
+                                                </tr>
+
+                                                {/* ── Expanded Athena Detail Row ── */}
+                                                {isExpanded && athena && (
+                                                    <tr>
+                                                        <td colSpan={7} style={{ padding: 0 }}>
+                                                            <div style={{
+                                                                background: 'rgba(139,92,246,0.04)', borderLeft: '3px solid #A78BFA',
+                                                                padding: '14px 20px', margin: '0',
+                                                            }}>
+                                                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '14px', marginBottom: '10px' }}>
+                                                                    <div>
+                                                                        <div style={{ fontSize: '9px', color: '#6B7280', textTransform: 'uppercase' as const, letterSpacing: '1px', marginBottom: '4px' }}>Athena Decision</div>
+                                                                        <div style={{ fontSize: '13px', fontWeight: 700, color: athena.action === 'EXECUTE' ? '#22C55E' : '#EF4444' }}>
+                                                                            {athena.action} ({Math.round((athena.confidence || 0) * 100)}%)
+                                                                        </div>
+                                                                    </div>
+                                                                    <div>
+                                                                        <div style={{ fontSize: '9px', color: '#6B7280', textTransform: 'uppercase' as const, letterSpacing: '1px', marginBottom: '4px' }}>Model</div>
+                                                                        <div style={{ fontSize: '13px', fontWeight: 600, color: '#A78BFA', fontFamily: 'monospace' }}>{athena.model || 'gpt-4o'}</div>
+                                                                    </div>
+                                                                    <div>
+                                                                        <div style={{ fontSize: '9px', color: '#6B7280', textTransform: 'uppercase' as const, letterSpacing: '1px', marginBottom: '4px' }}>Latency</div>
+                                                                        <div style={{ fontSize: '13px', fontWeight: 600, color: '#9CA3AF', fontFamily: 'monospace' }}>
+                                                                            {athena.latency_ms ? `${athena.latency_ms}ms` : '—'}
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
+                                                                {athena.risk_flags && athena.risk_flags.length > 0 && (
+                                                                    <div style={{ marginBottom: '8px' }}>
+                                                                        <span style={{ fontSize: '9px', color: '#EF4444', textTransform: 'uppercase' as const, letterSpacing: '1px' }}>Risk Flags: </span>
+                                                                        {athena.risk_flags.map((f: string, i: number) => (
+                                                                            <span key={i} style={{ fontSize: '11px', color: '#F59E0B', background: 'rgba(245,158,11,0.1)', padding: '2px 6px', borderRadius: '4px', marginRight: '4px' }}>{f}</span>
+                                                                        ))}
+                                                                    </div>
+                                                                )}
+                                                                <div>
+                                                                    <div style={{ fontSize: '9px', color: '#6B7280', textTransform: 'uppercase' as const, letterSpacing: '1px', marginBottom: '4px' }}>Reasoning</div>
+                                                                    <div style={{ fontSize: '12px', color: '#D1D5DB', lineHeight: 1.5, fontFamily: 'var(--font-mono, monospace)' }}>
+                                                                        {athena.reasoning || '—'}
+                                                                    </div>
                                                                 </div>
                                                             </div>
-                                                            <div>
-                                                                <div style={{ fontSize: '9px', color: '#6B7280', textTransform: 'uppercase' as const, letterSpacing: '1px', marginBottom: '4px' }}>Model</div>
-                                                                <div style={{ fontSize: '13px', fontWeight: 600, color: '#A78BFA', fontFamily: 'monospace' }}>{athena.model || 'gpt-4o'}</div>
-                                                            </div>
-                                                            <div>
-                                                                <div style={{ fontSize: '9px', color: '#6B7280', textTransform: 'uppercase' as const, letterSpacing: '1px', marginBottom: '4px' }}>Latency</div>
-                                                                <div style={{ fontSize: '13px', fontWeight: 600, color: '#9CA3AF', fontFamily: 'monospace' }}>
-                                                                    {athena.latency_ms ? `${athena.latency_ms}ms` : '—'}
-                                                                </div>
-                                                            </div>
-                                                        </div>
-                                                        {athena.risk_flags && athena.risk_flags.length > 0 && (
-                                                            <div style={{ marginBottom: '8px' }}>
-                                                                <span style={{ fontSize: '9px', color: '#EF4444', textTransform: 'uppercase' as const, letterSpacing: '1px' }}>Risk Flags: </span>
-                                                                {athena.risk_flags.map((f: string, i: number) => (
-                                                                    <span key={i} style={{ fontSize: '11px', color: '#F59E0B', background: 'rgba(245,158,11,0.1)', padding: '2px 6px', borderRadius: '4px', marginRight: '4px' }}>{f}</span>
-                                                                ))}
-                                                            </div>
-                                                        )}
-                                                        <div>
-                                                            <div style={{ fontSize: '9px', color: '#6B7280', textTransform: 'uppercase' as const, letterSpacing: '1px', marginBottom: '4px' }}>Reasoning</div>
-                                                            <div style={{ fontSize: '12px', color: '#D1D5DB', lineHeight: 1.5, fontFamily: 'var(--font-mono, monospace)' }}>
-                                                                {athena.reasoning || '—'}
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                </td>
-                                            </tr>
-                                        )}
-                                    </React.Fragment>
-                                );
-                            })}
-                        </tbody>
-                    </table>
+                                                        </td>
+                                                    </tr>
+                                                )}
+                                            </React.Fragment>
+                                        );
+                                    })}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
                 </div>
+
+                {/* Right: Signal Queue (25%) */}
+                <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{
+                        padding: '14px 16px',
+                        background: 'rgba(245,158,11,0.05)',
+                        border: '1px solid rgba(245,158,11,0.2)',
+                        borderRadius: '12px',
+                        display: 'flex', flexDirection: 'column', gap: 8,
+                        minHeight: 80,
+                    }}>
+                        <div style={{ fontSize: '11px', fontWeight: 700, color: '#F59E0B', letterSpacing: '1.5px', textTransform: 'uppercase', marginBottom: 4 }}>
+                            Signal Queue — Athena-Approved, Awaiting Deploy
+                        </div>
+                        {pendingSignals.length === 0 ? (
+                            <div style={{ fontSize: '11px', color: '#4B5563', fontStyle: 'italic' }}>No signals queued</div>
+                        ) : (
+                            pendingSignals.map((s: any) => {
+                                const isLong = s.side === 'BUY' || s.side === 'LONG';
+                                const ttlMin = Math.ceil(s.expires_in_sec / 60);
+                                return (
+                                    <div key={s.symbol} style={{
+                                        display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 6,
+                                        background: 'rgba(245,158,11,0.08)',
+                                        border: '1px solid rgba(245,158,11,0.25)',
+                                        borderRadius: 8, padding: '6px 10px',
+                                    }}>
+                                        <span style={{ fontWeight: 800, color: '#E8EDF5', fontFamily: 'monospace', fontSize: 13 }}>
+                                            {s.symbol.replace('USDT', '')}
+                                        </span>
+                                        <span style={{
+                                            fontSize: 10, fontWeight: 700,
+                                            color: isLong ? '#00FF88' : '#FF3B5C',
+                                            background: isLong ? 'rgba(0,255,136,0.08)' : 'rgba(255,59,92,0.08)',
+                                            padding: '2px 6px', borderRadius: 4,
+                                        }}>{isLong ? 'LONG' : 'SHORT'}</span>
+                                        <span style={{ fontSize: 10, color: '#F59E0B', fontWeight: 700 }}>{s.conviction?.toFixed(0)}%</span>
+                                        <span style={{ fontSize: 9, color: '#4B5563', marginLeft: 'auto' }}>TTL {ttlMin}m</span>
+                                    </div>
+                                );
+                            })
+                        )}
+                    </div>
+                </div>
+
             </div>
         </div>
     );

@@ -256,7 +256,6 @@ export function MarketStructurePanel() {
           display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 4,
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            <Zap size={12} style={{ color: '#F59E0B', flexShrink: 0 }} />
             <span style={{
               fontSize: 11, fontWeight: 800, color: '#F59E0B',
               letterSpacing: 0.5, textTransform: 'uppercase',
@@ -264,6 +263,7 @@ export function MarketStructurePanel() {
               Markets
             </span>
           </div>
+
 
 
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 4 }}>
