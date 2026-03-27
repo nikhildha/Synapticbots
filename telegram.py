@@ -24,7 +24,7 @@ _ENV_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), ".env")
 
 
 def _read_env_val(key, fallback=""):
-    """Read a single value directly from .env file (bypasses cached os.environ)."""
+    """Read a value from .env file first, then fall back to os.environ."""
     try:
         with open(_ENV_PATH, "r") as f:
             for line in f:
@@ -33,7 +33,8 @@ def _read_env_val(key, fallback=""):
                     return line[len(key) + 1:].strip()
     except Exception:
         pass
-    return fallback
+    # Fall back to os.environ (Railway sets env vars directly, no .env file)
+    return os.environ.get(key, fallback)
 
 
 def _get_live_config():
@@ -140,7 +141,7 @@ def notify_batch_entries(trades):
     send_message_async(msg)
 
 
-def notify_athena_signal(sym, side, conviction_pct, entry_price, sl, tp, segment, reasoning, bot_name=""):
+def notify_athena_signal(sym, side, conviction_pct, entry_price, sl, tp, segment, reasoning, bot_name="", leverage=0):
     """
     Fire when Athena approves a coin — before the trade actually deploys.
     This is the 'signal' alert; notify_batch_entries fires on confirmed deploy.
@@ -164,18 +165,27 @@ def notify_athena_signal(sym, side, conviction_pct, entry_price, sl, tp, segment
 
     sl_pct = abs((sl - entry_price) / entry_price * 100) if entry_price and sl else 0
     tp_pct = abs((tp - entry_price) / entry_price * 100) if entry_price and tp else 0
+    lev_str = f" · {leverage}×" if leverage else ""
+    coin_name = sym.replace('USDT', '')
 
     msg = (
-        f"🏛️ <b>ATHENA SIGNAL</b> — {segment}\n"
+        f"🏛️ <b>ATHENA SIGNAL</b>\n"
         f"━━━━━━━━━━━━━━━━━━\n"
-        f"{emoji} <b>{sym.replace('USDT','')}</b> · {dir_label} · <b>{conviction_pct:.0f}% conviction</b>\n"
+        f"{emoji} <b>{coin_name}</b>{lev_str} · {dir_label} · <b>{conviction_pct:.0f}%</b>\n"
+        f"📂 Segment: {segment}\n"
         f"\n"
         f"📍 Entry:  <code>{fmt(entry_price)}</code>\n"
         f"🛑 SL:     <code>{fmt(sl)}</code>  <i>(-{sl_pct:.1f}%)</i>\n"
         f"🎯 TP:     <code>{fmt(tp)}</code>  <i>(+{tp_pct:.1f}%)</i>\n"
         f"\n"
         f"💡 <i>{short_reason}</i>\n"
-        f"{'🤖 ' + bot_name if bot_name else ''}"
+        f"\n"
+        f"🛡 <b>Risk Manager</b>: Step Trailing SL\n"
+        f"   +7% → lock +3% · +10% → +5%\n"
+        f"   +15% → +10% · +20% → +15%\n"
+        f"   …up to +50% → lock +45%\n"
+        f"\n"
+        f"{'🤖 ' + bot_name + '  ' if bot_name else ''}"
         f"🕐 {datetime.utcnow().strftime('%H:%M:%S UTC')}"
     )
     send_message_async(msg)
@@ -191,11 +201,13 @@ def notify_athena_veto(sym, side, conviction_pct, reasoning, segment):
     short_reason = (reasoning or "").split(".")[0].strip()
     if len(short_reason) > 120:
         short_reason = short_reason[:117] + "…"
+    coin_name = sym.replace('USDT', '')
 
     msg = (
-        f"🚫 <b>ATHENA VETO</b> — {segment}\n"
+        f"🚫 <b>ATHENA VETO</b>\n"
         f"━━━━━━━━━━━━━━━━━━\n"
-        f"{emoji} <b>{sym.replace('USDT','')}</b> · {dir_label} · <b>{conviction_pct:.0f}% conf</b>\n"
+        f"{emoji} <b>{coin_name}</b> · {dir_label} · <b>{conviction_pct:.0f}% conf</b>\n"
+        f"📂 Segment: {segment}\n"
         f"\n"
         f"❌ <i>{short_reason}</i>\n"
         f"🕐 {datetime.utcnow().strftime('%H:%M:%S UTC')}"

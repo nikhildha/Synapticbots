@@ -1208,6 +1208,7 @@ class RegimeMasterBot:
                         segment=seg_name,
                         reasoning=athena_decision.reasoning or "",
                         bot_name=bot_name,
+                        leverage=lev,
                     )
                 except Exception as _tg_err:
                     logger.warning("⚠️ Athena EXECUTE telegram failed: %s", _tg_err)
