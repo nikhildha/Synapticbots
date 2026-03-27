@@ -28,6 +28,7 @@ export function BotsClient({ bots: initialBots }: BotsClientProps) {
   const [liveTradeCount, setLiveTradeCount] = useState(0);
   const [liveTrades, setLiveTrades] = useState<any[]>([]);
   const [tradesByBot, setTradesByBot] = useState<Record<string, any[]>>({});
+  const [livePrices, setLivePrices] = useState<Record<string, number>>({});
   const [allSessions, setAllSessions] = useState<any[]>([]);
   const [perfSummary, setPerfSummary] = useState<any>({ allTimePnl: 0, allTimeRoi: 0, totalSessions: 0 });
 
@@ -58,6 +59,14 @@ export function BotsClient({ bots: initialBots }: BotsClientProps) {
         const trades = d?.tradebook?.trades || [];
         setLiveTrades(trades);
         setTradesByBot(d?.tradesByBot || {});
+        // Extract live prices from coin_states for accurate PnL
+        const cs = d?.multi?.coin_states || {};
+        const prices: Record<string, number> = {};
+        for (const [sym, state] of Object.entries(cs)) {
+          const p = (state as any)?.price;
+          if (p && p > 0) prices[sym] = p;
+        }
+        setLivePrices(prev => ({ ...prev, ...prices }));
         setLiveTradeCount(trades.filter((t: any) => (t.status || '').toUpperCase() === 'ACTIVE').length);
       }
       if (perfRes.ok) {
@@ -287,7 +296,7 @@ export function BotsClient({ bots: initialBots }: BotsClientProps) {
                 const displayTrades = tradesByBot[bot?.id] ?? [];
                 return (
                   <motion.div key={bot?.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.06 }}>
-                    <BotCard bot={bot} onToggle={handleBotToggle} onDelete={handleDeleteBot} liveTradeCount={liveTradeCount} trades={displayTrades} sessions={botSessions} />
+                    <BotCard bot={bot} onToggle={handleBotToggle} onDelete={handleDeleteBot} liveTradeCount={liveTradeCount} trades={displayTrades} sessions={botSessions} livePrices={livePrices} />
                   </motion.div>
                 );
               })}

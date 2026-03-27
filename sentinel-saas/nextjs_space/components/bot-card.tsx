@@ -20,6 +20,7 @@ interface BotCardProps {
   liveTradeCount?: number;
   trades?: any[];
   sessions?: any[];
+  livePrices?: Record<string, number>;
 }
 
 /* ── helpers ── */
@@ -64,7 +65,7 @@ function getSegmentInfo(botName: string): { name: string; icon: string; color: s
   return { name: 'ALL', ...SEGMENT_ICONS['ALL'] };
 }
 
-export function BotCard({ bot, onToggle, onDelete, liveTradeCount, trades = [], sessions = [] }: BotCardProps) {
+export function BotCard({ bot, onToggle, onDelete, liveTradeCount, trades = [], sessions = [], livePrices = {} }: BotCardProps) {
   const [showSettings, setShowSettings] = useState(false);
   const [settingsMode, setSettingsMode] = useState(bot?.config?.mode || 'paper');
   const [settingsCPT, setSettingsCPT] = useState(bot?.config?.capitalPerTrade || 100);
@@ -87,17 +88,25 @@ export function BotCard({ bot, onToggle, onDelete, liveTradeCount, trades = [], 
   const winCount = closedTrades.filter((t: any) => (parseFloat(t.realized_pnl) || parseFloat(t.totalPnl) || 0) > 0).length;
   const winRate = closedTrades.length > 0 ? (winCount / closedTrades.length * 100) : null;
 
-  const totalPnl = trades.reduce((s: number, t: any) => {
-    const isActive = (t.status || '').toLowerCase() === 'active';
-    return s + (isActive
-      ? (parseFloat(t.unrealized_pnl) || parseFloat(t.activePnl) || 0)
-      : (parseFloat(t.realized_pnl) || parseFloat(t.totalPnl) || parseFloat(t.pnl) || 0));
-  }, 0);
-
-  const realizedPnl = closedTrades.reduce((s: number, t: any) =>
-    s + (parseFloat(t.realized_pnl) || parseFloat(t.totalPnl) || parseFloat(t.pnl) || 0), 0);
-  const unrealizedPnl = activeTrades.reduce((s: number, t: any) =>
-    s + (parseFloat(t.unrealized_pnl) || parseFloat(t.activePnl) || 0), 0);
+  const totalPnl = (() => {
+    // Realized from closed trades
+    const realized = closedTrades.reduce((s: number, t: any) =>
+      s + (parseFloat(t.realized_pnl) || parseFloat(t.totalPnl) || parseFloat(t.pnl) || 0), 0);
+    // Unrealized from active trades using live prices (matches dashboard calcUnrealized)
+    const unrealized = activeTrades.reduce((s: number, t: any) => {
+      const sym = (t.symbol || (t.coin || '') + 'USDT').toUpperCase();
+      const cp = livePrices[sym] || t.current_price || t.currentPrice || t.entry_price || t.entryPrice;
+      const entry = t.entry_price || t.entryPrice || 0;
+      const cap = t.capital || t.position_size || 100;
+      const lev = t.leverage || 1;
+      if (!cp || !entry || entry === 0 || cap === 0) return s;
+      const pos = (t.side || t.position || '').toLowerCase();
+      const isLong = pos === 'long' || pos === 'buy';
+      const diff = isLong ? (cp - entry) : (entry - cp);
+      return s + Math.round(diff / entry * lev * cap * 10000) / 10000;
+    }, 0);
+    return realized + unrealized;
+  })();
 
   const capitalDeployed = activeTrades.length * capitalPerTrade;
   const deployedPct = maxCapital > 0 ? Math.min(100, (capitalDeployed / maxCapital) * 100) : 0;
@@ -213,40 +222,18 @@ export function BotCard({ bot, onToggle, onDelete, liveTradeCount, trades = [], 
         )}
       </div>
 
-      {/* ── PnL Hero: Realized + Unrealized ── */}
-      <div style={{ padding: '10px 14px 6px' }}>
-        <div style={{ display: 'flex', justifyContent: 'center', gap: 16, marginBottom: 4 }}>
-          <div style={{ textAlign: 'center' }}>
-            <div style={{
-              fontSize: '16px', fontWeight: 800, fontFamily: 'var(--font-mono, monospace)',
-              color: pnlColor(realizedPnl), lineHeight: 1,
-            }}>
-              {sign(realizedPnl)}${Math.abs(realizedPnl).toFixed(2)}
-            </div>
-            <div style={{ fontSize: '8px', fontWeight: 700, color: 'var(--color-text-secondary)', letterSpacing: '0.8px', textTransform: 'uppercase' as const, marginTop: 2 }}>
-              Realized
-            </div>
-          </div>
-          <div style={{ width: 1, background: 'var(--color-border)', alignSelf: 'stretch' }} />
-          <div style={{ textAlign: 'center' }}>
-            <div style={{
-              fontSize: '16px', fontWeight: 800, fontFamily: 'var(--font-mono, monospace)',
-              color: pnlColor(unrealizedPnl), lineHeight: 1,
-            }}>
-              {sign(unrealizedPnl)}${Math.abs(unrealizedPnl).toFixed(2)}
-            </div>
-            <div style={{ fontSize: '8px', fontWeight: 700, color: 'var(--color-text-secondary)', letterSpacing: '0.8px', textTransform: 'uppercase' as const, marginTop: 2 }}>
-              Unrealized
-            </div>
-          </div>
+      {/* ── PnL Hero ── */}
+      <div style={{ padding: '12px 14px 8px', textAlign: 'center' }}>
+        <div style={{
+          fontSize: '22px', fontWeight: 800, fontFamily: 'var(--font-mono, monospace)',
+          color: pnlColor(totalPnl),
+          textShadow: `0 0 12px ${pnlColor(totalPnl)}33`,
+          lineHeight: 1,
+        }}>
+          {sign(totalPnl)}${Math.abs(totalPnl).toFixed(2)}
         </div>
-        <div style={{ textAlign: 'center' }}>
-          <span style={{
-            fontSize: '11px', fontWeight: 700, fontFamily: 'var(--font-mono, monospace)',
-            color: pnlColor(totalPnl),
-          }}>
-            Total: {sign(totalPnl)}${Math.abs(totalPnl).toFixed(2)}
-          </span>
+        <div style={{ fontSize: '9px', fontWeight: 700, color: 'var(--color-text-secondary)', letterSpacing: '1px', textTransform: 'uppercase' as const, marginTop: 3 }}>
+          Total P&L
         </div>
       </div>
 

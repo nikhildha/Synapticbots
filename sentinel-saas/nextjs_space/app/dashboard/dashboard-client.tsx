@@ -743,7 +743,7 @@ export function DashboardClient({ user, stats, bots, recentTrades }: DashboardCl
                   });
                   const displayTrades = botTrades.length > 0 ? botTrades : (bots.length === 1 ? trades : []);
                   return (
-                    <BotCard key={bot?.id} bot={bot} onToggle={handleBotToggle} onDelete={handleDeleteBot} liveTradeCount={liveActiveTrades.length} trades={displayTrades} />
+                    <BotCard key={bot?.id} bot={bot} onToggle={handleBotToggle} onDelete={handleDeleteBot} liveTradeCount={liveActiveTrades.length} trades={displayTrades} livePrices={livePrices} />
                   );
                 })}
               </div>
