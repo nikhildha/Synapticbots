@@ -71,8 +71,9 @@ export function BotsClient({ bots: initialBots }: BotsClientProps) {
 
   useEffect(() => {
     fetchLiveCount();
-    const timer = setInterval(fetchLiveCount, 1000);
+    const timer = setInterval(fetchLiveCount, 5000);
     return () => clearInterval(timer);
+
 
   }, [fetchLiveCount]);
 
