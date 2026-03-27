@@ -150,9 +150,7 @@ def get_hottest_segments(segment_limit=2, blocked_segments=None):
 
     segment_data = []
     for segment, coins in config.CRYPTO_SEGMENTS.items():
-        if segment in blocked_segments:
-            logger.info("🔒 Skipping segment '%s' in heatmap (currently in cooldown)", segment)
-            continue
+        is_cooldown = segment in blocked_segments
             
         valid_coins = []
         for symbol in coins:
@@ -198,6 +196,7 @@ def get_hottest_segments(segment_limit=2, blocked_segments=None):
             "blended_score": round(blended, 2),
             "abs_score":     abs(blended),
             "direction":     "LONG" if blended >= 0 else "SHORT",
+            "is_cooldown":   is_cooldown
         })
 
     # Sort by hottest absolute score — direction agnostic
@@ -215,15 +214,21 @@ def get_hottest_segments(segment_limit=2, blocked_segments=None):
     except Exception as e:
         logger.error("Failed to save segment heatmap: %s", e)
 
-    logger.info("🔥 Segment Heatmap [4h+1h blended | top %d]:", segment_limit)
+    logger.info("🔥 Segment Heatmap [4h+1h blended]:")
     for i, seg in enumerate(segment_data):
+        _cd_flag = " [COOLDOWN]" if seg.get("is_cooldown") else ""
         logger.info(
-            "   #%d %-10s : 4h=%+.2f%% | 1h_breadth=%.0f%% | Score=%+.2f [%s]",
+            "   #%d %-10s : 4h=%+.2f%% | 1h_breadth=%.0f%% | Score=%+.2f [%s]%s",
             i + 1, seg["segment"], seg["vw_4h"], seg["breadth_1h"],
-            seg["blended_score"], seg["direction"],
+            seg["blended_score"], seg["direction"], _cd_flag
         )
 
-    return [seg["segment"] for seg in segment_data[:segment_limit]]
+    # Filter out cooldown segments for the HMM engine pool
+    active_segments = [s["segment"] for s in segment_data if not s.get("is_cooldown")]
+    top_active = active_segments[:segment_limit]
+    
+    logger.info("🎯 Forwarding top %d UNBLOCKED segments to HMM: %s", len(top_active), ", ".join(top_active))
+    return top_active
 
 
 

@@ -10,6 +10,7 @@ interface SegmentData {
   blended_score: number;
   abs_score: number;
   direction: string; // "LONG" | "SHORT"
+  is_cooldown?: boolean;
 }
 
 interface SegmentHeatmapProps {
@@ -57,9 +58,11 @@ export function SegmentHeatmap({ heatmapData, loading = false }: SegmentHeatmapP
   // Sort by blended_score descending (hottest long → left, coldest short → right)
   const sortedSegments = [...heatmapData.segments].sort((a, b) => b.blended_score - a.blended_score);
 
-  // Top 4 by absolute score = the sectors the engine is actively scanning
-  const absSorted = [...heatmapData.segments].sort((a, b) => b.abs_score - a.abs_score);
-  const top2Targets = absSorted.slice(0, 2).map((s) => s.segment);
+  // Top 2 by absolute score, EXCLUDING cooldown segments = the sectors the engine is actively scanning
+  const unblockedRanked = [...heatmapData.segments]
+    .filter(s => !s.is_cooldown)
+    .sort((a, b) => b.abs_score - a.abs_score);
+  const top2Targets = unblockedRanked.slice(0, 2).map((s) => s.segment);
 
   return (
     <div className="mb-8 p-6 rounded-2xl border border-[var(--color-border)]" style={{ background: 'var(--color-surface)', backdropFilter: 'blur(12px)' }}>
@@ -101,13 +104,14 @@ export function SegmentHeatmap({ heatmapData, loading = false }: SegmentHeatmapP
       <div className="grid grid-cols-2 gap-2">
         {sortedSegments.map((seg, i) => {
           const isHot = top2Targets.includes(seg.segment);
+          const isCooldown = !!seg.is_cooldown;
           const isPositive = seg.blended_score >= 0;
 
           const magnitude = Math.min(Math.abs(seg.blended_score) / 3, 1);
           const bgOpacity = 0.05 + (magnitude * 0.15);
 
-          const primaryColor = isPositive ? 'rgba(34, 197, 94' : 'rgba(239, 68, 68';
-          const bgColor = `${primaryColor}, ${bgOpacity})`;
+          const primaryColor = isCooldown ? 'rgba(107, 114, 128' : (isPositive ? 'rgba(34, 197, 94' : 'rgba(239, 68, 68');
+          const bgColor = `${primaryColor}, ${isCooldown ? 0.05 : bgOpacity})`;
           const borderColor = isHot ? `${primaryColor}, 0.5)` : `${primaryColor}, 0.1)`;
 
           return (
@@ -116,7 +120,7 @@ export function SegmentHeatmap({ heatmapData, loading = false }: SegmentHeatmapP
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               transition={{ delay: i * 0.05 }}
-              className="relative p-4 rounded-xl flex flex-col justify-between"
+              className={`relative p-4 rounded-xl flex flex-col justify-between ${isCooldown ? 'opacity-50 grayscale select-none' : ''}`}
               style={{
                 background: bgColor,
                 border: `1px solid ${borderColor}`,
@@ -131,11 +135,14 @@ export function SegmentHeatmap({ heatmapData, loading = false }: SegmentHeatmapP
               )}
 
               <div className="flex justify-between items-start mb-3">
-                <span className="text-sm font-bold text-[var(--color-text)] tracking-wide">{seg.segment}</span>
+                <div className="flex flex-col">
+                  <span className="text-sm font-bold text-[var(--color-text)] tracking-wide">{seg.segment}</span>
+                  {isCooldown && <span className="text-[9px] font-bold text-gray-400 tracking-wider">COOLDOWN</span>}
+                </div>
                 <div className="flex items-center gap-1">
-                  {isPositive ? <TrendingUp className="w-3.5 h-3.5 text-green-400" /> : <TrendingDown className="w-3.5 h-3.5 text-red-400" />}
-                  <span className={`text-sm font-bold ${isPositive ? 'text-green-400' : 'text-red-400'}`}>
-                    {isPositive ? '+' : ''}{seg.blended_score.toFixed(2)}
+                  {!isCooldown && (isPositive ? <TrendingUp className="w-3.5 h-3.5 text-green-400" /> : <TrendingDown className="w-3.5 h-3.5 text-red-400" />)}
+                  <span className={`text-sm font-bold ${isCooldown ? 'text-gray-400' : (isPositive ? 'text-green-400' : 'text-red-400')}`}>
+                    {isPositive && !isCooldown ? '+' : ''}{seg.blended_score.toFixed(2)}
                   </span>
                 </div>
               </div>

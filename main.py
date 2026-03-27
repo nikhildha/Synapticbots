@@ -900,30 +900,46 @@ class RegimeMasterBot:
                 seg_results = list(raw_results)
             else:
                 # ── SEGMENT FALLBACK LOGIC ──
-                # If primary segment is in cooldown, try the next best segment
+                # If primary segment is in cooldown, try the highest-ranked available segment
                 target_segment = bot_segment_filter
                 is_blocked, _ = self._is_segment_in_cooldown(target_segment)
-                
+
                 if is_blocked:
+                    import json
+                    import os
                     logger.info("🔄 [%s] Primary segment '%s' in cooldown, looking for fallback...", bot_name, target_segment)
-                    # Find all segments sorted by some metric, or just iterate available
                     fallback_found = False
-                    for fallback_seg in config.CRYPTO_SEGMENTS.keys():
+                    
+                    # Read heatmap to get exact segment momentum rankings
+                    heatmap_path = os.path.join(config.DATA_DIR, "segment_heatmap.json")
+                    ranked_segments = []
+                    try:
+                        if os.path.exists(heatmap_path):
+                            with open(heatmap_path, "r") as f:
+                                heatmap_data = json.load(f)
+                                ranked_segments = [s["segment"] for s in sorted(heatmap_data.get("segments", []), key=lambda x: x["abs_score"], reverse=True)]
+                    except Exception as e:
+                        logger.error("Failed to parse heatmap for fallback routing: %s", e)
+
+                    if not ranked_segments:
+                        ranked_segments = list(config.CRYPTO_SEGMENTS.keys())
+
+                    for fallback_seg in ranked_segments:
                         if fallback_seg == bot_segment_filter or fallback_seg == "ALL":
                             continue
                         f_blocked, _ = self._is_segment_in_cooldown(fallback_seg)
                         if not f_blocked and fallback_seg not in deployed_segments:
-                            # Check if we have high-conviction coins in this fallback segment
+                            # ── Verify scanner provided coins for this fallback segment
                             has_coins = any(r.get("segment", fallback_seg) == fallback_seg for r in raw_results if r["symbol"] in config.CRYPTO_SEGMENTS[fallback_seg])
                             if has_coins:
-                                logger.info("✅ [%s] Found valid fallback segment: '%s'", bot_name, fallback_seg)
+                                logger.info("✅ [%s] Found valid fallback target: '%s' (Highest ranked unblocked)", bot_name, fallback_seg)
                                 target_segment = fallback_seg
                                 fallback_found = True
                                 break
                                 
                     if not fallback_found:
-                        logger.info("❌ [%s] No valid fallback segments available for '%s'.", bot_name, bot_segment_filter)
-                        # Keep target_segment as original so it fails the cooldown gate below normally and gets logged
+                        logger.info("⏸️ [%s] Scanner capacity met (All available top segments claimed). Starving bot for this cycle.", bot_name)
+                        # Keep target_segment as original so it gracefully fails the cooldown gate below without crashing
 
                 bot_allowed_coins = set(config.CRYPTO_SEGMENTS.get(target_segment, []))
                 # Filter raw_results to this target segment

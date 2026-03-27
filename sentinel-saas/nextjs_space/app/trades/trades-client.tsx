@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { Header } from '@/components/header';
 import { ActiveTradesChart } from '@/components/active-trades-chart';
-import { Download, Search, X, BarChart3, Trash2 } from 'lucide-react';
+import { Download, Search, X, BarChart3, Trash2, Zap } from 'lucide-react';
 import { motion } from 'framer-motion';
 
 /* ═══ Types ═══ */
@@ -204,6 +204,9 @@ export function TradesClient({ trades: initialTrades }: TradesClientProps) {
   const [clearSuccess, setClearSuccess] = useState<string | null>(null);
   const [confirmingClear, setConfirmingClear] = useState(false);
   const [deletingTradeId, setDeletingTradeId] = useState<string | null>(null);
+  const [closingTradeId, setClosingTradeId] = useState<string | null>(null);
+  const [isClosingAll, setIsClosingAll] = useState(false);
+  const [confirmingCloseAll, setConfirmingCloseAll] = useState(false);
   const clearPauseRef = useRef(false);
 
   // Stable ref so the WS handler always sees the latest active symbols without reconnecting
@@ -464,6 +467,58 @@ export function TradesClient({ trades: initialTrades }: TradesClientProps) {
     }
   };
 
+  const closeTrade = async (uiKey: string, dbId: string, symbol: string, mode: string) => {
+    if (!window.confirm(`Close active trade for ${symbol}?`)) return;
+    setClosingTradeId(uiKey);
+    try {
+      const res = await fetch('/api/trades/close', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tradeId: dbId, symbol, mode })
+      });
+      const data = await res.json();
+      if (res.ok) {
+        showMsg(`🛑 Closed ${symbol} trade successfully`, 4000);
+        refreshTrades();
+      } else {
+        showMsg(`❌ ${data.error || 'Failed to close trade'}`);
+      }
+    } catch {
+      showMsg('❌ Network error');
+    } finally {
+      setClosingTradeId(null);
+    }
+  };
+
+  const closeAllActiveTrades = async () => {
+    if (!confirmingCloseAll) {
+      setConfirmingCloseAll(true);
+      setTimeout(() => setConfirmingCloseAll(false), 5000);
+      return;
+    }
+    setConfirmingCloseAll(false);
+    setIsClosingAll(true);
+    setClearSuccess(null);
+    try {
+      const res = await fetch('/api/trades/close-all', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mode: modeFilter })
+      });
+      if (res.ok) {
+        showMsg('🛑 All active trades closed successfully', 6000);
+        refreshTrades();
+      } else {
+        const err = await res.json();
+        showMsg(`❌ ${err.error || 'Failed to close trades'}`);
+      }
+    } catch {
+      showMsg('❌ Network error');
+    } finally {
+      setIsClosingAll(false);
+    }
+  };
+
   const deleteTrade = async (uiKey: string, dbId: string) => {
     if (!window.confirm('Delete this trade from the database?')) return;
     setDeletingTradeId(uiKey);
@@ -511,6 +566,18 @@ export function TradesClient({ trades: initialTrades }: TradesClientProps) {
                   fontSize: '13px', fontWeight: 600, cursor: 'pointer',
                 }}>
                   <Download size={14} /> Export CSV
+                </button>
+
+                <button onClick={closeAllActiveTrades} disabled={isClosingAll} style={{
+                  display: 'flex', alignItems: 'center', gap: '6px',
+                  padding: '10px 14px', borderRadius: '12px', border: 'none',
+                  background: confirmingCloseAll ? 'rgba(245,158,11,0.3)' : 'rgba(245,158,11,0.1)',
+                  color: '#F59E0B',
+                  fontSize: '13px', fontWeight: 600, cursor: 'pointer',
+                  opacity: isClosingAll ? 0.5 : 1,
+                  ...(confirmingCloseAll ? { animation: 'pulse 1s infinite', border: '1px solid #F59E0B' } : {}),
+                }}>
+                  <Zap size={14} /> {isClosingAll ? 'Closing...' : confirmingCloseAll ? '⚠️ Click again to confirm' : 'Close Active Trades'}
                 </button>
 
                 <button onClick={clearAllTrades} disabled={isClearing} style={{
@@ -772,10 +839,28 @@ export function TradesClient({ trades: initialTrades }: TradesClientProps) {
                               {!isActive && t.exitPrice ? fmtPrice(t.exitPrice) : '—'}
                             </td>
 
-                            {/* Per-trade delete button */}
+                            {/* Per-trade delete/close buttons */}
                             <td style={{ padding: '8px 6px', textAlign: 'center' }}>
-                              <button
-                                onClick={() => deleteTrade(t.id, t.dbId || t.id)}
+                              <div style={{ display: 'flex', gap: '4px', justifyContent: 'center' }}>
+                                {isActive && (
+                                  <button
+                                    onClick={() => closeTrade(t.id, t.dbId || t.id, t.symbol || t.coin, t.mode || 'paper')}
+                                    disabled={closingTradeId === t.id}
+                                    title="Manually Close Trade"
+                                    style={{
+                                      background: 'rgba(245,158,11,0.08)',
+                                      border: '1px solid rgba(245,158,11,0.25)',
+                                      borderRadius: '6px', padding: '4px 8px', cursor: 'pointer',
+                                      color: '#F59E0B',
+                                      fontSize: '13px', lineHeight: 1,
+                                      opacity: closingTradeId === t.id ? 0.5 : 1,
+                                    }}
+                                  >
+                                    {closingTradeId === t.id ? '…' : '🛑'}
+                                  </button>
+                                )}
+                                <button
+                                  onClick={() => deleteTrade(t.id, t.dbId || t.id)}
                                 disabled={deletingTradeId === t.id}
                                 title="Delete this trade from DB"
                                 style={{
@@ -789,6 +874,7 @@ export function TradesClient({ trades: initialTrades }: TradesClientProps) {
                               >
                                 {deletingTradeId === t.id ? '…' : '🗑️'}
                               </button>
+                             </div>
                             </td>
 
                           </tr>
