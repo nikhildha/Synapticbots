@@ -175,17 +175,15 @@ export function AthenaPanel({ athena, vetoLog = [] }: Props) {
                 </div>
             </div>
 
-            {/* ── Tab Label ── */}
+            {/* ── Athena Context/Interpretation ── */}
             <div style={{
-                display: 'flex', borderBottom: '1px solid rgba(0,229,255,0.08)',
-                padding: '0 24px', gap: 4,
+                padding: '12px 24px',
+                borderBottom: '1px solid rgba(0,229,255,0.08)',
+                background: 'rgba(0,0,0,0.1)'
             }}>
-                <div style={{
-                    padding: '10px 16px', fontSize: 12, fontWeight: 700, letterSpacing: '0.5px',
-                    color: '#00E5FF', borderBottom: '2px solid #00E5FF', marginBottom: -1,
-                }}>
-                    Decisions
-                </div>
+                <p style={{ margin: 0, fontSize: 12, color: 'var(--color-text-secondary)', lineHeight: 1.5 }}>
+                    Evaluates incoming quantitative signals against real-time market structure, open interest, and strict risk guardrails to autonomously approve or veto bot deployments.
+                </p>
             </div>
 
             {/* ── Content Area ── */}
@@ -318,12 +316,12 @@ export function AthenaPanel({ athena, vetoLog = [] }: Props) {
                                                     )}
                                                     {/* Verdict pill — prominent */}
                                                     <div style={{
-                                                        padding: '5px 14px', borderRadius: 20,
+                                                        padding: '3px 10px', borderRadius: 12,
                                                         background: `rgba(${parseInt(theme.color.slice(1,3),16)},${parseInt(theme.color.slice(3,5),16)},${parseInt(theme.color.slice(5,7),16)},0.15)`,
                                                         border: `1px solid ${theme.color}55`,
-                                                        color: theme.color, fontSize: 12, fontWeight: 900,
-                                                        letterSpacing: '1.5px',
-                                                        boxShadow: `0 0 10px ${theme.glow}`,
+                                                        color: theme.color, fontSize: 10, fontWeight: 800,
+                                                        letterSpacing: '1px',
+                                                        boxShadow: `0 0 6px ${theme.glow}`,
                                                         whiteSpace: 'nowrap',
                                                     }}>
                                                         {action === 'EXECUTE' ? '✓ APPROVED' : '✗ VETOED'}

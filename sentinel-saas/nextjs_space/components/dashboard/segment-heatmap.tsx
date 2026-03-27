@@ -33,8 +33,8 @@ export function SegmentHeatmap({ heatmapData, loading = false }: SegmentHeatmapP
   if (!heatmapData || !heatmapData.segments || heatmapData.segments.length === 0) {
     return (
       <div className="mb-8 p-6 rounded-2xl border border-[var(--color-border)]" style={{ background: 'var(--color-surface)', backdropFilter: 'blur(12px)' }}>
-        <div className="flex items-center gap-3 mb-4">
-          <div className="p-2 rounded-lg bg-cyan-500/10">
+        <div className="flex items-start gap-3 mb-4">
+          <div className="p-2 rounded-lg bg-cyan-500/10 mt-1">
             <Activity className="w-5 h-5 text-cyan-400" />
           </div>
           <div>
@@ -42,7 +42,9 @@ export function SegmentHeatmap({ heatmapData, loading = false }: SegmentHeatmapP
               Segment Heatmap
               <span className="px-2 py-[2px] rounded text-[10px] font-bold bg-[var(--color-text)]/10 text-[var(--color-text-secondary)] tracking-wider">LIVE</span>
             </h2>
-            <p className="text-[12px] text-[var(--color-text-secondary)] mt-0.5">4h Momentum × 1h Breadth — Top 2 Active Sectors</p>
+            <p className="text-[12px] text-[var(--color-text-secondary)] mt-1 max-w-[90%] leading-relaxed">
+              Ranks market sectors by blending 4h momentum with 1h breadth. Bots are dynamically routed to the strongest active sectors to optimize capital efficiency.
+            </p>
           </div>
         </div>
         <div className="flex items-center justify-center h-24 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-light)]">
@@ -63,8 +65,8 @@ export function SegmentHeatmap({ heatmapData, loading = false }: SegmentHeatmapP
     <div className="mb-8 p-6 rounded-2xl border border-[var(--color-border)]" style={{ background: 'var(--color-surface)', backdropFilter: 'blur(12px)' }}>
       {/* Header */}
       <div className="mb-4">
-        <div className="flex items-center gap-3 mb-3">
-          <div className="p-2 rounded-lg bg-cyan-500/10">
+        <div className="flex items-start gap-3 mb-3">
+          <div className="p-2 rounded-lg bg-cyan-500/10 mt-1">
             <Activity className="w-5 h-5 text-cyan-400" />
           </div>
           <div>
@@ -72,8 +74,8 @@ export function SegmentHeatmap({ heatmapData, loading = false }: SegmentHeatmapP
               Segment Heatmap
               <span className="px-2 py-[2px] rounded text-[10px] font-bold bg-[var(--color-text)]/10 text-[var(--color-text-secondary)] tracking-wider">LIVE</span>
             </h2>
-            <p className="text-[11px] text-[var(--color-text-secondary)] mt-0.5">
-              4h Mom × 1h Breadth
+            <p className="text-[11px] text-[var(--color-text-secondary)] mt-1 max-w-[90%] leading-relaxed">
+              Ranks market sectors by blending 4h momentum with 1h breadth. Bots are dynamically routed to the strongest active sectors to optimize capital efficiency.
             </p>
           </div>
         </div>
