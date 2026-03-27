@@ -6,7 +6,10 @@ Uses the HTTP API directly (no external telegram library needed).
 import json
 import logging
 import os
+import queue
+import re
 import threading
+import time
 from datetime import datetime
 from urllib.request import Request, urlopen
 from urllib.error import URLError
@@ -112,10 +115,42 @@ def log_startup_config():
         logger.warning("[Telegram] token or chat_id missing — messages will be dropped.")
 
 
+# ─── Rate-Limited Send Queue ─────────────────────────────────────────────────
+# Telegram allows ~30 msg/s globally but recommends ≤1/s per chat to avoid 429s.
+# All async sends go through this queue; background worker drains at 1 msg/sec.
+
+_send_queue: queue.Queue = queue.Queue(maxsize=200)
+
+
+def _queue_worker():
+    """Background thread: drain _send_queue at max 1 message per second."""
+    while True:
+        try:
+            text, kwargs = _send_queue.get(timeout=5)
+            try:
+                send_message(text, **kwargs)
+            except Exception as e:
+                logger.error("[Telegram] Queue worker send error: %s", e)
+            finally:
+                _send_queue.task_done()
+            time.sleep(1)  # rate-limit: 1 msg/sec
+        except queue.Empty:
+            continue
+        except Exception as e:
+            logger.error("[Telegram] Queue worker fatal error: %s", e)
+
+
+_worker_thread = threading.Thread(target=_queue_worker, daemon=True, name="TelegramQueue")
+_worker_thread.start()
+
+
 def send_message_async(text, **kwargs):
-    """Non-blocking version — sends in a background thread."""
-    t = threading.Thread(target=send_message, args=(text,), kwargs=kwargs, daemon=True)
-    t.start()
+    """Queue a message for rate-limited delivery. Never drops silently."""
+    try:
+        _send_queue.put_nowait((text, kwargs))
+    except queue.Full:
+        logger.error("[Telegram] Send queue full (%d items) — message dropped: %.60s…",
+                     _send_queue.qsize(), text)
 
 
 # ─── Notification Formatters ─────────────────────────────────────────────────────
@@ -173,10 +208,12 @@ def notify_athena_signal(sym, side, conviction_pct, entry_price, sl, tp, segment
     emoji = "🟢" if side in ("BUY", "LONG") else "🔴"
     dir_label = "LONG ↑" if side in ("BUY", "LONG") else "SHORT ↓"
 
-    # Shorten reasoning to first sentence / 120 chars
-    short_reason = (reasoning or "").split(".")[0].strip()
-    if len(short_reason) > 120:
-        short_reason = short_reason[:117] + "…"
+    # Split on true sentence boundaries (". " not ".") to avoid cutting at decimal points.
+    # e.g. "confidence of 0.82" would wrongly split → "confidence of 0" with the old method.
+    sentences = re.split(r'(?<=[.!?])\s+', (reasoning or "").strip())
+    short_reason = " ".join(sentences[:2]).strip()  # up to 2 full sentences
+    if len(short_reason) > 400:
+        short_reason = short_reason[:397] + "…"
 
     # Format prices — use 6dp for small prices, 2dp for large
     def fmt(p):
@@ -219,9 +256,11 @@ def notify_athena_veto(sym, side, conviction_pct, reasoning, segment):
 
     emoji = "🟢" if side in ("BUY", "LONG") else "🔴"
     dir_label = "LONG ↑" if side in ("BUY", "LONG") else "SHORT ↓"
-    short_reason = (reasoning or "").split(".")[0].strip()
-    if len(short_reason) > 120:
-        short_reason = short_reason[:117] + "…"
+    # Use proper sentence boundary split — not '.' which hits decimal points
+    sentences = re.split(r'(?<=[\.!?])\s+', (reasoning or "").strip())
+    short_reason = " ".join(sentences[:2]).strip()
+    if len(short_reason) > 300:
+        short_reason = short_reason[:297] + "…"
     coin_name = sym.replace('USDT', '')
 
     msg = (
