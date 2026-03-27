@@ -62,32 +62,32 @@ export function SegmentHeatmap({ heatmapData, loading = false }: SegmentHeatmapP
   return (
     <div className="mb-8 p-6 rounded-2xl border border-white/5" style={{ background: 'rgba(17, 24, 39, 0.6)', backdropFilter: 'blur(12px)' }}>
       {/* Header */}
-      <div className="flex items-center justify-between mb-5">
-        <div className="flex items-center gap-3">
+      <div className="mb-4">
+        <div className="flex items-center gap-3 mb-3">
           <div className="p-2 rounded-lg bg-cyan-500/10">
             <Activity className="w-5 h-5 text-cyan-400" />
           </div>
           <div>
-            <h2 className="text-[17px] font-bold text-white flex items-center gap-2">
+            <h2 className="text-[15px] font-bold text-white flex items-center gap-2">
               Segment Heatmap
               <span className="px-2 py-[2px] rounded text-[10px] font-bold bg-white/10 text-white/70 tracking-wider">LIVE</span>
             </h2>
-            <p className="text-[12px] text-gray-400 mt-0.5">
-              4h Momentum × 1h Breadth | Cycle-matched scoring
+            <p className="text-[11px] text-gray-400 mt-0.5">
+              4h Mom × 1h Breadth
             </p>
           </div>
         </div>
 
-        <div className="text-right">
-          <div className="text-[11px] text-gray-400 font-semibold tracking-wide uppercase mb-1">Active Scan Targets</div>
-          <div className="flex items-center gap-2 flex-wrap justify-end">
+        <div>
+          <div className="text-[10px] text-gray-400 font-semibold tracking-wide uppercase mb-1">Active Targets</div>
+          <div className="flex items-center gap-2 flex-wrap">
             {top2Targets.map((seg) => {
               const segData = heatmapData.segments!.find(s => s.segment === seg);
               const isLong = segData?.direction === 'LONG';
               return (
-                <div key={seg} className={`flex items-center gap-1.5 px-3 py-1 rounded-full border ${isLong ? 'bg-green-500/10 border-green-500/20' : 'bg-red-500/10 border-red-500/20'}`}>
+                <div key={seg} className={`flex items-center gap-1 px-2 py-0.5 rounded-full border ${isLong ? 'bg-green-500/10 border-green-500/20' : 'bg-red-500/10 border-red-500/20'}`}>
                   <Zap className={`w-3 h-3 ${isLong ? 'text-green-400' : 'text-red-400'}`} />
-                  <span className={`text-[12px] font-bold ${isLong ? 'text-green-400' : 'text-red-400'}`}>{seg}</span>
+                  <span className={`text-[11px] font-bold ${isLong ? 'text-green-400' : 'text-red-400'}`}>{seg}</span>
                 </div>
               );
             })}
@@ -96,7 +96,7 @@ export function SegmentHeatmap({ heatmapData, loading = false }: SegmentHeatmapP
       </div>
 
       {/* Heatmap Grid */}
-      <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
+      <div className="grid grid-cols-2 gap-2">
         {sortedSegments.map((seg, i) => {
           const isHot = top2Targets.includes(seg.segment);
           const isPositive = seg.blended_score >= 0;

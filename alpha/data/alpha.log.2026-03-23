@@ -1,0 +1,756 @@
+2026-03-23 05:30:05 | INFO     | alpha.engine | ─── CYCLE #8 START | 2026-03-23 00:00 UTC ───
+2026-03-23 05:30:05 | DEBUG    | alpha.engine | AAVEUSDT: no signal — vol_zscore below threshold: prev=1.74, last=-0.30 (need >1.5)
+2026-03-23 05:30:05 | DEBUG    | alpha.engine | SNXUSDT: regime margin nan below filter — no entry
+2026-03-23 05:30:05 | DEBUG    | alpha.engine | COMPUSDT: regime margin nan below filter — no entry
+2026-03-23 05:30:05 | DEBUG    | alpha.engine | BNBUSDT: no signal — vol_zscore below threshold: prev=1.48, last=-0.52 (need >1.5)
+2026-03-23 05:30:05 | INFO     | alpha.engine | ─── CYCLE #8 DONE | 0.3s | entries=0 exits=0 be=0 ───
+2026-03-23 05:30:05 | INFO     | alpha.engine | Waiting 900s until next 15m boundary ...
+2026-03-23 05:45:05 | INFO     | alpha.engine | ─── CYCLE #9 START | 2026-03-23 00:15 UTC ───
+2026-03-23 05:45:05 | DEBUG    | alpha.engine | AAVEUSDT: no signal — vol_zscore below threshold: prev=1.74, last=-0.30 (need >1.5)
+2026-03-23 05:45:05 | DEBUG    | alpha.engine | SNXUSDT: regime margin nan below filter — no entry
+2026-03-23 05:45:05 | DEBUG    | alpha.engine | COMPUSDT: regime margin nan below filter — no entry
+2026-03-23 05:45:05 | DEBUG    | alpha.engine | BNBUSDT: no signal — vol_zscore below threshold: prev=1.48, last=-0.52 (need >1.5)
+2026-03-23 05:45:05 | INFO     | alpha.engine | ─── CYCLE #9 DONE | 0.4s | entries=0 exits=0 be=0 ───
+2026-03-23 05:45:05 | INFO     | alpha.engine | Waiting 900s until next 15m boundary ...
+2026-03-23 06:00:05 | INFO     | alpha.engine | ─── CYCLE #10 START | 2026-03-23 00:30 UTC ───
+2026-03-23 06:00:06 | DEBUG    | alpha.engine | AAVEUSDT: no signal — vol_zscore below threshold: prev=1.74, last=-0.30 (need >1.5)
+2026-03-23 06:00:06 | DEBUG    | alpha.engine | SNXUSDT: regime margin nan below filter — no entry
+2026-03-23 06:00:06 | DEBUG    | alpha.engine | COMPUSDT: regime margin nan below filter — no entry
+2026-03-23 06:00:06 | DEBUG    | alpha.engine | BNBUSDT: no signal — vol_zscore below threshold: prev=1.48, last=-0.52 (need >1.5)
+2026-03-23 06:00:06 | INFO     | alpha.engine | ─── CYCLE #10 DONE | 0.3s | entries=0 exits=0 be=0 ───
+2026-03-23 06:00:06 | INFO     | alpha.engine | Waiting 899s until next 15m boundary ...
+2026-03-23 06:15:05 | INFO     | alpha.engine | ─── CYCLE #11 START | 2026-03-23 00:45 UTC ───
+2026-03-23 06:15:05 | DEBUG    | alpha.engine | AAVEUSDT: no signal — vol_zscore below threshold: prev=1.74, last=-0.30 (need >1.5)
+2026-03-23 06:15:05 | DEBUG    | alpha.engine | SNXUSDT: regime margin nan below filter — no entry
+2026-03-23 06:15:05 | DEBUG    | alpha.engine | COMPUSDT: regime margin nan below filter — no entry
+2026-03-23 06:15:05 | DEBUG    | alpha.engine | BNBUSDT: no signal — vol_zscore below threshold: prev=1.48, last=-0.52 (need >1.5)
+2026-03-23 06:15:05 | INFO     | alpha.engine | ─── CYCLE #11 DONE | 0.3s | entries=0 exits=0 be=0 ───
+2026-03-23 06:15:05 | INFO     | alpha.engine | Waiting 900s until next 15m boundary ...
+2026-03-23 06:30:05 | INFO     | alpha.engine | ─── CYCLE #12 START | 2026-03-23 01:00 UTC ───
+2026-03-23 06:30:05 | INFO     | alpha.engine | AAVEUSDT: retraining HMM ...
+2026-03-23 06:30:05 | INFO     | alpha.engine | SNXUSDT: retraining HMM ...
+2026-03-23 06:30:05 | INFO     | alpha.engine | COMPUSDT: retraining HMM ...
+2026-03-23 06:30:05 | INFO     | alpha.engine | BNBUSDT: retraining HMM ...
+2026-03-23 06:30:05 | DEBUG    | alpha.engine | AAVEUSDT: no signal — vol_zscore below threshold: prev=1.74, last=-0.30 (need >1.5)
+2026-03-23 06:30:05 | DEBUG    | alpha.engine | SNXUSDT: regime margin nan below filter — no entry
+2026-03-23 06:30:05 | DEBUG    | alpha.engine | COMPUSDT: regime margin nan below filter — no entry
+2026-03-23 06:30:05 | DEBUG    | alpha.engine | BNBUSDT: no signal — vol_zscore below threshold: prev=1.48, last=-0.52 (need >1.5)
+2026-03-23 06:30:05 | INFO     | alpha.engine | ─── CYCLE #12 DONE | 0.5s | entries=0 exits=0 be=0 ───
+2026-03-23 06:30:05 | INFO     | alpha.engine | Waiting 900s until next 15m boundary ...
+2026-03-23 06:45:06 | INFO     | alpha.engine | ─── CYCLE #13 START | 2026-03-23 01:15 UTC ───
+2026-03-23 06:45:06 | DEBUG    | alpha.engine | AAVEUSDT: no signal — vol_zscore below threshold: prev=1.74, last=-0.30 (need >1.5)
+2026-03-23 06:45:06 | DEBUG    | alpha.engine | SNXUSDT: regime margin nan below filter — no entry
+2026-03-23 06:45:06 | DEBUG    | alpha.engine | COMPUSDT: regime margin nan below filter — no entry
+2026-03-23 06:45:06 | DEBUG    | alpha.engine | BNBUSDT: no signal — vol_zscore below threshold: prev=1.48, last=-0.52 (need >1.5)
+2026-03-23 06:45:06 | INFO     | alpha.engine | ─── CYCLE #13 DONE | 0.3s | entries=0 exits=0 be=0 ───
+2026-03-23 06:45:06 | INFO     | alpha.engine | Waiting 899s until next 15m boundary ...
+2026-03-23 07:00:05 | INFO     | alpha.engine | ─── CYCLE #14 START | 2026-03-23 01:30 UTC ───
+2026-03-23 07:00:05 | DEBUG    | alpha.engine | AAVEUSDT: no signal — vol_zscore below threshold: prev=1.74, last=-0.30 (need >1.5)
+2026-03-23 07:00:05 | DEBUG    | alpha.engine | SNXUSDT: regime margin nan below filter — no entry
+2026-03-23 07:00:05 | DEBUG    | alpha.engine | COMPUSDT: regime margin nan below filter — no entry
+2026-03-23 07:00:05 | DEBUG    | alpha.engine | BNBUSDT: no signal — vol_zscore below threshold: prev=1.48, last=-0.52 (need >1.5)
+2026-03-23 07:00:05 | INFO     | alpha.engine | ─── CYCLE #14 DONE | 0.3s | entries=0 exits=0 be=0 ───
+2026-03-23 07:00:05 | INFO     | alpha.engine | Waiting 900s until next 15m boundary ...
+2026-03-23 07:15:05 | INFO     | alpha.engine | ─── CYCLE #15 START | 2026-03-23 01:45 UTC ───
+2026-03-23 07:15:05 | DEBUG    | alpha.engine | AAVEUSDT: no signal — vol_zscore below threshold: prev=1.74, last=-0.30 (need >1.5)
+2026-03-23 07:15:05 | DEBUG    | alpha.engine | SNXUSDT: regime margin nan below filter — no entry
+2026-03-23 07:15:05 | DEBUG    | alpha.engine | COMPUSDT: regime margin nan below filter — no entry
+2026-03-23 07:15:05 | DEBUG    | alpha.engine | BNBUSDT: no signal — vol_zscore below threshold: prev=1.48, last=-0.52 (need >1.5)
+2026-03-23 07:15:05 | INFO     | alpha.engine | ─── CYCLE #15 DONE | 0.3s | entries=0 exits=0 be=0 ───
+2026-03-23 07:15:05 | INFO     | alpha.engine | Waiting 900s until next 15m boundary ...
+2026-03-23 07:30:05 | INFO     | alpha.engine | ─── CYCLE #16 START | 2026-03-23 02:00 UTC ───
+2026-03-23 07:30:06 | INFO     | alpha.engine | AAVEUSDT: retraining HMM ...
+2026-03-23 07:30:06 | INFO     | alpha.engine | SNXUSDT: retraining HMM ...
+2026-03-23 07:30:06 | INFO     | alpha.engine | COMPUSDT: retraining HMM ...
+2026-03-23 07:30:06 | INFO     | alpha.engine | BNBUSDT: retraining HMM ...
+2026-03-23 07:30:06 | DEBUG    | alpha.engine | AAVEUSDT: no signal — vol_zscore below threshold: prev=1.74, last=-0.30 (need >1.5)
+2026-03-23 07:30:06 | DEBUG    | alpha.engine | SNXUSDT: regime margin nan below filter — no entry
+2026-03-23 07:30:06 | DEBUG    | alpha.engine | COMPUSDT: regime margin nan below filter — no entry
+2026-03-23 07:30:06 | DEBUG    | alpha.engine | BNBUSDT: no signal — vol_zscore below threshold: prev=1.48, last=-0.52 (need >1.5)
+2026-03-23 07:30:06 | INFO     | alpha.engine | ─── CYCLE #16 DONE | 0.4s | entries=0 exits=0 be=0 ───
+2026-03-23 07:30:06 | INFO     | alpha.engine | Waiting 899s until next 15m boundary ...
+2026-03-23 07:45:05 | INFO     | alpha.engine | ─── CYCLE #17 START | 2026-03-23 02:15 UTC ───
+2026-03-23 07:45:05 | DEBUG    | alpha.engine | AAVEUSDT: no signal — vol_zscore below threshold: prev=1.74, last=-0.30 (need >1.5)
+2026-03-23 07:45:05 | DEBUG    | alpha.engine | SNXUSDT: regime margin nan below filter — no entry
+2026-03-23 07:45:05 | DEBUG    | alpha.engine | COMPUSDT: regime margin nan below filter — no entry
+2026-03-23 07:45:05 | DEBUG    | alpha.engine | BNBUSDT: no signal — vol_zscore below threshold: prev=1.48, last=-0.52 (need >1.5)
+2026-03-23 07:45:05 | INFO     | alpha.engine | ─── CYCLE #17 DONE | 0.3s | entries=0 exits=0 be=0 ───
+2026-03-23 07:45:05 | INFO     | alpha.engine | Waiting 900s until next 15m boundary ...
+2026-03-23 08:00:05 | INFO     | alpha.engine | ─── CYCLE #18 START | 2026-03-23 02:30 UTC ───
+2026-03-23 08:00:05 | DEBUG    | alpha.engine | AAVEUSDT: no signal — vol_zscore below threshold: prev=1.74, last=-0.30 (need >1.5)
+2026-03-23 08:00:05 | DEBUG    | alpha.engine | SNXUSDT: regime margin nan below filter — no entry
+2026-03-23 08:00:05 | DEBUG    | alpha.engine | COMPUSDT: regime margin nan below filter — no entry
+2026-03-23 08:00:05 | DEBUG    | alpha.engine | BNBUSDT: no signal — vol_zscore below threshold: prev=1.48, last=-0.52 (need >1.5)
+2026-03-23 08:00:05 | INFO     | alpha.engine | ─── CYCLE #18 DONE | 0.3s | entries=0 exits=0 be=0 ───
+2026-03-23 08:00:05 | INFO     | alpha.engine | Waiting 900s until next 15m boundary ...
+2026-03-23 08:15:05 | INFO     | alpha.engine | ─── CYCLE #19 START | 2026-03-23 02:45 UTC ───
+2026-03-23 08:15:06 | DEBUG    | alpha.engine | AAVEUSDT: no signal — vol_zscore below threshold: prev=1.74, last=-0.30 (need >1.5)
+2026-03-23 08:15:06 | DEBUG    | alpha.engine | SNXUSDT: regime margin nan below filter — no entry
+2026-03-23 08:15:06 | DEBUG    | alpha.engine | COMPUSDT: regime margin nan below filter — no entry
+2026-03-23 08:15:06 | DEBUG    | alpha.engine | BNBUSDT: no signal — vol_zscore below threshold: prev=1.48, last=-0.52 (need >1.5)
+2026-03-23 08:15:06 | INFO     | alpha.engine | ─── CYCLE #19 DONE | 1.1s | entries=0 exits=0 be=0 ───
+2026-03-23 08:15:06 | INFO     | alpha.engine | Waiting 899s until next 15m boundary ...
+2026-03-23 08:30:05 | INFO     | alpha.engine | ─── CYCLE #20 START | 2026-03-23 03:00 UTC ───
+2026-03-23 08:30:06 | INFO     | alpha.engine | AAVEUSDT: retraining HMM ...
+2026-03-23 08:30:06 | INFO     | alpha.engine | SNXUSDT: retraining HMM ...
+2026-03-23 08:30:06 | INFO     | alpha.engine | COMPUSDT: retraining HMM ...
+2026-03-23 08:30:06 | INFO     | alpha.engine | BNBUSDT: retraining HMM ...
+2026-03-23 08:30:06 | DEBUG    | alpha.engine | AAVEUSDT: no signal — vol_zscore below threshold: prev=1.74, last=-0.30 (need >1.5)
+2026-03-23 08:30:06 | DEBUG    | alpha.engine | SNXUSDT: regime margin nan below filter — no entry
+2026-03-23 08:30:06 | DEBUG    | alpha.engine | COMPUSDT: regime margin nan below filter — no entry
+2026-03-23 08:30:06 | DEBUG    | alpha.engine | BNBUSDT: no signal — vol_zscore below threshold: prev=1.48, last=-0.52 (need >1.5)
+2026-03-23 08:30:06 | INFO     | alpha.engine | ─── CYCLE #20 DONE | 0.4s | entries=0 exits=0 be=0 ───
+2026-03-23 08:30:06 | INFO     | alpha.engine | Waiting 899s until next 15m boundary ...
+2026-03-23 08:45:05 | INFO     | alpha.engine | ─── CYCLE #21 START | 2026-03-23 03:15 UTC ───
+2026-03-23 08:45:05 | DEBUG    | alpha.engine | AAVEUSDT: no signal — vol_zscore below threshold: prev=1.74, last=-0.30 (need >1.5)
+2026-03-23 08:45:05 | DEBUG    | alpha.engine | SNXUSDT: regime margin nan below filter — no entry
+2026-03-23 08:45:05 | DEBUG    | alpha.engine | COMPUSDT: regime margin nan below filter — no entry
+2026-03-23 08:45:05 | DEBUG    | alpha.engine | BNBUSDT: no signal — vol_zscore below threshold: prev=1.48, last=-0.52 (need >1.5)
+2026-03-23 08:45:05 | INFO     | alpha.engine | ─── CYCLE #21 DONE | 0.3s | entries=0 exits=0 be=0 ───
+2026-03-23 08:45:05 | INFO     | alpha.engine | Waiting 900s until next 15m boundary ...
+2026-03-23 09:00:05 | INFO     | alpha.engine | ─── CYCLE #22 START | 2026-03-23 03:30 UTC ───
+2026-03-23 09:00:06 | DEBUG    | alpha.engine | AAVEUSDT: no signal — vol_zscore below threshold: prev=1.74, last=-0.30 (need >1.5)
+2026-03-23 09:00:06 | DEBUG    | alpha.engine | SNXUSDT: regime margin nan below filter — no entry
+2026-03-23 09:00:06 | DEBUG    | alpha.engine | COMPUSDT: regime margin nan below filter — no entry
+2026-03-23 09:00:06 | DEBUG    | alpha.engine | BNBUSDT: no signal — vol_zscore below threshold: prev=1.48, last=-0.52 (need >1.5)
+2026-03-23 09:00:06 | INFO     | alpha.engine | ─── CYCLE #22 DONE | 0.3s | entries=0 exits=0 be=0 ───
+2026-03-23 09:00:06 | INFO     | alpha.engine | Waiting 899s until next 15m boundary ...
+2026-03-23 09:15:05 | INFO     | alpha.engine | ─── CYCLE #23 START | 2026-03-23 03:45 UTC ───
+2026-03-23 09:15:05 | DEBUG    | alpha.engine | AAVEUSDT: no signal — vol_zscore below threshold: prev=1.74, last=-0.30 (need >1.5)
+2026-03-23 09:15:05 | DEBUG    | alpha.engine | SNXUSDT: regime margin nan below filter — no entry
+2026-03-23 09:15:05 | DEBUG    | alpha.engine | COMPUSDT: regime margin nan below filter — no entry
+2026-03-23 09:15:05 | DEBUG    | alpha.engine | BNBUSDT: no signal — vol_zscore below threshold: prev=1.48, last=-0.52 (need >1.5)
+2026-03-23 09:15:05 | INFO     | alpha.engine | ─── CYCLE #23 DONE | 0.3s | entries=0 exits=0 be=0 ───
+2026-03-23 09:15:05 | INFO     | alpha.engine | Waiting 900s until next 15m boundary ...
+2026-03-23 09:30:05 | INFO     | alpha.engine | ─── CYCLE #24 START | 2026-03-23 04:00 UTC ───
+2026-03-23 09:30:05 | DEBUG    | alpha.engine | AAVEUSDT: no signal — vol_zscore below threshold: prev=1.74, last=-0.30 (need >1.5)
+2026-03-23 09:30:05 | DEBUG    | alpha.engine | SNXUSDT: regime margin nan below filter — no entry
+2026-03-23 09:30:05 | DEBUG    | alpha.engine | COMPUSDT: regime margin nan below filter — no entry
+2026-03-23 09:30:05 | DEBUG    | alpha.engine | BNBUSDT: no signal — vol_zscore below threshold: prev=1.48, last=-0.52 (need >1.5)
+2026-03-23 09:30:05 | INFO     | alpha.engine | ─── CYCLE #24 DONE | 0.6s | entries=0 exits=0 be=0 ───
+2026-03-23 09:30:05 | INFO     | alpha.engine | Waiting 900s until next 15m boundary ...
+2026-03-23 09:45:05 | INFO     | alpha.engine | ─── CYCLE #25 START | 2026-03-23 04:15 UTC ───
+2026-03-23 09:45:06 | INFO     | alpha.engine | AAVEUSDT: retraining HMM ...
+2026-03-23 09:45:06 | INFO     | alpha.engine | SNXUSDT: retraining HMM ...
+2026-03-23 09:45:06 | INFO     | alpha.engine | COMPUSDT: retraining HMM ...
+2026-03-23 09:45:06 | INFO     | alpha.engine | BNBUSDT: retraining HMM ...
+2026-03-23 09:45:06 | DEBUG    | alpha.engine | AAVEUSDT: no signal — vol_zscore below threshold: prev=1.74, last=-0.30 (need >1.5)
+2026-03-23 09:45:06 | DEBUG    | alpha.engine | SNXUSDT: regime margin nan below filter — no entry
+2026-03-23 09:45:06 | DEBUG    | alpha.engine | COMPUSDT: regime margin nan below filter — no entry
+2026-03-23 09:45:06 | DEBUG    | alpha.engine | BNBUSDT: no signal — vol_zscore below threshold: prev=1.48, last=-0.52 (need >1.5)
+2026-03-23 09:45:06 | INFO     | alpha.engine | ─── CYCLE #25 DONE | 0.4s | entries=0 exits=0 be=0 ───
+2026-03-23 09:45:06 | INFO     | alpha.engine | Waiting 899s until next 15m boundary ...
+2026-03-23 10:00:05 | INFO     | alpha.engine | ─── CYCLE #26 START | 2026-03-23 04:30 UTC ───
+2026-03-23 10:00:05 | DEBUG    | alpha.engine | AAVEUSDT: no signal — vol_zscore below threshold: prev=1.74, last=-0.30 (need >1.5)
+2026-03-23 10:00:05 | DEBUG    | alpha.engine | SNXUSDT: regime margin nan below filter — no entry
+2026-03-23 10:00:05 | DEBUG    | alpha.engine | COMPUSDT: regime margin nan below filter — no entry
+2026-03-23 10:00:05 | DEBUG    | alpha.engine | BNBUSDT: no signal — vol_zscore below threshold: prev=1.48, last=-0.52 (need >1.5)
+2026-03-23 10:00:05 | INFO     | alpha.engine | ─── CYCLE #26 DONE | 0.3s | entries=0 exits=0 be=0 ───
+2026-03-23 10:00:05 | INFO     | alpha.engine | Waiting 900s until next 15m boundary ...
+2026-03-23 10:15:05 | INFO     | alpha.engine | ─── CYCLE #27 START | 2026-03-23 04:45 UTC ───
+2026-03-23 10:15:06 | DEBUG    | alpha.engine | AAVEUSDT: no signal — vol_zscore below threshold: prev=1.74, last=-0.30 (need >1.5)
+2026-03-23 10:15:06 | DEBUG    | alpha.engine | SNXUSDT: regime margin nan below filter — no entry
+2026-03-23 10:15:06 | DEBUG    | alpha.engine | COMPUSDT: regime margin nan below filter — no entry
+2026-03-23 10:15:06 | DEBUG    | alpha.engine | BNBUSDT: no signal — vol_zscore below threshold: prev=1.48, last=-0.52 (need >1.5)
+2026-03-23 10:15:06 | INFO     | alpha.engine | ─── CYCLE #27 DONE | 0.3s | entries=0 exits=0 be=0 ───
+2026-03-23 10:15:06 | INFO     | alpha.engine | Waiting 899s until next 15m boundary ...
+2026-03-23 10:30:05 | INFO     | alpha.engine | ─── CYCLE #28 START | 2026-03-23 05:00 UTC ───
+2026-03-23 10:30:05 | DEBUG    | alpha.engine | AAVEUSDT: no signal — vol_zscore below threshold: prev=1.74, last=-0.30 (need >1.5)
+2026-03-23 10:30:05 | DEBUG    | alpha.engine | SNXUSDT: regime margin nan below filter — no entry
+2026-03-23 10:30:05 | DEBUG    | alpha.engine | COMPUSDT: regime margin nan below filter — no entry
+2026-03-23 10:30:05 | DEBUG    | alpha.engine | BNBUSDT: no signal — vol_zscore below threshold: prev=1.48, last=-0.52 (need >1.5)
+2026-03-23 10:30:05 | INFO     | alpha.engine | ─── CYCLE #28 DONE | 0.3s | entries=0 exits=0 be=0 ───
+2026-03-23 10:30:05 | INFO     | alpha.engine | Waiting 900s until next 15m boundary ...
+2026-03-23 10:45:05 | INFO     | alpha.engine | ─── CYCLE #29 START | 2026-03-23 05:15 UTC ───
+2026-03-23 10:45:05 | DEBUG    | alpha.engine | AAVEUSDT: no signal — vol_zscore below threshold: prev=1.74, last=-0.30 (need >1.5)
+2026-03-23 10:45:05 | DEBUG    | alpha.engine | SNXUSDT: regime margin nan below filter — no entry
+2026-03-23 10:45:05 | DEBUG    | alpha.engine | COMPUSDT: regime margin nan below filter — no entry
+2026-03-23 10:45:05 | DEBUG    | alpha.engine | BNBUSDT: no signal — vol_zscore below threshold: prev=1.48, last=-0.52 (need >1.5)
+2026-03-23 10:45:05 | INFO     | alpha.engine | ─── CYCLE #29 DONE | 0.3s | entries=0 exits=0 be=0 ───
+2026-03-23 10:45:05 | INFO     | alpha.engine | Waiting 900s until next 15m boundary ...
+2026-03-23 11:00:05 | INFO     | alpha.engine | ─── CYCLE #30 START | 2026-03-23 05:30 UTC ───
+2026-03-23 11:00:05 | INFO     | alpha.engine | AAVEUSDT: retraining HMM ...
+2026-03-23 11:00:05 | INFO     | alpha.engine | SNXUSDT: retraining HMM ...
+2026-03-23 11:00:06 | INFO     | alpha.engine | COMPUSDT: retraining HMM ...
+2026-03-23 11:00:06 | INFO     | alpha.engine | BNBUSDT: retraining HMM ...
+2026-03-23 11:00:06 | DEBUG    | alpha.engine | AAVEUSDT: no signal — vol_zscore below threshold: prev=1.74, last=-0.30 (need >1.5)
+2026-03-23 11:00:06 | DEBUG    | alpha.engine | SNXUSDT: regime margin nan below filter — no entry
+2026-03-23 11:00:06 | DEBUG    | alpha.engine | COMPUSDT: regime margin nan below filter — no entry
+2026-03-23 11:00:06 | DEBUG    | alpha.engine | BNBUSDT: no signal — vol_zscore below threshold: prev=1.48, last=-0.52 (need >1.5)
+2026-03-23 11:00:06 | INFO     | alpha.engine | ─── CYCLE #30 DONE | 0.4s | entries=0 exits=0 be=0 ───
+2026-03-23 11:00:06 | INFO     | alpha.engine | Waiting 899s until next 15m boundary ...
+2026-03-23 11:15:05 | INFO     | alpha.engine | ─── CYCLE #31 START | 2026-03-23 05:45 UTC ───
+2026-03-23 11:15:05 | DEBUG    | alpha.engine | AAVEUSDT: no signal — vol_zscore below threshold: prev=1.74, last=-0.30 (need >1.5)
+2026-03-23 11:15:05 | DEBUG    | alpha.engine | SNXUSDT: regime margin nan below filter — no entry
+2026-03-23 11:15:05 | DEBUG    | alpha.engine | COMPUSDT: regime margin nan below filter — no entry
+2026-03-23 11:15:05 | DEBUG    | alpha.engine | BNBUSDT: no signal — vol_zscore below threshold: prev=1.48, last=-0.52 (need >1.5)
+2026-03-23 11:15:05 | INFO     | alpha.engine | ─── CYCLE #31 DONE | 0.3s | entries=0 exits=0 be=0 ───
+2026-03-23 11:15:05 | INFO     | alpha.engine | Waiting 900s until next 15m boundary ...
+2026-03-23 11:30:05 | INFO     | alpha.engine | ─── CYCLE #32 START | 2026-03-23 06:00 UTC ───
+2026-03-23 11:30:05 | DEBUG    | alpha.engine | AAVEUSDT: no signal — vol_zscore below threshold: prev=1.74, last=-0.30 (need >1.5)
+2026-03-23 11:30:05 | DEBUG    | alpha.engine | SNXUSDT: regime margin nan below filter — no entry
+2026-03-23 11:30:05 | DEBUG    | alpha.engine | COMPUSDT: regime margin nan below filter — no entry
+2026-03-23 11:30:05 | DEBUG    | alpha.engine | BNBUSDT: no signal — vol_zscore below threshold: prev=1.48, last=-0.52 (need >1.5)
+2026-03-23 11:30:05 | INFO     | alpha.engine | ─── CYCLE #32 DONE | 0.3s | entries=0 exits=0 be=0 ───
+2026-03-23 11:30:05 | INFO     | alpha.engine | Waiting 900s until next 15m boundary ...
+2026-03-23 11:45:05 | INFO     | alpha.engine | ─── CYCLE #33 START | 2026-03-23 06:15 UTC ───
+2026-03-23 11:45:05 | DEBUG    | alpha.engine | AAVEUSDT: no signal — vol_zscore below threshold: prev=1.74, last=-0.30 (need >1.5)
+2026-03-23 11:45:05 | DEBUG    | alpha.engine | SNXUSDT: regime margin nan below filter — no entry
+2026-03-23 11:45:05 | DEBUG    | alpha.engine | COMPUSDT: regime margin nan below filter — no entry
+2026-03-23 11:45:05 | DEBUG    | alpha.engine | BNBUSDT: no signal — vol_zscore below threshold: prev=1.48, last=-0.52 (need >1.5)
+2026-03-23 11:45:05 | INFO     | alpha.engine | ─── CYCLE #33 DONE | 0.3s | entries=0 exits=0 be=0 ───
+2026-03-23 11:45:05 | INFO     | alpha.engine | Waiting 900s until next 15m boundary ...
+2026-03-23 12:00:06 | INFO     | alpha.engine | ─── CYCLE #34 START | 2026-03-23 06:30 UTC ───
+2026-03-23 12:00:06 | INFO     | alpha.engine | AAVEUSDT: retraining HMM ...
+2026-03-23 12:00:06 | INFO     | alpha.engine | SNXUSDT: retraining HMM ...
+2026-03-23 12:00:06 | INFO     | alpha.engine | COMPUSDT: retraining HMM ...
+2026-03-23 12:00:06 | INFO     | alpha.engine | BNBUSDT: retraining HMM ...
+2026-03-23 12:00:06 | DEBUG    | alpha.engine | AAVEUSDT: no signal — vol_zscore below threshold: prev=1.74, last=-0.30 (need >1.5)
+2026-03-23 12:00:06 | DEBUG    | alpha.engine | SNXUSDT: regime margin nan below filter — no entry
+2026-03-23 12:00:06 | DEBUG    | alpha.engine | COMPUSDT: regime margin nan below filter — no entry
+2026-03-23 12:00:06 | DEBUG    | alpha.engine | BNBUSDT: no signal — vol_zscore below threshold: prev=1.48, last=-0.52 (need >1.5)
+2026-03-23 12:00:06 | INFO     | alpha.engine | ─── CYCLE #34 DONE | 0.4s | entries=0 exits=0 be=0 ───
+2026-03-23 12:00:06 | INFO     | alpha.engine | Waiting 899s until next 15m boundary ...
+2026-03-23 12:15:05 | INFO     | alpha.engine | ─── CYCLE #35 START | 2026-03-23 06:45 UTC ───
+2026-03-23 12:15:05 | DEBUG    | alpha.engine | AAVEUSDT: no signal — vol_zscore below threshold: prev=1.74, last=-0.30 (need >1.5)
+2026-03-23 12:15:05 | DEBUG    | alpha.engine | SNXUSDT: regime margin nan below filter — no entry
+2026-03-23 12:15:05 | DEBUG    | alpha.engine | COMPUSDT: regime margin nan below filter — no entry
+2026-03-23 12:15:05 | DEBUG    | alpha.engine | BNBUSDT: no signal — vol_zscore below threshold: prev=1.48, last=-0.52 (need >1.5)
+2026-03-23 12:15:05 | INFO     | alpha.engine | ─── CYCLE #35 DONE | 0.3s | entries=0 exits=0 be=0 ───
+2026-03-23 12:15:05 | INFO     | alpha.engine | Waiting 900s until next 15m boundary ...
+2026-03-23 12:30:05 | INFO     | alpha.engine | ─── CYCLE #36 START | 2026-03-23 07:00 UTC ───
+2026-03-23 12:30:06 | DEBUG    | alpha.engine | AAVEUSDT: no signal — vol_zscore below threshold: prev=1.74, last=-0.30 (need >1.5)
+2026-03-23 12:30:06 | DEBUG    | alpha.engine | SNXUSDT: regime margin nan below filter — no entry
+2026-03-23 12:30:06 | DEBUG    | alpha.engine | COMPUSDT: regime margin nan below filter — no entry
+2026-03-23 12:30:06 | DEBUG    | alpha.engine | BNBUSDT: no signal — vol_zscore below threshold: prev=1.48, last=-0.52 (need >1.5)
+2026-03-23 12:30:06 | INFO     | alpha.engine | ─── CYCLE #36 DONE | 1.0s | entries=0 exits=0 be=0 ───
+2026-03-23 12:30:06 | INFO     | alpha.engine | Waiting 899s until next 15m boundary ...
+2026-03-23 12:45:05 | INFO     | alpha.engine | ─── CYCLE #37 START | 2026-03-23 07:15 UTC ───
+2026-03-23 12:45:05 | DEBUG    | alpha.engine | AAVEUSDT: no signal — vol_zscore below threshold: prev=1.74, last=-0.30 (need >1.5)
+2026-03-23 12:45:05 | DEBUG    | alpha.engine | SNXUSDT: regime margin nan below filter — no entry
+2026-03-23 12:45:05 | DEBUG    | alpha.engine | COMPUSDT: regime margin nan below filter — no entry
+2026-03-23 12:45:05 | DEBUG    | alpha.engine | BNBUSDT: no signal — vol_zscore below threshold: prev=1.48, last=-0.52 (need >1.5)
+2026-03-23 12:45:05 | INFO     | alpha.engine | ─── CYCLE #37 DONE | 0.3s | entries=0 exits=0 be=0 ───
+2026-03-23 12:45:05 | INFO     | alpha.engine | Waiting 900s until next 15m boundary ...
+2026-03-23 13:00:06 | INFO     | alpha.engine | ─── CYCLE #38 START | 2026-03-23 07:30 UTC ───
+2026-03-23 13:00:06 | INFO     | alpha.engine | AAVEUSDT: retraining HMM ...
+2026-03-23 13:00:06 | INFO     | alpha.engine | SNXUSDT: retraining HMM ...
+2026-03-23 13:00:06 | INFO     | alpha.engine | COMPUSDT: retraining HMM ...
+2026-03-23 13:00:06 | INFO     | alpha.engine | BNBUSDT: retraining HMM ...
+2026-03-23 13:00:06 | DEBUG    | alpha.engine | AAVEUSDT: no signal — vol_zscore below threshold: prev=1.74, last=-0.30 (need >1.5)
+2026-03-23 13:00:06 | DEBUG    | alpha.engine | SNXUSDT: regime margin nan below filter — no entry
+2026-03-23 13:00:06 | DEBUG    | alpha.engine | COMPUSDT: regime margin nan below filter — no entry
+2026-03-23 13:00:06 | DEBUG    | alpha.engine | BNBUSDT: no signal — vol_zscore below threshold: prev=1.48, last=-0.52 (need >1.5)
+2026-03-23 13:00:06 | INFO     | alpha.engine | ─── CYCLE #38 DONE | 0.5s | entries=0 exits=0 be=0 ───
+2026-03-23 13:00:06 | INFO     | alpha.engine | Waiting 899s until next 15m boundary ...
+2026-03-23 13:15:05 | INFO     | alpha.engine | ─── CYCLE #39 START | 2026-03-23 07:45 UTC ───
+2026-03-23 13:15:05 | DEBUG    | alpha.engine | AAVEUSDT: no signal — vol_zscore below threshold: prev=1.74, last=-0.30 (need >1.5)
+2026-03-23 13:15:05 | DEBUG    | alpha.engine | SNXUSDT: regime margin nan below filter — no entry
+2026-03-23 13:15:05 | DEBUG    | alpha.engine | COMPUSDT: regime margin nan below filter — no entry
+2026-03-23 13:15:05 | DEBUG    | alpha.engine | BNBUSDT: no signal — vol_zscore below threshold: prev=1.48, last=-0.52 (need >1.5)
+2026-03-23 13:15:05 | INFO     | alpha.engine | ─── CYCLE #39 DONE | 0.3s | entries=0 exits=0 be=0 ───
+2026-03-23 13:15:05 | INFO     | alpha.engine | Waiting 900s until next 15m boundary ...
+2026-03-23 13:30:05 | INFO     | alpha.engine | ─── CYCLE #40 START | 2026-03-23 08:00 UTC ───
+2026-03-23 13:30:06 | DEBUG    | alpha.engine | AAVEUSDT: no signal — vol_zscore below threshold: prev=1.74, last=-0.30 (need >1.5)
+2026-03-23 13:30:06 | DEBUG    | alpha.engine | SNXUSDT: regime margin nan below filter — no entry
+2026-03-23 13:30:06 | DEBUG    | alpha.engine | COMPUSDT: regime margin nan below filter — no entry
+2026-03-23 13:30:06 | DEBUG    | alpha.engine | BNBUSDT: no signal — vol_zscore below threshold: prev=1.48, last=-0.52 (need >1.5)
+2026-03-23 13:30:06 | INFO     | alpha.engine | ─── CYCLE #40 DONE | 0.4s | entries=0 exits=0 be=0 ───
+2026-03-23 13:30:06 | INFO     | alpha.engine | Waiting 899s until next 15m boundary ...
+2026-03-23 13:45:05 | INFO     | alpha.engine | ─── CYCLE #41 START | 2026-03-23 08:15 UTC ───
+2026-03-23 13:45:05 | DEBUG    | alpha.engine | AAVEUSDT: no signal — vol_zscore below threshold: prev=1.74, last=-0.30 (need >1.5)
+2026-03-23 13:45:05 | DEBUG    | alpha.engine | SNXUSDT: regime margin nan below filter — no entry
+2026-03-23 13:45:05 | DEBUG    | alpha.engine | COMPUSDT: regime margin nan below filter — no entry
+2026-03-23 13:45:05 | DEBUG    | alpha.engine | BNBUSDT: no signal — vol_zscore below threshold: prev=1.48, last=-0.52 (need >1.5)
+2026-03-23 13:45:05 | INFO     | alpha.engine | ─── CYCLE #41 DONE | 0.3s | entries=0 exits=0 be=0 ───
+2026-03-23 13:45:05 | INFO     | alpha.engine | Waiting 900s until next 15m boundary ...
+2026-03-23 14:00:05 | INFO     | alpha.engine | ─── CYCLE #42 START | 2026-03-23 08:30 UTC ───
+2026-03-23 14:00:05 | DEBUG    | alpha.engine | AAVEUSDT: no signal — vol_zscore below threshold: prev=1.74, last=-0.30 (need >1.5)
+2026-03-23 14:00:05 | DEBUG    | alpha.engine | SNXUSDT: regime margin nan below filter — no entry
+2026-03-23 14:00:05 | DEBUG    | alpha.engine | COMPUSDT: regime margin nan below filter — no entry
+2026-03-23 14:00:05 | DEBUG    | alpha.engine | BNBUSDT: no signal — vol_zscore below threshold: prev=1.48, last=-0.52 (need >1.5)
+2026-03-23 14:00:05 | INFO     | alpha.engine | ─── CYCLE #42 DONE | 0.3s | entries=0 exits=0 be=0 ───
+2026-03-23 14:00:05 | INFO     | alpha.engine | Waiting 900s until next 15m boundary ...
+2026-03-23 14:15:05 | INFO     | alpha.engine | ─── CYCLE #43 START | 2026-03-23 08:45 UTC ───
+2026-03-23 14:15:06 | INFO     | alpha.engine | AAVEUSDT: retraining HMM ...
+2026-03-23 14:15:06 | INFO     | alpha.engine | SNXUSDT: retraining HMM ...
+2026-03-23 14:15:06 | INFO     | alpha.engine | COMPUSDT: retraining HMM ...
+2026-03-23 14:15:06 | INFO     | alpha.engine | BNBUSDT: retraining HMM ...
+2026-03-23 14:15:06 | DEBUG    | alpha.engine | AAVEUSDT: no signal — vol_zscore below threshold: prev=1.74, last=-0.30 (need >1.5)
+2026-03-23 14:15:06 | DEBUG    | alpha.engine | SNXUSDT: regime margin nan below filter — no entry
+2026-03-23 14:15:06 | DEBUG    | alpha.engine | COMPUSDT: regime margin nan below filter — no entry
+2026-03-23 14:15:06 | DEBUG    | alpha.engine | BNBUSDT: no signal — vol_zscore below threshold: prev=1.48, last=-0.52 (need >1.5)
+2026-03-23 14:15:06 | INFO     | alpha.engine | ─── CYCLE #43 DONE | 0.5s | entries=0 exits=0 be=0 ───
+2026-03-23 14:15:06 | INFO     | alpha.engine | Waiting 899s until next 15m boundary ...
+2026-03-23 14:30:05 | INFO     | alpha.engine | ─── CYCLE #44 START | 2026-03-23 09:00 UTC ───
+2026-03-23 14:30:05 | DEBUG    | alpha.engine | AAVEUSDT: no signal — vol_zscore below threshold: prev=1.74, last=-0.30 (need >1.5)
+2026-03-23 14:30:05 | DEBUG    | alpha.engine | SNXUSDT: regime margin nan below filter — no entry
+2026-03-23 14:30:05 | DEBUG    | alpha.engine | COMPUSDT: regime margin nan below filter — no entry
+2026-03-23 14:30:05 | DEBUG    | alpha.engine | BNBUSDT: no signal — vol_zscore below threshold: prev=1.48, last=-0.52 (need >1.5)
+2026-03-23 14:30:05 | INFO     | alpha.engine | ─── CYCLE #44 DONE | 0.3s | entries=0 exits=0 be=0 ───
+2026-03-23 14:30:05 | INFO     | alpha.engine | Waiting 900s until next 15m boundary ...
+2026-03-23 14:45:05 | INFO     | alpha.engine | ─── CYCLE #45 START | 2026-03-23 09:15 UTC ───
+2026-03-23 14:45:06 | DEBUG    | alpha.engine | AAVEUSDT: no signal — vol_zscore below threshold: prev=1.74, last=-0.30 (need >1.5)
+2026-03-23 14:45:06 | DEBUG    | alpha.engine | SNXUSDT: regime margin nan below filter — no entry
+2026-03-23 14:45:06 | DEBUG    | alpha.engine | COMPUSDT: regime margin nan below filter — no entry
+2026-03-23 14:45:06 | DEBUG    | alpha.engine | BNBUSDT: no signal — vol_zscore below threshold: prev=1.48, last=-0.52 (need >1.5)
+2026-03-23 14:45:06 | INFO     | alpha.engine | ─── CYCLE #45 DONE | 0.4s | entries=0 exits=0 be=0 ───
+2026-03-23 14:45:06 | INFO     | alpha.engine | Waiting 899s until next 15m boundary ...
+2026-03-23 15:00:05 | INFO     | alpha.engine | ─── CYCLE #46 START | 2026-03-23 09:30 UTC ───
+2026-03-23 15:00:05 | DEBUG    | alpha.engine | AAVEUSDT: no signal — vol_zscore below threshold: prev=1.74, last=-0.30 (need >1.5)
+2026-03-23 15:00:05 | DEBUG    | alpha.engine | SNXUSDT: regime margin nan below filter — no entry
+2026-03-23 15:00:05 | DEBUG    | alpha.engine | COMPUSDT: regime margin nan below filter — no entry
+2026-03-23 15:00:05 | DEBUG    | alpha.engine | BNBUSDT: no signal — vol_zscore below threshold: prev=1.48, last=-0.52 (need >1.5)
+2026-03-23 15:00:05 | INFO     | alpha.engine | ─── CYCLE #46 DONE | 0.3s | entries=0 exits=0 be=0 ───
+2026-03-23 15:00:05 | INFO     | alpha.engine | Waiting 900s until next 15m boundary ...
+2026-03-23 15:15:05 | INFO     | alpha.engine | ─── CYCLE #47 START | 2026-03-23 09:45 UTC ───
+2026-03-23 15:15:05 | DEBUG    | alpha.engine | AAVEUSDT: no signal — vol_zscore below threshold: prev=1.74, last=-0.30 (need >1.5)
+2026-03-23 15:15:05 | DEBUG    | alpha.engine | SNXUSDT: regime margin nan below filter — no entry
+2026-03-23 15:15:05 | DEBUG    | alpha.engine | COMPUSDT: regime margin nan below filter — no entry
+2026-03-23 15:15:05 | DEBUG    | alpha.engine | BNBUSDT: no signal — vol_zscore below threshold: prev=1.48, last=-0.52 (need >1.5)
+2026-03-23 15:15:05 | INFO     | alpha.engine | ─── CYCLE #47 DONE | 0.3s | entries=0 exits=0 be=0 ───
+2026-03-23 15:15:05 | INFO     | alpha.engine | Waiting 900s until next 15m boundary ...
+2026-03-23 15:30:05 | INFO     | alpha.engine | ─── CYCLE #48 START | 2026-03-23 10:00 UTC ───
+2026-03-23 15:30:06 | INFO     | alpha.engine | AAVEUSDT: retraining HMM ...
+2026-03-23 15:30:06 | INFO     | alpha.engine | SNXUSDT: retraining HMM ...
+2026-03-23 15:30:06 | INFO     | alpha.engine | COMPUSDT: retraining HMM ...
+2026-03-23 15:30:06 | INFO     | alpha.engine | BNBUSDT: retraining HMM ...
+2026-03-23 15:30:06 | DEBUG    | alpha.engine | AAVEUSDT: no signal — vol_zscore below threshold: prev=1.74, last=-0.30 (need >1.5)
+2026-03-23 15:30:06 | DEBUG    | alpha.engine | SNXUSDT: regime margin nan below filter — no entry
+2026-03-23 15:30:06 | DEBUG    | alpha.engine | COMPUSDT: regime margin nan below filter — no entry
+2026-03-23 15:30:06 | DEBUG    | alpha.engine | BNBUSDT: no signal — vol_zscore below threshold: prev=1.48, last=-0.52 (need >1.5)
+2026-03-23 15:30:06 | INFO     | alpha.engine | ─── CYCLE #48 DONE | 0.5s | entries=0 exits=0 be=0 ───
+2026-03-23 15:30:06 | INFO     | alpha.engine | Waiting 899s until next 15m boundary ...
+2026-03-23 15:45:05 | INFO     | alpha.engine | ─── CYCLE #49 START | 2026-03-23 10:15 UTC ───
+2026-03-23 15:45:05 | DEBUG    | alpha.engine | AAVEUSDT: no signal — vol_zscore below threshold: prev=1.74, last=-0.30 (need >1.5)
+2026-03-23 15:45:05 | DEBUG    | alpha.engine | SNXUSDT: regime margin nan below filter — no entry
+2026-03-23 15:45:05 | DEBUG    | alpha.engine | COMPUSDT: regime margin nan below filter — no entry
+2026-03-23 15:45:05 | DEBUG    | alpha.engine | BNBUSDT: no signal — vol_zscore below threshold: prev=1.48, last=-0.52 (need >1.5)
+2026-03-23 15:45:05 | INFO     | alpha.engine | ─── CYCLE #49 DONE | 0.3s | entries=0 exits=0 be=0 ───
+2026-03-23 15:45:05 | INFO     | alpha.engine | Waiting 900s until next 15m boundary ...
+2026-03-23 16:00:05 | INFO     | alpha.engine | ─── CYCLE #50 START | 2026-03-23 10:30 UTC ───
+2026-03-23 16:00:05 | DEBUG    | alpha.engine | AAVEUSDT: no signal — vol_zscore below threshold: prev=1.74, last=-0.30 (need >1.5)
+2026-03-23 16:00:05 | DEBUG    | alpha.engine | SNXUSDT: regime margin nan below filter — no entry
+2026-03-23 16:00:05 | DEBUG    | alpha.engine | COMPUSDT: regime margin nan below filter — no entry
+2026-03-23 16:00:05 | DEBUG    | alpha.engine | BNBUSDT: no signal — vol_zscore below threshold: prev=1.48, last=-0.52 (need >1.5)
+2026-03-23 16:00:05 | INFO     | alpha.engine | ─── CYCLE #50 DONE | 0.2s | entries=0 exits=0 be=0 ───
+2026-03-23 16:00:05 | INFO     | alpha.engine | Waiting 900s until next 15m boundary ...
+2026-03-23 16:15:05 | INFO     | alpha.engine | ─── CYCLE #51 START | 2026-03-23 10:45 UTC ───
+2026-03-23 16:15:05 | DEBUG    | alpha.engine | AAVEUSDT: no signal — vol_zscore below threshold: prev=1.74, last=-0.30 (need >1.5)
+2026-03-23 16:15:05 | DEBUG    | alpha.engine | SNXUSDT: regime margin nan below filter — no entry
+2026-03-23 16:15:05 | DEBUG    | alpha.engine | COMPUSDT: regime margin nan below filter — no entry
+2026-03-23 16:15:05 | DEBUG    | alpha.engine | BNBUSDT: no signal — vol_zscore below threshold: prev=1.48, last=-0.52 (need >1.5)
+2026-03-23 16:15:05 | INFO     | alpha.engine | ─── CYCLE #51 DONE | 0.2s | entries=0 exits=0 be=0 ───
+2026-03-23 16:15:05 | INFO     | alpha.engine | Waiting 900s until next 15m boundary ...
+2026-03-23 16:30:06 | INFO     | alpha.engine | ─── CYCLE #52 START | 2026-03-23 11:00 UTC ───
+2026-03-23 16:30:06 | INFO     | alpha.engine | AAVEUSDT: retraining HMM ...
+2026-03-23 16:30:06 | INFO     | alpha.engine | SNXUSDT: retraining HMM ...
+2026-03-23 16:30:06 | INFO     | alpha.engine | COMPUSDT: retraining HMM ...
+2026-03-23 16:30:06 | INFO     | alpha.engine | BNBUSDT: retraining HMM ...
+2026-03-23 16:30:06 | DEBUG    | alpha.engine | AAVEUSDT: no signal — vol_zscore below threshold: prev=1.74, last=-0.30 (need >1.5)
+2026-03-23 16:30:06 | DEBUG    | alpha.engine | SNXUSDT: regime margin nan below filter — no entry
+2026-03-23 16:30:06 | DEBUG    | alpha.engine | COMPUSDT: regime margin nan below filter — no entry
+2026-03-23 16:30:06 | DEBUG    | alpha.engine | BNBUSDT: no signal — vol_zscore below threshold: prev=1.48, last=-0.52 (need >1.5)
+2026-03-23 16:30:06 | INFO     | alpha.engine | ─── CYCLE #52 DONE | 0.4s | entries=0 exits=0 be=0 ───
+2026-03-23 16:30:06 | INFO     | alpha.engine | Waiting 899s until next 15m boundary ...
+2026-03-23 16:45:05 | INFO     | alpha.engine | ─── CYCLE #53 START | 2026-03-23 11:15 UTC ───
+2026-03-23 16:45:05 | DEBUG    | alpha.engine | AAVEUSDT: no signal — vol_zscore below threshold: prev=1.74, last=-0.30 (need >1.5)
+2026-03-23 16:45:05 | DEBUG    | alpha.engine | SNXUSDT: regime margin nan below filter — no entry
+2026-03-23 16:45:05 | DEBUG    | alpha.engine | COMPUSDT: regime margin nan below filter — no entry
+2026-03-23 16:45:05 | DEBUG    | alpha.engine | BNBUSDT: no signal — vol_zscore below threshold: prev=1.48, last=-0.52 (need >1.5)
+2026-03-23 16:45:06 | INFO     | alpha.engine | ─── CYCLE #53 DONE | 1.0s | entries=0 exits=0 be=0 ───
+2026-03-23 16:45:06 | INFO     | alpha.engine | Waiting 899s until next 15m boundary ...
+2026-03-23 17:00:05 | INFO     | alpha.engine | ─── CYCLE #54 START | 2026-03-23 11:30 UTC ───
+2026-03-23 17:00:05 | DEBUG    | alpha.engine | AAVEUSDT: no signal — vol_zscore below threshold: prev=1.74, last=-0.30 (need >1.5)
+2026-03-23 17:00:05 | DEBUG    | alpha.engine | SNXUSDT: regime margin nan below filter — no entry
+2026-03-23 17:00:05 | DEBUG    | alpha.engine | COMPUSDT: regime margin nan below filter — no entry
+2026-03-23 17:00:05 | DEBUG    | alpha.engine | BNBUSDT: no signal — vol_zscore below threshold: prev=1.48, last=-0.52 (need >1.5)
+2026-03-23 17:00:05 | INFO     | alpha.engine | ─── CYCLE #54 DONE | 0.3s | entries=0 exits=0 be=0 ───
+2026-03-23 17:00:05 | INFO     | alpha.engine | Waiting 900s until next 15m boundary ...
+2026-03-23 17:15:05 | INFO     | alpha.engine | ─── CYCLE #55 START | 2026-03-23 11:45 UTC ───
+2026-03-23 17:15:06 | DEBUG    | alpha.engine | AAVEUSDT: no signal — vol_zscore below threshold: prev=1.74, last=-0.30 (need >1.5)
+2026-03-23 17:15:06 | DEBUG    | alpha.engine | SNXUSDT: regime margin nan below filter — no entry
+2026-03-23 17:15:06 | DEBUG    | alpha.engine | COMPUSDT: regime margin nan below filter — no entry
+2026-03-23 17:15:06 | DEBUG    | alpha.engine | BNBUSDT: no signal — vol_zscore below threshold: prev=1.48, last=-0.52 (need >1.5)
+2026-03-23 17:15:06 | INFO     | alpha.engine | ─── CYCLE #55 DONE | 1.2s | entries=0 exits=0 be=0 ───
+2026-03-23 17:15:06 | INFO     | alpha.engine | Waiting 899s until next 15m boundary ...
+2026-03-23 17:30:05 | INFO     | alpha.engine | ─── CYCLE #56 START | 2026-03-23 12:00 UTC ───
+2026-03-23 17:30:06 | INFO     | alpha.engine | AAVEUSDT: retraining HMM ...
+2026-03-23 17:30:06 | INFO     | alpha.engine | SNXUSDT: retraining HMM ...
+2026-03-23 17:30:06 | INFO     | alpha.engine | COMPUSDT: retraining HMM ...
+2026-03-23 17:30:06 | INFO     | alpha.engine | BNBUSDT: retraining HMM ...
+2026-03-23 17:30:06 | DEBUG    | alpha.engine | AAVEUSDT: no signal — vol_zscore below threshold: prev=1.74, last=-0.30 (need >1.5)
+2026-03-23 17:30:06 | DEBUG    | alpha.engine | SNXUSDT: regime margin nan below filter — no entry
+2026-03-23 17:30:06 | DEBUG    | alpha.engine | COMPUSDT: regime margin nan below filter — no entry
+2026-03-23 17:30:06 | DEBUG    | alpha.engine | BNBUSDT: no signal — vol_zscore below threshold: prev=1.48, last=-0.52 (need >1.5)
+2026-03-23 17:30:06 | INFO     | alpha.engine | ─── CYCLE #56 DONE | 0.6s | entries=0 exits=0 be=0 ───
+2026-03-23 17:30:06 | INFO     | alpha.engine | Waiting 899s until next 15m boundary ...
+2026-03-23 17:45:05 | INFO     | alpha.engine | ─── CYCLE #57 START | 2026-03-23 12:15 UTC ───
+2026-03-23 17:45:05 | DEBUG    | alpha.engine | AAVEUSDT: no signal — vol_zscore below threshold: prev=1.74, last=-0.30 (need >1.5)
+2026-03-23 17:45:05 | DEBUG    | alpha.engine | SNXUSDT: regime margin nan below filter — no entry
+2026-03-23 17:45:05 | DEBUG    | alpha.engine | COMPUSDT: regime margin nan below filter — no entry
+2026-03-23 17:45:05 | DEBUG    | alpha.engine | BNBUSDT: no signal — vol_zscore below threshold: prev=1.48, last=-0.52 (need >1.5)
+2026-03-23 17:45:05 | INFO     | alpha.engine | ─── CYCLE #57 DONE | 0.4s | entries=0 exits=0 be=0 ───
+2026-03-23 17:45:05 | INFO     | alpha.engine | Waiting 900s until next 15m boundary ...
+2026-03-23 18:00:05 | INFO     | alpha.engine | ─── CYCLE #58 START | 2026-03-23 12:30 UTC ───
+2026-03-23 18:00:06 | DEBUG    | alpha.engine | AAVEUSDT: no signal — vol_zscore below threshold: prev=1.74, last=-0.30 (need >1.5)
+2026-03-23 18:00:06 | DEBUG    | alpha.engine | SNXUSDT: regime margin nan below filter — no entry
+2026-03-23 18:00:06 | DEBUG    | alpha.engine | COMPUSDT: regime margin nan below filter — no entry
+2026-03-23 18:00:06 | DEBUG    | alpha.engine | BNBUSDT: no signal — vol_zscore below threshold: prev=1.48, last=-0.52 (need >1.5)
+2026-03-23 18:00:06 | INFO     | alpha.engine | ─── CYCLE #58 DONE | 0.3s | entries=0 exits=0 be=0 ───
+2026-03-23 18:00:06 | INFO     | alpha.engine | Waiting 899s until next 15m boundary ...
+2026-03-23 18:15:05 | INFO     | alpha.engine | ─── CYCLE #59 START | 2026-03-23 12:45 UTC ───
+2026-03-23 18:15:05 | DEBUG    | alpha.engine | AAVEUSDT: no signal — vol_zscore below threshold: prev=1.74, last=-0.30 (need >1.5)
+2026-03-23 18:15:05 | DEBUG    | alpha.engine | SNXUSDT: regime margin nan below filter — no entry
+2026-03-23 18:15:05 | DEBUG    | alpha.engine | COMPUSDT: regime margin nan below filter — no entry
+2026-03-23 18:15:05 | DEBUG    | alpha.engine | BNBUSDT: no signal — vol_zscore below threshold: prev=1.48, last=-0.52 (need >1.5)
+2026-03-23 18:15:05 | INFO     | alpha.engine | ─── CYCLE #59 DONE | 0.4s | entries=0 exits=0 be=0 ───
+2026-03-23 18:15:05 | INFO     | alpha.engine | Waiting 900s until next 15m boundary ...
+2026-03-23 18:30:05 | INFO     | alpha.engine | ─── CYCLE #60 START | 2026-03-23 13:00 UTC ───
+2026-03-23 18:30:05 | DEBUG    | alpha.engine | AAVEUSDT: no signal — vol_zscore below threshold: prev=1.74, last=-0.30 (need >1.5)
+2026-03-23 18:30:05 | DEBUG    | alpha.engine | SNXUSDT: regime margin nan below filter — no entry
+2026-03-23 18:30:05 | DEBUG    | alpha.engine | COMPUSDT: regime margin nan below filter — no entry
+2026-03-23 18:30:05 | DEBUG    | alpha.engine | BNBUSDT: no signal — vol_zscore below threshold: prev=1.48, last=-0.52 (need >1.5)
+2026-03-23 18:30:05 | INFO     | alpha.engine | ─── CYCLE #60 DONE | 0.2s | entries=0 exits=0 be=0 ───
+2026-03-23 18:30:05 | INFO     | alpha.engine | Waiting 900s until next 15m boundary ...
+2026-03-23 18:45:05 | INFO     | alpha.engine | ─── CYCLE #61 START | 2026-03-23 13:15 UTC ───
+2026-03-23 18:45:06 | INFO     | alpha.engine | AAVEUSDT: retraining HMM ...
+2026-03-23 18:45:06 | INFO     | alpha.engine | SNXUSDT: retraining HMM ...
+2026-03-23 18:45:06 | INFO     | alpha.engine | COMPUSDT: retraining HMM ...
+2026-03-23 18:45:06 | INFO     | alpha.engine | BNBUSDT: retraining HMM ...
+2026-03-23 18:45:06 | DEBUG    | alpha.engine | AAVEUSDT: no signal — vol_zscore below threshold: prev=1.74, last=-0.30 (need >1.5)
+2026-03-23 18:45:06 | DEBUG    | alpha.engine | SNXUSDT: regime margin nan below filter — no entry
+2026-03-23 18:45:06 | DEBUG    | alpha.engine | COMPUSDT: regime margin nan below filter — no entry
+2026-03-23 18:45:06 | DEBUG    | alpha.engine | BNBUSDT: no signal — vol_zscore below threshold: prev=1.48, last=-0.52 (need >1.5)
+2026-03-23 18:45:06 | INFO     | alpha.engine | ─── CYCLE #61 DONE | 0.4s | entries=0 exits=0 be=0 ───
+2026-03-23 18:45:06 | INFO     | alpha.engine | Waiting 899s until next 15m boundary ...
+2026-03-23 19:00:05 | INFO     | alpha.engine | ─── CYCLE #62 START | 2026-03-23 13:30 UTC ───
+2026-03-23 19:00:05 | DEBUG    | alpha.engine | AAVEUSDT: no signal — vol_zscore below threshold: prev=1.74, last=-0.30 (need >1.5)
+2026-03-23 19:00:05 | DEBUG    | alpha.engine | SNXUSDT: regime margin nan below filter — no entry
+2026-03-23 19:00:05 | DEBUG    | alpha.engine | COMPUSDT: regime margin nan below filter — no entry
+2026-03-23 19:00:05 | DEBUG    | alpha.engine | BNBUSDT: no signal — vol_zscore below threshold: prev=1.48, last=-0.52 (need >1.5)
+2026-03-23 19:00:05 | INFO     | alpha.engine | ─── CYCLE #62 DONE | 0.4s | entries=0 exits=0 be=0 ───
+2026-03-23 19:00:05 | INFO     | alpha.engine | Waiting 900s until next 15m boundary ...
+2026-03-23 19:15:05 | INFO     | alpha.engine | ─── CYCLE #63 START | 2026-03-23 13:45 UTC ───
+2026-03-23 19:15:06 | DEBUG    | alpha.engine | AAVEUSDT: no signal — vol_zscore below threshold: prev=1.74, last=-0.30 (need >1.5)
+2026-03-23 19:15:06 | DEBUG    | alpha.engine | SNXUSDT: regime margin nan below filter — no entry
+2026-03-23 19:15:06 | DEBUG    | alpha.engine | COMPUSDT: regime margin nan below filter — no entry
+2026-03-23 19:15:06 | DEBUG    | alpha.engine | BNBUSDT: no signal — vol_zscore below threshold: prev=1.48, last=-0.52 (need >1.5)
+2026-03-23 19:15:06 | INFO     | alpha.engine | ─── CYCLE #63 DONE | 0.3s | entries=0 exits=0 be=0 ───
+2026-03-23 19:15:06 | INFO     | alpha.engine | Waiting 899s until next 15m boundary ...
+2026-03-23 19:30:05 | INFO     | alpha.engine | ─── CYCLE #64 START | 2026-03-23 14:00 UTC ───
+2026-03-23 19:30:05 | DEBUG    | alpha.engine | AAVEUSDT: no signal — vol_zscore below threshold: prev=1.74, last=-0.30 (need >1.5)
+2026-03-23 19:30:05 | DEBUG    | alpha.engine | SNXUSDT: regime margin nan below filter — no entry
+2026-03-23 19:30:05 | DEBUG    | alpha.engine | COMPUSDT: regime margin nan below filter — no entry
+2026-03-23 19:30:05 | DEBUG    | alpha.engine | BNBUSDT: no signal — vol_zscore below threshold: prev=1.48, last=-0.52 (need >1.5)
+2026-03-23 19:30:05 | INFO     | alpha.engine | ─── CYCLE #64 DONE | 0.2s | entries=0 exits=0 be=0 ───
+2026-03-23 19:30:05 | INFO     | alpha.engine | Waiting 900s until next 15m boundary ...
+2026-03-23 19:45:05 | INFO     | alpha.engine | ─── CYCLE #65 START | 2026-03-23 14:15 UTC ───
+2026-03-23 19:45:05 | DEBUG    | alpha.engine | AAVEUSDT: no signal — vol_zscore below threshold: prev=1.74, last=-0.30 (need >1.5)
+2026-03-23 19:45:05 | DEBUG    | alpha.engine | SNXUSDT: regime margin nan below filter — no entry
+2026-03-23 19:45:05 | DEBUG    | alpha.engine | COMPUSDT: regime margin nan below filter — no entry
+2026-03-23 19:45:05 | DEBUG    | alpha.engine | BNBUSDT: no signal — vol_zscore below threshold: prev=1.48, last=-0.52 (need >1.5)
+2026-03-23 19:45:05 | INFO     | alpha.engine | ─── CYCLE #65 DONE | 0.3s | entries=0 exits=0 be=0 ───
+2026-03-23 19:45:05 | INFO     | alpha.engine | Waiting 900s until next 15m boundary ...
+2026-03-23 20:00:05 | INFO     | alpha.engine | ─── CYCLE #66 START | 2026-03-23 14:30 UTC ───
+2026-03-23 20:00:05 | INFO     | alpha.engine | AAVEUSDT: retraining HMM ...
+2026-03-23 20:00:05 | INFO     | alpha.engine | SNXUSDT: retraining HMM ...
+2026-03-23 20:00:05 | INFO     | alpha.engine | COMPUSDT: retraining HMM ...
+2026-03-23 20:00:05 | INFO     | alpha.engine | BNBUSDT: retraining HMM ...
+2026-03-23 20:00:05 | DEBUG    | alpha.engine | AAVEUSDT: no signal — vol_zscore below threshold: prev=1.74, last=-0.30 (need >1.5)
+2026-03-23 20:00:05 | DEBUG    | alpha.engine | SNXUSDT: regime margin nan below filter — no entry
+2026-03-23 20:00:05 | DEBUG    | alpha.engine | COMPUSDT: regime margin nan below filter — no entry
+2026-03-23 20:00:05 | DEBUG    | alpha.engine | BNBUSDT: no signal — vol_zscore below threshold: prev=1.48, last=-0.52 (need >1.5)
+2026-03-23 20:00:05 | INFO     | alpha.engine | ─── CYCLE #66 DONE | 0.3s | entries=0 exits=0 be=0 ───
+2026-03-23 20:00:05 | INFO     | alpha.engine | Waiting 900s until next 15m boundary ...
+2026-03-23 20:15:05 | INFO     | alpha.engine | ─── CYCLE #67 START | 2026-03-23 14:45 UTC ───
+2026-03-23 20:15:06 | DEBUG    | alpha.engine | AAVEUSDT: no signal — vol_zscore below threshold: prev=1.74, last=-0.30 (need >1.5)
+2026-03-23 20:15:06 | DEBUG    | alpha.engine | SNXUSDT: regime margin nan below filter — no entry
+2026-03-23 20:15:06 | DEBUG    | alpha.engine | COMPUSDT: regime margin nan below filter — no entry
+2026-03-23 20:15:06 | DEBUG    | alpha.engine | BNBUSDT: no signal — vol_zscore below threshold: prev=1.48, last=-0.52 (need >1.5)
+2026-03-23 20:15:06 | INFO     | alpha.engine | ─── CYCLE #67 DONE | 0.3s | entries=0 exits=0 be=0 ───
+2026-03-23 20:15:06 | INFO     | alpha.engine | Waiting 899s until next 15m boundary ...
+2026-03-23 20:30:05 | INFO     | alpha.engine | ─── CYCLE #68 START | 2026-03-23 15:00 UTC ───
+2026-03-23 20:30:05 | DEBUG    | alpha.engine | AAVEUSDT: no signal — vol_zscore below threshold: prev=1.74, last=-0.30 (need >1.5)
+2026-03-23 20:30:05 | DEBUG    | alpha.engine | SNXUSDT: regime margin nan below filter — no entry
+2026-03-23 20:30:05 | DEBUG    | alpha.engine | COMPUSDT: regime margin nan below filter — no entry
+2026-03-23 20:30:05 | DEBUG    | alpha.engine | BNBUSDT: no signal — vol_zscore below threshold: prev=1.48, last=-0.52 (need >1.5)
+2026-03-23 20:30:05 | INFO     | alpha.engine | ─── CYCLE #68 DONE | 0.6s | entries=0 exits=0 be=0 ───
+2026-03-23 20:30:05 | INFO     | alpha.engine | Waiting 900s until next 15m boundary ...
+2026-03-23 20:45:05 | INFO     | alpha.engine | ─── CYCLE #69 START | 2026-03-23 15:15 UTC ───
+2026-03-23 20:45:06 | DEBUG    | alpha.engine | AAVEUSDT: no signal — vol_zscore below threshold: prev=1.74, last=-0.30 (need >1.5)
+2026-03-23 20:45:06 | DEBUG    | alpha.engine | SNXUSDT: regime margin nan below filter — no entry
+2026-03-23 20:45:06 | DEBUG    | alpha.engine | COMPUSDT: regime margin nan below filter — no entry
+2026-03-23 20:45:06 | DEBUG    | alpha.engine | BNBUSDT: no signal — vol_zscore below threshold: prev=1.48, last=-0.52 (need >1.5)
+2026-03-23 20:45:06 | INFO     | alpha.engine | ─── CYCLE #69 DONE | 0.3s | entries=0 exits=0 be=0 ───
+2026-03-23 20:45:06 | INFO     | alpha.engine | Waiting 899s until next 15m boundary ...
+2026-03-23 21:00:05 | INFO     | alpha.engine | ─── CYCLE #70 START | 2026-03-23 15:30 UTC ───
+2026-03-23 21:00:05 | DEBUG    | alpha.engine | AAVEUSDT: no signal — vol_zscore below threshold: prev=1.74, last=-0.30 (need >1.5)
+2026-03-23 21:00:05 | DEBUG    | alpha.engine | SNXUSDT: regime margin nan below filter — no entry
+2026-03-23 21:00:05 | DEBUG    | alpha.engine | COMPUSDT: regime margin nan below filter — no entry
+2026-03-23 21:00:05 | DEBUG    | alpha.engine | BNBUSDT: no signal — vol_zscore below threshold: prev=1.48, last=-0.52 (need >1.5)
+2026-03-23 21:00:06 | INFO     | alpha.engine | ─── CYCLE #70 DONE | 1.2s | entries=0 exits=0 be=0 ───
+2026-03-23 21:00:06 | INFO     | alpha.engine | Waiting 899s until next 15m boundary ...
+2026-03-23 21:15:05 | INFO     | alpha.engine | ─── CYCLE #71 START | 2026-03-23 15:45 UTC ───
+2026-03-23 21:15:05 | INFO     | alpha.engine | AAVEUSDT: retraining HMM ...
+2026-03-23 21:15:05 | INFO     | alpha.engine | SNXUSDT: retraining HMM ...
+2026-03-23 21:15:05 | INFO     | alpha.engine | COMPUSDT: retraining HMM ...
+2026-03-23 21:15:05 | INFO     | alpha.engine | BNBUSDT: retraining HMM ...
+2026-03-23 21:15:05 | DEBUG    | alpha.engine | AAVEUSDT: no signal — vol_zscore below threshold: prev=1.74, last=-0.30 (need >1.5)
+2026-03-23 21:15:05 | DEBUG    | alpha.engine | SNXUSDT: regime margin nan below filter — no entry
+2026-03-23 21:15:05 | DEBUG    | alpha.engine | COMPUSDT: regime margin nan below filter — no entry
+2026-03-23 21:15:05 | DEBUG    | alpha.engine | BNBUSDT: no signal — vol_zscore below threshold: prev=1.48, last=-0.52 (need >1.5)
+2026-03-23 21:15:05 | INFO     | alpha.engine | ─── CYCLE #71 DONE | 0.4s | entries=0 exits=0 be=0 ───
+2026-03-23 21:15:05 | INFO     | alpha.engine | Waiting 900s until next 15m boundary ...
+2026-03-23 21:30:05 | INFO     | alpha.engine | ─── CYCLE #72 START | 2026-03-23 16:00 UTC ───
+2026-03-23 21:30:05 | DEBUG    | alpha.engine | AAVEUSDT: no signal — vol_zscore below threshold: prev=1.74, last=-0.30 (need >1.5)
+2026-03-23 21:30:05 | DEBUG    | alpha.engine | SNXUSDT: regime margin nan below filter — no entry
+2026-03-23 21:30:05 | DEBUG    | alpha.engine | COMPUSDT: regime margin nan below filter — no entry
+2026-03-23 21:30:05 | DEBUG    | alpha.engine | BNBUSDT: no signal — vol_zscore below threshold: prev=1.48, last=-0.52 (need >1.5)
+2026-03-23 21:30:05 | INFO     | alpha.engine | ─── CYCLE #72 DONE | 0.3s | entries=0 exits=0 be=0 ───
+2026-03-23 21:30:05 | INFO     | alpha.engine | Waiting 900s until next 15m boundary ...
+2026-03-23 21:45:05 | INFO     | alpha.engine | ─── CYCLE #73 START | 2026-03-23 16:15 UTC ───
+2026-03-23 21:45:06 | DEBUG    | alpha.engine | AAVEUSDT: no signal — vol_zscore below threshold: prev=1.74, last=-0.30 (need >1.5)
+2026-03-23 21:45:06 | DEBUG    | alpha.engine | SNXUSDT: regime margin nan below filter — no entry
+2026-03-23 21:45:06 | DEBUG    | alpha.engine | COMPUSDT: regime margin nan below filter — no entry
+2026-03-23 21:45:06 | DEBUG    | alpha.engine | BNBUSDT: no signal — vol_zscore below threshold: prev=1.48, last=-0.52 (need >1.5)
+2026-03-23 21:45:06 | INFO     | alpha.engine | ─── CYCLE #73 DONE | 0.3s | entries=0 exits=0 be=0 ───
+2026-03-23 21:45:06 | INFO     | alpha.engine | Waiting 899s until next 15m boundary ...
+2026-03-23 22:00:05 | INFO     | alpha.engine | ─── CYCLE #74 START | 2026-03-23 16:30 UTC ───
+2026-03-23 22:00:05 | DEBUG    | alpha.engine | AAVEUSDT: no signal — vol_zscore below threshold: prev=1.74, last=-0.30 (need >1.5)
+2026-03-23 22:00:05 | DEBUG    | alpha.engine | SNXUSDT: regime margin nan below filter — no entry
+2026-03-23 22:00:05 | DEBUG    | alpha.engine | COMPUSDT: regime margin nan below filter — no entry
+2026-03-23 22:00:05 | DEBUG    | alpha.engine | BNBUSDT: no signal — vol_zscore below threshold: prev=1.48, last=-0.52 (need >1.5)
+2026-03-23 22:00:05 | INFO     | alpha.engine | ─── CYCLE #74 DONE | 0.3s | entries=0 exits=0 be=0 ───
+2026-03-23 22:00:05 | INFO     | alpha.engine | Waiting 900s until next 15m boundary ...
+2026-03-23 22:15:05 | INFO     | alpha.engine | ─── CYCLE #75 START | 2026-03-23 16:45 UTC ───
+2026-03-23 22:15:05 | INFO     | alpha.engine | AAVEUSDT: retraining HMM ...
+2026-03-23 22:15:05 | INFO     | alpha.engine | SNXUSDT: retraining HMM ...
+2026-03-23 22:15:05 | INFO     | alpha.engine | COMPUSDT: retraining HMM ...
+2026-03-23 22:15:05 | INFO     | alpha.engine | BNBUSDT: retraining HMM ...
+2026-03-23 22:15:05 | DEBUG    | alpha.engine | AAVEUSDT: no signal — vol_zscore below threshold: prev=1.74, last=-0.30 (need >1.5)
+2026-03-23 22:15:05 | DEBUG    | alpha.engine | SNXUSDT: regime margin nan below filter — no entry
+2026-03-23 22:15:05 | DEBUG    | alpha.engine | COMPUSDT: regime margin nan below filter — no entry
+2026-03-23 22:15:05 | DEBUG    | alpha.engine | BNBUSDT: no signal — vol_zscore below threshold: prev=1.48, last=-0.52 (need >1.5)
+2026-03-23 22:15:05 | INFO     | alpha.engine | ─── CYCLE #75 DONE | 0.4s | entries=0 exits=0 be=0 ───
+2026-03-23 22:15:05 | INFO     | alpha.engine | Waiting 900s until next 15m boundary ...
+2026-03-23 22:30:05 | INFO     | alpha.engine | ─── CYCLE #76 START | 2026-03-23 17:00 UTC ───
+2026-03-23 22:30:06 | DEBUG    | alpha.engine | AAVEUSDT: no signal — vol_zscore below threshold: prev=1.74, last=-0.30 (need >1.5)
+2026-03-23 22:30:06 | DEBUG    | alpha.engine | SNXUSDT: regime margin nan below filter — no entry
+2026-03-23 22:30:06 | DEBUG    | alpha.engine | COMPUSDT: regime margin nan below filter — no entry
+2026-03-23 22:30:06 | DEBUG    | alpha.engine | BNBUSDT: no signal — vol_zscore below threshold: prev=1.48, last=-0.52 (need >1.5)
+2026-03-23 22:30:06 | INFO     | alpha.engine | ─── CYCLE #76 DONE | 0.3s | entries=0 exits=0 be=0 ───
+2026-03-23 22:30:06 | INFO     | alpha.engine | Waiting 899s until next 15m boundary ...
+2026-03-23 22:45:05 | INFO     | alpha.engine | ─── CYCLE #77 START | 2026-03-23 17:15 UTC ───
+2026-03-23 22:45:05 | DEBUG    | alpha.engine | AAVEUSDT: no signal — vol_zscore below threshold: prev=1.74, last=-0.30 (need >1.5)
+2026-03-23 22:45:05 | DEBUG    | alpha.engine | SNXUSDT: regime margin nan below filter — no entry
+2026-03-23 22:45:05 | DEBUG    | alpha.engine | COMPUSDT: regime margin nan below filter — no entry
+2026-03-23 22:45:05 | DEBUG    | alpha.engine | BNBUSDT: no signal — vol_zscore below threshold: prev=1.48, last=-0.52 (need >1.5)
+2026-03-23 22:45:05 | INFO     | alpha.engine | ─── CYCLE #77 DONE | 0.2s | entries=0 exits=0 be=0 ───
+2026-03-23 22:45:05 | INFO     | alpha.engine | Waiting 900s until next 15m boundary ...
+2026-03-23 23:00:05 | INFO     | alpha.engine | ─── CYCLE #78 START | 2026-03-23 17:30 UTC ───
+2026-03-23 23:00:05 | DEBUG    | alpha.engine | AAVEUSDT: no signal — vol_zscore below threshold: prev=1.74, last=-0.30 (need >1.5)
+2026-03-23 23:00:05 | DEBUG    | alpha.engine | SNXUSDT: regime margin nan below filter — no entry
+2026-03-23 23:00:05 | DEBUG    | alpha.engine | COMPUSDT: regime margin nan below filter — no entry
+2026-03-23 23:00:05 | DEBUG    | alpha.engine | BNBUSDT: no signal — vol_zscore below threshold: prev=1.48, last=-0.52 (need >1.5)
+2026-03-23 23:00:05 | INFO     | alpha.engine | ─── CYCLE #78 DONE | 0.3s | entries=0 exits=0 be=0 ───
+2026-03-23 23:00:05 | INFO     | alpha.engine | Waiting 900s until next 15m boundary ...
+2026-03-23 23:15:05 | INFO     | alpha.engine | ─── CYCLE #79 START | 2026-03-23 17:45 UTC ───
+2026-03-23 23:15:05 | INFO     | alpha.engine | AAVEUSDT: retraining HMM ...
+2026-03-23 23:15:06 | INFO     | alpha.engine | SNXUSDT: retraining HMM ...
+2026-03-23 23:15:06 | INFO     | alpha.engine | COMPUSDT: retraining HMM ...
+2026-03-23 23:15:06 | INFO     | alpha.engine | BNBUSDT: retraining HMM ...
+2026-03-23 23:15:06 | DEBUG    | alpha.engine | AAVEUSDT: no signal — vol_zscore below threshold: prev=1.74, last=-0.30 (need >1.5)
+2026-03-23 23:15:06 | DEBUG    | alpha.engine | SNXUSDT: regime margin nan below filter — no entry
+2026-03-23 23:15:06 | DEBUG    | alpha.engine | COMPUSDT: regime margin nan below filter — no entry
+2026-03-23 23:15:06 | DEBUG    | alpha.engine | BNBUSDT: no signal — vol_zscore below threshold: prev=1.48, last=-0.52 (need >1.5)
+2026-03-23 23:15:06 | INFO     | alpha.engine | ─── CYCLE #79 DONE | 0.3s | entries=0 exits=0 be=0 ───
+2026-03-23 23:15:06 | INFO     | alpha.engine | Waiting 899s until next 15m boundary ...
+2026-03-23 23:30:05 | INFO     | alpha.engine | ─── CYCLE #80 START | 2026-03-23 18:00 UTC ───
+2026-03-23 23:30:05 | DEBUG    | alpha.engine | AAVEUSDT: no signal — vol_zscore below threshold: prev=1.74, last=-0.30 (need >1.5)
+2026-03-23 23:30:05 | DEBUG    | alpha.engine | SNXUSDT: regime margin nan below filter — no entry
+2026-03-23 23:30:05 | DEBUG    | alpha.engine | COMPUSDT: regime margin nan below filter — no entry
+2026-03-23 23:30:05 | DEBUG    | alpha.engine | BNBUSDT: no signal — vol_zscore below threshold: prev=1.48, last=-0.52 (need >1.5)
+2026-03-23 23:30:05 | INFO     | alpha.engine | ─── CYCLE #80 DONE | 0.3s | entries=0 exits=0 be=0 ───
+2026-03-23 23:30:05 | INFO     | alpha.engine | Waiting 900s until next 15m boundary ...
+2026-03-23 23:45:05 | INFO     | alpha.engine | ─── CYCLE #81 START | 2026-03-23 18:15 UTC ───
+2026-03-23 23:45:05 | DEBUG    | alpha.engine | AAVEUSDT: no signal — vol_zscore below threshold: prev=1.74, last=-0.30 (need >1.5)
+2026-03-23 23:45:05 | DEBUG    | alpha.engine | SNXUSDT: regime margin nan below filter — no entry
+2026-03-23 23:45:05 | DEBUG    | alpha.engine | COMPUSDT: regime margin nan below filter — no entry
+2026-03-23 23:45:05 | DEBUG    | alpha.engine | BNBUSDT: no signal — vol_zscore below threshold: prev=1.48, last=-0.52 (need >1.5)
+2026-03-23 23:45:05 | INFO     | alpha.engine | ─── CYCLE #81 DONE | 0.2s | entries=0 exits=0 be=0 ───
+2026-03-23 23:45:05 | INFO     | alpha.engine | Waiting 900s until next 15m boundary ...
+2026-03-24 00:00:05 | INFO     | alpha.engine | ─── CYCLE #82 START | 2026-03-23 18:30 UTC ───
+2026-03-24 00:00:05 | DEBUG    | alpha.engine | AAVEUSDT: no signal — vol_zscore below threshold: prev=1.74, last=-0.30 (need >1.5)
+2026-03-24 00:00:05 | DEBUG    | alpha.engine | SNXUSDT: regime margin nan below filter — no entry
+2026-03-24 00:00:05 | DEBUG    | alpha.engine | COMPUSDT: regime margin nan below filter — no entry
+2026-03-24 00:00:05 | DEBUG    | alpha.engine | BNBUSDT: no signal — vol_zscore below threshold: prev=1.48, last=-0.52 (need >1.5)
+2026-03-24 00:00:05 | INFO     | alpha.engine | ─── CYCLE #82 DONE | 0.2s | entries=0 exits=0 be=0 ───
+2026-03-24 00:00:05 | INFO     | alpha.engine | Waiting 900s until next 15m boundary ...
+2026-03-24 00:15:05 | INFO     | alpha.engine | ─── CYCLE #83 START | 2026-03-23 18:45 UTC ───
+2026-03-24 00:15:06 | INFO     | alpha.engine | AAVEUSDT: retraining HMM ...
+2026-03-24 00:15:06 | INFO     | alpha.engine | SNXUSDT: retraining HMM ...
+2026-03-24 00:15:06 | INFO     | alpha.engine | COMPUSDT: retraining HMM ...
+2026-03-24 00:15:06 | INFO     | alpha.engine | BNBUSDT: retraining HMM ...
+2026-03-24 00:15:06 | DEBUG    | alpha.engine | AAVEUSDT: no signal — vol_zscore below threshold: prev=1.74, last=-0.30 (need >1.5)
+2026-03-24 00:15:06 | DEBUG    | alpha.engine | SNXUSDT: regime margin nan below filter — no entry
+2026-03-24 00:15:06 | DEBUG    | alpha.engine | COMPUSDT: regime margin nan below filter — no entry
+2026-03-24 00:15:06 | DEBUG    | alpha.engine | BNBUSDT: no signal — vol_zscore below threshold: prev=1.48, last=-0.52 (need >1.5)
+2026-03-24 00:15:06 | INFO     | alpha.engine | ─── CYCLE #83 DONE | 0.4s | entries=0 exits=0 be=0 ───
+2026-03-24 00:15:06 | INFO     | alpha.engine | Waiting 899s until next 15m boundary ...
+2026-03-24 00:30:05 | INFO     | alpha.engine | ─── CYCLE #84 START | 2026-03-23 19:00 UTC ───
+2026-03-24 00:30:05 | DEBUG    | alpha.engine | AAVEUSDT: no signal — vol_zscore below threshold: prev=1.74, last=-0.30 (need >1.5)
+2026-03-24 00:30:05 | DEBUG    | alpha.engine | SNXUSDT: regime margin nan below filter — no entry
+2026-03-24 00:30:05 | DEBUG    | alpha.engine | COMPUSDT: regime margin nan below filter — no entry
+2026-03-24 00:30:05 | DEBUG    | alpha.engine | BNBUSDT: no signal — vol_zscore below threshold: prev=1.48, last=-0.52 (need >1.5)
+2026-03-24 00:30:05 | INFO     | alpha.engine | ─── CYCLE #84 DONE | 0.3s | entries=0 exits=0 be=0 ───
+2026-03-24 00:30:05 | INFO     | alpha.engine | Waiting 900s until next 15m boundary ...
+2026-03-24 00:45:05 | INFO     | alpha.engine | ─── CYCLE #85 START | 2026-03-23 19:15 UTC ───
+2026-03-24 00:45:05 | DEBUG    | alpha.engine | AAVEUSDT: no signal — vol_zscore below threshold: prev=1.74, last=-0.30 (need >1.5)
+2026-03-24 00:45:05 | DEBUG    | alpha.engine | SNXUSDT: regime margin nan below filter — no entry
+2026-03-24 00:45:05 | DEBUG    | alpha.engine | COMPUSDT: regime margin nan below filter — no entry
+2026-03-24 00:45:05 | DEBUG    | alpha.engine | BNBUSDT: no signal — vol_zscore below threshold: prev=1.48, last=-0.52 (need >1.5)
+2026-03-24 00:45:05 | INFO     | alpha.engine | ─── CYCLE #85 DONE | 0.3s | entries=0 exits=0 be=0 ───
+2026-03-24 00:45:05 | INFO     | alpha.engine | Waiting 900s until next 15m boundary ...
+2026-03-24 01:00:05 | INFO     | alpha.engine | ─── CYCLE #86 START | 2026-03-23 19:30 UTC ───
+2026-03-24 01:00:06 | DEBUG    | alpha.engine | AAVEUSDT: no signal — vol_zscore below threshold: prev=1.74, last=-0.30 (need >1.5)
+2026-03-24 01:00:06 | DEBUG    | alpha.engine | SNXUSDT: regime margin nan below filter — no entry
+2026-03-24 01:00:06 | DEBUG    | alpha.engine | COMPUSDT: regime margin nan below filter — no entry
+2026-03-24 01:00:06 | DEBUG    | alpha.engine | BNBUSDT: no signal — vol_zscore below threshold: prev=1.48, last=-0.52 (need >1.5)
+2026-03-24 01:00:06 | INFO     | alpha.engine | ─── CYCLE #86 DONE | 0.3s | entries=0 exits=0 be=0 ───
+2026-03-24 01:00:06 | INFO     | alpha.engine | Waiting 899s until next 15m boundary ...
+2026-03-24 01:15:05 | INFO     | alpha.engine | ─── CYCLE #87 START | 2026-03-23 19:45 UTC ───
+2026-03-24 01:15:05 | DEBUG    | alpha.engine | AAVEUSDT: no signal — vol_zscore below threshold: prev=1.74, last=-0.30 (need >1.5)
+2026-03-24 01:15:05 | DEBUG    | alpha.engine | SNXUSDT: regime margin nan below filter — no entry
+2026-03-24 01:15:05 | DEBUG    | alpha.engine | COMPUSDT: regime margin nan below filter — no entry
+2026-03-24 01:15:05 | DEBUG    | alpha.engine | BNBUSDT: no signal — vol_zscore below threshold: prev=1.48, last=-0.52 (need >1.5)
+2026-03-24 01:15:06 | INFO     | alpha.engine | ─── CYCLE #87 DONE | 1.0s | entries=0 exits=0 be=0 ───
+2026-03-24 01:15:06 | INFO     | alpha.engine | Waiting 899s until next 15m boundary ...
+2026-03-24 01:30:05 | INFO     | alpha.engine | ─── CYCLE #88 START | 2026-03-23 20:00 UTC ───
+2026-03-24 01:30:05 | INFO     | alpha.engine | AAVEUSDT: retraining HMM ...
+2026-03-24 01:30:05 | INFO     | alpha.engine | SNXUSDT: retraining HMM ...
+2026-03-24 01:30:05 | INFO     | alpha.engine | COMPUSDT: retraining HMM ...
+2026-03-24 01:30:05 | INFO     | alpha.engine | BNBUSDT: retraining HMM ...
+2026-03-24 01:30:05 | DEBUG    | alpha.engine | AAVEUSDT: no signal — vol_zscore below threshold: prev=1.74, last=-0.30 (need >1.5)
+2026-03-24 01:30:05 | DEBUG    | alpha.engine | SNXUSDT: regime margin nan below filter — no entry
+2026-03-24 01:30:05 | DEBUG    | alpha.engine | COMPUSDT: regime margin nan below filter — no entry
+2026-03-24 01:30:05 | DEBUG    | alpha.engine | BNBUSDT: no signal — vol_zscore below threshold: prev=1.48, last=-0.52 (need >1.5)
+2026-03-24 01:30:05 | INFO     | alpha.engine | ─── CYCLE #88 DONE | 0.4s | entries=0 exits=0 be=0 ───
+2026-03-24 01:30:05 | INFO     | alpha.engine | Waiting 900s until next 15m boundary ...
+2026-03-24 01:45:05 | INFO     | alpha.engine | ─── CYCLE #89 START | 2026-03-23 20:15 UTC ───
+2026-03-24 01:45:05 | DEBUG    | alpha.engine | AAVEUSDT: no signal — vol_zscore below threshold: prev=1.74, last=-0.30 (need >1.5)
+2026-03-24 01:45:05 | DEBUG    | alpha.engine | SNXUSDT: regime margin nan below filter — no entry
+2026-03-24 01:45:05 | DEBUG    | alpha.engine | COMPUSDT: regime margin nan below filter — no entry
+2026-03-24 01:45:05 | DEBUG    | alpha.engine | BNBUSDT: no signal — vol_zscore below threshold: prev=1.48, last=-0.52 (need >1.5)
+2026-03-24 01:45:05 | INFO     | alpha.engine | ─── CYCLE #89 DONE | 0.2s | entries=0 exits=0 be=0 ───
+2026-03-24 01:45:05 | INFO     | alpha.engine | Waiting 900s until next 15m boundary ...
+2026-03-24 02:00:05 | INFO     | alpha.engine | ─── CYCLE #90 START | 2026-03-23 20:30 UTC ───
+2026-03-24 02:00:06 | DEBUG    | alpha.engine | AAVEUSDT: no signal — vol_zscore below threshold: prev=1.74, last=-0.30 (need >1.5)
+2026-03-24 02:00:06 | DEBUG    | alpha.engine | SNXUSDT: regime margin nan below filter — no entry
+2026-03-24 02:00:06 | DEBUG    | alpha.engine | COMPUSDT: regime margin nan below filter — no entry
+2026-03-24 02:00:06 | DEBUG    | alpha.engine | BNBUSDT: no signal — vol_zscore below threshold: prev=1.48, last=-0.52 (need >1.5)
+2026-03-24 02:00:06 | INFO     | alpha.engine | ─── CYCLE #90 DONE | 0.2s | entries=0 exits=0 be=0 ───
+2026-03-24 02:00:06 | INFO     | alpha.engine | Waiting 899s until next 15m boundary ...
+2026-03-24 02:15:05 | INFO     | alpha.engine | ─── CYCLE #91 START | 2026-03-23 20:45 UTC ───
+2026-03-24 02:15:44 | WARNING  | alpha.engine | No data for AAVEUSDT this cycle — skipping
+2026-03-24 02:15:44 | WARNING  | alpha.engine | No data for SNXUSDT this cycle — skipping
+2026-03-24 02:15:44 | DEBUG    | alpha.engine | COMPUSDT: regime margin nan below filter — no entry
+2026-03-24 02:15:44 | DEBUG    | alpha.engine | BNBUSDT: no signal — vol_zscore below threshold: prev=-0.99, last=-1.04 (need >1.5)
+2026-03-24 02:15:44 | INFO     | alpha.engine | ─── CYCLE #91 DONE | 39.1s | entries=0 exits=0 be=0 ───
+2026-03-24 02:15:44 | INFO     | alpha.engine | Waiting 861s until next 15m boundary ...
+2026-03-24 02:30:05 | INFO     | alpha.engine | ─── CYCLE #92 START | 2026-03-23 21:00 UTC ───
+2026-03-24 02:30:10 | WARNING  | alpha.engine | No data for SNXUSDT this cycle — skipping
+2026-03-24 02:30:10 | INFO     | alpha.engine | AAVEUSDT: retraining HMM ...
+2026-03-24 02:30:10 | INFO     | alpha.engine | COMPUSDT: retraining HMM ...
+2026-03-24 02:30:10 | INFO     | alpha.engine | BNBUSDT: retraining HMM ...
+2026-03-24 02:30:10 | DEBUG    | alpha.engine | AAVEUSDT: no signal — vol_zscore below threshold: prev=0.39, last=0.68 (need >1.5)
+2026-03-24 02:30:10 | DEBUG    | alpha.engine | COMPUSDT: no signal — vol_zscore below threshold: prev=-0.57, last=-1.95 (need >1.5)
+2026-03-24 02:30:10 | DEBUG    | alpha.engine | BNBUSDT: no signal — vol_zscore below threshold: prev=-0.99, last=-1.04 (need >1.5)
+2026-03-24 02:30:10 | INFO     | alpha.engine | ─── CYCLE #92 DONE | 5.3s | entries=0 exits=0 be=0 ───
+2026-03-24 02:30:10 | INFO     | alpha.engine | Waiting 895s until next 15m boundary ...
+2026-03-24 02:45:05 | INFO     | alpha.engine | ─── CYCLE #93 START | 2026-03-23 21:15 UTC ───
+2026-03-24 02:45:08 | INFO     | alpha.engine | SNXUSDT: retraining HMM ...
+2026-03-24 02:45:08 | DEBUG    | alpha.engine | AAVEUSDT: no signal — vol_zscore below threshold: prev=0.39, last=0.68 (need >1.5)
+2026-03-24 02:45:08 | DEBUG    | alpha.engine | SNXUSDT: no signal — vol_zscore below threshold: prev=-0.99, last=0.63 (need >1.5)
+2026-03-24 02:45:08 | DEBUG    | alpha.engine | COMPUSDT: no signal — vol_zscore below threshold: prev=-0.57, last=-1.95 (need >1.5)
+2026-03-24 02:45:08 | DEBUG    | alpha.engine | BNBUSDT: no signal — vol_zscore below threshold: prev=-0.99, last=-1.04 (need >1.5)
+2026-03-24 02:45:08 | INFO     | alpha.engine | ─── CYCLE #93 DONE | 2.9s | entries=0 exits=0 be=0 ───
+2026-03-24 02:45:08 | INFO     | alpha.engine | Waiting 897s until next 15m boundary ...
+2026-03-24 03:00:05 | INFO     | alpha.engine | ─── CYCLE #94 START | 2026-03-23 21:30 UTC ───
+2026-03-24 03:00:05 | DEBUG    | alpha.engine | AAVEUSDT: no signal — vol_zscore below threshold: prev=0.39, last=0.68 (need >1.5)
+2026-03-24 03:00:05 | DEBUG    | alpha.engine | SNXUSDT: no signal — vol_zscore below threshold: prev=-0.99, last=0.63 (need >1.5)
+2026-03-24 03:00:05 | DEBUG    | alpha.engine | COMPUSDT: no signal — vol_zscore below threshold: prev=-0.57, last=-1.95 (need >1.5)
+2026-03-24 03:00:05 | DEBUG    | alpha.engine | BNBUSDT: no signal — vol_zscore below threshold: prev=-0.99, last=-1.04 (need >1.5)
+2026-03-24 03:00:05 | INFO     | alpha.engine | ─── CYCLE #94 DONE | 0.2s | entries=0 exits=0 be=0 ───
+2026-03-24 03:00:05 | INFO     | alpha.engine | Waiting 900s until next 15m boundary ...
+2026-03-24 03:15:05 | INFO     | alpha.engine | ─── CYCLE #95 START | 2026-03-23 21:45 UTC ───
+2026-03-24 03:15:05 | DEBUG    | alpha.engine | AAVEUSDT: no signal — vol_zscore below threshold: prev=0.39, last=0.68 (need >1.5)
+2026-03-24 03:15:05 | DEBUG    | alpha.engine | SNXUSDT: no signal — vol_zscore below threshold: prev=-0.99, last=0.63 (need >1.5)
+2026-03-24 03:15:05 | DEBUG    | alpha.engine | COMPUSDT: no signal — vol_zscore below threshold: prev=-0.57, last=-1.95 (need >1.5)
+2026-03-24 03:15:05 | DEBUG    | alpha.engine | BNBUSDT: no signal — vol_zscore below threshold: prev=-0.99, last=-1.04 (need >1.5)
+2026-03-24 03:15:05 | INFO     | alpha.engine | ─── CYCLE #95 DONE | 0.2s | entries=0 exits=0 be=0 ───
+2026-03-24 03:15:05 | INFO     | alpha.engine | Waiting 900s until next 15m boundary ...
+2026-03-24 03:30:05 | INFO     | alpha.engine | ─── CYCLE #96 START | 2026-03-23 22:00 UTC ───
+2026-03-24 03:30:06 | DEBUG    | alpha.engine | AAVEUSDT: no signal — vol_zscore below threshold: prev=0.39, last=0.68 (need >1.5)
+2026-03-24 03:30:06 | DEBUG    | alpha.engine | SNXUSDT: no signal — vol_zscore below threshold: prev=-0.99, last=0.63 (need >1.5)
+2026-03-24 03:30:06 | DEBUG    | alpha.engine | COMPUSDT: no signal — vol_zscore below threshold: prev=-0.57, last=-1.95 (need >1.5)
+2026-03-24 03:30:06 | DEBUG    | alpha.engine | BNBUSDT: no signal — vol_zscore below threshold: prev=-0.99, last=-1.04 (need >1.5)
+2026-03-24 03:30:06 | INFO     | alpha.engine | ─── CYCLE #96 DONE | 0.2s | entries=0 exits=0 be=0 ───
+2026-03-24 03:30:06 | INFO     | alpha.engine | Waiting 899s until next 15m boundary ...
+2026-03-24 03:45:05 | INFO     | alpha.engine | ─── CYCLE #97 START | 2026-03-23 22:15 UTC ───
+2026-03-24 03:45:05 | INFO     | alpha.engine | AAVEUSDT: retraining HMM ...
+2026-03-24 03:45:05 | INFO     | alpha.engine | COMPUSDT: retraining HMM ...
+2026-03-24 03:45:05 | INFO     | alpha.engine | BNBUSDT: retraining HMM ...
+2026-03-24 03:45:05 | DEBUG    | alpha.engine | AAVEUSDT: no signal — vol_zscore below threshold: prev=0.39, last=0.68 (need >1.5)
+2026-03-24 03:45:05 | DEBUG    | alpha.engine | SNXUSDT: no signal — vol_zscore below threshold: prev=-0.99, last=0.63 (need >1.5)
+2026-03-24 03:45:05 | DEBUG    | alpha.engine | COMPUSDT: no signal — vol_zscore below threshold: prev=-0.57, last=-1.95 (need >1.5)
+2026-03-24 03:45:05 | DEBUG    | alpha.engine | BNBUSDT: no signal — vol_zscore below threshold: prev=-0.99, last=-1.04 (need >1.5)
+2026-03-24 03:45:05 | INFO     | alpha.engine | ─── CYCLE #97 DONE | 0.3s | entries=0 exits=0 be=0 ───
+2026-03-24 03:45:05 | INFO     | alpha.engine | Waiting 900s until next 15m boundary ...
+2026-03-24 04:00:05 | INFO     | alpha.engine | ─── CYCLE #98 START | 2026-03-23 22:30 UTC ───
+2026-03-24 04:00:05 | INFO     | alpha.engine | SNXUSDT: retraining HMM ...
+2026-03-24 04:00:05 | DEBUG    | alpha.engine | AAVEUSDT: no signal — vol_zscore below threshold: prev=0.39, last=0.68 (need >1.5)
+2026-03-24 04:00:05 | DEBUG    | alpha.engine | SNXUSDT: no signal — vol_zscore below threshold: prev=-0.99, last=0.63 (need >1.5)
+2026-03-24 04:00:05 | DEBUG    | alpha.engine | COMPUSDT: no signal — vol_zscore below threshold: prev=-0.57, last=-1.95 (need >1.5)
+2026-03-24 04:00:05 | DEBUG    | alpha.engine | BNBUSDT: no signal — vol_zscore below threshold: prev=-0.99, last=-1.04 (need >1.5)
+2026-03-24 04:00:05 | INFO     | alpha.engine | ─── CYCLE #98 DONE | 0.2s | entries=0 exits=0 be=0 ───
+2026-03-24 04:00:05 | INFO     | alpha.engine | Waiting 900s until next 15m boundary ...
+2026-03-24 04:15:05 | INFO     | alpha.engine | ─── CYCLE #99 START | 2026-03-23 22:45 UTC ───
+2026-03-24 04:15:05 | DEBUG    | alpha.engine | AAVEUSDT: no signal — vol_zscore below threshold: prev=0.39, last=0.68 (need >1.5)
+2026-03-24 04:15:05 | DEBUG    | alpha.engine | SNXUSDT: no signal — vol_zscore below threshold: prev=-0.99, last=0.63 (need >1.5)
+2026-03-24 04:15:05 | DEBUG    | alpha.engine | COMPUSDT: no signal — vol_zscore below threshold: prev=-0.57, last=-1.95 (need >1.5)
+2026-03-24 04:15:05 | DEBUG    | alpha.engine | BNBUSDT: no signal — vol_zscore below threshold: prev=-0.99, last=-1.04 (need >1.5)
+2026-03-24 04:15:05 | INFO     | alpha.engine | ─── CYCLE #99 DONE | 0.2s | entries=0 exits=0 be=0 ───
+2026-03-24 04:15:05 | INFO     | alpha.engine | Waiting 900s until next 15m boundary ...
+2026-03-24 04:30:05 | INFO     | alpha.engine | ─── CYCLE #100 START | 2026-03-23 23:00 UTC ───
+2026-03-24 04:30:06 | DEBUG    | alpha.engine | AAVEUSDT: no signal — vol_zscore below threshold: prev=0.39, last=0.68 (need >1.5)
+2026-03-24 04:30:06 | DEBUG    | alpha.engine | SNXUSDT: no signal — vol_zscore below threshold: prev=-0.99, last=0.63 (need >1.5)
+2026-03-24 04:30:06 | DEBUG    | alpha.engine | COMPUSDT: no signal — vol_zscore below threshold: prev=-0.57, last=-1.95 (need >1.5)
+2026-03-24 04:30:06 | DEBUG    | alpha.engine | BNBUSDT: no signal — vol_zscore below threshold: prev=-0.99, last=-1.04 (need >1.5)
+2026-03-24 04:30:06 | INFO     | alpha.engine | ─── CYCLE #100 DONE | 0.2s | entries=0 exits=0 be=0 ───
+2026-03-24 04:30:06 | INFO     | alpha.engine | Waiting 899s until next 15m boundary ...
+2026-03-24 04:45:05 | INFO     | alpha.engine | ─── CYCLE #101 START | 2026-03-23 23:15 UTC ───
+2026-03-24 04:45:05 | DEBUG    | alpha.engine | AAVEUSDT: no signal — vol_zscore below threshold: prev=0.39, last=0.68 (need >1.5)
+2026-03-24 04:45:05 | DEBUG    | alpha.engine | SNXUSDT: no signal — vol_zscore below threshold: prev=-0.99, last=0.63 (need >1.5)
+2026-03-24 04:45:05 | DEBUG    | alpha.engine | COMPUSDT: no signal — vol_zscore below threshold: prev=-0.57, last=-1.95 (need >1.5)
+2026-03-24 04:45:05 | DEBUG    | alpha.engine | BNBUSDT: no signal — vol_zscore below threshold: prev=-0.99, last=-1.04 (need >1.5)
+2026-03-24 04:45:05 | INFO     | alpha.engine | ─── CYCLE #101 DONE | 0.2s | entries=0 exits=0 be=0 ───
+2026-03-24 04:45:05 | INFO     | alpha.engine | Waiting 900s until next 15m boundary ...
+2026-03-24 05:00:05 | INFO     | alpha.engine | ─── CYCLE #102 START | 2026-03-23 23:30 UTC ───
+2026-03-24 05:00:05 | INFO     | alpha.engine | AAVEUSDT: retraining HMM ...
+2026-03-24 05:00:05 | INFO     | alpha.engine | SNXUSDT: retraining HMM ...
+2026-03-24 05:00:05 | INFO     | alpha.engine | COMPUSDT: retraining HMM ...
+2026-03-24 05:00:05 | INFO     | alpha.engine | BNBUSDT: retraining HMM ...
+2026-03-24 05:00:05 | DEBUG    | alpha.engine | AAVEUSDT: no signal — vol_zscore below threshold: prev=0.39, last=0.68 (need >1.5)
+2026-03-24 05:00:05 | DEBUG    | alpha.engine | SNXUSDT: no signal — vol_zscore below threshold: prev=-0.99, last=0.63 (need >1.5)
+2026-03-24 05:00:05 | DEBUG    | alpha.engine | COMPUSDT: no signal — vol_zscore below threshold: prev=-0.57, last=-1.95 (need >1.5)
+2026-03-24 05:00:05 | DEBUG    | alpha.engine | BNBUSDT: no signal — vol_zscore below threshold: prev=-0.99, last=-1.04 (need >1.5)
+2026-03-24 05:00:05 | INFO     | alpha.engine | ─── CYCLE #102 DONE | 0.3s | entries=0 exits=0 be=0 ───
+2026-03-24 05:00:05 | INFO     | alpha.engine | Waiting 900s until next 15m boundary ...
+2026-03-24 05:15:05 | INFO     | alpha.engine | ─── CYCLE #103 START | 2026-03-23 23:45 UTC ───
+2026-03-24 05:15:05 | DEBUG    | alpha.engine | AAVEUSDT: no signal — vol_zscore below threshold: prev=0.39, last=0.68 (need >1.5)
+2026-03-24 05:15:05 | DEBUG    | alpha.engine | SNXUSDT: no signal — vol_zscore below threshold: prev=-0.99, last=0.63 (need >1.5)
+2026-03-24 05:15:05 | DEBUG    | alpha.engine | COMPUSDT: no signal — vol_zscore below threshold: prev=-0.57, last=-1.95 (need >1.5)
+2026-03-24 05:15:05 | DEBUG    | alpha.engine | BNBUSDT: no signal — vol_zscore below threshold: prev=-0.99, last=-1.04 (need >1.5)
+2026-03-24 05:15:05 | INFO     | alpha.engine | ─── CYCLE #103 DONE | 0.2s | entries=0 exits=0 be=0 ───
+2026-03-24 05:15:05 | INFO     | alpha.engine | Waiting 900s until next 15m boundary ...

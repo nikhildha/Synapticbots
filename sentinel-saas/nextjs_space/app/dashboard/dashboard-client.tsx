@@ -538,11 +538,11 @@ export function DashboardClient({ user, stats, bots, recentTrades }: DashboardCl
             }}>
               {/* Paper Trades Card (left) */}
               <PaperTradesCard
+                activeTrades={paperActiveTrades.length}
                 activeBots={paperBots}
-                deployedCapital={liveStats.paperCapitalDeployed}
                 pnl={liveStats.paperTotalPnl}
                 pnlPct={liveStats.paperPnlPct}
-                segmentsScanned={segmentsScanned}
+                deployedCapital={liveStats.paperCapitalDeployed}
                 totalTrades={paperTotalTrades}
                 wins={paperWins}
                 losses={paperLosses}
@@ -699,58 +699,30 @@ export function DashboardClient({ user, stats, bots, recentTrades }: DashboardCl
 
               {/* Live Trades Card (right) */}
               <LiveTradesCard
+                activeTrades={liveModeTrades.length}
                 activeBots={liveBots}
-                deployedCapital={liveStats.liveCapitalDeployed}
                 pnl={liveStats.liveTotalPnl}
                 pnlPct={liveStats.livePnlPct}
-                segmentsScanned={segmentsScanned}
+                deployedCapital={liveStats.liveCapitalDeployed}
                 totalTrades={liveTotalTrades}
                 wins={liveWins}
                 losses={liveLosses}
-                binanceBalance={walletBalance.binance}
-                coinDcxBalance={walletBalance.coindcx}
+                walletBalance={
+                  walletBalance.binance != null || walletBalance.coindcx != null
+                    ? (walletBalance.binance ?? 0) + (walletBalance.coindcx ?? 0)
+                    : null
+                }
               />
             </div>
           </motion.div>
 
 
-          {/* ═══ Row 4: Athena Intelligence ═══ */}
-          {(botState?.athena?.enabled || bots?.some((b: any) => (b.name || '').toLowerCase().includes('athena'))) && (
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.27 }}
-              className="mt-6 mb-8"
-            >
-              <div className="flex flex-col w-full">
-                <AthenaPanel
-                  athena={botState?.athena || { enabled: true, recent_decisions: [], model: 'gemini-2.5-flash' }}
-                  coinStates={multi?.coin_states}
-                  perBot={botState?.perBot || {}}
-                  vetoLog={multi?.veto_log || []}
-                />
-              </div>
-            </motion.div>
-          )}
-
-          {/* ═══ Row 5: Institutional Segment Heatmap ═══ */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.24 }}
-            className="mb-8"
-          >
-            <SegmentHeatmap
-              heatmapData={botState?.heatmap || null}
-            />
-          </motion.div>
-
-          {/* ═══ Row 5: Bots Section ═══ */}
+          {/* ═══ Row 4: Bots Section ═══ */}
 
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.25 }}
+            transition={{ delay: 0.22 }}
             className="mb-12"
           >
             <div className="flex items-center justify-between mb-6">
@@ -809,6 +781,33 @@ export function DashboardClient({ user, stats, bots, recentTrades }: DashboardCl
             )}
           </motion.div>
 
+
+          {/* ═══ Row 5: Athena Intelligence + Segment Heatmap (side-by-side) ═══ */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.27 }}
+            className="mb-8"
+          >
+            <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '20px', alignItems: 'start' }}>
+              {/* Athena Panel — 67% width */}
+              {(botState?.athena?.enabled || bots?.some((b: any) => (b.name || '').toLowerCase().includes('athena'))) && (
+                <div className="flex flex-col w-full">
+                  <AthenaPanel
+                    athena={botState?.athena || { enabled: true, recent_decisions: [], model: 'gemini-2.5-flash' }}
+                    coinStates={multi?.coin_states}
+                    perBot={botState?.perBot || {}}
+                    vetoLog={multi?.veto_log || []}
+                  />
+                </div>
+              )}
+
+              {/* Segment Heatmap — 33% width */}
+              <SegmentHeatmap
+                heatmapData={botState?.heatmap || null}
+              />
+            </div>
+          </motion.div>
 
           {/* ═══ Row 6: Brain Execution Scan Summary ═══ */}
           <motion.div

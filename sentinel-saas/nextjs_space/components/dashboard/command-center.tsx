@@ -377,141 +377,139 @@ export function RegimeCard({ regime, confidence, symbol, macroRegime, trend15m, 
     );
 }
 
-// ─── Shared mini-cell styles ─────────────────────────────────────────────────
-const cellStyle = (bg: string, border: string): React.CSSProperties => ({
+// ─── Shared mini-cell styles (Redesigned) ────────────────────────────────────
+const cellStyleClean = (): React.CSSProperties => ({
     padding: '10px 12px', borderRadius: 12,
-    background: bg, border: `1px solid ${border}`,
+    background: 'rgba(255,255,255,0.02)',
+    border: '1px solid rgba(255,255,255,0.06)',
     display: 'flex', flexDirection: 'column',
     justifyContent: 'space-between', gap: 2,
 });
-const cellLabel: React.CSSProperties = { fontSize: '9px', fontWeight: 700, color: '#4B6080', letterSpacing: '1px', textTransform: 'uppercase' };
-const cellValue = (color: string, size = '20px'): React.CSSProperties => ({ fontSize: size, fontWeight: 800, fontFamily: 'var(--font-mono, monospace)', color, lineHeight: 1 });
+const cellLabelClean: React.CSSProperties = { fontSize: '9px', fontWeight: 700, color: '#6B7280', letterSpacing: '1.2px', textTransform: 'uppercase' };
+const cellValueClean = (size = '22px'): React.CSSProperties => ({ fontSize: size, fontWeight: 800, fontFamily: 'var(--font-mono, monospace)', color: '#E5E7EB', lineHeight: 1 });
 
-// ─── Paper Trades Card (Left) ────────────────────────────────────────────────
+// ─── Trades Summary Card ─────────────────────────────────────────────────────
 interface TradesCardProps {
+    activeTrades: number;
     activeBots: number;
-    deployedCapital: number;
     pnl: number;
     pnlPct: number;
-    segmentsScanned: number;
+    deployedCapital: number;
+    totalCapital?: number;
     totalTrades: number;
     wins: number;
     losses: number;
-    // Live-only extras
-    binanceBalance?: number | null;
-    coinDcxBalance?: number | null;
+    // Live-only: wallet balance replaces capital
+    walletBalance?: number | null;
 }
 
-function _TradesCard({ title, accent, activeBots, deployedCapital, pnl, pnlPct, segmentsScanned, totalTrades, wins, losses, binanceBalance, coinDcxBalance }: TradesCardProps & { title: string; accent: string }) {
+function _TradesCard({ title, accent, activeTrades, activeBots, pnl, pnlPct, deployedCapital, totalCapital, totalTrades, wins, losses, walletBalance }: TradesCardProps & { title: string; accent: string }) {
     const pSign = (v: number) => v >= 0 ? '+' : '';
-    const pnlColor = (v: number) => v >= 0 ? '#00FF88' : '#FF3B5C';
+    const pnlColor = (v: number) => v >= 0 ? '#22C55E' : '#EF4444';
     const fmtAmt = (v: number) => `${pSign(v)}$${Math.abs(v).toFixed(2)}`;
-    const showWallet = binanceBalance != null || coinDcxBalance != null;
+    const winRate = totalTrades > 0 ? Math.round((wins / totalTrades) * 100) : 0;
+    const showWallet = walletBalance != null;
 
     return (
         <div style={{
             background: 'linear-gradient(160deg, rgba(8,14,26,0.97) 0%, rgba(4,8,16,0.99) 100%)',
             backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)',
-            border: `1px solid ${accent}22`,
+            border: '1px solid rgba(255,255,255,0.06)',
             borderRadius: 22, padding: '14px 16px 16px',
             position: 'relative', overflow: 'hidden',
             boxShadow: '0 0 40px rgba(0,0,0,0.8), inset 0 1px 0 rgba(255,255,255,0.04)',
             display: 'flex', flexDirection: 'column' as const,
         }}>
-            {/* Top accent */}
-            <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '1px', background: `linear-gradient(90deg, transparent, ${accent}88, transparent)` }} />
+            {/* Top accent line */}
+            <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '1px', background: `linear-gradient(90deg, transparent, ${accent}66, transparent)` }} />
 
-            {/* Header */}
-            <div style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase' as const, letterSpacing: '2.5px', color: accent, marginBottom: 10 }}>
-                {title}
+            {/* Header with status dot */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+                <div style={{ width: 7, height: 7, borderRadius: '50%', background: accent, boxShadow: `0 0 8px ${accent}88` }} />
+                <div style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase' as const, letterSpacing: '2.5px', color: '#9CA3AF' }}>
+                    {title}
+                </div>
             </div>
 
             {/* 2×3 grid of metrics */}
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, flex: 1 }}>
-                {/* 1. Active Bots */}
-                <div style={cellStyle('rgba(0,229,255,0.04)', 'rgba(0,229,255,0.08)')}>
-                    <div style={cellLabel}>Active Bots</div>
-                    <div style={cellValue('#00E5FF', '24px')}>{activeBots}</div>
+                {/* 1. Active Trades */}
+                <div style={cellStyleClean()}>
+                    <div style={cellLabelClean}>Active Trades</div>
+                    <div style={cellValueClean('24px')}>{activeTrades}</div>
                 </div>
 
-                {/* 2. Deployed Capital */}
-                <div style={cellStyle('rgba(139,92,246,0.04)', 'rgba(139,92,246,0.10)')}>
-                    <div style={cellLabel}>Deployed Capital</div>
-                    <div style={cellValue('#A78BFA', '20px')}>${deployedCapital.toFixed(0)}</div>
+                {/* 2. Active Bots */}
+                <div style={cellStyleClean()}>
+                    <div style={cellLabelClean}>Active Bots</div>
+                    <div style={cellValueClean('24px')}>{activeBots}</div>
                 </div>
 
-                {/* 3. PnL */}
-                <div style={cellStyle(pnl >= 0 ? 'rgba(0,255,136,0.04)' : 'rgba(255,59,92,0.04)', pnl >= 0 ? 'rgba(0,255,136,0.10)' : 'rgba(255,59,92,0.10)')}>
-                    <div style={cellLabel}>PnL</div>
+                {/* 3. Total PnL */}
+                <div style={cellStyleClean()}>
+                    <div style={cellLabelClean}>Total P&L</div>
                     <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, flexWrap: 'wrap' as const }}>
-                        <div style={{ ...cellValue(pnlColor(pnl), '20px'), textShadow: pnl >= 0 ? '0 0 10px rgba(0,255,136,0.4)' : '0 0 10px rgba(255,59,92,0.4)' }}>
+                        <div style={{ ...cellValueClean('20px'), color: pnlColor(pnl), textShadow: `0 0 10px ${pnlColor(pnl)}33` }}>
                             {fmtAmt(pnl)}
                         </div>
-                        <div style={{ fontSize: '11px', fontWeight: 700, color: pnlColor(pnl) }}>
+                        <div style={{ fontSize: '11px', fontWeight: 700, color: pnlColor(pnlPct) }}>
                             {pSign(pnlPct)}{Math.abs(pnlPct).toFixed(1)}%
                         </div>
                     </div>
                 </div>
 
-                {/* 4. Segments Scanned */}
-                <div style={cellStyle('rgba(245,158,11,0.04)', 'rgba(245,158,11,0.10)')}>
-                    <div style={cellLabel}>Segments Scanned</div>
-                    <div style={cellValue('#F59E0B', '24px')}>{segmentsScanned}</div>
+                {/* 4. Capital — shows wallet balance for Live, deployed/total for Paper */}
+                <div style={cellStyleClean()}>
+                    <div style={cellLabelClean}>
+                        {showWallet ? 'Wallet Balance' : 'Capital'}
+                    </div>
+                    {showWallet ? (
+                        <div style={cellValueClean('20px')}>
+                            ${walletBalance != null ? walletBalance.toFixed(2) : '—'}
+                        </div>
+                    ) : (
+                        <div style={{ display: 'flex', alignItems: 'baseline', gap: 4 }}>
+                            <div style={cellValueClean('20px')}>
+                                ${deployedCapital.toFixed(0)}
+                            </div>
+                            {totalCapital != null && totalCapital > 0 && (
+                                <span style={{ fontSize: '11px', color: '#6B7280', fontWeight: 600 }}>
+                                    / ${totalCapital.toFixed(0)}
+                                </span>
+                            )}
+                        </div>
+                    )}
                 </div>
 
                 {/* 5. Total Trades */}
-                <div style={cellStyle('rgba(6,182,212,0.04)', 'rgba(6,182,212,0.10)')}>
-                    <div style={cellLabel}>Total Trades</div>
-                    <div style={cellValue('#06B6D4', '24px')}>{totalTrades}</div>
+                <div style={cellStyleClean()}>
+                    <div style={cellLabelClean}>Total Trades</div>
+                    <div style={cellValueClean('24px')}>{totalTrades}</div>
                 </div>
 
-                {/* 6. Wins / Losses */}
-                <div style={cellStyle('rgba(34,197,94,0.04)', 'rgba(34,197,94,0.10)')}>
-                    <div style={cellLabel}>Wins / Losses</div>
-                    <div style={{ display: 'flex', alignItems: 'baseline', gap: 4 }}>
-                        <span style={{ fontSize: '22px', fontWeight: 800, fontFamily: 'var(--font-mono, monospace)', color: '#22C55E', lineHeight: 1 }}>{wins}</span>
-                        <span style={{ fontSize: '14px', color: '#4B6080', fontWeight: 700 }}>/</span>
-                        <span style={{ fontSize: '22px', fontWeight: 800, fontFamily: 'var(--font-mono, monospace)', color: '#EF4444', lineHeight: 1 }}>{losses}</span>
+                {/* 6. Win Rate */}
+                <div style={cellStyleClean()}>
+                    <div style={cellLabelClean}>Win Rate</div>
+                    <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
+                        <div style={cellValueClean('24px')}>{winRate}%</div>
+                        <div style={{ display: 'flex', alignItems: 'baseline', gap: 3 }}>
+                            <span style={{ fontSize: '11px', fontWeight: 700, color: '#22C55E' }}>{wins}W</span>
+                            <span style={{ fontSize: '10px', color: '#4B5563' }}>/</span>
+                            <span style={{ fontSize: '11px', fontWeight: 700, color: '#EF4444' }}>{losses}L</span>
+                        </div>
                     </div>
                 </div>
             </div>
-
-            {/* Wallet row — only for Live card */}
-            {showWallet && (
-                <>
-                    <div style={{ height: 1, background: 'linear-gradient(90deg, transparent, rgba(0,229,255,0.12), transparent)', margin: '10px 2px 8px' }} />
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-                        <div style={cellStyle('rgba(240,185,11,0.05)', 'rgba(240,185,11,0.15)')}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-                                <span style={{ fontSize: 12 }}>🔶</span>
-                                <span style={{ fontSize: '9px', fontWeight: 700, color: '#F0B90B', letterSpacing: '1px' }}>BINANCE</span>
-                            </div>
-                            <div style={{ fontSize: '16px', fontWeight: 800, fontFamily: 'var(--font-mono, monospace)', color: '#E8EDF5', lineHeight: 1 }}>
-                                {binanceBalance != null ? `$${binanceBalance.toFixed(2)}` : <span style={{ fontSize: 11, color: '#3D4F63' }}>—</span>}
-                            </div>
-                        </div>
-                        <div style={cellStyle('rgba(14,165,233,0.05)', 'rgba(14,165,233,0.15)')}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-                                <span style={{ fontSize: 12 }}>🇮🇳</span>
-                                <span style={{ fontSize: '9px', fontWeight: 700, color: '#0EA5E9', letterSpacing: '1px' }}>COINDCX</span>
-                            </div>
-                            <div style={{ fontSize: '16px', fontWeight: 800, fontFamily: 'var(--font-mono, monospace)', color: '#E8EDF5', lineHeight: 1 }}>
-                                {coinDcxBalance != null ? `$${coinDcxBalance.toFixed(2)}` : <span style={{ fontSize: 11, color: '#3D4F63' }}>—</span>}
-                            </div>
-                        </div>
-                    </div>
-                </>
-            )}
         </div>
     );
 }
 
-export function PaperTradesCard(props: Omit<TradesCardProps, 'binanceBalance' | 'coinDcxBalance'>) {
-    return <_TradesCard title="Paper Trades" accent="#06B6D4" {...props} />;
+export function PaperTradesCard(props: Omit<TradesCardProps, 'walletBalance'>) {
+    return <_TradesCard title="Paper Trading" accent="#06B6D4" {...props} />;
 }
 
 export function LiveTradesCard(props: TradesCardProps) {
-    return <_TradesCard title="Live Trades" accent="#EF4444" {...props} />;
+    return <_TradesCard title="Live Trading" accent="#22C55E" {...props} />;
 }
 
 interface ActivePositionsProps {
