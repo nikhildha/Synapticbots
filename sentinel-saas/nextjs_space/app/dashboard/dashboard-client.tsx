@@ -679,15 +679,6 @@ export function DashboardClient({ user, stats, bots, recentTrades }: DashboardCl
           </motion.div>
 
 
-          {/* ═══ Market Structure Panel (above Synaptic Bots) ═══ */}
-          <motion.div
-            initial={{ opacity: 0, y: 16 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.20 }}
-          >
-            <MarketStructurePanel />
-          </motion.div>
-
 
           {/* ═══ Row 4: Segment Heatmap (left) + Athena Intelligence (right) ═══ */}
           <motion.div
