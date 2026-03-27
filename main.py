@@ -623,8 +623,11 @@ class RegimeMasterBot:
             # Always refresh the segment heatmap JSON every cycle (cheap Binance ticker call)
             # This keeps the dashboard heatmap live even when the pool is not being rebuilt
             try:
+                # Find which segments are currently blocked across the engine
+                blocked_segments = {seg for seg in config.CRYPTO_SEGMENTS.keys() if self._is_segment_in_cooldown(seg)[0]}
+                
                 from coin_scanner import get_hottest_segments as _refresh_heatmap
-                _refresh_heatmap(getattr(config, "SEGMENT_SCAN_LIMIT", 2))
+                _refresh_heatmap(getattr(config, "SEGMENT_SCAN_LIMIT", 2), blocked_segments)
             except Exception as _he:
                 logger.warning("⚠️  Heatmap refresh failed (non-fatal): %s", _he)
 
@@ -640,8 +643,12 @@ class RegimeMasterBot:
             # Refresh the full coin pool every N cycles (or on first run)
             refresh_rotations = max(1, self._SCAN_POOL_SIZE // self._SCAN_BATCH_SIZE)
             if not self._full_coin_pool or self._cycle_count % max(1, config.SCAN_INTERVAL_CYCLES * refresh_rotations) == 1:
-                logger.info("🔄 Refreshing Segment-First coin pool based on %d active bots...", len(config.ENGINE_ACTIVE_BOTS))
-                self._full_coin_pool = get_active_bot_segment_pool(config.ENGINE_ACTIVE_BOTS)
+                # Find which segments are currently blocked across the engine
+                blocked_segments = {seg for seg in config.CRYPTO_SEGMENTS.keys() if self._is_segment_in_cooldown(seg)[0]}
+                
+                logger.info("🔄 Refreshing Segment-First coin pool based on %d active bots (excluding %d blocked segments)...", 
+                            len(config.ENGINE_ACTIVE_BOTS), len(blocked_segments))
+                self._full_coin_pool = get_active_bot_segment_pool(config.ENGINE_ACTIVE_BOTS, blocked_segments)
                 logger.info("📋 Full pool (%d coins): %s ...",
                             len(self._full_coin_pool), ", ".join(self._full_coin_pool[:8]))
 

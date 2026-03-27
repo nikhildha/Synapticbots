@@ -103,7 +103,7 @@ def _save_rotation_state(state):
     except Exception as e:
         logger.error("Failed to save rotation state: %s", e)
 
-def get_hottest_segments(segment_limit=2):
+def get_hottest_segments(segment_limit=2, blocked_segments=None):
     """
     Evaluate segment momentum using cycle-matched timeframes (NOT lagged 24h).
 
@@ -112,9 +112,10 @@ def get_hottest_segments(segment_limit=2):
       Pillar 2 — 1h breadth (50%): are coins *still* participating RIGHT NOW?
 
     Ranked by absolute blended score → both hot longs and hot shorts surface.
-    Direction (LONG/SHORT) is decided downstream by HMM + Athena.
-    Falls back to 24h ticker return if kline fetch fails for a coin.
+    Direction (LONG/SHORT) is decided downstream by HMM + Athena. # Falls back to 24h ticker return if kline fetch fails for a coin.
     """
+    if blocked_segments is None:
+        blocked_segments = set()
     # ── Fetch live ticker for volume weighting (cached 60s) ─────────────────
     try:
         tickers = get_cached_ticker()
@@ -149,6 +150,10 @@ def get_hottest_segments(segment_limit=2):
 
     segment_data = []
     for segment, coins in config.CRYPTO_SEGMENTS.items():
+        if segment in blocked_segments:
+            logger.info("🔒 Skipping segment '%s' in heatmap (currently in cooldown)", segment)
+            continue
+            
         valid_coins = []
         for symbol in coins:
             t = ticker_map.get(symbol)
@@ -418,7 +423,7 @@ def get_segment_pools_for_regime(short_n=None, long_n=None):
 
 
 
-def get_active_bot_segment_pool(active_bots):
+def get_active_bot_segment_pool(active_bots, blocked_segments=None):
     """
     Builds the coin scan pool based on the segment_filter of all active bots.
     If USE_SEGMENT_FILTER=True: ONLY use the top-N hottest segments (SEGMENT_SCAN_LIMIT).
@@ -435,15 +440,15 @@ def get_active_bot_segment_pool(active_bots):
     # Always use ONLY top-N dynamic segments. Ignore individual bot segment_filter settings
     # so we don't merge all 10 segments → 74 coins when all bots are default 'ALL'.
     if use_segment_filter:
-        top_segments = get_hottest_segments(segment_limit)  # writes heatmap JSON
-        logger.info("🎯 Segment filter ON — pool capped to top %d segments: %s",
+        top_segments = get_hottest_segments(segment_limit, blocked_segments)  # writes heatmap JSON
+        logger.info("🎯 Segment filter ON — pool capped to top %d non-blocked segments: %s",
                     segment_limit, ", ".join(top_segments))
         target_segments = set(top_segments)
     else:
         # Segment filter disabled — merge all individual bot segment assignments
         target_segments = set()
         if not active_bots:
-            get_hottest_segments(segment_limit)  # still write heatmap JSON
+            get_hottest_segments(segment_limit, blocked_segments)  # still write heatmap JSON
             target_segments = set(config.CRYPTO_SEGMENTS.keys())
         else:
             for bot in active_bots:
