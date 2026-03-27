@@ -49,7 +49,12 @@ def _get_live_config():
 def _send_request(method, params=None):
     """Send a request to the Telegram Bot API."""
     cfg = _get_live_config()
-    if not cfg["enabled"] or not cfg["token"]:
+    if not cfg["enabled"]:
+        logger.warning("[Telegram] TELEGRAM_ENABLED is not 'true' — message dropped (method=%s). "
+                       "Set TELEGRAM_ENABLED=true in Railway env vars.", method)
+        return None
+    if not cfg["token"]:
+        logger.warning("[Telegram] TELEGRAM_BOT_TOKEN is empty — message dropped (method=%s).", method)
         return None
 
     url = BASE_URL.format(token=cfg["token"], method=method)
@@ -80,7 +85,8 @@ def send_message(text, parse_mode="HTML", silent=False):
     """
     cfg = _get_live_config()
     if not cfg["chat_id"]:
-        logger.debug("Telegram chat_id not set, skipping message.")
+        logger.warning("[Telegram] TELEGRAM_CHAT_ID is empty — message dropped. "
+                       "Set TELEGRAM_CHAT_ID in Railway env vars.")
         return None
 
     return _send_request("sendMessage", {
@@ -89,6 +95,21 @@ def send_message(text, parse_mode="HTML", silent=False):
         "parse_mode": parse_mode,
         "disable_notification": silent,
     })
+
+
+def log_startup_config():
+    """Log Telegram config at startup so prod issues are visible immediately."""
+    cfg = _get_live_config()
+    token_preview = (cfg["token"][:8] + "...") if cfg["token"] else "(not set)"
+    logger.info(
+        "[Telegram] Config loaded — enabled=%s | token=%s | chat_id=%s",
+        cfg["enabled"], token_preview, cfg["chat_id"] or "(not set)"
+    )
+    if not cfg["enabled"]:
+        logger.warning("[Telegram] TELEGRAM_ENABLED is not true — all notifications are OFF. "
+                       "Set TELEGRAM_ENABLED=true in Railway environment variables.")
+    elif not cfg["token"] or not cfg["chat_id"]:
+        logger.warning("[Telegram] token or chat_id missing — messages will be dropped.")
 
 
 def send_message_async(text, **kwargs):

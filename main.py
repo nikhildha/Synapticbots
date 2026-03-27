@@ -47,6 +47,7 @@ logging.basicConfig(
 logging.getLogger("binance.ws.threaded_stream").setLevel(logging.CRITICAL)
 logging.getLogger("binance").setLevel(logging.WARNING)
 logger = logging.getLogger("RegimeMaster")
+tg.log_startup_config()  # logs TELEGRAM_ENABLED / token / chat_id at boot so Railway issues are visible
 
 # ─── Signal Broadcast Audit Logger ───────────────────────────────────────────
 # Separate rotating log file: every signal after Athena verdict, per bot receive

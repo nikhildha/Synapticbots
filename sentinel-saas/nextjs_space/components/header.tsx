@@ -68,16 +68,16 @@ export function Header() {
                     Deploy
                   </Link>
                   <Link href="/trades" className="text-[17px] font-medium text-[var(--color-text-secondary)] hover:text-[var(--color-primary)] transition-colors">
-                    Trade Book
+                    Paper Trade
                   </Link>
                   <Link href="/live" className="text-[17px] font-semibold flex items-center gap-1.5 transition-colors" style={{ color: '#EF4444', textShadow: '0 0 8px rgba(239,68,68,0.35)' }}>
                     <span style={{ display: 'inline-block', width: 7, height: 7, borderRadius: '50%', background: '#EF4444', boxShadow: '0 0 6px #EF4444', animation: 'pulse 1.5s ease-in-out infinite' }} />
-                    Live
+                    Live Trade
                   </Link>
-                  {/* Alpha — standalone quant engine, do not merge with main engine */}
-                  <Link href="/alpha" className="text-[17px] font-semibold transition-colors" style={{ color: '#F0B90B', textShadow: '0 0 8px rgba(240,185,11,0.4)' }}>
+                  {/* Alpha — disabled, coming soon */}
+                  <span className="text-[17px] font-semibold" style={{ color: '#6B7280', cursor: 'not-allowed', opacity: 0.45 }} title="Coming soon">
                     α Alpha
-                  </Link>
+                  </span>
                   {(session.user as any)?.role === 'admin' && (
                     <Link href="/admin" className="text-amber-400 hover:text-amber-300 transition-colors">
                       Admin
@@ -165,18 +165,18 @@ export function Header() {
                     Deploy
                   </Link>
                   <Link href="/trades" className="block text-[var(--color-text-secondary)] hover:text-[var(--color-primary)] transition-colors">
-                    Trade Book
+                    Paper Trade
                   </Link>
                   <Link href="/live" className="block font-semibold transition-colors" style={{ color: '#EF4444' }}>
-                    ● Live
+                    ● Live Trade
                   </Link>
 
                   <Link href="/account" className="block font-semibold transition-colors" style={{ color: '#00E5FF' }}>
                     {(session.user as any)?.name || 'Account'}
                   </Link>
-                  <Link href="/alpha" className="block font-semibold transition-colors" style={{ color: '#F0B90B' }}>
-                    α Alpha
-                  </Link>
+                  <span className="block font-semibold" style={{ color: '#6B7280', opacity: 0.45 }}>
+                    α Alpha (soon)
+                  </span>
                   <button
                     onClick={handleSignOut}
                     className="w-full text-left px-4 py-2 bg-[var(--color-danger)] text-white rounded-lg hover:opacity-90 transition-opacity"

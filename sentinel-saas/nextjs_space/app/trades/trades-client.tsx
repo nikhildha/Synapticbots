@@ -190,7 +190,8 @@ export function TradesClient({ trades: initialTrades }: TradesClientProps) {
   const [mounted, setMounted] = useState(false);
   const [trades, setTrades] = useState<Trade[]>(initialTrades);
   // ── Live LTP via Binance WebSocket ──────────────────────────────────────
-  // Streams !miniTicker@arr (all symbols, ~1s cadence) and extracts active coins.
+  // Uses a SINGLE persistent !miniTicker@arr stream (all symbols, ~1s cadence).
+  // Filtering to active-trade symbols happens inside the handler — no reconnect loop.
   const [ltpPrices, setLtpPrices] = useState<Record<string, number>>({});
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'closed'>('active');
 
@@ -205,31 +206,58 @@ export function TradesClient({ trades: initialTrades }: TradesClientProps) {
   const [deletingTradeId, setDeletingTradeId] = useState<string | null>(null);
   const clearPauseRef = useRef(false);
 
-  // ── Binance combined stream WebSocket for LTP ─────────────────────────
+  // Stable ref so the WS handler always sees the latest active symbols without reconnecting
+  const activeSymbolsRef = useRef<Set<string>>(new Set());
+
+  // ── Single persistent Binance !miniTicker@arr WebSocket ────────────────
+  // One connection for all symbols — no per-symbol subscription, no reconnect loop.
+  useEffect(() => {
+    let ws: WebSocket;
+    let reconnectTimer: ReturnType<typeof setTimeout>;
+
+    const connect = () => {
+      ws = new WebSocket('wss://stream.binance.com:9443/ws/!miniTicker@arr');
+      ws.onmessage = (ev) => {
+        try {
+          const arr: { s: string; c: string }[] = JSON.parse(ev.data);
+          if (!Array.isArray(arr)) return;
+          const updates: Record<string, number> = {};
+          for (const d of arr) {
+            if (d.s && d.c && activeSymbolsRef.current.has(d.s)) {
+              updates[d.s] = parseFloat(d.c);
+            }
+          }
+          if (Object.keys(updates).length > 0) {
+            setLtpPrices(prev => ({ ...prev, ...updates }));
+          }
+        } catch {}
+      };
+      ws.onerror = () => { try { ws.close(); } catch {} };
+      ws.onclose = () => {
+        // Auto-reconnect after 2s on unexpected close
+        reconnectTimer = setTimeout(connect, 2000);
+      };
+    };
+
+    connect();
+    return () => {
+      clearTimeout(reconnectTimer);
+      try { ws.close(); } catch {}
+    };
+  // Mount-only — single persistent connection for the page lifetime
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Keep activeSymbolsRef in sync with current active trades (no WS reconnect needed)
   useEffect(() => {
     const activeTrades = trades.filter(t => (t.status || '').toLowerCase() === 'active');
-    const symbols = [...new Set(activeTrades.map(t => (t.symbol || t.coin + 'USDT').toLowerCase()))];
-    if (symbols.length === 0) return;
-    // Build combined stream: btcusdt@miniTicker/ethusdt@miniTicker/...
-    const streams = symbols.map(s => `${s}@miniTicker`).join('/');
-    const ws = new WebSocket(`wss://stream.binance.com:9443/stream?streams=${streams}`);
-    ws.onmessage = (ev) => {
-      try {
-        const msg = JSON.parse(ev.data);
-        const d = msg.data;
-        if (d && d.s && d.c) {
-          setLtpPrices(prev => ({ ...prev, [d.s]: parseFloat(d.c) }));
-        }
-      } catch {}
-    };
-    ws.onerror = () => ws.close();
-    return () => ws.close();
-  // Re-subscribe when active trades change (new trade opened/closed)
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [trades.filter(t => (t.status||'').toLowerCase()==='active').map(t=>t.symbol||t.coin).join(',')]);
-
+    activeSymbolsRef.current = new Set(
+      activeTrades.map(t => (t.symbol || t.coin + 'USDT').toUpperCase())
+    );
+  }, [trades]);
 
   useEffect(() => { setMounted(true); }, []);
+
 
 
 
