@@ -47,10 +47,12 @@ export async function POST() {
         where: { botId: bot.id, status: { in: ['active', 'ACTIVE'] } },
       });
       for (const trade of activeTrades) {
-        await prisma.trade.update({
-          where: { id: trade.id },
-          data: buildCloseData(trade, 'STOP_ALL'),
-        });
+        try {
+          await prisma.trade.update({
+            where: { id: trade.id },
+            data: buildCloseData(trade, 'STOP_ALL'),
+          });
+        } catch { /* skip — bot stop should not fail due to a single trade */ }
       }
     }
 

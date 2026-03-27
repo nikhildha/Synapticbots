@@ -34,10 +34,12 @@ export async function POST() {
       where: { botId: { in: botIds }, status: { in: ['active', 'ACTIVE'] } },
     });
     for (const trade of activeTrades) {
-      await prisma.trade.update({
-        where: { id: trade.id },
-        data: { status: 'CLOSED' },
-      });
+      try {
+        await prisma.trade.update({
+          where: { id: trade.id },
+          data: { status: 'CLOSED' },
+        });
+      } catch { /* skip — deletion should not fail due to a single trade update */ }
     }
 
     // Delete sessions then bots

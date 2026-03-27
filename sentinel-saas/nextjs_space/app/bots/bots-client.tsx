@@ -17,6 +17,7 @@ export function BotsClient({ bots: initialBots }: BotsClientProps) {
   const [showDeployModal, setShowDeployModal] = useState(false);
   const [bots, setBots] = useState(initialBots);
   const [loading, setLoading] = useState(false);
+  const [togglingBots, setTogglingBots] = useState<Record<string, boolean>>({});
   const [startAllLoading, setStartAllLoading] = useState(false);
   const [stopAllLoading, setStopAllLoading] = useState(false);
   const [deleteAllLoading, setDeleteAllLoading] = useState(false);
@@ -26,7 +27,6 @@ export function BotsClient({ bots: initialBots }: BotsClientProps) {
 
   /* ── Live state ── */
   const [liveTradeCount, setLiveTradeCount] = useState(0);
-  const [liveTrades, setLiveTrades] = useState<any[]>([]);
   const [tradesByBot, setTradesByBot] = useState<Record<string, any[]>>({});
   const [livePrices, setLivePrices] = useState<Record<string, number>>({});
   const [allSessions, setAllSessions] = useState<any[]>([]);
@@ -57,7 +57,6 @@ export function BotsClient({ bots: initialBots }: BotsClientProps) {
       if (stateRes.ok) {
         const d = await stateRes.json();
         const trades = d?.tradebook?.trades || [];
-        setLiveTrades(trades);
         setTradesByBot(d?.tradesByBot || {});
         // Extract live prices from coin_states for accurate PnL
         const cs = d?.multi?.coin_states || {};
@@ -83,6 +82,8 @@ export function BotsClient({ bots: initialBots }: BotsClientProps) {
   }, [fetchLiveCount]);
 
   const handleBotToggle = async (botId: string, currentStatus: boolean) => {
+    if (togglingBots[botId]) return; // prevent double-click
+    setTogglingBots(prev => ({ ...prev, [botId]: true }));
     try {
       const res = await fetch('/api/bots/toggle', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -96,6 +97,7 @@ export function BotsClient({ bots: initialBots }: BotsClientProps) {
         alert(d.error || 'Failed to toggle bot');
       }
     } catch { alert('Failed to toggle bot. Please try again.'); }
+    finally { setTogglingBots(prev => { const n = { ...prev }; delete n[botId]; return n; }); }
   };
 
   const handleDeployBots = async () => {
@@ -106,7 +108,7 @@ export function BotsClient({ bots: initialBots }: BotsClientProps) {
       if (deployType === 'adaptive') {
         deployments.push({ name: 'ALL', segment: 'ALL', coinList: [] });
       } else if (deployType === 'segments') {
-        if (selectedSegments.length === 0) { alert('Please select at least one segment.'); return; }
+        if (selectedSegments.length === 0) { alert('Please select at least one segment.'); setLoading(false); return; }
         selectedSegments.forEach(segId => {
           deployments.push({ 
             name: segId,
@@ -296,7 +298,7 @@ export function BotsClient({ bots: initialBots }: BotsClientProps) {
                 const displayTrades = tradesByBot[bot?.id] ?? [];
                 return (
                   <motion.div key={bot?.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.06 }}>
-                    <BotCard bot={bot} onToggle={handleBotToggle} onDelete={handleDeleteBot} liveTradeCount={liveTradeCount} trades={displayTrades} sessions={botSessions} livePrices={livePrices} />
+                    <BotCard bot={bot} onToggle={handleBotToggle} onDelete={handleDeleteBot} liveTradeCount={liveTradeCount} trades={displayTrades} sessions={botSessions} livePrices={livePrices} isToggling={!!togglingBots[bot?.id]} />
                   </motion.div>
                 );
               })}

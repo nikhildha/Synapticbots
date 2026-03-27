@@ -1,6 +1,6 @@
 'use client';
 
-import { Bot, Play, Square, Trash2, Settings, ChevronDown, ChevronUp } from 'lucide-react';
+import { Play, Square, Trash2, Settings } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useState } from 'react';
 
@@ -21,12 +21,12 @@ interface BotCardProps {
   trades?: any[];
   sessions?: any[];
   livePrices?: Record<string, number>;
+  isToggling?: boolean;
 }
 
 /* ── helpers ── */
 const pnlColor = (v: number) => v >= 0 ? '#22C55E' : '#EF4444';
 const sign = (v: number) => v >= 0 ? '+' : '';
-const fmt = (n: number) => (n >= 0 ? '+' : '') + n.toFixed(2);
 
 const BRAIN_META: Record<string, { label: string; color: string; glow: string }> = {
   adaptive: { label: 'Synaptic Adaptive', color: '#22C55E', glow: 'rgba(34,197,94,0.18)' },
@@ -65,7 +65,7 @@ function getSegmentInfo(botName: string): { name: string; icon: string; color: s
   return { name: 'ALL', ...SEGMENT_ICONS['ALL'] };
 }
 
-export function BotCard({ bot, onToggle, onDelete, liveTradeCount, trades = [], sessions = [], livePrices = {} }: BotCardProps) {
+export function BotCard({ bot, onToggle, onDelete, trades = [], livePrices = {}, isToggling = false }: BotCardProps) {
   const [showSettings, setShowSettings] = useState(false);
   const [settingsMode, setSettingsMode] = useState(bot?.config?.mode || 'paper');
   const [settingsCPT, setSettingsCPT] = useState(bot?.config?.capitalPerTrade || 100);
@@ -113,6 +113,7 @@ export function BotCard({ bot, onToggle, onDelete, liveTradeCount, trades = [], 
   const roiPct = maxCapital > 0 ? (totalPnl / maxCapital * 100) : 0;
 
   const handleSaveSettings = async () => {
+    if (settingsCPT <= 0 || settingsMaxTrades <= 0) { alert('Capital and max trades must be greater than 0.'); return; }
     setSaving(true);
     try {
       const res = await fetch('/api/bots/config', {
@@ -120,8 +121,9 @@ export function BotCard({ bot, onToggle, onDelete, liveTradeCount, trades = [], 
         body: JSON.stringify({ botId: bot?.id, mode: settingsMode, capitalPerTrade: settingsCPT, maxOpenTrades: settingsMaxTrades }),
       });
       if (res.ok) { setShowSettings(false); window.location.reload(); }
-    } catch (e) { console.error('Settings save error:', e); }
-    setSaving(false);
+      else { const d = await res.json().catch(() => ({})); alert(d.error || 'Failed to save settings'); }
+    } catch { alert('Failed to save settings. Please try again.'); }
+    finally { setSaving(false); }
   };
 
   const handleDeleteClick = () => {
@@ -284,20 +286,25 @@ export function BotCard({ bot, onToggle, onDelete, liveTradeCount, trades = [], 
         borderTop: '1px solid var(--color-border)', paddingTop: 10,
       }}>
         <button
-          onClick={(e) => { e.stopPropagation(); onToggle(bot?.id ?? '', isRunning); }}
+          onClick={(e) => { e.stopPropagation(); if (!isToggling) onToggle(bot?.id ?? '', isRunning); }}
+          disabled={isToggling}
           style={{
             flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5,
             padding: '7px 0', borderRadius: 8,
-            background: isRunning
-              ? 'rgba(239,68,68,0.1)' : `${brain.color}15`,
+            background: isRunning ? 'rgba(239,68,68,0.1)' : `${brain.color}15`,
             color: isRunning ? '#EF4444' : brain.color,
             border: `1px solid ${isRunning ? 'rgba(239,68,68,0.25)' : brain.color + '25'}`,
-            fontSize: '11px', fontWeight: 700, cursor: 'pointer', transition: 'all 0.2s',
+            fontSize: '11px', fontWeight: 700,
+            cursor: isToggling ? 'wait' : 'pointer',
+            opacity: isToggling ? 0.6 : 1,
+            transition: 'all 0.2s',
           }}
         >
-          {isRunning
-            ? <><Square style={{ width: 11, height: 11 }} /> Stop</>
-            : <><Play style={{ width: 11, height: 11 }} /> Start</>
+          {isToggling
+            ? '…'
+            : isRunning
+              ? <><Square style={{ width: 11, height: 11 }} /> Stop</>
+              : <><Play style={{ width: 11, height: 11 }} /> Start</>
           }
         </button>
 
@@ -360,15 +367,15 @@ export function BotCard({ bot, onToggle, onDelete, liveTradeCount, trades = [], 
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
                   <div>
                     <label style={{ display: 'block', fontSize: '9px', color: 'var(--color-text-secondary)', marginBottom: 3, fontWeight: 600, textTransform: 'uppercase' as const, letterSpacing: '0.5px' }}>Capital/Trade ($)</label>
-                    <input type="number" value={settingsCPT}
-                      onChange={(e) => setSettingsCPT(Number(e.target.value))}
+                    <input type="number" value={settingsCPT} min={1} max={100000}
+                      onChange={(e) => setSettingsCPT(Math.max(1, Number(e.target.value)))}
                       className="input-field" style={{ fontSize: '12px', fontFamily: 'monospace', width: '100%', background: 'var(--color-background)', color: 'var(--color-text)', border: '1px solid var(--color-border)' }}
                     />
                   </div>
                   <div>
                     <label style={{ display: 'block', fontSize: '9px', color: 'var(--color-text-secondary)', marginBottom: 3, fontWeight: 600, textTransform: 'uppercase' as const, letterSpacing: '0.5px' }}>Max Trades</label>
-                    <input type="number" value={settingsMaxTrades}
-                      onChange={(e) => setSettingsMaxTrades(Number(e.target.value))}
+                    <input type="number" value={settingsMaxTrades} min={1} max={100}
+                      onChange={(e) => setSettingsMaxTrades(Math.max(1, Number(e.target.value)))}
                       className="input-field" style={{ fontSize: '12px', fontFamily: 'monospace', width: '100%', background: 'var(--color-background)', color: 'var(--color-text)', border: '1px solid var(--color-border)' }}
                     />
                   </div>
