@@ -23,7 +23,8 @@ interface MarketStructureData {
 }
 
 // ── Constants ──────────────────────────────────────────────────
-const LIVE_SYMBOLS = ['BTCUSDT', 'ETHUSDT', 'SOLUSDT', 'AVAXUSDT'];
+const LIVE_SYMBOLS = ['BTCUSDT'];
+
 
 const COIN_META: Record<string, { icon: string; color: string }> = {
   BTC:  { icon: '₿',  color: '#F59E0B' },
@@ -124,8 +125,11 @@ function TickerChip({
 
 // ── Main Panel ──────────────────────────────────────────────────
 export function MarketStructurePanel() {
+  // ── State ──────────────────────────────────────────────────────
   const [data, setData] = useState<MarketStructureData | null>(null);
   const [livePrices, setLivePrices] = useState<Record<string, number>>({});
+  // open prices from Binance REST 24hr stats (UTC 00:00 baseline for % change)
+  const [restOpenPrices, setRestOpenPrices] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(true);
   const [lastUpdate, setLastUpdate] = useState<string | null>(null);
   const [summaryExpanded, setSummaryExpanded] = useState(true);
@@ -143,27 +147,53 @@ export function MarketStructurePanel() {
     }
   };
 
+  // Fetch 24hr stats from Binance REST on mount — gives open_price for all 4 symbols
+  // This is the fallback when market_structure.json hasn't been generated yet
+  useEffect(() => {
+    const symbols = LIVE_SYMBOLS.map(s => `"${s}"`).join(',');
+    fetch(`https://api.binance.com/api/v3/ticker/24hr?symbols=[${symbols}]`)
+      .then(r => r.ok ? r.json() : null)
+      .then((arr: any[] | null) => {
+        if (!Array.isArray(arr)) return;
+        const opens: Record<string, number> = {};
+        for (const t of arr) {
+          if (t.symbol && t.openPrice) opens[t.symbol] = parseFloat(t.openPrice);
+        }
+        setRestOpenPrices(opens);
+      })
+      .catch(() => {});
+  }, []);
+
   useEffect(() => {
     fetchData();
     const t = setInterval(fetchData, 60_000);
     return () => clearInterval(t);
   }, []);
 
-  // Binance WebSocket
+  // Single persistent !miniTicker@arr WebSocket (same pattern as tradebook)
   useEffect(() => {
-    const streams = LIVE_SYMBOLS.map(s => `${s.toLowerCase()}@miniTicker`).join('/');
-    const ws = new WebSocket(`wss://stream.binance.com:9443/stream?streams=${streams}`);
-    ws.onmessage = (ev) => {
-      try {
-        const msg = JSON.parse(ev.data);
-        const d = msg.data;
-        if (d?.s && d?.c) {
-          setLivePrices(prev => ({ ...prev, [d.s]: parseFloat(d.c) }));
-        }
-      } catch {}
+    let ws: WebSocket;
+    let timer: ReturnType<typeof setTimeout>;
+    const connect = () => {
+      ws = new WebSocket('wss://stream.binance.com:9443/ws/!miniTicker@arr');
+      ws.onmessage = (ev) => {
+        try {
+          const arr: { s: string; c: string }[] = JSON.parse(ev.data);
+          if (!Array.isArray(arr)) return;
+          const updates: Record<string, number> = {};
+          for (const d of arr) {
+            if (d.s && d.c && (LIVE_SYMBOLS as string[]).includes(d.s)) {
+              updates[d.s] = parseFloat(d.c);
+            }
+          }
+          if (Object.keys(updates).length) setLivePrices(prev => ({ ...prev, ...updates }));
+        } catch {}
+      };
+      ws.onerror = () => { try { ws.close(); } catch {} };
+      ws.onclose = () => { timer = setTimeout(connect, 2000); };
     };
-    ws.onerror = () => ws.close();
-    return () => ws.close();
+    connect();
+    return () => { clearTimeout(timer); try { ws.close(); } catch {} };
   }, []);
 
   const fmtAgo = (iso: string | null) => {
@@ -176,15 +206,20 @@ export function MarketStructurePanel() {
     } catch { return ''; }
   };
 
-  // Tickers: from API or WS-only fallbacks
+  // Tickers: from API or WS+REST fallbacks — open_price always comes from REST if JSON is missing
   const tickers: TickerData[] = data?.tickers?.length
-    ? data.tickers
+    ? data.tickers.map(t => ({
+        ...t,
+        open_price: t.open_price && t.open_price > 0 ? t.open_price : (restOpenPrices[t.symbol] ?? 0),
+      }))
     : LIVE_SYMBOLS.map(sym => ({
         symbol: sym,
         display: sym.replace('USDT', ''),
         price: livePrices[sym] ?? 0,
         change_pct: 0,
+        open_price: restOpenPrices[sym] ?? 0,
       }));
+
 
   return (
     <motion.div
@@ -229,9 +264,8 @@ export function MarketStructurePanel() {
               Markets
             </span>
           </div>
-          <div style={{ fontSize: 9, color: 'var(--color-text-secondary)', letterSpacing: 1, textTransform: 'uppercase' }}>
-            15-Min AI Analysis
-          </div>
+
+
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 4 }}>
             {lastUpdate && (
               <span style={{ fontSize: 9, color: 'var(--color-text-secondary)', fontFamily: 'monospace' }}>

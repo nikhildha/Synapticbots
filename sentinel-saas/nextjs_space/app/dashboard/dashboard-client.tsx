@@ -688,12 +688,39 @@ export function DashboardClient({ user, stats, bots, recentTrades }: DashboardCl
             <MarketStructurePanel />
           </motion.div>
 
-          {/* ═══ Row 4: Bots Section ═══ */}
 
+          {/* ═══ Row 4: Segment Heatmap (left) + Athena Intelligence (right) ═══ */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.22 }}
+            className="mb-8"
+          >
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '20px', alignItems: 'start' }}>
+              {/* Segment Heatmap — 33% width (left) */}
+              <SegmentHeatmap
+                heatmapData={botState?.heatmap || null}
+              />
+
+              {/* Athena Panel — 67% width (right) */}
+              {(botState?.athena?.enabled || bots?.some((b: any) => (b.name || '').toLowerCase().includes('athena'))) && (
+                <div className="flex flex-col w-full">
+                  <AthenaPanel
+                    athena={botState?.athena || { enabled: true, recent_decisions: [], model: 'gemini-2.5-flash' }}
+                    coinStates={multi?.coin_states}
+                    perBot={botState?.perBot || {}}
+                    vetoLog={multi?.veto_log || []}
+                  />
+                </div>
+              )}
+            </div>
+          </motion.div>
+
+          {/* ═══ Row 5: Bots Section ═══ */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.27 }}
             className="mb-12"
           >
             <div className="flex items-center justify-between mb-6">
@@ -711,24 +738,18 @@ export function DashboardClient({ user, stats, bots, recentTrades }: DashboardCl
             {bots && bots.length > 0 ? (
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '14px' }}>
                 {bots.map((bot) => {
-                  // Filter trades for this specific bot
                   const botNameLower = (bot?.name || '').toLowerCase();
                   const botTrades = trades.filter((t: any) => {
-                    // Direct botId match
                     if (t.bot_id && bot?.id && t.bot_id === bot.id) return true;
                     if (t.botId && bot?.id && t.botId === bot.id) return true;
-                    // Bot name matching — extract model keyword for matching
                     const tradeBotName = (t.bot_name || t.botName || '').toLowerCase();
                     if (!tradeBotName) return false;
-                    // Check if the model keyword (adaptive/standard/conservative) appears in both
                     const modelKeywords = ['adaptive', 'standard', 'conservative', 'aggressive'];
                     const tradeModel = modelKeywords.find(k => tradeBotName.includes(k));
                     const botModel = modelKeywords.find(k => botNameLower.includes(k));
                     if (tradeModel && botModel) return tradeModel === botModel;
-                    // Fallback: direct name inclusion
                     return botNameLower.includes(tradeBotName) || tradeBotName.includes(botNameLower);
                   });
-                  // If no trades matched, fall back to all trades only if there's exactly 1 bot
                   const displayTrades = botTrades.length > 0 ? botTrades : (bots.length === 1 ? trades : []);
                   return (
                     <BotCard key={bot?.id} bot={bot} onToggle={handleBotToggle} onDelete={handleDeleteBot} liveTradeCount={liveActiveTrades.length} trades={displayTrades} />
@@ -752,34 +773,6 @@ export function DashboardClient({ user, stats, bots, recentTrades }: DashboardCl
             )}
           </motion.div>
 
-
-          {/* ═══ Row 5: Segment Heatmap (left) + Athena Intelligence (right) ═══ */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.27 }}
-            className="mb-8"
-          >
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '20px', alignItems: 'start' }}>
-              {/* Segment Heatmap — 33% width (left) */}
-              <SegmentHeatmap
-                heatmapData={botState?.heatmap || null}
-              />
-
-              {/* Athena Panel — 67% width (right) */}
-              {(botState?.athena?.enabled || bots?.some((b: any) => (b.name || '').toLowerCase().includes('athena'))) && (
-                <div className="flex flex-col w-full">
-                  <AthenaPanel
-                    athena={botState?.athena || { enabled: true, recent_decisions: [], model: 'gemini-2.5-flash' }}
-                    coinStates={multi?.coin_states}
-                    perBot={botState?.perBot || {}}
-                    vetoLog={multi?.veto_log || []}
-                  />
-                </div>
-              )}
-            </div>
-          </motion.div>
-
           {/* ═══ Row 6: Brain Execution Scan Summary ═══ */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
@@ -789,6 +782,8 @@ export function DashboardClient({ user, stats, bots, recentTrades }: DashboardCl
           >
             <BrainExecutionSummary coinStates={multi?.coin_states || {}} multi={multi} heatmap={botState?.heatmap || null} botId={bots.find(b => b.isActive)?.id || bots[0]?.id} pendingSignals={multi?.pending_signals_detail || []} />
           </motion.div>
+
+
 
         </div>
       </main>
