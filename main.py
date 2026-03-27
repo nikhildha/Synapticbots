@@ -16,7 +16,7 @@ IST = timezone(timedelta(hours=5, minutes=30))
 
 import config
 from hmm_brain import HMMBrain, MultiTFHMMBrain
-from data_pipeline import fetch_klines, get_multi_timeframe_data, _get_binance_client, compute_market_structure
+from data_pipeline import fetch_klines, get_multi_timeframe_data, _get_binance_client
 from feature_engine import compute_all_features, compute_hmm_features, compute_trend, compute_ema
 from execution_engine import ExecutionEngine
 from risk_manager import RiskManager
@@ -631,14 +631,7 @@ class RegimeMasterBot:
             except Exception as _he:
                 logger.warning("⚠️  Heatmap refresh failed (non-fatal): %s", _he)
 
-            # ── Market Structure Analysis (BTC/ETH/SOL/AAVE — 15m) ─────────────
-            # Runs every cycle (~15 min). Writes data/market_structure.json for the dashboard.
-            try:
-                from market_structure import run_market_structure_analysis as _run_ms
-                _run_ms()
-                logger.info("📊 Market structure analysis written to disk")
-            except Exception as _ms_err:
-                logger.warning("⚠️  Market structure analysis failed (non-fatal): %s", _ms_err)
+            # ── Market Structure Analysis (Removed) ─────────────
 
             # Refresh the full coin pool every N cycles (or on first run)
             refresh_rotations = max(1, self._SCAN_POOL_SIZE // self._SCAN_BATCH_SIZE)
@@ -1124,8 +1117,6 @@ class RegimeMasterBot:
                         )
                         continue
                     try:
-                        # Compute market structure levels for Athena context
-                        mkt_struct = compute_market_structure(sym)
 
                         # Per-TF HMM predictions — passed from _analyze_coin via top dict
                         tf_summary = top.get("tf_breakdown", {})
@@ -1177,19 +1168,6 @@ class RegimeMasterBot:
                             "funding_rate":    top.get("funding_rate"),   # float or None
                             "oi_change":       top.get("oi_change"),      # % OI change
                             "orderflow_score": top.get("orderflow_score"), # -1.0 to +1.0
-                            # ── Market structure levels ───────────────────
-                            "pdh":             mkt_struct.get("pdh"),
-                            "pdl":             mkt_struct.get("pdl"),
-                            "pwh":             mkt_struct.get("pwh"),
-                            "pwl":             mkt_struct.get("pwl"),
-                            "vwap":            mkt_struct.get("vwap"),
-                            "dist_vwap_pct":   mkt_struct.get("dist_vwap_pct"),
-                            "swing_high_3":    mkt_struct.get("swing_high_3"),
-                            "swing_low_3":     mkt_struct.get("swing_low_3"),
-                            "swing_high_5":    mkt_struct.get("swing_high_5"),
-                            "swing_low_5":     mkt_struct.get("swing_low_5"),
-                            "ath_7d":          mkt_struct.get("ath_7d"),
-                            "atl_7d":          mkt_struct.get("atl_7d"),
                             # ── Entry quality: OB zones + order walls ────
                             "nearest_bullish_ob": top.get("nearest_bullish_ob"),  # demand zone
                             "nearest_bearish_ob": top.get("nearest_bearish_ob"),  # supply zone
