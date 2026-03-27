@@ -4,20 +4,18 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import { Header } from '@/components/header';
 import { BotCard } from '@/components/bot-card';
 import {
-  Rocket, X, Info, Search, CheckCircle2, ChevronDown, ChevronRight, Activity, BookOpen
+  Rocket, X, Info, ChevronDown, ChevronRight, BookOpen
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { useSession } from 'next-auth/react';
 
 import { SEGMENT_KNOWLEDGE } from '@/lib/segment-knowledge';
 
 interface BotsClientProps { bots: any[]; sessions?: any[]; perfSummary?: any; }
 
 export function BotsClient({ bots: initialBots }: BotsClientProps) {
-  const { data: session } = useSession();
   const [mounted, setMounted] = useState(false);
   const [showDeployModal, setShowDeployModal] = useState(false);
-  const [bots, setBots] = useState(initialBots);
+  const [bots] = useState(initialBots);
   const [loading, setLoading] = useState(false);
   const [startAllLoading, setStartAllLoading] = useState(false);
   const [stopAllLoading, setStopAllLoading] = useState(false);
@@ -42,10 +40,6 @@ export function BotsClient({ bots: initialBots }: BotsClientProps) {
   const [deployMaxTrades, setDeployMaxTrades] = useState(10);
   const [deployCapitalPerTrade, setDeployCapitalPerTrade] = useState(100);
   
-  const [verifying, setVerifying] = useState(false);
-  const [verifyStatus, setVerifyStatus] = useState<'idle' | 'ok' | 'fail'>('idle');
-  const [verifyBalance, setVerifyBalance] = useState<number | null>(null);
-
   /* ── Intel Drawer State ── */
   const [intelSegmentId, setIntelSegmentId] = useState<string | null>(null);
   const [expandedCoins, setExpandedCoins] = useState<Record<string, boolean>>({});
@@ -90,20 +84,6 @@ export function BotsClient({ bots: initialBots }: BotsClientProps) {
       });
       if (res.ok) window.location.reload();
     } catch (error) { console.error('Error toggling bot:', error); }
-  };
-
-  const handleVerifyConnection = async () => {
-    setVerifying(true); setVerifyStatus('idle'); setVerifyBalance(null);
-    try {
-      const res = await fetch('/api/wallet-balance');
-      const data = await res.json();
-      const balance = deployExchange === 'coindcx' ? data.coindcx : data.binance;
-      const isConnected = deployExchange === 'coindcx' ? data.coindcxConnected : data.binanceConnected;
-      if (balance !== null && balance !== undefined) { setVerifyStatus('ok'); setVerifyBalance(balance); }
-      else if (isConnected) { setVerifyStatus('ok'); setVerifyBalance(null); }
-      else { setVerifyStatus('fail'); }
-    } catch { setVerifyStatus('fail'); }
-    finally { setVerifying(false); }
   };
 
   const handleDeployBots = async () => {
@@ -200,7 +180,6 @@ export function BotsClient({ bots: initialBots }: BotsClientProps) {
   const activeBots = bots.filter((b: any) => b?.status !== 'retired');
   const runningBots = activeBots.filter((b: any) => b?.isActive);
   const stoppedBots = activeBots.filter((b: any) => !b?.isActive);
-  const signFmt = (n: number) => (n >= 0 ? '+' : '') + n.toFixed(2);
 
   // Derived Values
   const botMultiplier = deployType === 'adaptive' ? 1 : Math.max(1, selectedSegments.length);
