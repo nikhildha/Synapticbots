@@ -216,6 +216,15 @@ class RegimeMasterBot:
         self._pending_signals: dict = {}
         self._SIGNAL_QUEUE_TTL_SECONDS = 300   # 5 min — 1 cycle TTL
 
+        # ── Coin Cooldown (anti-churn) ───────────────────────────────────────────
+        # _coin_cooldowns:    sym → datetime expiry (block deploy until this time)
+        # _coin_daily_trades: sym → [close_datetime, ...] last 24h (Rule 5 cap)
+        # _coin_last_side:    sym → 'BUY'|'SELL' (Rule 4 same-direction repeat)
+        self._coin_cooldowns: dict    = {}   # sym → datetime
+        self._coin_daily_trades: dict = {}   # sym → [datetime]
+        self._coin_last_side: dict    = {}   # sym → str
+
+
         # ── Startup: wipe stale signal queue from persisted state file ─────────
         # Without this, the dashboard shows ghost signals from the previous crash
         # for up to 2 minutes until the first cycle completes and overwrites state.
@@ -1034,11 +1043,21 @@ class RegimeMasterBot:
                 else:
                     lev, fallback_lev = 10, 5
 
+                # ── Cooldown Gate: block redeployment per 5-rule policy ───────────────
+                _cd_blocked, _cd_reason = self._is_in_cooldown(sym)
+                if _cd_blocked:
+                    logger.info("⏳ COOLDOWN [%s] %s — skipping deploy for [%s]", sym, _cd_reason, bot_name)
+                    self._coin_states.setdefault(sym, {}).setdefault("bot_deploy_statuses", {})[bot_id] = (
+                        f"COOLDOWN: {_cd_reason}"
+                    )
+                    continue
+
                 # ── Athena: FINAL CALL (gates deployment) ────────────────────────
                 current_price = self._coin_states.get(sym, {}).get("price", 0)
                 atr_val = top.get("atr", 0)
                 athena_decision = None
                 if self._athena and config.LLM_REASONING_ENABLED:
+
                     # H4 Fix: enforce per-cycle call cap to prevent rate-limit burst.
                     # IMPORTANT: cached calls are FREE (no Gemini API hit) — only count them
                     # if the result is NOT from cache. Otherwise, with 3 bots × N coins,
@@ -2224,6 +2243,116 @@ class RegimeMasterBot:
         except Exception as e:
             logger.warning("Could not load tradebook positions on startup: %s", e)
 
+
+    # ── Coin Cooldown Methods ──────────────────────────────────────────────────
+
+    def _apply_cooldown(self, sym: str, trade: dict) -> None:
+        """Evaluate all 5 cooldown rules for a just-closed trade and set expiry.
+
+        Rules (in priority order — highest duration wins):
+          1. SL/Trailing-SL/MAX_LOSS exit      → 90 min
+          2. Any loss close (non-SL)           → 45 min
+          3. Flash close  (loss + held < 15m)  → 120 min (overrides rule 1&2)
+          4. Same-direction repeat             → 30 min (additive if no harder rule)
+          5. Daily cap (≥ 3 closes in 24h)    → until UTC midnight
+        """
+        if not getattr(config, "COOLDOWN_ENABLED", True):
+            return
+
+        now = datetime.utcnow()
+        exit_reason   = (trade.get("exit_reason") or "").upper()
+        realized_pnl  = float(trade.get("realized_pnl_pct") or trade.get("pnl_pct") or 0)
+        side          = (trade.get("position") or trade.get("side") or "").upper()
+
+        # Hold time in minutes
+        opened_at = trade.get("entry_time") or trade.get("created_at") or trade.get("open_time")
+        hold_mins = 9999
+        if opened_at:
+            try:
+                if isinstance(opened_at, str):
+                    from dateutil import parser as _dp
+                    opened_dt = _dp.parse(opened_at.replace("Z", "+00:00")).replace(tzinfo=None)
+                else:
+                    opened_dt = opened_at
+                hold_mins = (now - opened_dt).total_seconds() / 60
+            except Exception:
+                pass
+
+        cooldown_mins = 0
+        rule_label    = ""
+
+        # Rule 3 (highest priority): flash close = loss AND held < threshold
+        flash_thresh = getattr(config, "COOLDOWN_FLASH_HOLD_THRESH", 15)
+        if realized_pnl < 0 and hold_mins < flash_thresh:
+            cooldown_mins = getattr(config, "COOLDOWN_FLASH_CLOSE_MIN", 120)
+            rule_label    = f"Rule3:FlashClose({hold_mins:.0f}min hold)"
+
+        # Rule 1: SL / trailing-SL / max-loss exit
+        elif exit_reason in ("STOP_LOSS", "TRAILING_SL", "MAX_LOSS"):
+            cooldown_mins = getattr(config, "COOLDOWN_SL_MINUTES", 90)
+            rule_label    = f"Rule1:{exit_reason}"
+
+        # Rule 2: generic loss close
+        elif realized_pnl < 0:
+            cooldown_mins = getattr(config, "COOLDOWN_LOSS_MINUTES", 45)
+            rule_label    = "Rule2:LossClose"
+
+        # Rule 4: same-direction repeat (additive only — applies even to break-even)
+        same_dir_mins = getattr(config, "COOLDOWN_SAME_DIR_MINUTES", 30)
+        if side and self._coin_last_side.get(sym) == side:
+            if cooldown_mins < same_dir_mins:
+                cooldown_mins = same_dir_mins
+                rule_label    = rule_label or "Rule4:SameDirRepeat"
+
+        # Track close for Rule 5 (daily cap) regardless of PnL
+        self._coin_daily_trades.setdefault(sym, []).append(now)
+        # Prune entries older than 24h
+        cutoff = now - timedelta(hours=24)
+        self._coin_daily_trades[sym] = [t for t in self._coin_daily_trades[sym] if t >= cutoff]
+
+        # Rule 5: daily cap exceeded → block to UTC midnight
+        daily_cap = getattr(config, "COOLDOWN_DAILY_CAP_TRADES", 3)
+        if len(self._coin_daily_trades[sym]) >= daily_cap:
+            from datetime import timezone
+            midnight = (now + timedelta(days=1)).replace(hour=0, minute=0, second=0, microsecond=0)
+            mins_to_midnight = (midnight - now).total_seconds() / 60
+            if mins_to_midnight > cooldown_mins:
+                cooldown_mins = mins_to_midnight
+                rule_label    = "Rule5:DailyCap"
+
+        # Store last side for Rule 4
+        if side:
+            self._coin_last_side[sym] = side
+
+        # Apply cooldown
+        if cooldown_mins > 0:
+            expiry = now + timedelta(minutes=cooldown_mins)
+            self._coin_cooldowns[sym] = expiry
+            logger.info(
+                "⏳ COOLDOWN [%s] for %.0f min until %s UTC (%s, PnL=%.1f%%, hold=%.0fm)",
+                sym, cooldown_mins, expiry.strftime("%H:%M"), rule_label, realized_pnl, hold_mins
+            )
+            # Update brain summary so dashboard shows the cooldown status
+            self._coin_states.setdefault(sym, {})["cooldown_until"] = expiry.isoformat() + "Z"
+            self._coin_states[sym]["cooldown_rule"] = rule_label
+
+    def _is_in_cooldown(self, sym: str) -> tuple[bool, str]:
+        """Return (True, reason) if the coin is under cooldown, else (False, '')."""
+        if not getattr(config, "COOLDOWN_ENABLED", True):
+            return False, ""
+        expiry = self._coin_cooldowns.get(sym)
+        if expiry is None:
+            return False, ""
+        now = datetime.utcnow()
+        if now < expiry:
+            remaining = (expiry - now).total_seconds() / 60
+            return True, f"cooldown {remaining:.0f}m (until {expiry.strftime('%H:%M')} UTC)"
+        # Expired — clean up
+        del self._coin_cooldowns[sym]
+        self._coin_states.get(sym, {}).pop("cooldown_until", None)
+        self._coin_states.get(sym, {}).pop("cooldown_rule", None)
+        return False, ""
+
     def _sync_positions(self):
         """
         Remove entries from _active_positions that were auto-closed
@@ -2231,12 +2360,24 @@ class RegimeMasterBot:
         Keys may be "profile_id:symbol" or plain "symbol" — extract symbol portion.
         """
         active_symbols = {t["symbol"] for t in tradebook.get_active_trades()}
+        # Get full closed trade data to pass to _apply_cooldown
+        try:
+            all_trades = tradebook.get_all_trades() if hasattr(tradebook, "get_all_trades") else []
+            recent_closed = {t["symbol"]: t for t in all_trades if (t.get("status") or "").lower() != "active"}
+        except Exception:
+            recent_closed = {}
+
         closed_out = [key for key in self._active_positions
                       if (key.split(":")[-1] if ":" in key else key) not in active_symbols]
         for key in closed_out:
             sym = key.split(":")[-1] if ":" in key else key
             logger.info("📗 Position %s auto-closed by tradebook (SL/TP hit). Removing.", sym)
+            # Apply cooldown using the closed trade record
+            closed_trade = recent_closed.get(sym, {})
+            if closed_trade:
+                self._apply_cooldown(sym, closed_trade)
             del self._active_positions[key]
+
 
     def _sync_coindcx_positions(self):
         """

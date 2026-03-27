@@ -314,6 +314,18 @@ LLM_CONFIDENCE_WEIGHT       = 0.20                             # LLM can adjust 
 LLM_MAX_CALLS_PER_CYCLE     = 10                               # Rate limit: max N Athena calls per cycle
 LLM_LOG_FILE                = os.path.join(DATA_DIR, "athena_decisions.json")
 
+# ─── Coin Cooldown (anti-churn, anti-revenge-trade) ──────────────────────────
+# Prevents immediate redeployment after a trade closes on the same coin.
+# Cooldowns are stored in-memory (reset on engine restart) and visible in Brain Summary.
+COOLDOWN_ENABLED            = True    # Master switch — set False to bypass all rules
+COOLDOWN_SL_MINUTES         = 90     # Rule 1: SL / trailing-SL / max-loss exit
+COOLDOWN_LOSS_MINUTES       = 45     # Rule 2: any loss close (non-SL)
+COOLDOWN_FLASH_CLOSE_MIN    = 120    # Rule 3: loss close AND held < COOLDOWN_FLASH_HOLD_THRESH
+COOLDOWN_SAME_DIR_MINUTES   = 30     # Rule 4: same direction as last trade (same session)
+COOLDOWN_DAILY_CAP_TRADES   = 3      # Rule 5: max deployments per coin per rolling 24h
+COOLDOWN_FLASH_HOLD_THRESH  = 15     # minutes — what counts as a "flash close"
+
+
 
 
 # ─── Order Flow Engine ────────────────────────────────────────────────────────
