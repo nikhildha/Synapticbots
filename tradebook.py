@@ -670,7 +670,7 @@ def _update_single_trade(trade, book, prices, funding_rates):
             fr = config.DEFAULT_FUNDING_RATE
             if funding_rates and sym in funding_rates:
                 fr = abs(funding_rates[sym])  # always treat as cost
-            notional = entry * qty * lev
+            notional = entry * qty  # qty already includes leverage (qty = capital*lev/price)
             cost_per_interval = notional * fr
             new_cost = round(cost_per_interval * intervals, 6)
             trade["funding_cost"] = round(trade["funding_cost"] + new_cost, 6)
@@ -680,6 +680,17 @@ def _update_single_trade(trade, book, prices, funding_rates):
         pass
 
     funding_cost = trade.get("funding_cost", 0)
+
+    # ── Sanity clamp: auto-heal trades with inflated funding from old double-lev bug ──
+    # Funding cost cannot realistically exceed 50% of capital in paper mode.
+    # If it does, the accumulated value is garbage from the old `notional * lev` bug — reset.
+    if funding_cost > capital * 0.5:
+        logger.warning(
+            "⚠️ Funding cost sanity clamp: %s funding_cost=%.2f exceeds 50%% of capital=%.2f — resetting to 0",
+            symbol, funding_cost, capital,
+        )
+        trade["funding_cost"] = 0
+        funding_cost = 0
 
     # To prevent trades from starting in an immediate deep paper loss,
     # we do NOT subtract estimated exit commissions from the unrealized PnL.

@@ -476,50 +476,12 @@ export function DashboardClient({ user, stats, bots, recentTrades }: DashboardCl
           >
             <div className="flex items-center justify-between">
               <div>
-                <h1 className="text-3xl font-bold mb-1">
+                <h1 className="text-2xl font-bold mb-1">
                   Welcome, <span style={{ color: '#ffffff' }}>{user?.name ?? 'Trader'}</span>
                 </h1>
-                <p className="text-[var(--color-text-secondary)] text-sm">
+                <p className="text-[var(--color-text-secondary)] text-xs">
                   AI Crypto Trading Cockpit — Monitor your bots and market signals
                 </p>
-              </div>
-              {/* PnL Scope Toggle + Mode Badge — top right */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                {/* LIVE / PAPER badge */}
-                {liveStats.activeBots > 0 && (
-                  <span style={{
-                    padding: '3px 10px', borderRadius: '6px', fontSize: '11px', fontWeight: 700, letterSpacing: '0.5px',
-                    background: activeBotMode === 'live' ? 'rgba(239,68,68,0.15)' : 'rgba(6,182,212,0.1)',
-                    color: activeBotMode === 'live' ? '#EF4444' : '#06B6D4',
-                    border: `1px solid ${activeBotMode === 'live' ? 'rgba(239,68,68,0.3)' : 'rgba(6,182,212,0.2)'}`,
-                  }}>
-                    {activeBotMode === 'live' ? '⬤ LIVE' : 'PAPER'}
-                  </span>
-                )}
-                <span style={{ fontSize: '11px', color: '#6B7280', fontWeight: 500 }}>PnL Scope:</span>
-                <div style={{
-                  display: 'inline-flex', borderRadius: '8px', overflow: 'hidden',
-                  border: '1px solid rgba(6,182,212,0.2)', background: 'rgba(17,24,39,0.6)',
-                }}>
-                  {(['session', 'all'] as const).map((scope) => (
-                    <button
-                      key={scope}
-                      onClick={() => setPnlScope(scope)}
-                      style={{
-                        padding: '4px 12px', fontSize: '11px', fontWeight: 600,
-                        border: 'none', cursor: 'pointer', transition: 'all 0.15s',
-                        background: pnlScope === scope ? 'rgba(6,182,212,0.2)' : 'transparent',
-                        color: pnlScope === scope ? '#06B6D4' : '#6B7280',
-                        borderRight: scope === 'session' ? '1px solid rgba(6,182,212,0.15)' : 'none',
-                      }}
-                    >
-                      {scope === 'session' ? 'This Session' : 'All Time'}
-                    </button>
-                  ))}
-                </div>
-                {pnlScope === 'session' && !currentSessionId && (
-                  <span style={{ fontSize: '10px', color: '#F59E0B' }}>No active session</span>
-                )}
               </div>
             </div>
           </motion.div>
