@@ -298,16 +298,27 @@ export function TradesClient({ trades: initialTrades }: TradesClientProps) {
     const losses = closed.filter(t => t.totalPnl <= 0);
     const winRate = closed.length > 0 ? (wins.length / closed.length) * 100 : 0;
     const realizedPnl = closed.reduce((s, t) => s + (t.totalPnl || 0), 0);
-    // Recalculate unrealized PnL from live prices (matches table P&L formula)
+
+    // Use live WS price first, fallback to DB currentPrice, last resort entryPrice
+    const getLivePrice = (t: Trade) => {
+      const sym = (t.symbol || t.coin + 'USDT').toUpperCase();
+      return ltpPrices[sym] ?? t.currentPrice ?? t.entryPrice;
+    };
+
+    // Recalculate unrealized PnL from live prices
+    // Skip entries where PnL% > ±500% (garbage/cross-contaminated data)
     const unrealizedPnl = active.reduce((s, t) => {
-      const cp = t.currentPrice || t.entryPrice;
-      return s + calcLivePnl(t, cp).pnl;
+      const cp = getLivePrice(t);
+      const { pnl, pnlPct } = calcLivePnl(t, cp);
+      if (Math.abs(pnlPct) > 500) return s; // skip stale/corrupt
+      return s + pnl;
     }, 0);
     const combinedPnl = realizedPnl + unrealizedPnl;
 
     const activePnlPcts = active.map(t => {
-      const cp = t.currentPrice || t.entryPrice;
-      return calcLivePnl(t, cp).pnlPct;
+      const cp = getLivePrice(t);
+      const { pnlPct } = calcLivePnl(t, cp);
+      return Math.abs(pnlPct) > 500 ? 0 : pnlPct; // cap garbage
     });
     const allPnlPcts = [
       ...closed.map(t => t.totalPnlPercent || 0),
@@ -341,10 +352,8 @@ export function TradesClient({ trades: initialTrades }: TradesClientProps) {
     const avgLoss = losses.length > 0 ? grossLoss / losses.length : 1;
     const riskReward = avgLoss > 0 ? avgWin / avgLoss : 0;
 
-    // totalPnl is ALREADY net-of-commission (engine subtracts fees at close).
-    // Do NOT subtract t.fee again — that double-counts it.
     const totalFees = closed.reduce((s: number, t: any) => s + (t.fee || 0), 0);
-    const realizedPnlAfterFees = realizedPnl; // same as realizedPnl — fees already baked in
+    const realizedPnlAfterFees = realizedPnl;
 
     return {
       total: all.length, active: active.length, closed: closed.length,
@@ -354,7 +363,10 @@ export function TradesClient({ trades: initialTrades }: TradesClientProps) {
       bestTrade, worstTrade,
       maxDD, maxDDPct, profitFactor, riskReward,
     };
-  }, [modeFiltered]);
+  // ltpPrices drives live unrealized PnL — must be a dependency
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [modeFiltered, ltpPrices]);
+
 
 
   /* ── CSV Export (all trades, respects mode filter only) ── */
