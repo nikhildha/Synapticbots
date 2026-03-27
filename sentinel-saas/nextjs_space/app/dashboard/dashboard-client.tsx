@@ -700,7 +700,7 @@ export function DashboardClient({ user, stats, bots, recentTrades }: DashboardCl
             </div>
 
             {bots && bots.length > 0 ? (
-              <div className="flex flex-col gap-3">
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '14px' }}>
                 {bots.map((bot) => {
                   // Filter trades for this specific bot
                   const botNameLower = (bot?.name || '').toLowerCase();
