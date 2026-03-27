@@ -219,8 +219,9 @@ export function AthenaPanel({ athena, vetoLog = [] }: Props) {
                             </div>
                         </div>
                     ) : (
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: 10, maxHeight: 520, overflowY: 'auto', paddingRight: 4,
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 10, maxHeight: 760, overflowY: 'auto', paddingRight: 4,
                             scrollbarWidth: 'thin', scrollbarColor: 'rgba(0,229,255,0.2) transparent' }}>
+
                             <AnimatePresence>
                                 {decisions.map((d, i) => {
                                     // Normalize field names — support both in-memory and log-history shapes

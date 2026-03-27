@@ -240,20 +240,20 @@ export function MarketStructurePanel() {
         background: 'linear-gradient(90deg, #F59E0B60, #818CF860, #14F19560, #E8414260)',
       }} />
 
-      {/* One wide row: header + tickers + insight */}
+      {/* Two-column: left = Markets label + BTC chip | right = AI summary */}
       <div style={{
         display: 'grid',
-        gridTemplateColumns: '140px 1fr 1fr',
+        gridTemplateColumns: '200px 1fr',
         gap: 0,
         alignItems: 'stretch',
         minHeight: 76,
       }}>
 
-        {/* ── Left: Label block ── */}
+        {/* ── Left: Label + BTC ticker ── */}
         <div style={{
           borderRight: '1px solid var(--color-border)',
           padding: '10px 14px',
-          display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 4,
+          display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 8,
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
             <span style={{
@@ -264,9 +264,16 @@ export function MarketStructurePanel() {
             </span>
           </div>
 
+          {/* BTC ticker chip */}
+          {tickers.map(t => (
+            <TickerChip
+              key={t.symbol}
+              ticker={t}
+              livePrice={livePrices[t.symbol] ?? null}
+            />
+          ))}
 
-
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 4 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
             {lastUpdate && (
               <span style={{ fontSize: 9, color: 'var(--color-text-secondary)', fontFamily: 'monospace' }}>
                 {fmtAgo(lastUpdate)}
@@ -285,24 +292,9 @@ export function MarketStructurePanel() {
           </div>
         </div>
 
-        {/* ── Centre: 4 compact ticker chips ── */}
+        {/* ── Right: AI Insight summary (full width) ── */}
         <div style={{
-          borderRight: '1px solid var(--color-border)',
-          padding: '8px 12px',
-          display: 'flex', gap: 8, alignItems: 'center',
-        }}>
-          {tickers.map(t => (
-            <TickerChip
-              key={t.symbol}
-              ticker={t}
-              livePrice={livePrices[t.symbol] ?? null}
-            />
-          ))}
-        </div>
-
-        {/* ── Right: AI Insight text ── */}
-        <div style={{
-          padding: '10px 14px',
+          padding: '10px 18px',
           display: 'flex', flexDirection: 'column', justifyContent: 'center',
           overflow: 'hidden',
         }}>
@@ -340,3 +332,4 @@ export function MarketStructurePanel() {
     </motion.div>
   );
 }
+
