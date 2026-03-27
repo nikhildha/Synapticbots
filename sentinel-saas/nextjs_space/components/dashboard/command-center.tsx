@@ -169,14 +169,14 @@ export function RegimeCard({ regime, confidence, symbol, macroRegime, trend15m, 
 
     return (
         <div style={{
-            background: 'linear-gradient(160deg, rgba(8,14,26,0.97) 0%, rgba(4,8,16,0.99) 100%)',
+            background: 'var(--color-surface)',
             backdropFilter: 'blur(20px)',
             border: `1px solid ${info.color}18`,
             borderRadius: '22px',
             padding: '16px 20px 20px',
             position: 'relative',
             overflow: 'hidden',
-            boxShadow: `0 0 40px rgba(0,0,0,0.8), inset 0 1px 0 rgba(255,255,255,0.04)`,
+            boxShadow: `0 0 40px rgba(0,0,0,0.8), inset 0 1px 0 var(--color-border)`,
         }}>
             {/* Top accent line */}
             <div style={{
@@ -244,7 +244,7 @@ export function RegimeCard({ regime, confidence, symbol, macroRegime, trend15m, 
                 <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '6px' }}>
                     <div style={{
                         fontSize: '11px', fontWeight: 700, textTransform: 'uppercase' as const,
-                        letterSpacing: '2.5px', color: '#4B6080',
+                        letterSpacing: '2.5px', color: 'var(--color-text-secondary)',
                     }}>Market Regime</div>
                     {macro && (
                         <div style={{
@@ -292,7 +292,7 @@ export function RegimeCard({ regime, confidence, symbol, macroRegime, trend15m, 
                             <div style={{
                                 fontSize: '13px', fontWeight: 900,
                                 fontFamily: 'var(--font-mono, monospace)',
-                                color: '#E8EDF5', letterSpacing: '-0.5px',
+                                color: 'var(--color-text)', letterSpacing: '-0.5px',
                                 textShadow: '0 0 10px rgba(0,229,255,0.15)',
                             }}>
                                 ${btcPrice.toLocaleString('en-US', { maximumFractionDigits: 0 })}
@@ -380,13 +380,13 @@ export function RegimeCard({ regime, confidence, symbol, macroRegime, trend15m, 
 // ─── Shared mini-cell styles (Redesigned) ────────────────────────────────────
 const cellStyleClean = (): React.CSSProperties => ({
     padding: '10px 12px', borderRadius: 12,
-    background: 'rgba(255,255,255,0.02)',
-    border: '1px solid rgba(255,255,255,0.06)',
+    background: 'var(--color-surface)',
+    border: '1px solid var(--color-border)',
     display: 'flex', flexDirection: 'column',
     justifyContent: 'space-between', gap: 2,
 });
-const cellLabelClean: React.CSSProperties = { fontSize: '9px', fontWeight: 700, color: '#6B7280', letterSpacing: '1.2px', textTransform: 'uppercase' };
-const cellValueClean = (size = '22px'): React.CSSProperties => ({ fontSize: size, fontWeight: 800, fontFamily: 'var(--font-mono, monospace)', color: '#E5E7EB', lineHeight: 1 });
+const cellLabelClean: React.CSSProperties = { fontSize: '9px', fontWeight: 700, color: 'var(--color-text-secondary)', letterSpacing: '1.2px', textTransform: 'uppercase' };
+const cellValueClean = (size = '22px'): React.CSSProperties => ({ fontSize: size, fontWeight: 800, fontFamily: 'var(--font-mono, monospace)', color: 'var(--color-text)', lineHeight: 1 });
 
 // ─── Trades Summary Card ─────────────────────────────────────────────────────
 interface TradesCardProps {
@@ -412,12 +412,12 @@ function _TradesCard({ title, accent, activeTrades, activeBots, pnl, pnlPct, dep
 
     return (
         <div style={{
-            background: 'linear-gradient(160deg, rgba(8,14,26,0.97) 0%, rgba(4,8,16,0.99) 100%)',
+            background: 'var(--color-surface)',
             backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)',
-            border: '1px solid rgba(255,255,255,0.06)',
+            border: '1px solid var(--color-border)',
             borderRadius: 22, padding: '14px 16px 16px',
             position: 'relative', overflow: 'hidden',
-            boxShadow: '0 0 40px rgba(0,0,0,0.8), inset 0 1px 0 rgba(255,255,255,0.04)',
+            boxShadow: '0 0 40px rgba(0,0,0,0.8), inset 0 1px 0 var(--color-border)',
             display: 'flex', flexDirection: 'column' as const,
         }}>
             {/* Top accent line */}
@@ -426,7 +426,7 @@ function _TradesCard({ title, accent, activeTrades, activeBots, pnl, pnlPct, dep
             {/* Header with status dot */}
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
                 <div style={{ width: 7, height: 7, borderRadius: '50%', background: accent, boxShadow: `0 0 8px ${accent}88` }} />
-                <div style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase' as const, letterSpacing: '2.5px', color: '#9CA3AF' }}>
+                <div style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase' as const, letterSpacing: '2.5px', color: 'var(--color-text-secondary)' }}>
                     {title}
                 </div>
             </div>
@@ -529,35 +529,35 @@ export function ActivePositionsCard({ deployedCount, activePositions, trades }: 
 
     return (
         <div style={{
-            background: 'rgba(17, 24, 39, 0.8)',
+            background: 'var(--color-surface)',
             backdropFilter: 'blur(12px)',
-            border: '1px solid rgba(255,255,255,0.06)',
+            border: '1px solid var(--color-border)',
             borderRadius: '16px',
             padding: '28px',
             textAlign: 'center',
         }}>
             <div style={{
                 fontSize: '11px', fontWeight: 600, textTransform: 'uppercase' as const,
-                letterSpacing: '1.5px', color: '#9CA3AF', marginBottom: '16px',
+                letterSpacing: '1.5px', color: 'var(--color-text-secondary)', marginBottom: '16px',
             }}>Deployment</div>
 
             <div style={{
-                fontSize: '42px', fontWeight: 700, color: '#F0F4F8',
+                fontSize: '42px', fontWeight: 700, color: 'var(--color-text)',
             }}>{count}</div>
 
-            <div style={{ fontSize: '13px', color: '#9CA3AF', marginTop: '4px' }}>
+            <div style={{ fontSize: '13px', color: 'var(--color-text-secondary)', marginTop: '4px' }}>
                 Active Positions
             </div>
 
             <div style={{
-                fontSize: '12px', color: '#6B7280', marginTop: '8px',
+                fontSize: '12px', color: 'var(--color-text-secondary)', marginTop: '8px',
                 maxWidth: '200px', margin: '8px auto 0',
                 overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' as const,
             }}>
                 {coinList}
             </div>
 
-            <div style={{ fontSize: '11px', color: '#6B7280', marginTop: '4px' }}>
+            <div style={{ fontSize: '11px', color: 'var(--color-text-secondary)', marginTop: '4px' }}>
                 Capital: ${capital}
             </div>
         </div>
@@ -736,13 +736,13 @@ export function BrainExecutionSummary({ coinStates, multi, heatmap: heatmapProp,
         <div>
             {/* Header */}
             <div style={{ marginBottom: '20px' }}>
-                <h2 style={{ fontSize: '22px', fontWeight: 800, color: '#E5E7EB', margin: 0, letterSpacing: '-0.3px' }}>
+                <h2 style={{ fontSize: '22px', fontWeight: 800, color: 'var(--color-text)', margin: 0, letterSpacing: '-0.3px' }}>
                     Brain Execution Summary
-                    <span style={{ fontSize: '13px', fontWeight: 600, color: 'rgba(156,163,175,0.5)', fontFamily: 'var(--font-mono, monospace)', marginLeft: '10px' }}>
+                    <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--color-text-tertiary)', fontFamily: 'var(--font-mono, monospace)', marginLeft: '10px' }}>
                         Cycle #{liveMulti?.cycle || 0} · {formatIST(lastCycle)}
                     </span>
                 </h2>
-                <p style={{ fontSize: '12px', color: 'rgba(156,163,175,0.35)', marginTop: 4, fontFamily: 'var(--font-mono, monospace)' }}>
+                <p style={{ fontSize: '12px', color: 'var(--color-text-tertiary)', marginTop: 4, fontFamily: 'var(--font-mono, monospace)' }}>
                     Full pipeline visibility — Segment → HMM → Athena → Deploy
                 </p>
             </div>

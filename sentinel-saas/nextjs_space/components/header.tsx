@@ -70,6 +70,10 @@ export function Header() {
                   <Link href="/trades" className="text-[17px] font-medium text-[var(--color-text-secondary)] hover:text-[var(--color-primary)] transition-colors">
                     Trade Book
                   </Link>
+                  <Link href="/live" className="text-[17px] font-semibold flex items-center gap-1.5 transition-colors" style={{ color: '#EF4444', textShadow: '0 0 8px rgba(239,68,68,0.35)' }}>
+                    <span style={{ display: 'inline-block', width: 7, height: 7, borderRadius: '50%', background: '#EF4444', boxShadow: '0 0 6px #EF4444', animation: 'pulse 1.5s ease-in-out infinite' }} />
+                    Live
+                  </Link>
 
                   <Link href="/account" className="text-[17px] font-medium text-[var(--color-text-secondary)] hover:text-[var(--color-primary)] transition-colors">
                     Account
@@ -158,6 +162,9 @@ export function Header() {
                   </Link>
                   <Link href="/trades" className="block text-[var(--color-text-secondary)] hover:text-[var(--color-primary)] transition-colors">
                     Trade Book
+                  </Link>
+                  <Link href="/live" className="block font-semibold transition-colors" style={{ color: '#EF4444' }}>
+                    ● Live
                   </Link>
 
                   <Link href="/account" className="block text-[var(--color-text-secondary)] hover:text-[var(--color-primary)] transition-colors">

@@ -115,16 +115,15 @@ export function BotCard({ bot, onToggle, onDelete, liveTradeCount, trades = [], 
     onDelete?.(bot?.id ?? '');
   };
 
-  // Mini metric cell
   const MetricCell = ({ label, value, color }: { label: string; value: string; color?: string }) => (
     <div style={{ textAlign: 'center' }}>
       <div style={{
         fontSize: '14px', fontWeight: 800, fontFamily: 'var(--font-mono, monospace)',
-        color: color || '#E5E7EB', lineHeight: 1.2,
+        color: color || 'var(--color-text)', lineHeight: 1.2,
       }}>
         {value}
       </div>
-      <div style={{ fontSize: '8px', fontWeight: 700, color: '#6B7280', letterSpacing: '0.8px', textTransform: 'uppercase' as const, marginTop: 2 }}>
+      <div style={{ fontSize: '8px', fontWeight: 700, color: 'var(--color-text-secondary)', letterSpacing: '0.8px', textTransform: 'uppercase' as const, marginTop: 2 }}>
         {label}
       </div>
     </div>
@@ -135,10 +134,10 @@ export function BotCard({ bot, onToggle, onDelete, liveTradeCount, trades = [], 
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
       style={{
-        background: 'rgba(8, 14, 26, 0.85)',
+        background: 'var(--color-surface)',
         backdropFilter: 'blur(14px)',
         WebkitBackdropFilter: 'blur(14px)',
-        border: `1px solid ${isRunning ? brain.color + '25' : 'rgba(255,255,255,0.06)'}`,
+        border: `1px solid ${isRunning ? brain.color + '25' : 'var(--color-border)'}`,
         borderRadius: 16,
         boxShadow: isRunning
           ? `0 0 24px ${brain.glow}, var(--shadow-card)`
@@ -158,7 +157,7 @@ export function BotCard({ bot, onToggle, onDelete, liveTradeCount, trades = [], 
         position: 'absolute', top: 0, left: 0, right: 0, height: '2px',
         background: isRunning
           ? `linear-gradient(90deg, transparent, ${brain.color}88, transparent)`
-          : 'linear-gradient(90deg, transparent, rgba(255,255,255,0.08), transparent)',
+          : 'linear-gradient(90deg, transparent, var(--color-border), transparent)',
       }} />
 
       {/* ── Header: Segment + Name + Status ── */}
@@ -176,14 +175,14 @@ export function BotCard({ bot, onToggle, onDelete, liveTradeCount, trades = [], 
           </div>
           <div style={{ minWidth: 0 }}>
             <div style={{
-              fontSize: '13px', fontWeight: 700, color: '#E5E7EB',
+              fontSize: '13px', fontWeight: 700, color: 'var(--color-text)',
               whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
             }}>
               {segment.name}
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 2 }}>
               {isRunning && <span className="live-dot" />}
-              <span style={{ fontSize: '10px', fontWeight: 600, color: isRunning ? brain.color : '#6B7280' }}>
+              <span style={{ fontSize: '10px', fontWeight: 600, color: isRunning ? brain.color : 'var(--color-text-secondary)' }}>
                 {isRunning ? 'Running' : 'Stopped'}
               </span>
               <span style={{
@@ -219,7 +218,7 @@ export function BotCard({ bot, onToggle, onDelete, liveTradeCount, trades = [], 
         }}>
           {sign(totalPnl)}${Math.abs(totalPnl).toFixed(2)}
         </div>
-        <div style={{ fontSize: '9px', fontWeight: 700, color: '#6B7280', letterSpacing: '1px', textTransform: 'uppercase' as const, marginTop: 3 }}>
+        <div style={{ fontSize: '9px', fontWeight: 700, color: 'var(--color-text-secondary)', letterSpacing: '1px', textTransform: 'uppercase' as const, marginTop: 3 }}>
           Total P&L
         </div>
       </div>
@@ -249,12 +248,12 @@ export function BotCard({ bot, onToggle, onDelete, liveTradeCount, trades = [], 
       {/* ── Capital bar ── */}
       <div style={{ padding: '0 14px 12px' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
-          <span style={{ fontSize: '8px', fontWeight: 700, color: '#6B7280', letterSpacing: '0.8px', textTransform: 'uppercase' as const }}>Capital</span>
-          <span style={{ fontSize: '10px', fontWeight: 700, fontFamily: 'monospace', color: '#9CA3AF' }}>
-            ${capitalDeployed}<span style={{ color: '#4B5563' }}>/${maxCapital}</span>
+          <span style={{ fontSize: '8px', fontWeight: 700, color: 'var(--color-text-secondary)', letterSpacing: '0.8px', textTransform: 'uppercase' as const }}>Capital</span>
+          <span style={{ fontSize: '10px', fontWeight: 700, fontFamily: 'monospace', color: 'var(--color-text-secondary)' }}>
+            ${capitalDeployed}<span style={{ color: 'var(--color-text-secondary)', opacity: 0.6 }}>/${maxCapital}</span>
           </span>
         </div>
-        <div style={{ height: 4, borderRadius: 4, background: 'rgba(255,255,255,0.06)', overflow: 'hidden' }}>
+        <div style={{ height: 4, borderRadius: 4, background: 'var(--color-border)', overflow: 'hidden' }}>
           <div style={{
             height: '100%', borderRadius: 4, width: `${deployedPct}%`,
             background: deployedPct > 75
@@ -268,7 +267,7 @@ export function BotCard({ bot, onToggle, onDelete, liveTradeCount, trades = [], 
       {/* ── Action buttons ── */}
       <div style={{
         display: 'flex', gap: 6, padding: '0 14px 12px',
-        borderTop: '1px solid rgba(255,255,255,0.04)', paddingTop: 10,
+        borderTop: '1px solid var(--color-border)', paddingTop: 10,
       }}>
         <button
           onClick={(e) => { e.stopPropagation(); onToggle(bot?.id ?? '', isRunning); }}
@@ -292,10 +291,11 @@ export function BotCard({ bot, onToggle, onDelete, liveTradeCount, trades = [], 
           onClick={(e) => { e.stopPropagation(); setShowSettings(!showSettings); setDeleteConfirm(false); }}
           title="Settings"
           style={{
-            width: 32, height: 32, borderRadius: 8, border: 'none', cursor: 'pointer',
-            background: showSettings ? 'rgba(6,182,212,0.15)' : 'rgba(255,255,255,0.04)',
-            color: showSettings ? '#06B6D4' : '#6B7280',
+            width: 32, height: 32, borderRadius: 8, cursor: 'pointer',
+            background: showSettings ? 'var(--color-primary-transparent)' : 'var(--color-surface-light)',
+            color: showSettings ? 'var(--color-primary)' : 'var(--color-text-secondary)',
             display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.2s',
+            border: '1px solid var(--color-border)',
           }}
         ><Settings style={{ width: 13, height: 13 }} /></button>
 
@@ -328,16 +328,16 @@ export function BotCard({ bot, onToggle, onDelete, liveTradeCount, trades = [], 
             style={{ overflow: 'hidden' }}
           >
             <div style={{
-              borderTop: '1px solid rgba(255,255,255,0.06)',
+              borderTop: '1px solid var(--color-border)',
               padding: '12px 14px',
-              background: 'rgba(6,182,212,0.03)',
+              background: 'var(--color-surface-light)',
             }}>
-              <div style={{ fontSize: '10px', fontWeight: 700, color: '#06B6D4', marginBottom: 10, letterSpacing: '0.8px', textTransform: 'uppercase' as const }}>
+              <div style={{ fontSize: '10px', fontWeight: 700, color: 'var(--color-primary)', marginBottom: 10, letterSpacing: '0.8px', textTransform: 'uppercase' as const }}>
                 ⚙️ Configuration
               </div>
               <div style={{ display: 'flex', flexDirection: 'column' as const, gap: 8 }}>
                 <div>
-                  <label style={{ display: 'block', fontSize: '9px', color: '#6B7280', marginBottom: 3, fontWeight: 600, textTransform: 'uppercase' as const, letterSpacing: '0.5px' }}>Mode</label>
+                  <label style={{ display: 'block', fontSize: '9px', color: 'var(--color-text-secondary)', marginBottom: 3, fontWeight: 600, textTransform: 'uppercase' as const, letterSpacing: '0.5px' }}>Mode</label>
                   <select value={settingsMode} onChange={(e) => setSettingsMode(e.target.value)} className="input-field" style={{ fontSize: '12px', width: '100%' }}>
                     <option value="paper">🟢 Paper</option>
                     <option value="live">🔴 Live</option>
@@ -345,25 +345,25 @@ export function BotCard({ bot, onToggle, onDelete, liveTradeCount, trades = [], 
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
                   <div>
-                    <label style={{ display: 'block', fontSize: '9px', color: '#6B7280', marginBottom: 3, fontWeight: 600, textTransform: 'uppercase' as const, letterSpacing: '0.5px' }}>Capital/Trade ($)</label>
+                    <label style={{ display: 'block', fontSize: '9px', color: 'var(--color-text-secondary)', marginBottom: 3, fontWeight: 600, textTransform: 'uppercase' as const, letterSpacing: '0.5px' }}>Capital/Trade ($)</label>
                     <input type="number" value={settingsCPT}
                       onChange={(e) => setSettingsCPT(Number(e.target.value))}
-                      className="input-field" style={{ fontSize: '12px', fontFamily: 'monospace', width: '100%' }}
+                      className="input-field" style={{ fontSize: '12px', fontFamily: 'monospace', width: '100%', background: 'var(--color-background)', color: 'var(--color-text)', border: '1px solid var(--color-border)' }}
                     />
                   </div>
                   <div>
-                    <label style={{ display: 'block', fontSize: '9px', color: '#6B7280', marginBottom: 3, fontWeight: 600, textTransform: 'uppercase' as const, letterSpacing: '0.5px' }}>Max Trades</label>
+                    <label style={{ display: 'block', fontSize: '9px', color: 'var(--color-text-secondary)', marginBottom: 3, fontWeight: 600, textTransform: 'uppercase' as const, letterSpacing: '0.5px' }}>Max Trades</label>
                     <input type="number" value={settingsMaxTrades}
                       onChange={(e) => setSettingsMaxTrades(Number(e.target.value))}
-                      className="input-field" style={{ fontSize: '12px', fontFamily: 'monospace', width: '100%' }}
+                      className="input-field" style={{ fontSize: '12px', fontFamily: 'monospace', width: '100%', background: 'var(--color-background)', color: 'var(--color-text)', border: '1px solid var(--color-border)' }}
                     />
                   </div>
                 </div>
                 <div style={{ display: 'flex', gap: 6, marginTop: 2 }}>
                   <button onClick={handleSaveSettings} disabled={saving}
                     style={{
-                      flex: 1, padding: '7px 0', borderRadius: 8, border: '1px solid rgba(6,182,212,0.3)',
-                      background: 'rgba(6,182,212,0.1)', color: '#06B6D4',
+                      flex: 1, padding: '7px 0', borderRadius: 8, border: '1px solid var(--color-primary)',
+                      background: 'var(--color-primary-transparent)', color: 'var(--color-primary)',
                       fontSize: '11px', fontWeight: 700, cursor: saving ? 'wait' : 'pointer',
                       opacity: saving ? 0.7 : 1,
                     }}>
@@ -371,8 +371,8 @@ export function BotCard({ bot, onToggle, onDelete, liveTradeCount, trades = [], 
                   </button>
                   <button onClick={() => setShowSettings(false)}
                     style={{
-                      flex: 1, padding: '7px 0', borderRadius: 8, border: '1px solid rgba(255,255,255,0.06)',
-                      background: 'rgba(255,255,255,0.03)', color: '#6B7280',
+                      flex: 1, padding: '7px 0', borderRadius: 8, border: '1px solid var(--color-border)',
+                      background: 'transparent', color: 'var(--color-text-secondary)',
                       fontSize: '11px', fontWeight: 700, cursor: 'pointer',
                     }}>
                     Cancel

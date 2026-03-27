@@ -5,8 +5,10 @@ import { Header } from '@/components/header';
 import {
   User, Crown, Calendar, Check, Key, Shield, Sliders,
   Bell, TrendingUp, Coins, Save, CheckCircle, AlertCircle,
-  ChevronDown, ChevronUp, Settings, Unplug
+  ChevronDown, ChevronUp, Settings, Unplug, Palette
 } from 'lucide-react';
+import { useTheme } from '@/components/providers/theme-provider';
+import { themes, ThemeKey } from '@/lib/themes';
 import { motion } from 'framer-motion';
 import Link from 'next/link';
 import { format } from 'date-fns';
@@ -39,8 +41,8 @@ function Section({ icon, title, sub, children, defaultOpen = true }: {
   return (
     <div style={{ marginBottom: '12px' }}>
       <div onClick={() => setOpen(!open)} style={{
-        background: 'rgba(17,24,39,0.8)', backdropFilter: 'blur(12px)',
-        border: '1px solid rgba(255,255,255,0.06)',
+        background: 'var(--color-surface)', backdropFilter: 'blur(12px)',
+        border: '1px solid var(--color-border)',
         borderRadius: open ? '16px 16px 0 0' : '16px',
         padding: '16px 20px', cursor: 'pointer',
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
@@ -48,19 +50,19 @@ function Section({ icon, title, sub, children, defaultOpen = true }: {
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
           <div style={{
             width: '36px', height: '36px', borderRadius: '10px',
-            background: 'rgba(8,145,178,0.15)',
+            background: 'rgba(var(--color-primary-rgb, 0,229,255), 0.15)',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
           }}>{icon}</div>
           <div>
-            <div style={{ fontSize: '14px', fontWeight: 700, color: '#06B6D4' }}>{title}</div>
-            <div style={{ fontSize: '10px', color: '#6B7280' }}>{sub}</div>
+            <div style={{ fontSize: '14px', fontWeight: 700, color: 'var(--color-primary)' }}>{title}</div>
+            <div style={{ fontSize: '10px', color: 'var(--color-text-secondary)' }}>{sub}</div>
           </div>
         </div>
-        {open ? <ChevronUp size={16} color="#6B7280" /> : <ChevronDown size={16} color="#6B7280" />}
+        {open ? <ChevronUp size={16} color="var(--color-text-secondary)" /> : <ChevronDown size={16} color="var(--color-text-secondary)" />}
       </div>
       {open && (
         <div style={{
-          background: 'rgba(17,24,39,0.6)', border: '1px solid rgba(255,255,255,0.06)',
+          background: 'var(--color-surface-light)', border: '1px solid var(--color-border)',
           borderTop: 'none', borderRadius: '0 0 16px 16px', padding: '20px',
         }}>{children}</div>
       )}
@@ -70,16 +72,16 @@ function Section({ icon, title, sub, children, defaultOpen = true }: {
 
 const inputStyle: React.CSSProperties = {
   width: '100%', padding: '8px 12px', fontSize: '13px',
-  background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)',
-  borderRadius: '10px', color: '#F0F4F8', outline: 'none',
+  background: 'var(--color-background)', border: '1px solid var(--color-border)',
+  borderRadius: '10px', color: 'var(--color-text)', outline: 'none',
 };
 
 function Field({ label, sub, children }: { label: string; sub?: string; children: React.ReactNode }) {
   return (
     <div style={{ marginBottom: '14px' }}>
-      <label style={{ fontSize: '11px', fontWeight: 600, color: '#D1D5DB', marginBottom: '4px', display: 'block' }}>
+      <label style={{ fontSize: '11px', fontWeight: 600, color: 'var(--color-text)', marginBottom: '4px', display: 'block' }}>
         {label}
-        {sub && <span style={{ fontWeight: 400, color: '#6B7280', marginLeft: '6px' }}>{sub}</span>}
+        {sub && <span style={{ fontWeight: 400, color: 'var(--color-text-secondary)', marginLeft: '6px' }}>{sub}</span>}
       </label>
       {children}
     </div>
@@ -103,7 +105,7 @@ function Toggle({ value, onChange, label }: { value: boolean; onChange: (v: bool
     <div onClick={() => onChange(!value)} style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer', padding: '6px 0' }}>
       <div style={{
         width: '36px', height: '20px', borderRadius: '10px',
-        background: value ? '#22C55E' : 'rgba(255,255,255,0.1)',
+        background: value ? 'var(--color-success)' : 'var(--color-border)',
         position: 'relative', transition: 'background 0.3s',
       }}>
         <div style={{
@@ -112,7 +114,7 @@ function Toggle({ value, onChange, label }: { value: boolean; onChange: (v: bool
           transition: 'left 0.3s', boxShadow: '0 1px 3px rgba(0,0,0,0.3)',
         }} />
       </div>
-      <span style={{ fontSize: '12px', color: '#D1D5DB' }}>{label}</span>
+      <span style={{ fontSize: '12px', color: 'var(--color-text)' }}>{label}</span>
     </div>
   );
 }
@@ -319,6 +321,9 @@ export function AccountClient({ user, subscription }: AccountClientProps) {
   const [config, setConfig] = useState<Config>(DEFAULT_CONFIG);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState({ type: '', text: '' });
+  
+  // Custom hook for theme (must handle mounted state gracefully)
+  const { currentTheme, setTheme } = useTheme();
 
   useEffect(() => { setMounted(true); }, []);
   if (!mounted) return null;
@@ -364,16 +369,16 @@ export function AccountClient({ user, subscription }: AccountClientProps) {
           {/* Tab Bar */}
           <div style={{
             display: 'flex', gap: '4px', marginBottom: '24px', padding: '4px',
-            background: 'rgba(17,24,39,0.6)', borderRadius: '14px',
-            border: '1px solid rgba(255,255,255,0.06)',
+            background: 'var(--color-surface)', borderRadius: '14px',
+            border: '1px solid var(--color-border)',
           }}>
             {TABS.map(tab => (
               <button key={tab.id} onClick={() => setActiveTab(tab.id)}
                 style={{
                   flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center',
                   gap: '8px', padding: '10px 16px', borderRadius: '10px', border: 'none',
-                  background: activeTab === tab.id ? 'rgba(8,145,178,0.15)' : 'transparent',
-                  color: activeTab === tab.id ? '#06B6D4' : '#6B7280',
+                  background: activeTab === tab.id ? 'var(--color-surface-light)' : 'transparent',
+                  color: activeTab === tab.id ? 'var(--color-primary)' : 'var(--color-text-secondary)',
                   fontSize: '13px', fontWeight: 600, cursor: 'pointer', transition: 'all 0.2s',
                 }}>
                 {tab.icon} {tab.label}
@@ -495,6 +500,39 @@ export function AccountClient({ user, subscription }: AccountClientProps) {
                   <span style={{ fontSize: '13px', fontWeight: 600 }}>{message.text}</span>
                 </div>
               )}
+
+              {/* Appearance / Theme Settings */}
+              <Section icon={<Palette size={16} color="var(--color-primary)" />} title="Appearance & Theme"
+                sub="Customize the look and feel of your cockpit" defaultOpen={true}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '12px' }}>
+                  {Object.entries(themes).map(([key, theme]) => {
+                    const isActive = currentTheme === key;
+                    return (
+                      <button
+                        key={key}
+                        onClick={() => setTheme(key as ThemeKey)}
+                        style={{
+                          display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px',
+                          padding: '16px', borderRadius: '12px', cursor: 'pointer',
+                          background: isActive ? 'var(--color-surface-light)' : 'var(--color-surface)',
+                          border: `2px solid ${isActive ? theme.colors.primary : 'var(--color-border)'}`,
+                          transition: 'all 0.2s',
+                        }}
+                      >
+                        {/* Theme preview dot */}
+                        <div style={{
+                          width: '24px', height: '24px', borderRadius: '50%',
+                          background: theme.colors.primary,
+                          boxShadow: `0 0 12px ${theme.colors.primary}44`
+                        }} />
+                        <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--color-text)' }}>
+                          {theme.name}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </Section>
 
               {/* Exchange Connection */}
               <Section icon={<Key size={16} color="#0EA5E9" />} title="Exchange Connection"

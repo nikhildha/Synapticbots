@@ -7,7 +7,7 @@ import { BotCard } from '@/components/bot-card';
 import { RegimeCard, PaperTradesCard, LiveTradesCard, ActivePositionsCard, BrainExecutionSummary } from '@/components/dashboard/command-center';
 
 import { AthenaPanel } from '@/components/dashboard/athena-panel';
-
+import { MarketStructurePanel } from '@/components/dashboard/market-structure';
 import { SegmentHeatmap } from '@/components/dashboard/segment-heatmap';
 import { Bot, TrendingUp, Activity, DollarSign, Zap } from 'lucide-react';
 import Link from 'next/link';
@@ -700,7 +700,7 @@ export function DashboardClient({ user, stats, bots, recentTrades }: DashboardCl
             </div>
 
             {bots && bots.length > 0 ? (
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '14px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '14px' }}>
                 {bots.map((bot) => {
                   // Filter trades for this specific bot
                   const botNameLower = (bot?.name || '').toLowerCase();
@@ -743,6 +743,15 @@ export function DashboardClient({ user, stats, bots, recentTrades }: DashboardCl
             )}
           </motion.div>
 
+
+          {/* ═══ Market Structure Panel (above Athena) ═══ */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.25 }}
+          >
+            <MarketStructurePanel />
+          </motion.div>
 
           {/* ═══ Row 5: Segment Heatmap (left) + Athena Intelligence (right) ═══ */}
           <motion.div

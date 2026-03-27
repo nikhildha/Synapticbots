@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Activity, ShieldAlert, Zap, Lock, Eye, Cpu, XCircle, TrendingUp, TrendingDown } from 'lucide-react';
+import { Activity, ShieldAlert, Zap, Lock, Eye, Cpu, XCircle, TrendingUp, TrendingDown, ChevronUp, ChevronDown } from 'lucide-react';
 
 interface AthenaDecision {
     symbol: string;
@@ -71,7 +71,12 @@ function timeSince(ts: string): string {
 export function AthenaPanel({ athena, vetoLog = [] }: Props) {
     const [retroPrices, setRetroPrices] = useState<Record<string, number>>({});
     const [logHistory, setLogHistory] = useState<any[]>([]);
+    const [expandedDecisions, setExpandedDecisions] = useState<Record<string, boolean>>({});
     const enabled = !!athena?.enabled;
+
+    const toggleExpand = (id: string) => {
+        setExpandedDecisions(prev => ({ ...prev, [id]: !prev[id] }));
+    };
 
     // Fetch persistent decision history from /api/athena-log (JSONL backend)
     useEffect(() => {
@@ -245,10 +250,12 @@ export function AthenaPanel({ athena, vetoLog = [] }: Props) {
                                     // Extract leverage — prefer d.leverage, fallback to parsed
                                     const leverageVal = d.leverage ?? (parsed.leverage ? parseFloat(parsed.leverage) : null);
                                     const leverageDisplay = leverageVal && leverageVal > 0 ? `${Number(leverageVal).toFixed(0)}x` : parsed.leverage || null;
+                                    const decisionId = d.symbol + d.time;
+                                    const isExpanded = !!expandedDecisions[decisionId];
 
                                     return (
                                         <motion.div
-                                            key={d.symbol + d.time}
+                                            key={decisionId}
                                             initial={{ opacity: 0, y: -8 }}
                                             animate={{ opacity: 1, y: 0 }}
                                             transition={{ duration: 0.25, delay: i * 0.05 }}
@@ -354,33 +361,61 @@ export function AthenaPanel({ athena, vetoLog = [] }: Props) {
                                                 </div>
                                             )}
 
-                                            {/* ── Reasoning strip ── */}
+                                            {/* ── Toggle expanding reasoning ── */}
                                             {parsed.main && (
-                                                <div style={{ padding: '10px 16px', borderBottom: d.risk_flags?.length ? '1px solid rgba(255,255,255,0.04)' : 'none' }}>
-                                                    <p style={{
-                                                        fontSize: 11, color: '#6B7280', lineHeight: '1.5', margin: 0,
-                                                        paddingLeft: 8, borderLeft: '2px solid rgba(167,139,250,0.2)',
-                                                    }}>
-                                                        {parsed.main}
-                                                    </p>
-                                                </div>
+                                                <button
+                                                    onClick={() => toggleExpand(decisionId)}
+                                                    style={{
+                                                        width: '100%', padding: '6px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+                                                        background: 'transparent', borderTop: '1px solid var(--color-border)', cursor: 'pointer',
+                                                        color: 'var(--color-text-secondary)', fontSize: 11, fontWeight: 600, letterSpacing: '0.5px'
+                                                    }}
+                                                    className="hover:bg-[var(--color-surface)] hover:text-[var(--color-primary)] transition-colors"
+                                                >
+                                                    {isExpanded ? (
+                                                        <><ChevronUp size={14} /> Hide Reasoning</>
+                                                    ) : (
+                                                        <><ChevronDown size={14} /> Show Reasoning</>
+                                                    )}
+                                                </button>
                                             )}
 
-                                            {/* ── Risk Flags ── */}
-                                            {d.risk_flags && d.risk_flags.length > 0 && (
-                                                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5, padding: '8px 16px' }}>
-                                                    {(d.risk_flags as string[]).map((flag: string, idx: number) => (
-                                                        <span key={idx} style={{
-                                                            fontSize: 9, padding: '2px 7px', borderRadius: 4,
-                                                            background: 'rgba(255,179,0,0.07)', color: '#D4860A',
-                                                            border: '1px solid rgba(255,179,0,0.15)',
-                                                            letterSpacing: '0.3px',
-                                                        }}>
-                                                            ⚠ {flag}
-                                                        </span>
-                                                    ))}
-                                                </div>
-                                            )}
+                                            <AnimatePresence>
+                                                {isExpanded && parsed.main && (
+                                                    <motion.div
+                                                        initial={{ opacity: 0, height: 0 }}
+                                                        animate={{ opacity: 1, height: 'auto' }}
+                                                        exit={{ opacity: 0, height: 0 }}
+                                                        style={{ overflow: 'hidden' }}
+                                                    >
+                                                        {/* ── Reasoning strip ── */}
+                                                        <div style={{ padding: '10px 16px', borderBottom: d.risk_flags?.length ? '1px solid var(--color-border)' : 'none', background: 'var(--color-surface-light)' }}>
+                                                            <p style={{
+                                                                fontSize: 11, color: 'var(--color-text-secondary)', lineHeight: '1.5', margin: 0,
+                                                                paddingLeft: 8, borderLeft: '2px solid rgba(167,139,250,0.5)',
+                                                            }}>
+                                                                {parsed.main}
+                                                            </p>
+                                                        </div>
+
+                                                        {/* ── Risk Flags ── */}
+                                                        {d.risk_flags && d.risk_flags.length > 0 && (
+                                                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5, padding: '8px 16px', background: 'var(--color-surface-light)' }}>
+                                                                {(d.risk_flags as string[]).map((flag: string, idx: number) => (
+                                                                    <span key={idx} style={{
+                                                                        fontSize: 9, padding: '2px 7px', borderRadius: 4,
+                                                                        background: 'rgba(255,179,0,0.1)', color: '#D4860A',
+                                                                        border: '1px solid rgba(255,179,0,0.2)',
+                                                                        letterSpacing: '0.3px',
+                                                                    }}>
+                                                                        ⚠ {flag}
+                                                                    </span>
+                                                                ))}
+                                                            </div>
+                                                        )}
+                                                    </motion.div>
+                                                )}
+                                            </AnimatePresence>
                                         </motion.div>
                                     );
                                 })}

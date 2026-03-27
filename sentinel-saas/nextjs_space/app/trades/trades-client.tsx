@@ -164,8 +164,8 @@ function mapTrade(t: any): Trade {
 function Card({ children, className = '' }: { children: React.ReactNode; className?: string }) {
   return (
     <div className={className} style={{
-      background: 'rgba(17, 24, 39, 0.8)', backdropFilter: 'blur(12px)',
-      border: '1px solid rgba(255,255,255,0.06)', borderRadius: '16px', padding: '20px',
+      background: 'var(--color-surface)', backdropFilter: 'blur(12px)',
+      border: '1px solid var(--color-border)', borderRadius: '16px', padding: '20px',
     }}>{children}</div>
   );
 }
@@ -173,9 +173,9 @@ function Card({ children, className = '' }: { children: React.ReactNode; classNa
 function StatCard({ label, value, sub, color }: { label: string; value: string; sub?: string; color?: string }) {
   return (
     <Card>
-      <div style={{ fontSize: '10px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '1px', color: '#6B7280', marginBottom: '6px' }}>{label}</div>
-      <div style={{ fontSize: '22px', fontWeight: 700, color: color || '#F0F4F8' }}>{value}</div>
-      {sub && <div style={{ fontSize: '11px', color: '#6B7280', marginTop: '4px' }}>{sub}</div>}
+      <div style={{ fontSize: '10px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '1px', color: 'var(--color-text-secondary)', marginBottom: '6px' }}>{label}</div>
+      <div style={{ fontSize: '22px', fontWeight: 700, color: color || 'var(--color-text)' }}>{value}</div>
+      {sub && <div style={{ fontSize: '11px', color: 'var(--color-text-secondary)', marginTop: '4px' }}>{sub}</div>}
     </Card>
   );
 }
@@ -515,8 +515,8 @@ export function TradesClient({ trades: initialTrades }: TradesClientProps) {
                   <button key={s} onClick={() => setStatusFilter(s)} style={{
                     padding: '6px 14px', borderRadius: '8px', border: 'none', cursor: 'pointer',
                     fontSize: '13px', fontWeight: 600,
-                    background: statusFilter === s ? '#0891B2' : 'rgba(255,255,255,0.05)',
-                    color: statusFilter === s ? '#fff' : '#9CA3AF',
+                    background: statusFilter === s ? '#0891B2' : 'var(--color-surface-light)',
+                    color: statusFilter === s ? '#fff' : 'var(--color-text-secondary)',
                     transition: 'all 0.2s',
                   }}>
                     {s === 'all' ? `All (${stats.total})` : s === 'active' ? `Active (${stats.active})` : `Closed (${stats.closed})`}
@@ -539,8 +539,8 @@ export function TradesClient({ trades: initialTrades }: TradesClientProps) {
                 )}
 
                 <select value={posFilter} onChange={e => setPosFilter(e.target.value)} style={{
-                  padding: '6px 10px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.1)',
-                  background: 'rgba(255,255,255,0.04)', color: '#D1D5DB', fontSize: '13px',
+                  padding: '6px 10px', borderRadius: '8px', border: '1px solid var(--color-border)',
+                  background: 'var(--color-surface-light)', color: 'var(--color-text)', fontSize: '13px',
                 }}>
                   <option value="all">All Positions</option>
                   <option value="long">Long / Buy</option>
@@ -550,8 +550,8 @@ export function TradesClient({ trades: initialTrades }: TradesClientProps) {
 
 
                 <select value={pnlFilter} onChange={e => setPnlFilter(e.target.value as any)} style={{
-                  padding: '6px 10px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.1)',
-                  background: 'rgba(255,255,255,0.04)', color: '#D1D5DB', fontSize: '13px',
+                  padding: '6px 10px', borderRadius: '8px', border: '1px solid var(--color-border)',
+                  background: 'var(--color-surface-light)', color: 'var(--color-text)', fontSize: '13px',
                 }}>
                   <option value="all">All P&L</option>
                   <option value="profit">Profit Only</option>
@@ -561,16 +561,16 @@ export function TradesClient({ trades: initialTrades }: TradesClientProps) {
 
 
                 <div style={{ marginLeft: 'auto', position: 'relative' }}>
-                  <Search size={14} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: '#6B7280' }} />
+                  <Search size={14} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: 'var(--color-text-secondary)' }} />
                   <input value={coinSearch} onChange={e => setCoinSearch(e.target.value)}
                     placeholder="Search coin..."
                     style={{
-                      padding: '6px 10px 6px 30px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.1)',
-                      background: 'rgba(255,255,255,0.04)', color: '#D1D5DB', fontSize: '13px', width: '150px',
+                      padding: '6px 10px 6px 30px', borderRadius: '8px', border: '1px solid var(--color-border)',
+                      background: 'var(--color-surface-light)', color: 'var(--color-text)', fontSize: '13px', width: '150px',
                     }} />
                   {coinSearch && (
                     <X size={12} onClick={() => setCoinSearch('')}
-                      style={{ position: 'absolute', right: '8px', top: '50%', transform: 'translateY(-50%)', cursor: 'pointer', color: '#6B7280' }} />
+                      style={{ position: 'absolute', right: '8px', top: '50%', transform: 'translateY(-50%)', cursor: 'pointer', color: 'var(--color-text-secondary)' }} />
                   )}
                 </div>
               </div>
@@ -588,12 +588,12 @@ export function TradesClient({ trades: initialTrades }: TradesClientProps) {
                 <div style={{ overflowX: 'auto', maxHeight: '600px', overflowY: 'auto' }}>
                   <table style={{ width: '100%', minWidth: '1300px', borderCollapse: 'collapse', fontSize: '17px' }}>
                     <thead>
-                      <tr style={{ borderBottom: '2px solid rgba(255,255,255,0.10)' }}>
+                        <tr style={{ borderBottom: '2px solid var(--color-border)' }}>
                          {['Bot', 'Coin', 'Position', 'Leverage', 'Capital', 'Entry', 'LTP', 'Stop Loss', 'SL Step', 'Target Price', 'PnL', 'Fee', 'Net PnL', 'Exit', ''].map(h => (
                           <th key={h} style={{
                             padding: '12px 14px', textAlign: h === 'Bot' || h === 'Coin' ? 'left' : 'center',
                             fontSize: '13px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.8px',
-                            color: '#9CA3AF', position: 'sticky', top: 0, background: 'rgba(17, 24, 39, 0.95)',
+                            color: 'var(--color-text-secondary)', position: 'sticky', top: 0, background: 'var(--color-surface)',
                           }}>{h}</th>
                         ))}
                       </tr>
@@ -609,13 +609,13 @@ export function TradesClient({ trades: initialTrades }: TradesClientProps) {
                           : { pnl: t.totalPnl, pnlPct: t.totalPnlPercent };
 
                         return (
-                          <tr key={t.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                          <tr key={t.id} style={{ borderBottom: '1px solid var(--color-border)' }}>
                             <td style={{ padding: '12px 14px', color: '#0891B2', fontWeight: 600, fontSize: '14px' }}>
                               <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                                 {t.botName || 'Unknown Bot'}
                               </div>
                               {t.sessionId && (
-                                <div style={{ fontSize: '11px', color: '#6B7280', marginTop: '2px' }}>
+                                <div style={{ fontSize: '11px', color: 'var(--color-text-secondary)', marginTop: '2px' }}>
                                   {(() => {
                                     const idx = uniqueSessions.indexOf(t.sessionId);
                                     return idx === -1 ? 'Legacy' : `Run #${uniqueSessions.length - idx}`;
@@ -623,7 +623,7 @@ export function TradesClient({ trades: initialTrades }: TradesClientProps) {
                                 </div>
                               )}
                             </td>
-                            <td style={{ padding: '12px 14px', fontWeight: 700, color: '#F0F4F8', fontSize: '14px' }}>
+                            <td style={{ padding: '12px 14px', fontWeight: 700, color: 'var(--color-text)', fontSize: '14px' }}>
                               {t.coin.replace('USDT', '')}
                             </td>
                             <td style={{ padding: '12px 14px', textAlign: 'center' }}>
@@ -635,9 +635,9 @@ export function TradesClient({ trades: initialTrades }: TradesClientProps) {
                                 {isLong ? 'LONG' : 'SHORT'}
                               </span>
                             </td>
-                            <td style={{ padding: '12px 14px', textAlign: 'center', color: '#E5E7EB', fontSize: '14px' }}>{t.leverage}×</td>
-                            <td style={{ padding: '12px 14px', textAlign: 'center', color: '#E5E7EB', fontSize: '14px' }}>${t.capital}</td>
-                             <td style={{ padding: '12px 14px', textAlign: 'center', color: '#E5E7EB', fontFamily: 'monospace', fontSize: '14px' }}>{fmtPrice(t.entryPrice)}</td>
+                            <td style={{ padding: '12px 14px', textAlign: 'center', color: 'var(--color-text)', fontSize: '14px' }}>{t.leverage}×</td>
+                            <td style={{ padding: '12px 14px', textAlign: 'center', color: 'var(--color-text)', fontSize: '14px' }}>${t.capital}</td>
+                             <td style={{ padding: '12px 14px', textAlign: 'center', color: 'var(--color-text)', fontFamily: 'monospace', fontSize: '14px' }}>{fmtPrice(t.entryPrice)}</td>
 
                              {/* LTP — live last traded price from Binance WebSocket */}
                              <td style={{ padding: '12px 14px', textAlign: 'center', fontFamily: 'monospace', fontSize: '14px' }}>
@@ -708,14 +708,14 @@ export function TradesClient({ trades: initialTrades }: TradesClientProps) {
                             <td style={{ padding: '12px 14px', textAlign: 'center', fontWeight: 700, fontSize: '14px', color: pnlColor(pnl) }}>
                               {fmt$(pnl)} <span style={{ fontSize: '12px', fontWeight: 600, color: pnlColor(pnlPct) }}>({fmtPct(pnlPct)})</span>
                             </td>
-                            <td style={{ padding: '12px 14px', textAlign: 'center', fontFamily: 'monospace', fontSize: '13px', color: t.fee > 0 ? '#F59E0B' : '#4B5563' }}>
+                            <td style={{ padding: '12px 14px', textAlign: 'center', fontFamily: 'monospace', fontSize: '13px', color: t.fee > 0 ? '#F59E0B' : 'var(--color-text-secondary)' }}>
                               {!isActive && t.fee > 0 ? `$${t.fee.toFixed(4)}` : '—'}
                             </td>
                             <td style={{ padding: '12px 14px', textAlign: 'center', fontWeight: 700, fontFamily: 'monospace', fontSize: '14px', color: pnlColor(pnl - (isActive ? 0 : t.fee)) }}>
                               {fmt$(pnl - (isActive ? 0 : t.fee))}
                             </td>
 
-                            <td style={{ padding: '12px 14px', textAlign: 'center', fontFamily: 'monospace', fontSize: '14px', color: '#E5E7EB' }}>
+                            <td style={{ padding: '12px 14px', textAlign: 'center', fontFamily: 'monospace', fontSize: '14px', color: 'var(--color-text)' }}>
                               {!isActive && t.exitPrice ? fmtPrice(t.exitPrice) : '—'}
                             </td>
 
@@ -744,7 +744,7 @@ export function TradesClient({ trades: initialTrades }: TradesClientProps) {
                     </tbody>
                   </table>
                 </div>
-                <div style={{ marginTop: '12px', fontSize: '12px', color: '#6B7280', textAlign: 'right' }}>
+                <div style={{ marginTop: '12px', fontSize: '12px', color: 'var(--color-text-secondary)', textAlign: 'right' }}>
                   Showing {filtered.length} of {trades.length} trades
                 </div>
               </Card>
@@ -752,8 +752,8 @@ export function TradesClient({ trades: initialTrades }: TradesClientProps) {
               <Card>
                 <div style={{ textAlign: 'center', padding: '60px 0' }}>
                   <div style={{ width: '48px', height: '48px', borderRadius: '12px', background: 'rgba(8,145,178,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 12px' }}><BarChart3 size={24} style={{ color: '#0891B2' }} /></div>
-                  <div style={{ fontSize: '18px', fontWeight: 600, color: '#D1D5DB', marginBottom: '8px' }}>No Trades Found</div>
-                  <div style={{ fontSize: '14px', color: '#6B7280' }}>
+                  <div style={{ fontSize: '18px', fontWeight: 600, color: 'var(--color-text)', marginBottom: '8px' }}>No Trades Found</div>
+                  <div style={{ fontSize: '14px', color: 'var(--color-text-secondary)' }}>
                     {statusFilter === 'all' ? 'Deploy a bot to start trading' : `No ${statusFilter} trades match your filters`}
                   </div>
                 </div>

@@ -609,6 +609,15 @@ class RegimeMasterBot:
             except Exception as _he:
                 logger.warning("⚠️  Heatmap refresh failed (non-fatal): %s", _he)
 
+            # ── Market Structure Analysis (BTC/ETH/SOL/AAVE — 15m) ─────────────
+            # Runs every cycle (~15 min). Writes data/market_structure.json for the dashboard.
+            try:
+                from market_structure import run_market_structure_analysis as _run_ms
+                _run_ms()
+                logger.info("📊 Market structure analysis written to disk")
+            except Exception as _ms_err:
+                logger.warning("⚠️  Market structure analysis failed (non-fatal): %s", _ms_err)
+
             # Refresh the full coin pool every N cycles (or on first run)
             refresh_rotations = max(1, self._SCAN_POOL_SIZE // self._SCAN_BATCH_SIZE)
             if not self._full_coin_pool or self._cycle_count % max(1, config.SCAN_INTERVAL_CYCLES * refresh_rotations) == 1:
