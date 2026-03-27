@@ -209,6 +209,15 @@ export async function GET() {
             athena: mergedAthena,
             perBot,
 
+            // Per-bot trade lists — keyed by botId. Clients must use this
+            // instead of the flat `trades` array to avoid cross-segment display.
+            tradesByBot: Object.fromEntries(
+                userBots.map((ub: any) => [
+                    ub.id,
+                    trades.filter((t: any) => (t.bot_id || t.botId) === ub.id),
+                ])
+            ),
+
             tradebook: {
                 trades,
                 // RAW FALLBACK: direct engine trades for instant display (no Prisma round-trip needed)

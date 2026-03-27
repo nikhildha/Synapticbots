@@ -29,6 +29,7 @@ export function BotsClient({ bots: initialBots }: BotsClientProps) {
   /* ── Live state ── */
   const [liveTradeCount, setLiveTradeCount] = useState(0);
   const [liveTrades, setLiveTrades] = useState<any[]>([]);
+  const [tradesByBot, setTradesByBot] = useState<Record<string, any[]>>({});
   const [allSessions, setAllSessions] = useState<any[]>([]);
   const [perfSummary, setPerfSummary] = useState<any>({ allTimePnl: 0, allTimeRoi: 0, totalSessions: 0 });
 
@@ -58,6 +59,8 @@ export function BotsClient({ bots: initialBots }: BotsClientProps) {
         const d = await res.json();
         const trades = d?.tradebook?.trades || [];
         setLiveTrades(trades);
+        // Store per-bot trade map for cross-segment isolation
+        setTradesByBot(d?.tradesByBot || {});
         setLiveTradeCount(trades.filter((t: any) => (t.status || '').toUpperCase() === 'ACTIVE').length);
       }
     } catch { /* silent */ }
@@ -296,8 +299,7 @@ export function BotsClient({ bots: initialBots }: BotsClientProps) {
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 14, marginBottom: 40 }}>
               {activeBots.map((bot, i) => {
                 const botSessions = allSessions.filter((s: any) => s.botId === bot?.id);
-                const botTrades = liveTrades.filter((t: any) => (t.bot_id && bot?.id && t.bot_id === bot.id) || (t.botId && bot?.id && t.botId === bot.id));
-                const displayTrades = botTrades.length > 0 ? botTrades : (activeBots.length === 1 ? liveTrades : []);
+                const displayTrades = tradesByBot[bot?.id] ?? [];
                 return (
                   <motion.div key={bot?.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.06 }}>
                     <BotCard bot={bot} onToggle={handleBotToggle} onDelete={handleDeleteBot} liveTradeCount={liveTradeCount} trades={displayTrades} sessions={botSessions} />
