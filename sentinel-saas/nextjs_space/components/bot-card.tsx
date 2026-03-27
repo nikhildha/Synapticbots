@@ -211,38 +211,26 @@ export function BotCard({ bot, onToggle, onDelete, trades = [], livePrices = {},
             </div>
           </div>
         </div>
-        {/* Active count badge */}
-        {activeTrades.length > 0 && (
+        {/* PnL Top Right */}
+        <div style={{ textAlign: 'right' }}>
           <div style={{
-            width: 26, height: 26, borderRadius: 8,
-            background: 'rgba(0,229,255,0.1)', border: '1px solid rgba(0,229,255,0.2)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontSize: '13px', fontWeight: 800, fontFamily: 'var(--font-mono, monospace)', color: '#00E5FF',
+            fontSize: '18px', fontWeight: 800, fontFamily: 'var(--font-mono, monospace)',
+            color: pnlColor(totalPnl),
+            textShadow: `0 0 8px ${pnlColor(totalPnl)}33`,
+            lineHeight: 1,
           }}>
-            {activeTrades.length}
+            {sign(totalPnl)}${Math.abs(totalPnl).toFixed(2)}
           </div>
-        )}
-      </div>
-
-      {/* ── PnL Hero ── */}
-      <div style={{ padding: '12px 14px 8px', textAlign: 'center' }}>
-        <div style={{
-          fontSize: '22px', fontWeight: 800, fontFamily: 'var(--font-mono, monospace)',
-          color: pnlColor(totalPnl),
-          textShadow: `0 0 12px ${pnlColor(totalPnl)}33`,
-          lineHeight: 1,
-        }}>
-          {sign(totalPnl)}${Math.abs(totalPnl).toFixed(2)}
-        </div>
-        <div style={{ fontSize: '9px', fontWeight: 700, color: 'var(--color-text-secondary)', letterSpacing: '1px', textTransform: 'uppercase' as const, marginTop: 3 }}>
-          Total P&L
+          <div style={{ fontSize: '9px', fontWeight: 700, color: 'var(--color-text-secondary)', letterSpacing: '1px', textTransform: 'uppercase' as const, marginTop: 3 }}>
+            Total P&L
+          </div>
         </div>
       </div>
 
       {/* ── 3-col metrics: Win Rate | Active | ROI ── */}
       <div style={{
         display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 0,
-        padding: '0 14px 10px',
+        padding: '14px 14px 10px',
       }}>
         <MetricCell
           label="Win Rate"

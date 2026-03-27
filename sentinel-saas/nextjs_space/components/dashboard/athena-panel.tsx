@@ -153,7 +153,7 @@ export function AthenaPanel({ athena, vetoLog = [] }: Props) {
                     </div>
                     <div>
                         <h2 style={{ margin: 0, fontSize: 18, fontWeight: 800, color: 'var(--color-text)', letterSpacing: '1px' }}>
-                            ATHENA A.I.
+                            ATHENA AI
                         </h2>
                     </div>
                 </div>
