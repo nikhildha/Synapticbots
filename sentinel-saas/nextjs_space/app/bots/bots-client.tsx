@@ -15,7 +15,7 @@ interface BotsClientProps { bots: any[]; sessions?: any[]; perfSummary?: any; }
 export function BotsClient({ bots: initialBots }: BotsClientProps) {
   const [mounted, setMounted] = useState(false);
   const [showDeployModal, setShowDeployModal] = useState(false);
-  const [bots] = useState(initialBots);
+  const [bots, setBots] = useState(initialBots);
   const [loading, setLoading] = useState(false);
   const [startAllLoading, setStartAllLoading] = useState(false);
   const [stopAllLoading, setStopAllLoading] = useState(false);
@@ -47,34 +47,30 @@ export function BotsClient({ bots: initialBots }: BotsClientProps) {
   useEffect(() => { setMounted(true); }, []);
 
   const fetchLiveCount = useCallback(async () => {
+    if (document.hidden) return;
     try {
-      const res = await fetch('/api/bot-state', { cache: 'no-store' });
-      if (res.ok) {
-        const d = await res.json();
+      const [stateRes, perfRes] = await Promise.all([
+        fetch('/api/bot-state', { cache: 'no-store' }),
+        fetch('/api/performance', { cache: 'no-store' }),
+      ]);
+      if (stateRes.ok) {
+        const d = await stateRes.json();
         const trades = d?.tradebook?.trades || [];
         setLiveTrades(trades);
-        // Store per-bot trade map for cross-segment isolation
         setTradesByBot(d?.tradesByBot || {});
         setLiveTradeCount(trades.filter((t: any) => (t.status || '').toUpperCase() === 'ACTIVE').length);
+      }
+      if (perfRes.ok) {
+        const d = await perfRes.json();
+        if (d) { setAllSessions(d.sessions || []); setPerfSummary(d.summary || perfSummary); }
       }
     } catch { /* silent */ }
   }, []);
 
   useEffect(() => {
-    fetch('/api/performance', { cache: 'no-store' })
-      .then(r => r.ok ? r.json() : null)
-      .then(d => {
-        if (d) { setAllSessions(d.sessions || []); setPerfSummary(d.summary || perfSummary); }
-      })
-      .catch(() => { });
-  }, []);
-
-  useEffect(() => {
     fetchLiveCount();
-    const timer = setInterval(fetchLiveCount, 5000);
+    const timer = setInterval(fetchLiveCount, 15000);
     return () => clearInterval(timer);
-
-
   }, [fetchLiveCount]);
 
   const handleBotToggle = async (botId: string, currentStatus: boolean) => {
@@ -83,8 +79,14 @@ export function BotsClient({ bots: initialBots }: BotsClientProps) {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ botId, isActive: !currentStatus }),
       });
-      if (res.ok) window.location.reload();
-    } catch (error) { console.error('Error toggling bot:', error); }
+      if (res.ok) {
+        setBots(prev => prev.map((b: any) => b.id === botId ? { ...b, isActive: !currentStatus } : b));
+        fetchLiveCount();
+      } else {
+        const d = await res.json().catch(() => ({}));
+        alert(d.error || 'Failed to toggle bot');
+      }
+    } catch { alert('Failed to toggle bot. Please try again.'); }
   };
 
   const handleDeployBots = async () => {
@@ -127,8 +129,10 @@ export function BotsClient({ bots: initialBots }: BotsClientProps) {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ botId }),
       });
-      if (res.ok) window.location.reload();
-      else {
+      if (res.ok) {
+        setBots(prev => prev.filter((b: any) => b.id !== botId));
+        fetchLiveCount();
+      } else {
         const data = await res.json().catch(() => ({}));
         alert(data.error || 'Failed to delete bot. Try stopping it first.');
       }
