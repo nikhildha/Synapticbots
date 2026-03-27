@@ -476,6 +476,10 @@ class AthenaEngine:
 
         # Apply veto threshold
         if adj_conf < config.LLM_VETO_THRESHOLD and action != "VETO":
+            logger.info(
+                "🚫 Athena [%s] raw=%s conf=%.2f < threshold=%.2f → overriding to VETO",
+                symbol, action, adj_conf, config.LLM_VETO_THRESHOLD,
+            )
             action = "VETO"
 
         # Build rich reasoning with Athena's analysis
