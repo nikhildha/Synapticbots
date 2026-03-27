@@ -224,6 +224,15 @@ class RegimeMasterBot:
         self._coin_daily_trades: dict = {}   # sym → [datetime]
         self._coin_last_side: dict    = {}   # sym → str
 
+        # ── Segment Cooldown (anti-correlation) ──────────────────────────────────
+        # Prevents deploying into segments experiencing correlated drawdowns.
+        self._seg_cooldowns: dict      = {}   # segment → datetime expiry
+        self._seg_sl_events: dict      = {}   # segment → [datetime] (SL timestamps for Rule 1)
+        self._seg_close_history: dict  = {}   # segment → [(datetime, pnl_pct)] (Rule 2+5)
+        self._seg_open_count: dict     = {}   # segment → [datetime] (deploy timestamps for Rule 4)
+        self._seg_consec_losses: dict  = {}   # segment → int (consecutive loss counter for Rule 5)
+
+
 
         # ── Startup: wipe stale signal queue from persisted state file ─────────
         # Without this, the dashboard shows ghost signals from the previous crash
@@ -1043,6 +1052,17 @@ class RegimeMasterBot:
                 else:
                     lev, fallback_lev = 10, 5
 
+                # ── Segment Cooldown Gate: block entire segment under cooldown ────────
+                _seg_blocked, _seg_reason = self._is_segment_in_cooldown(seg_name)
+                if _seg_blocked:
+                    logger.info("🔒 SEGMENT_COOLDOWN [%s] seg=%s %s — skipping deploy for [%s]",
+                                sym, seg_name, _seg_reason, bot_name)
+                    self._coin_states.setdefault(sym, {}).setdefault("bot_deploy_statuses", {})[bot_id] = (
+                        f"SEG_COOLDOWN: {_seg_reason}"
+                    )
+                    self._coin_states.setdefault(sym, {})["segment_cooldown"] = _seg_reason
+                    continue
+
                 # ── Cooldown Gate: block redeployment per 5-rule policy ───────────────
                 _cd_blocked, _cd_reason = self._is_in_cooldown(sym)
                 if _cd_blocked:
@@ -1461,6 +1481,8 @@ class RegimeMasterBot:
                 # Guard 4: lock this segment for the rest of the cycle
                 if bot_segment_filter not in ("ALL", None):
                     deployed_segments.add(bot_segment_filter)
+                # ── Segment Cooldown: track deployment for churn detection (Rule 4) ──
+                self._record_segment_open(seg_name)
                 # Signal Queue: step 4 — dequeue successfully deployed coin
                 if sym in self._pending_signals:
                     logger.info("✅ Signal queue: dequeuing %s (deployed after %d cycle(s) pending)",
@@ -2353,6 +2375,143 @@ class RegimeMasterBot:
         self._coin_states.get(sym, {}).pop("cooldown_rule", None)
         return False, ""
 
+    # ── Segment Cooldown Methods ────────────────────────────────────────────────
+
+    def _apply_segment_cooldown(self, seg: str, trade: dict) -> None:
+        """Evaluate 5 segment cooldown rules for a just-closed trade.
+
+        Rules (highest duration wins):
+          1. SL Burst:          ≥N SLs in segment within window      → 90 min
+          2. Segment Loss Rate: ≥60% losses in 4h (min 3 trades)     → 120 min
+          3. Overexposure:      ≥3 active positions in segment       → hard block (checked at deploy time)
+          4. Segment Churn:     ≥N opens in segment within 6h        → 180 min
+          5. Consecutive Loss:  N consecutive losses in segment      → 240 min
+        """
+        if not seg or not getattr(config, "SEG_COOLDOWN_ENABLED", True):
+            return
+
+        now = datetime.utcnow()
+        exit_reason  = (trade.get("exit_reason") or "").upper()
+        realized_pnl = float(trade.get("realized_pnl_pct") or trade.get("pnl_pct") or 0)
+        is_loss      = realized_pnl < 0
+        is_sl        = exit_reason in ("STOP_LOSS", "TRAILING_SL", "MAX_LOSS")
+        is_tp        = exit_reason in ("TAKE_PROFIT", "TP")
+
+        # ── Track SL events (Rule 1) ──
+        if is_sl:
+            self._seg_sl_events.setdefault(seg, []).append(now)
+
+        # ── Track close history (Rule 2 + 5) ──
+        self._seg_close_history.setdefault(seg, []).append((now, realized_pnl))
+
+        # ── Consecutive loss counter (Rule 5) ──
+        if is_loss and not is_tp:
+            self._seg_consec_losses[seg] = self._seg_consec_losses.get(seg, 0) + 1
+        elif not is_loss:
+            # Reset on any non-loss close (TP, break-even, profit)
+            self._seg_consec_losses[seg] = 0
+
+        cooldown_mins = 0
+        rule_label    = ""
+
+        # ── Rule 1: SL Burst ──
+        burst_window = getattr(config, "SEG_COOLDOWN_SL_BURST_WINDOW", 60)
+        burst_count  = getattr(config, "SEG_COOLDOWN_SL_BURST_COUNT", 2)
+        cutoff_r1    = now - timedelta(minutes=burst_window)
+        self._seg_sl_events[seg] = [t for t in self._seg_sl_events.get(seg, []) if t >= cutoff_r1]
+        if len(self._seg_sl_events.get(seg, [])) >= burst_count:
+            r1_mins = getattr(config, "SEG_COOLDOWN_SL_BURST_MINS", 90)
+            if r1_mins > cooldown_mins:
+                cooldown_mins = r1_mins
+                rule_label    = f"SegRule1:SL_Burst({len(self._seg_sl_events[seg])}x in {burst_window}m)"
+
+        # ── Rule 2: Segment Loss Rate (4h window, min 3 trades) ──
+        cutoff_r2 = now - timedelta(hours=4)
+        recent_closes = [(t, pnl) for t, pnl in self._seg_close_history.get(seg, []) if t >= cutoff_r2]
+        if len(recent_closes) >= 3:
+            loss_count = sum(1 for _, pnl in recent_closes if pnl < 0)
+            loss_pct   = (loss_count / len(recent_closes)) * 100
+            threshold  = getattr(config, "SEG_COOLDOWN_LOSS_RATE_PCT", 60)
+            if loss_pct >= threshold:
+                r2_mins = getattr(config, "SEG_COOLDOWN_LOSS_RATE_MINS", 120)
+                if r2_mins > cooldown_mins:
+                    cooldown_mins = r2_mins
+                    rule_label    = f"SegRule2:LossRate({loss_pct:.0f}%>{threshold}%)"
+
+        # ── Rule 5: Consecutive Losses ──
+        consec_thresh = getattr(config, "SEG_COOLDOWN_CONSEC_LOSS", 3)
+        if self._seg_consec_losses.get(seg, 0) >= consec_thresh:
+            r5_mins = getattr(config, "SEG_COOLDOWN_CONSEC_LOSS_MINS", 240)
+            if r5_mins > cooldown_mins:
+                cooldown_mins = r5_mins
+                rule_label    = f"SegRule5:ConsecLoss({self._seg_consec_losses[seg]}x)"
+
+        # ── Prune old close history (keep last 24h) ──
+        prune_cutoff = now - timedelta(hours=24)
+        self._seg_close_history[seg] = [(t, p) for t, p in self._seg_close_history.get(seg, []) if t >= prune_cutoff]
+
+        # ── Apply cooldown if any rule triggered ──
+        if cooldown_mins > 0:
+            expiry = now + timedelta(minutes=cooldown_mins)
+            # Only extend, never shorten an existing cooldown
+            existing = self._seg_cooldowns.get(seg)
+            if existing is None or expiry > existing:
+                self._seg_cooldowns[seg] = expiry
+                logger.info(
+                    "🔒 SEGMENT_COOLDOWN [%s] for %.0f min until %s UTC (%s, PnL=%.1f%%)",
+                    seg, cooldown_mins, expiry.strftime("%H:%M"), rule_label, realized_pnl
+                )
+
+    def _is_segment_in_cooldown(self, seg: str) -> tuple:
+        """Return (True, reason) if segment is under cooldown, else (False, '').
+        Also checks Rule 3 (max active) dynamically."""
+        if not seg or not getattr(config, "SEG_COOLDOWN_ENABLED", True):
+            return False, ""
+
+        # ── Rule 3: Overexposure (dynamic — checked at deploy time) ──
+        max_active = getattr(config, "SEG_COOLDOWN_MAX_ACTIVE", 3)
+        active_in_seg = sum(
+            1 for key in self._active_positions
+            if get_segment_for_coin(key.split(":")[-1] if ":" in key else key) == seg
+        )
+        if active_in_seg >= max_active:
+            return True, f"SegRule3:MaxActive({active_in_seg}/{max_active})"
+
+        # ── Rule 4: Churn (checked at deploy time from _seg_open_count) ──
+        churn_window = getattr(config, "SEG_COOLDOWN_CHURN_WINDOW", 360)
+        churn_count  = getattr(config, "SEG_COOLDOWN_CHURN_COUNT", 4)
+        now = datetime.utcnow()
+        cutoff_r4 = now - timedelta(minutes=churn_window)
+        self._seg_open_count[seg] = [t for t in self._seg_open_count.get(seg, []) if t >= cutoff_r4]
+        if len(self._seg_open_count.get(seg, [])) >= churn_count:
+            churn_mins = getattr(config, "SEG_COOLDOWN_CHURN_MINS", 180)
+            expiry = now + timedelta(minutes=churn_mins)
+            existing = self._seg_cooldowns.get(seg)
+            if existing is None or expiry > existing:
+                self._seg_cooldowns[seg] = expiry
+                logger.info(
+                    "🔒 SEGMENT_COOLDOWN [%s] Rule4:Churn (%d opens in %dm) → %dm block",
+                    seg, len(self._seg_open_count[seg]), churn_window, churn_mins
+                )
+
+        # ── Time-based cooldown check (Rules 1, 2, 4, 5) ──
+        expiry = self._seg_cooldowns.get(seg)
+        if expiry is None:
+            return False, ""
+        if now < expiry:
+            remaining = (expiry - now).total_seconds() / 60
+            return True, f"segment_cooldown {remaining:.0f}m (until {expiry.strftime('%H:%M')} UTC)"
+        # Expired — clean up
+        del self._seg_cooldowns[seg]
+        return False, ""
+
+    def _record_segment_open(self, seg: str) -> None:
+        """Track a new deployment for segment churn detection (Rule 4)."""
+        if seg and getattr(config, "SEG_COOLDOWN_ENABLED", True):
+            self._seg_open_count.setdefault(seg, []).append(datetime.utcnow())
+
+
+
     def _sync_positions(self):
         """
         Remove entries from _active_positions that were auto-closed
@@ -2376,6 +2535,10 @@ class RegimeMasterBot:
             closed_trade = recent_closed.get(sym, {})
             if closed_trade:
                 self._apply_cooldown(sym, closed_trade)
+                # Apply segment cooldown alongside coin cooldown
+                seg = get_segment_for_coin(sym)
+                if seg:
+                    self._apply_segment_cooldown(seg, closed_trade)
             del self._active_positions[key]
 
 

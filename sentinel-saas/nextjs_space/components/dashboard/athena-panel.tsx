@@ -92,9 +92,8 @@ export function AthenaPanel({ athena, vetoLog = [] }: Props) {
         return () => clearInterval(id);
     }, []);
 
-    // Merge persistent log + in-memory recent_decisions, deduplicate by symbol (latest wins)
+    // Show only current-cycle decisions (from in-memory prop), not accumulated log history
     const rawDecisions = (athena?.recent_decisions || []).slice().reverse();
-    // Map in-memory decisions to logHistory shape for display
     const inMemoryMapped = rawDecisions.map((d: any) => ({
         ts: d.time,
         symbol: d.symbol,
@@ -104,20 +103,18 @@ export function AthenaPanel({ athena, vetoLog = [] }: Props) {
         summary: d.reasoning || '',
         risk_flags: d.risk_flags || [],
         model: d.model || '',
-        // Price levels from LLM output — passed through for card header display
         entry_price: d.entry_price ?? null,
         stop_loss: d.stop_loss ?? null,
         target: d.target ?? null,
     }));
-    // Merge: log history first (oldest), then in-memory (newest)
-    const merged = [...logHistory, ...inMemoryMapped];
-    // Deduplicate by symbol keeping last entry
+    // Deduplicate by symbol keeping latest entry
     const seenSymbols = new Set<string>();
-    const decisions = [...merged].reverse().filter((d) => {
+    const decisions = inMemoryMapped.filter((d) => {
         if (seenSymbols.has(d.symbol)) return false;
         seenSymbols.add(d.symbol);
         return true;
     });
+
 
     const hasData = decisions.length > 0;
 
@@ -219,11 +216,12 @@ export function AthenaPanel({ athena, vetoLog = [] }: Props) {
                             </div>
                         </div>
                     ) : (
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: 10, maxHeight: 760, overflowY: 'auto', paddingRight: 4,
-                            scrollbarWidth: 'thin', scrollbarColor: 'rgba(0,229,255,0.2) transparent' }}>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+
 
                             <AnimatePresence>
-                                {decisions.map((d, i) => {
+                                {decisions.map((d: any, i) => {
+
                                     // Normalize field names — support both in-memory and log-history shapes
                                     const action = d.action || d.decision || 'VETO';
                                     const reasoning = d.reasoning || d.summary || '';

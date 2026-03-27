@@ -325,6 +325,24 @@ COOLDOWN_SAME_DIR_MINUTES   = 30     # Rule 4: same direction as last trade (sam
 COOLDOWN_DAILY_CAP_TRADES   = 3      # Rule 5: max deployments per coin per rolling 24h
 COOLDOWN_FLASH_HOLD_THRESH  = 15     # minutes — what counts as a "flash close"
 
+# ─── Segment Cooldown (anti-correlation, anti-drawdown) ──────────────────────
+# Prevents redeployment into a segment experiencing correlated drawdowns.
+# Works alongside coin-level cooldowns — checked BEFORE coin cooldown at deploy gate.
+SEG_COOLDOWN_ENABLED          = True
+SEG_COOLDOWN_SL_BURST_COUNT   = 2     # Rule 1: ≥N SLs in same segment within window → block
+SEG_COOLDOWN_SL_BURST_WINDOW  = 60    # minutes — sliding window for Rule 1
+SEG_COOLDOWN_SL_BURST_MINS    = 90    # cooldown duration for Rule 1
+SEG_COOLDOWN_LOSS_RATE_PCT    = 60    # Rule 2: ≥N% of closes are losses (4h window, min 3 trades)
+SEG_COOLDOWN_LOSS_RATE_MINS   = 120   # cooldown duration for Rule 2
+SEG_COOLDOWN_MAX_ACTIVE       = 3     # Rule 3: max concurrent active positions per segment (hard cap)
+SEG_COOLDOWN_CHURN_COUNT      = 4     # Rule 4: ≥N opens in same segment within window → block
+SEG_COOLDOWN_CHURN_WINDOW     = 360   # minutes (6h) — sliding window for Rule 4
+SEG_COOLDOWN_CHURN_MINS       = 180   # cooldown duration for Rule 4
+SEG_COOLDOWN_CONSEC_LOSS      = 3     # Rule 5: N consecutive losses from segment → block
+SEG_COOLDOWN_CONSEC_LOSS_MINS = 240   # cooldown duration for Rule 5
+
+
+
 
 
 
