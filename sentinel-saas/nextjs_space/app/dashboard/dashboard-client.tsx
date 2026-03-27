@@ -477,7 +477,7 @@ export function DashboardClient({ user, stats, bots, recentTrades }: DashboardCl
             <div className="flex items-center justify-between">
               <div>
                 <h1 className="text-2xl font-bold mb-1">
-                  Welcome, <span style={{ color: '#ffffff' }}>{user?.name ?? 'Trader'}</span>
+                  Welcome, <span className="text-[var(--color-primary)]">{user?.name ?? 'Trader'}</span>
                 </h1>
                 <p className="text-[var(--color-text-secondary)] text-xs">
                   AI Crypto Trading Cockpit — Monitor your bots and market signals
@@ -744,15 +744,20 @@ export function DashboardClient({ user, stats, bots, recentTrades }: DashboardCl
           </motion.div>
 
 
-          {/* ═══ Row 5: Athena Intelligence + Segment Heatmap (side-by-side) ═══ */}
+          {/* ═══ Row 5: Segment Heatmap (left) + Athena Intelligence (right) ═══ */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.27 }}
             className="mb-8"
           >
-            <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '20px', alignItems: 'start' }}>
-              {/* Athena Panel — 67% width */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '20px', alignItems: 'start' }}>
+              {/* Segment Heatmap — 33% width (left) */}
+              <SegmentHeatmap
+                heatmapData={botState?.heatmap || null}
+              />
+
+              {/* Athena Panel — 67% width (right) */}
               {(botState?.athena?.enabled || bots?.some((b: any) => (b.name || '').toLowerCase().includes('athena'))) && (
                 <div className="flex flex-col w-full">
                   <AthenaPanel
@@ -763,11 +768,6 @@ export function DashboardClient({ user, stats, bots, recentTrades }: DashboardCl
                   />
                 </div>
               )}
-
-              {/* Segment Heatmap — 33% width */}
-              <SegmentHeatmap
-                heatmapData={botState?.heatmap || null}
-              />
             </div>
           </motion.div>
 

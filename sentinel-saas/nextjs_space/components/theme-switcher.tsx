@@ -38,8 +38,8 @@ export function ThemeSwitcher() {
                 setIsOpen(false);
               }}
               className={`w-full text-left px-3 py-2 rounded-lg transition-colors ${currentTheme === key
-                  ? 'bg-[var(--color-primary)] text-white'
-                  : 'hover:bg-[var(--color-surface-light)]'
+                  ? 'bg-[var(--color-primary)] text-[var(--color-background)] font-medium'
+                  : 'text-[var(--color-text)] hover:bg-[var(--color-surface-light)]'
                 }`}
             >
               <div className="flex items-center space-x-2">

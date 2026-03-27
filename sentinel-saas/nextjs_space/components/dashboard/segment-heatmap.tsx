@@ -32,21 +32,21 @@ export function SegmentHeatmap({ heatmapData, loading = false }: SegmentHeatmapP
 
   if (!heatmapData || !heatmapData.segments || heatmapData.segments.length === 0) {
     return (
-      <div className="mb-8 p-6 rounded-2xl border border-white/5" style={{ background: 'rgba(17, 24, 39, 0.6)', backdropFilter: 'blur(12px)' }}>
+      <div className="mb-8 p-6 rounded-2xl border border-[var(--color-border)]" style={{ background: 'var(--color-surface)', backdropFilter: 'blur(12px)' }}>
         <div className="flex items-center gap-3 mb-4">
           <div className="p-2 rounded-lg bg-cyan-500/10">
             <Activity className="w-5 h-5 text-cyan-400" />
           </div>
           <div>
-            <h2 className="text-[17px] font-bold text-white flex items-center gap-2">
+            <h2 className="text-[17px] font-bold text-[var(--color-text)] flex items-center gap-2">
               Segment Heatmap
-              <span className="px-2 py-[2px] rounded text-[10px] font-bold bg-white/10 text-white/70 tracking-wider">LIVE</span>
+              <span className="px-2 py-[2px] rounded text-[10px] font-bold bg-[var(--color-text)]/10 text-[var(--color-text-secondary)] tracking-wider">LIVE</span>
             </h2>
-            <p className="text-[12px] text-gray-400 mt-0.5">4h Momentum × 1h Breadth — Top 2 Active Sectors</p>
+            <p className="text-[12px] text-[var(--color-text-secondary)] mt-0.5">4h Momentum × 1h Breadth — Top 2 Active Sectors</p>
           </div>
         </div>
-        <div className="flex items-center justify-center h-24 rounded-xl border border-white/5 bg-white/[0.02]">
-          <p className="text-[13px] text-gray-500 italic">Waiting for first engine cycle — heatmap will appear here</p>
+        <div className="flex items-center justify-center h-24 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-light)]">
+          <p className="text-[13px] text-[var(--color-text-secondary)] italic">Waiting for first engine cycle — heatmap will appear here</p>
         </div>
       </div>
     );
@@ -60,7 +60,7 @@ export function SegmentHeatmap({ heatmapData, loading = false }: SegmentHeatmapP
   const top2Targets = absSorted.slice(0, 2).map((s) => s.segment);
 
   return (
-    <div className="mb-8 p-6 rounded-2xl border border-white/5" style={{ background: 'rgba(17, 24, 39, 0.6)', backdropFilter: 'blur(12px)' }}>
+    <div className="mb-8 p-6 rounded-2xl border border-[var(--color-border)]" style={{ background: 'var(--color-surface)', backdropFilter: 'blur(12px)' }}>
       {/* Header */}
       <div className="mb-4">
         <div className="flex items-center gap-3 mb-3">
@@ -68,11 +68,11 @@ export function SegmentHeatmap({ heatmapData, loading = false }: SegmentHeatmapP
             <Activity className="w-5 h-5 text-cyan-400" />
           </div>
           <div>
-            <h2 className="text-[15px] font-bold text-white flex items-center gap-2">
+            <h2 className="text-[15px] font-bold text-[var(--color-text)] flex items-center gap-2">
               Segment Heatmap
-              <span className="px-2 py-[2px] rounded text-[10px] font-bold bg-white/10 text-white/70 tracking-wider">LIVE</span>
+              <span className="px-2 py-[2px] rounded text-[10px] font-bold bg-[var(--color-text)]/10 text-[var(--color-text-secondary)] tracking-wider">LIVE</span>
             </h2>
-            <p className="text-[11px] text-gray-400 mt-0.5">
+            <p className="text-[11px] text-[var(--color-text-secondary)] mt-0.5">
               4h Mom × 1h Breadth
             </p>
           </div>
@@ -129,7 +129,7 @@ export function SegmentHeatmap({ heatmapData, loading = false }: SegmentHeatmapP
               )}
 
               <div className="flex justify-between items-start mb-3">
-                <span className="text-sm font-bold text-white tracking-wide">{seg.segment}</span>
+                <span className="text-sm font-bold text-[var(--color-text)] tracking-wide">{seg.segment}</span>
                 <div className="flex items-center gap-1">
                   {isPositive ? <TrendingUp className="w-3.5 h-3.5 text-green-400" /> : <TrendingDown className="w-3.5 h-3.5 text-red-400" />}
                   <span className={`text-sm font-bold ${isPositive ? 'text-green-400' : 'text-red-400'}`}>
@@ -140,14 +140,14 @@ export function SegmentHeatmap({ heatmapData, loading = false }: SegmentHeatmapP
 
               <div className="space-y-1.5 mt-auto">
                 <div className="flex justify-between items-center text-[11px]">
-                  <span className="text-gray-400">4h Return</span>
+                  <span className="text-[var(--color-text-secondary)]">4h Return</span>
                   <span className={`font-medium ${seg.vw_4h >= 0 ? 'text-green-400/80' : 'text-red-400/80'}`}>
                     {seg.vw_4h >= 0 ? '+' : ''}{seg.vw_4h.toFixed(1)}%
                   </span>
                 </div>
-                <div className="flex justify-between items-center text-[11px] pt-1 mt-1 border-t border-white/5">
-                  <span className="text-gray-400">1h Breadth</span>
-                  <span className="text-white/80 font-medium">{seg.breadth_1h.toFixed(0)}%</span>
+                <div className="flex justify-between items-center text-[11px] pt-1 mt-1 border-t border-[var(--color-border)]">
+                  <span className="text-[var(--color-text-secondary)]">1h Breadth</span>
+                  <span className="text-[var(--color-text)] opacity-80 font-medium">{seg.breadth_1h.toFixed(0)}%</span>
                 </div>
               </div>
             </motion.div>

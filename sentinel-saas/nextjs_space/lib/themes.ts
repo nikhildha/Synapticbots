@@ -67,6 +67,23 @@ export const themes = {
       warning: '#F59E0B',
     },
   },
+  light: {
+    name: 'Stark White',
+    colors: {
+      primary: '#F59E0B',      // Amber/Yellow
+      primaryDark: '#D97706',
+      primaryLight: '#FBBF24',
+      accent: '#0A0E1A',       // Dark contrasting accent
+      background: '#FFFFFF',   // Pure white
+      surface: '#F3F4F6',      // Light gray surface
+      surfaceLight: '#E5E7EB', // Slightly darker gray light surface
+      text: '#111827',         // Very dark gray text
+      textSecondary: '#4B5563',// Medium gray text
+      success: '#10B981',
+      danger: '#EF4444',
+      warning: '#F59E0B',
+    },
+  },
 };
 
 export type ThemeKey = keyof typeof themes;

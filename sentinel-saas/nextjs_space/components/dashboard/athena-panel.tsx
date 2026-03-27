@@ -118,12 +118,12 @@ export function AthenaPanel({ athena, vetoLog = [] }: Props) {
 
     return (
         <div style={{
-            background: 'linear-gradient(145deg, rgba(8,12,20,0.9) 0%, rgba(5,7,12,0.95) 100%)',
+            background: 'var(--color-surface)',
             backdropFilter: 'blur(30px)',
-            border: '1px solid rgba(0,229,255,0.15)',
+            border: '1px solid var(--color-border)',
             borderRadius: 20,
             overflow: 'hidden',
-            boxShadow: '0 8px 32px rgba(0,0,0,0.6), inset 0 0 0 1px rgba(255,255,255,0.02)',
+            boxShadow: 'var(--shadow-card)',
             display: 'flex',
             flexDirection: 'column',
             height: '100%',
@@ -131,26 +131,26 @@ export function AthenaPanel({ athena, vetoLog = [] }: Props) {
             {/* ── Header ── */}
             <div style={{
                 padding: '16px 24px',
-                background: 'rgba(0,229,255,0.03)',
-                borderBottom: '1px solid rgba(0,229,255,0.1)',
+                background: 'rgba(var(--color-primary-rgb, 0,229,255), 0.03)',
+                borderBottom: '1px solid var(--color-border)',
                 display: 'flex',
                 justifyContent: 'space-between',
                 alignItems: 'center',
                 position: 'relative'
             }}>
-                <div style={{ position: 'absolute', top: 0, left: 24, right: 24, height: 1, background: 'linear-gradient(90deg, transparent, rgba(0,229,255,0.5), transparent)' }} />
+                <div style={{ position: 'absolute', top: 0, left: 24, right: 24, height: 1, background: 'linear-gradient(90deg, transparent, var(--color-primary), transparent)', opacity: 0.5 }} />
 
                 <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                     <div style={{
                         width: 36, height: 36, borderRadius: '50%',
-                        background: 'rgba(0,229,255,0.1)',
+                        background: 'rgba(var(--color-primary-rgb, 0,229,255), 0.1)',
                         display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        boxShadow: '0 0 15px rgba(0,229,255,0.2)'
+                        boxShadow: '0 0 15px rgba(var(--color-primary-rgb, 0,229,255), 0.2)'
                     }}>
-                        <Cpu size={18} color="#00E5FF" />
+                        <Cpu size={18} className="text-[var(--color-primary)]" />
                     </div>
                     <div>
-                        <h2 style={{ margin: 0, fontSize: 18, fontWeight: 800, color: '#E8EDF5', letterSpacing: '1px' }}>
+                        <h2 style={{ margin: 0, fontSize: 18, fontWeight: 800, color: 'var(--color-text)', letterSpacing: '1px' }}>
                             ATHENA A.I.
                         </h2>
                     </div>
@@ -159,11 +159,11 @@ export function AthenaPanel({ athena, vetoLog = [] }: Props) {
                 <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                     <div style={{
                         display: 'flex', alignItems: 'center', gap: 6,
-                        background: 'rgba(0,0,0,0.3)', padding: '6px 14px',
-                        borderRadius: 30, border: '1px solid rgba(255,255,255,0.05)'
+                        background: 'var(--color-surface-light)', padding: '6px 14px',
+                        borderRadius: 30, border: '1px solid var(--color-border)'
                     }}>
-                        <div style={{ width: 8, height: 8, borderRadius: '50%', background: enabled ? '#00FF88' : '#FF3B5C', boxShadow: `0 0 10px ${enabled ? '#00FF88' : '#FF3B5C'}` }} />
-                        <span style={{ fontSize: 11, fontWeight: 700, color: '#E8EDF5', letterSpacing: '1px' }}>
+                        <div style={{ width: 8, height: 8, borderRadius: '50%', background: enabled ? 'var(--color-success)' : 'var(--color-danger)', boxShadow: `0 0 10px ${enabled ? 'var(--color-success)' : 'var(--color-danger)'}` }} />
+                        <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--color-text)', letterSpacing: '1px' }}>
                             {enabled ? 'SYSTEM ONLINE' : 'OFFLINE'}
                         </span>
                     </div>
@@ -242,86 +242,141 @@ export function AthenaPanel({ athena, vetoLog = [] }: Props) {
                                         }
                                     }
 
+                                    // Extract leverage — prefer d.leverage, fallback to parsed
+                                    const leverageVal = d.leverage ?? (parsed.leverage ? parseFloat(parsed.leverage) : null);
+                                    const leverageDisplay = leverageVal && leverageVal > 0 ? `${Number(leverageVal).toFixed(0)}x` : parsed.leverage || null;
+
                                     return (
                                         <motion.div
                                             key={d.symbol + d.time}
-                                            initial={{ opacity: 0, x: -20 }}
-                                            animate={{ opacity: 1, x: 0 }}
-                                            transition={{ duration: 0.3, delay: i * 0.06 }}
+                                            initial={{ opacity: 0, y: -8 }}
+                                            animate={{ opacity: 1, y: 0 }}
+                                            transition={{ duration: 0.25, delay: i * 0.05 }}
                                             style={{
-                                                background: 'rgba(15,20,30,0.6)',
-                                                border: `1px solid ${theme.glow}`,
+                                                background: 'var(--color-surface-light)',
+                                                border: `1px solid ${theme.color}28`,
                                                 borderLeft: `4px solid ${theme.color}`,
-                                                borderRadius: 12,
-                                                padding: '14px 18px',
-                                                position: 'relative',
+                                                borderRadius: 14,
                                                 overflow: 'hidden',
+                                                position: 'relative',
                                             }}
                                         >
-                                            <div style={{ position: 'absolute', top: -40, right: -40, width: 80, height: 80, background: theme.color, filter: 'blur(50px)', opacity: 0.1 }} />
+                                            {/* Subtle corner glow */}
+                                            <div style={{ position: 'absolute', top: -30, right: -30, width: 80, height: 80, background: theme.color, filter: 'blur(50px)', opacity: 0.08, pointerEvents: 'none' }} />
 
-                                            {/* ── Top row: coin + direction + entry/sl/tp + verdict ── */}
-                                            <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', justifyContent: 'space-between' }}>
-                                                <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-                                                    {/* Coin name */}
-                                                    <span style={{ fontSize: 18, fontWeight: 900, color: '#E8EDF5', letterSpacing: '1px', fontFamily: 'monospace' }}>
+                                            {/* ── Header row: coin name + direction + verdict + timestamp ── */}
+                                            <div style={{
+                                                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                                                padding: '12px 16px 10px 16px',
+                                                borderBottom: `1px solid var(--color-border)`,
+                                                gap: 10,
+                                            }}>
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                                                    {/* Coin name — big & prominent */}
+                                                    <span style={{
+                                                        fontSize: 20, fontWeight: 900, color: 'var(--color-text)',
+                                                        letterSpacing: '1.5px', fontFamily: 'monospace',
+                                                        textShadow: `0 0 12px ${theme.color}44`,
+                                                    }}>
                                                         {d.symbol.replace('USDT', '')}
                                                     </span>
-                                                    {/* Long/Short badge */}
+                                                    {/* Long/Short direction pill */}
                                                     <span style={{
-                                                        padding: '3px 10px', borderRadius: 6,
-                                                        background: isLong ? 'rgba(0,255,136,0.12)' : isShort ? 'rgba(255,59,92,0.12)' : 'transparent',
-                                                        color: isLong ? '#00FF88' : isShort ? '#FF3B5C' : '#6B7280',
-                                                        fontSize: 11, fontWeight: 800, letterSpacing: '1px',
+                                                        padding: '3px 10px', borderRadius: 20,
+                                                        background: isLong ? 'rgba(0,255,136,0.13)' : isShort ? 'rgba(255,59,92,0.13)' : 'rgba(107,114,128,0.15)',
+                                                        color: isLong ? '#00FF88' : isShort ? '#FF3B5C' : '#9CA3AF',
+                                                        fontSize: 10, fontWeight: 800, letterSpacing: '1px',
+                                                        border: `1px solid ${isLong ? 'rgba(0,255,136,0.25)' : isShort ? 'rgba(255,59,92,0.25)' : 'rgba(107,114,128,0.2)'}`,
                                                     }}>
-                                                        {isLong ? 'LONG' : isShort ? 'SHORT' : d.side}
+                                                        {isLong ? '▲ LONG' : isShort ? '▼ SHORT' : d.side || '—'}
                                                     </span>
-                                                    {/* Entry / SL / Target inline */}
-                                                    {(entryPrice || slPrice || targetPrice) && (
-                                                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, fontFamily: 'monospace' }}>
-                                                            {entryPrice && <span style={{ color: '#6B7280' }}>Entry <strong style={{ color: '#E8EDF5' }}>{entryPrice}</strong></span>}
-                                                            {entryPrice && (slPrice || targetPrice) && <span style={{ color: '#374151' }}>·</span>}
-                                                            {slPrice && <span style={{ color: '#6B7280' }}>SL <strong style={{ color: '#FF3B5C' }}>{slPrice}</strong></span>}
-                                                            {slPrice && targetPrice && <span style={{ color: '#374151' }}>·</span>}
-                                                            {targetPrice && <span style={{ color: '#6B7280' }}>Target <strong style={{ color: '#00FF88' }}>{targetPrice}</strong></span>}
-                                                        </div>
+                                                    {/* Leverage badge */}
+                                                    {leverageDisplay && (
+                                                        <span style={{
+                                                            padding: '2px 8px', borderRadius: 6,
+                                                            background: 'rgba(167,139,250,0.1)',
+                                                            border: '1px solid rgba(167,139,250,0.2)',
+                                                            color: '#A78BFA', fontSize: 11, fontWeight: 700,
+                                                            fontFamily: 'monospace',
+                                                        }}>
+                                                            {leverageDisplay} LEV
+                                                        </span>
                                                     )}
+                                                </div>
+
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                                                     {/* Timestamp */}
                                                     {timestamp && (
                                                         <span style={{ fontSize: 10, color: '#4B5563', fontFamily: 'monospace' }}>{timeSince(timestamp)}</span>
                                                     )}
-                                                </div>
-                                                {/* Verdict badge */}
-                                                <div style={{
-                                                    padding: '4px 12px', borderRadius: 6,
-                                                    background: `rgba(${parseInt(theme.color.slice(1,3), 16)},${parseInt(theme.color.slice(3,5), 16)},${parseInt(theme.color.slice(5,7), 16)},0.12)`,
-                                                    border: `1px solid ${theme.color}40`,
-                                                    color: theme.color, fontSize: 11, fontWeight: 800, letterSpacing: '1px',
-                                                    boxShadow: `0 0 8px ${theme.glow}`,
-                                                    whiteSpace: 'nowrap',
-                                                }}>
-                                                    {theme.label}
+                                                    {/* Verdict pill — prominent */}
+                                                    <div style={{
+                                                        padding: '5px 14px', borderRadius: 20,
+                                                        background: `rgba(${parseInt(theme.color.slice(1,3),16)},${parseInt(theme.color.slice(3,5),16)},${parseInt(theme.color.slice(5,7),16)},0.15)`,
+                                                        border: `1px solid ${theme.color}55`,
+                                                        color: theme.color, fontSize: 12, fontWeight: 900,
+                                                        letterSpacing: '1.5px',
+                                                        boxShadow: `0 0 10px ${theme.glow}`,
+                                                        whiteSpace: 'nowrap',
+                                                    }}>
+                                                        {action === 'EXECUTE' ? '✓ APPROVED' : '✗ VETOED'}
+                                                    </div>
                                                 </div>
                                             </div>
 
-                                            {/* ── Reasoning ── */}
-                                            <p style={{
-                                                fontSize: 12, color: '#9CA3AF', lineHeight: '1.55', margin: '10px 0 0 0',
-                                                paddingLeft: 10, borderLeft: '2px solid rgba(167,139,250,0.25)',
-                                            }}>
-                                                {parsed.main}
-                                            </p>
+                                            {/* ── Trade levels: Entry | SL | Target ── */}
+                                            {(entryPrice || slPrice || targetPrice) && (
+                                                <div style={{
+                                                    display: 'grid',
+                                                    gridTemplateColumns: entryPrice && slPrice && targetPrice ? '1fr 1fr 1fr' : 'repeat(auto-fit, minmax(80px, 1fr))',
+                                                    gap: '1px',
+                                                    background: 'var(--color-border)',
+                                                    borderBottom: '1px solid var(--color-border)',
+                                                }}>
+                                                    {entryPrice && (
+                                                        <div style={{ padding: '10px 16px', background: 'var(--color-surface)', textAlign: 'center' }}>
+                                                            <div style={{ fontSize: 9, color: '#6B7280', letterSpacing: '1px', textTransform: 'uppercase', marginBottom: 4 }}>Entry</div>
+                                                            <div style={{ fontSize: 14, fontWeight: 800, color: 'var(--color-text)', fontFamily: 'monospace' }}>{entryPrice}</div>
+                                                        </div>
+                                                    )}
+                                                    {slPrice && (
+                                                        <div style={{ padding: '10px 16px', background: 'var(--color-surface)', textAlign: 'center', borderLeft: '1px solid var(--color-border)' }}>
+                                                            <div style={{ fontSize: 9, color: '#6B7280', letterSpacing: '1px', textTransform: 'uppercase', marginBottom: 4 }}>Stop Loss</div>
+                                                            <div style={{ fontSize: 14, fontWeight: 800, color: '#FF3B5C', fontFamily: 'monospace' }}>{slPrice}</div>
+                                                        </div>
+                                                    )}
+                                                    {targetPrice && (
+                                                        <div style={{ padding: '10px 16px', background: 'var(--color-surface)', textAlign: 'center', borderLeft: '1px solid var(--color-border)' }}>
+                                                            <div style={{ fontSize: 9, color: '#6B7280', letterSpacing: '1px', textTransform: 'uppercase', marginBottom: 4 }}>Target</div>
+                                                            <div style={{ fontSize: 14, fontWeight: 800, color: '#00FF88', fontFamily: 'monospace' }}>{targetPrice}</div>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            )}
+
+                                            {/* ── Reasoning strip ── */}
+                                            {parsed.main && (
+                                                <div style={{ padding: '10px 16px', borderBottom: d.risk_flags?.length ? '1px solid rgba(255,255,255,0.04)' : 'none' }}>
+                                                    <p style={{
+                                                        fontSize: 11, color: '#6B7280', lineHeight: '1.5', margin: 0,
+                                                        paddingLeft: 8, borderLeft: '2px solid rgba(167,139,250,0.2)',
+                                                    }}>
+                                                        {parsed.main}
+                                                    </p>
+                                                </div>
+                                            )}
 
                                             {/* ── Risk Flags ── */}
                                             {d.risk_flags && d.risk_flags.length > 0 && (
-                                                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 10 }}>
+                                                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5, padding: '8px 16px' }}>
                                                     {(d.risk_flags as string[]).map((flag: string, idx: number) => (
                                                         <span key={idx} style={{
-                                                            fontSize: 10, padding: '3px 8px', borderRadius: 4,
-                                                            background: 'rgba(255,179,0,0.08)', color: '#FFB300',
-                                                            border: '1px solid rgba(255,179,0,0.18)',
+                                                            fontSize: 9, padding: '2px 7px', borderRadius: 4,
+                                                            background: 'rgba(255,179,0,0.07)', color: '#D4860A',
+                                                            border: '1px solid rgba(255,179,0,0.15)',
+                                                            letterSpacing: '0.3px',
                                                         }}>
-                                                            {flag}
+                                                            ⚠ {flag}
                                                         </span>
                                                     ))}
                                                 </div>
