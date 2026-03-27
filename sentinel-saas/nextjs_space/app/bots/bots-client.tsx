@@ -291,9 +291,9 @@ export function BotsClient({ bots: initialBots }: BotsClientProps) {
             </motion.div>
           )}
 
-          {/* ════ BOT CARDS LIST ════ */}
+          {/* ════ BOT CARDS GRID (4×4) ════ */}
           {activeBots.length > 0 && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 14, marginBottom: 40 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 14, marginBottom: 40 }}>
               {activeBots.map((bot, i) => {
                 const botSessions = allSessions.filter((s: any) => s.botId === bot?.id);
                 const botTrades = liveTrades.filter((t: any) => (t.bot_id && bot?.id && t.bot_id === bot.id) || (t.botId && bot?.id && t.botId === bot.id));
