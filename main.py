@@ -894,24 +894,48 @@ class RegimeMasterBot:
             for _cs in self._coin_states.values():
                 _cs.get("bot_deploy_statuses", {}).pop(bot_id, None)
 
-            # Build allowed-coin set for this bot's segment
+            # Build allowed-coin set for this bot's segment (including fallbacks if primary is blocked)
             if bot_segment_filter == "ALL":
                 bot_allowed_coins = None  # no restriction
+                seg_results = list(raw_results)
             else:
-                bot_allowed_coins = set(config.CRYPTO_SEGMENTS.get(bot_segment_filter, []))
+                # ── SEGMENT FALLBACK LOGIC ──
+                # If primary segment is in cooldown, try the next best segment
+                target_segment = bot_segment_filter
+                is_blocked, _ = self._is_segment_in_cooldown(target_segment)
+                
+                if is_blocked:
+                    logger.info("🔄 [%s] Primary segment '%s' in cooldown, looking for fallback...", bot_name, target_segment)
+                    # Find all segments sorted by some metric, or just iterate available
+                    fallback_found = False
+                    for fallback_seg in config.CRYPTO_SEGMENTS.keys():
+                        if fallback_seg == bot_segment_filter or fallback_seg == "ALL":
+                            continue
+                        f_blocked, _ = self._is_segment_in_cooldown(fallback_seg)
+                        if not f_blocked and fallback_seg not in deployed_segments:
+                            # Check if we have high-conviction coins in this fallback segment
+                            has_coins = any(r.get("segment", fallback_seg) == fallback_seg for r in raw_results if r["symbol"] in config.CRYPTO_SEGMENTS[fallback_seg])
+                            if has_coins:
+                                logger.info("✅ [%s] Found valid fallback segment: '%s'", bot_name, fallback_seg)
+                                target_segment = fallback_seg
+                                fallback_found = True
+                                break
+                                
+                    if not fallback_found:
+                        logger.info("❌ [%s] No valid fallback segments available for '%s'.", bot_name, bot_segment_filter)
+                        # Keep target_segment as original so it fails the cooldown gate below normally and gets logged
 
-            # Filter raw_results to this bot's segment using the stamped segment field.
-            # Coins that have no matching segment tag (or BTCUSDT macro ref) are excluded.
-            if bot_allowed_coins is not None:
+                bot_allowed_coins = set(config.CRYPTO_SEGMENTS.get(target_segment, []))
+                # Filter raw_results to this target segment
                 seg_results = [
                     r for r in raw_results
                     if r["symbol"] in bot_allowed_coins
-                    # Hard segment field check: result must declare the same segment.
-                    # Prevents stale CRYPTO_SEGMENTS lists from leaking cross-segment.
-                    and r.get("segment", bot_segment_filter) == bot_segment_filter
+                    and r.get("segment", target_segment) == target_segment
                 ]
-            else:
-                seg_results = list(raw_results)
+                
+                # Update the bot's effective segment filter for this cycle so the rest of the loop uses the fallback
+                bot_segment_filter = target_segment
+
 
             # ── Waterfall: evaluate candidates in conviction order ─────────────────
             # ATHENA_WATERFALL_DEPTH = how many coins per bot we'll send to Athena.
