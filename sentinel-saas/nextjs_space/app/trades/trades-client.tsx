@@ -89,15 +89,15 @@ function mapTrade(t: any): Trade {
 
     const slDist = Math.abs(entryPrice - sl);
     const tpDist = Math.abs(tp - entryPrice);
-    const maxSaneDist = entryPrice * 0.20; // SL/TP should be within 20% of entry
+    const maxSaneDist = entryPrice * 0.12; // SL/TP should be within 12% of entry (tightened from 20%)
 
     // Detect garbage: SL/TP too far from entry, or SL on wrong side for position
     const slGarbage = sl <= 0 || slDist > maxSaneDist ||
-      (isLong && sl > entryPrice * 1.01) ||  // LONG SL should be below entry
-      (!isLong && sl < entryPrice * 0.99);    // SHORT SL should be above entry
+      (isLong && sl > entryPrice * 1.005) ||  // LONG SL should be below entry
+      (!isLong && sl < entryPrice * 0.995);    // SHORT SL should be above entry
     const tpGarbage = tp <= 0 || tpDist > maxSaneDist ||
-      (isLong && tp < entryPrice * 0.99) ||  // LONG TP should be above entry
-      (!isLong && tp > entryPrice * 1.01);    // SHORT TP should be below entry
+      (isLong && tp < entryPrice * 0.995) ||  // LONG TP should be above entry
+      (!isLong && tp > entryPrice * 1.005);    // SHORT TP should be below entry
 
     if (slGarbage) {
       sl = isLong
@@ -602,11 +602,21 @@ export function TradesClient({ trades: initialTrades }: TradesClientProps) {
                       {filtered.map(t => {
                         const isActive = (t.status || '').toLowerCase() === 'active';
                         const sym = tradeSym(t);
-                        const currentPrice = isActive ? (t.currentPrice || t.entryPrice) : null;
+                        // LIVE FIX: always prefer live WS price over stale DB currentPrice
+                        const livePrice = ltpPrices[sym] ?? null;
+                        const currentPrice = isActive
+                          ? (livePrice ?? t.currentPrice ?? t.entryPrice)
+                          : null;
                         const isLong = tradeIsLong(t);
-                        const { pnl, pnlPct } = isActive && currentPrice
+                        const rawPnl = isActive && currentPrice
                           ? calcLivePnl(t, currentPrice)
                           : { pnl: t.totalPnl, pnlPct: t.totalPnlPercent };
+
+                        // SANITY GUARD: if pnl% > ±500% it's clearly stale/corrupt — show as stale
+                        const pnlIsStale = isActive && Math.abs(rawPnl.pnlPct) > 500;
+                        const { pnl, pnlPct } = pnlIsStale
+                          ? { pnl: 0, pnlPct: 0 }
+                          : rawPnl;
 
                         return (
                           <tr key={t.id} style={{ borderBottom: '1px solid var(--color-border)' }}>
@@ -705,14 +715,17 @@ export function TradesClient({ trades: initialTrades }: TradesClientProps) {
                             </td>
                             <td style={{ padding: '12px 14px', textAlign: 'center', color: '#22C55E', fontFamily: 'monospace', fontSize: '14px' }}>{fmtPrice(t.takeProfit)}</td>
 
-                            <td style={{ padding: '12px 14px', textAlign: 'center', fontWeight: 700, fontSize: '14px', color: pnlColor(pnl) }}>
-                              {fmt$(pnl)} <span style={{ fontSize: '12px', fontWeight: 600, color: pnlColor(pnlPct) }}>({fmtPct(pnlPct)})</span>
+                            <td style={{ padding: '12px 14px', textAlign: 'center', fontWeight: 700, fontSize: '14px', color: pnlIsStale ? '#6B7280' : pnlColor(pnl) }}>
+                              {pnlIsStale
+                                ? <span style={{ fontSize: '12px', color: '#6B7280' }}>Stale</span>
+                                : <>{fmt$(pnl)} <span style={{ fontSize: '12px', fontWeight: 600, color: pnlColor(pnlPct) }}>({fmtPct(pnlPct)})</span></>
+                              }
                             </td>
                             <td style={{ padding: '12px 14px', textAlign: 'center', fontFamily: 'monospace', fontSize: '13px', color: t.fee > 0 ? '#F59E0B' : 'var(--color-text-secondary)' }}>
                               {!isActive && t.fee > 0 ? `$${t.fee.toFixed(4)}` : '—'}
                             </td>
-                            <td style={{ padding: '12px 14px', textAlign: 'center', fontWeight: 700, fontFamily: 'monospace', fontSize: '14px', color: pnlColor(pnl - (isActive ? 0 : t.fee)) }}>
-                              {fmt$(pnl - (isActive ? 0 : t.fee))}
+                            <td style={{ padding: '12px 14px', textAlign: 'center', fontWeight: 700, fontFamily: 'monospace', fontSize: '14px', color: pnlIsStale ? '#6B7280' : pnlColor(pnl - (isActive ? 0 : t.fee)) }}>
+                              {pnlIsStale ? '—' : fmt$(pnl - (isActive ? 0 : t.fee))}
                             </td>
 
                             <td style={{ padding: '12px 14px', textAlign: 'center', fontFamily: 'monospace', fontSize: '14px', color: 'var(--color-text)' }}>

@@ -74,10 +74,6 @@ export function Header() {
                     <span style={{ display: 'inline-block', width: 7, height: 7, borderRadius: '50%', background: '#EF4444', boxShadow: '0 0 6px #EF4444', animation: 'pulse 1.5s ease-in-out infinite' }} />
                     Live
                   </Link>
-
-                  <Link href="/account" className="text-[17px] font-medium text-[var(--color-text-secondary)] hover:text-[var(--color-primary)] transition-colors">
-                    Account
-                  </Link>
                   {/* Alpha — standalone quant engine, do not merge with main engine */}
                   <Link href="/alpha" className="text-[17px] font-semibold transition-colors" style={{ color: '#F0B90B', textShadow: '0 0 8px rgba(240,185,11,0.4)' }}>
                     α Alpha
@@ -113,9 +109,17 @@ export function Header() {
                   )}
                   {session && (
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginLeft: '12px' }}>
-                      <span style={{ fontSize: '13px', fontWeight: 600, color: '#00E5FF' }}>
+                      <Link
+                        href="/account"
+                        style={{
+                          fontSize: '13px', fontWeight: 600, color: '#00E5FF',
+                          textDecoration: 'none', cursor: 'pointer',
+                          transition: 'opacity 0.2s',
+                        }}
+                        title="Account Settings"
+                      >
                         {(session.user as any)?.name || 'User'} {((session.user as any)?.role === 'admin') ? '(Admin)' : ''}
-                      </span>
+                      </Link>
                       <button
                         onClick={handleSignOut}
                         className="p-2 text-[var(--color-text-secondary)] hover:text-[var(--color-primary)] hover:bg-[var(--color-primary)]/10 rounded-lg transition-all"
@@ -167,8 +171,8 @@ export function Header() {
                     ● Live
                   </Link>
 
-                  <Link href="/account" className="block text-[var(--color-text-secondary)] hover:text-[var(--color-primary)] transition-colors">
-                    Account
+                  <Link href="/account" className="block font-semibold transition-colors" style={{ color: '#00E5FF' }}>
+                    {(session.user as any)?.name || 'Account'}
                   </Link>
                   <Link href="/alpha" className="block font-semibold transition-colors" style={{ color: '#F0B90B' }}>
                     α Alpha
