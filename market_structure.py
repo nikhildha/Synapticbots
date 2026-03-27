@@ -1,6 +1,6 @@
 """
 Market Structure Analyzer — Synaptic Engine
-Fetches 15-minute OHLCV data for BTC, ETH, SOL, and AAVE,
+Fetches 15-minute OHLCV data for BTC, ETH, SOL, and AVAX,
 then uses the configured LLM (GPT-4o) to produce a 5-9 sentence
 market structure summary. Output is written to data/market_structure.json.
 Designed to be called from main.py or run standalone every 15 minutes.
@@ -22,8 +22,8 @@ logger = logging.getLogger(__name__)
 
 MARKET_STRUCTURE_FILE = os.path.join(config.DATA_DIR, "market_structure.json")
 
-MACRO_TICKERS = ["BTCUSDT", "ETHUSDT", "SOLUSDT", "AAVEUSDT"]
-TICKER_DISPLAY = {"BTCUSDT": "BTC", "ETHUSDT": "ETH", "SOLUSDT": "SOL", "AAVEUSDT": "AAVE"}
+MACRO_TICKERS = ["BTCUSDT", "ETHUSDT", "SOLUSDT", "AVAXUSDT"]
+TICKER_DISPLAY = {"BTCUSDT": "BTC", "ETHUSDT": "ETH", "SOLUSDT": "SOL", "AVAXUSDT": "AVAX"}
 TIMEFRAME = "15m"
 CANDLE_LIMIT = 100   # 100 × 15m = 25 hours of context
 
@@ -124,7 +124,7 @@ Provide a 5-9 sentence institutional-grade market structure summary covering:
 1. BTC dominance and macro direction (bullish/bearish/ranging)
 2. ETH structure relative to BTC (leading, lagging, or diverging)
 3. SOL momentum and key price levels
-4. AAVE DeFi sector signal
+4. AVAX Layer-1 network signal and capital rotation cues
 5. Overall risk-on vs risk-off sentiment and any notable correlations or divergences across the four assets
 
 Be specific about price action, key levels, and actionable context for an algorithmic crypto trading system. Do NOT include disclaimers or boilerplate. Output ONLY the market structure paragraph."""
@@ -156,7 +156,7 @@ def call_llm(prompt: str) -> Optional[str]:
 
 def run_market_structure_analysis() -> dict:
     """
-    Perform full market structure analysis for BTC/ETH/SOL/AAVE.
+    Perform full market structure analysis for BTC/ETH/SOL/AVAX.
     Returns the result dict and also writes it to MARKET_STRUCTURE_FILE.
     """
     logger.info("[MarketStructure] Starting 15m market structure analysis…")
