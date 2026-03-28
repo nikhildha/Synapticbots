@@ -225,7 +225,14 @@ def get_hottest_segments(segment_limit=2, blocked_segments=None):
 
     # Filter out cooldown segments for the HMM engine pool
     active_segments = [s["segment"] for s in segment_data if not s.get("is_cooldown")]
-    top_active = active_segments[:segment_limit]
+    
+    top_active = []
+    if "L1" in active_segments:
+        top_active.append("L1")
+        active_segments.remove("L1")
+        
+    remaining_limit = max(0, segment_limit - len(top_active))
+    top_active.extend(active_segments[:remaining_limit])
     
     logger.info("🎯 Forwarding top %d UNBLOCKED segments to HMM: %s", len(top_active), ", ".join(top_active))
     return top_active

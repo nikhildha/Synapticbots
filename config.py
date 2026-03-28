@@ -222,7 +222,7 @@ MULTI_COIN_MODE = True          # Enable multi-coin scanning
 # ─── Dynamic Segment Scanner ─────────────────────────────────────────────────────
 SCANNER_SEGMENT_ROTATION = True     # Rotate market segments every hour
 SCANNER_COINS_PER_SEGMENT = 5       # Scan top 5 highest-volume coins within the active segment
-SEGMENT_SCAN_LIMIT = 2              # Top N segments to scan per cycle (4h+1h blended scorer)
+SEGMENT_SCAN_LIMIT = 3              # Top N segments to scan per cycle (4h+1h blended scorer)
 
 # ── 3-Mode Macro-Regime-Aware Segment Selection ──────────────────────────────
 # The engine detects market mode each cycle and picks segment pools accordingly:
