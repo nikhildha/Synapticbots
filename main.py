@@ -1056,11 +1056,11 @@ class RegimeMasterBot:
                 conviction = top.get("conviction", 0)
                 hmm_confidence = top.get("confidence", 0)
                 
-                # ── NEW: HMM 90% Absolute Minimum ─────────────────────────────────
-                if hmm_confidence < 0.90:
-                    logger.info("⛔ [%s] %s HMM confidence %.2f < 0.90 — HMM VETO", bot_name, sym, hmm_confidence)
+                # ── NEW: HMM 80% Absolute Minimum ─────────────────────────────────
+                if hmm_confidence < 0.80:
+                    logger.info("⛔ [%s] %s HMM confidence %.2f < 0.80 — HMM VETO", bot_name, sym, hmm_confidence)
                     self._coin_states.setdefault(sym, {}).setdefault("bot_deploy_statuses", {})[bot_id] = (
-                        f"FILTERED: HMM confidence < 90% ({hmm_confidence:.2f})"
+                        f"FILTERED: HMM confidence < 80% ({hmm_confidence:.2f})"
                     )
                     continue
 
@@ -1090,20 +1090,7 @@ class RegimeMasterBot:
                     )
                     continue
 
-                # ── NEW: Liquidity Sweep Veto ─────────────────────────────────────
-                exhaustion = top.get("exhaustion_tail", 0.0)
-                if trade_side == "BUY" and exhaustion < 1.0:
-                    logger.info("⛔ [%s] %s LONG lacks bullish sweep (tail %.2f < 1.0) — SWEEP VETO", bot_name, sym, exhaustion)
-                    self._coin_states.setdefault(sym, {}).setdefault("bot_deploy_statuses", {})[bot_id] = (
-                        f"FILTERED: No bullish sweep (tail {exhaustion:.2f})"
-                    )
-                    continue
-                elif trade_side == "SELL" and exhaustion > -1.0:
-                    logger.info("⛔ [%s] %s SHORT lacks bearish sweep (tail %.2f > -1.0) — SWEEP VETO", bot_name, sym, exhaustion)
-                    self._coin_states.setdefault(sym, {}).setdefault("bot_deploy_statuses", {})[bot_id] = (
-                        f"FILTERED: No bearish sweep (tail {exhaustion:.2f})"
-                    )
-                    continue
+
 
                 min_conv   = getattr(config, "MIN_CONVICTION_FOR_DEPLOY", 60)
                 if conviction < min_conv:
