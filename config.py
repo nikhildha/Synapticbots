@@ -141,7 +141,7 @@ CAPITAL_PER_TRADE = 100        # $100 per trade, fixed
 # ─── Risk Management ────────────────────────────────────────────────────────────
 RISK_PER_TRADE = 0.04
 KILL_SWITCH_DRAWDOWN = 0.10   # Pause bot if 10% drawdown in 24h
-MAX_LOSS_PER_TRADE_PCT = -35     # Hard max-loss per trade: -35% of capital
+MAX_LOSS_PER_TRADE_PCT = -25     # Hard max-loss per trade: -25% of capital
 MAX_PROFIT_PER_TRADE_PCT = 35    # Hard profit cap: auto-close when trade reaches +35% PnL
 MIN_LEVERAGE_FLOOR = 5           # Skip trade if leverage must drop below this
 MIN_HOLD_MINUTES = 30         # Minimum hold time before regime-change exits
