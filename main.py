@@ -1054,6 +1054,57 @@ class RegimeMasterBot:
 
                 # Conviction threshold — skip before Athena call if too low
                 conviction = top.get("conviction", 0)
+                hmm_confidence = top.get("confidence", 0)
+                
+                # ── NEW: HMM 90% Absolute Minimum ─────────────────────────────────
+                if hmm_confidence < 0.90:
+                    logger.info("⛔ [%s] %s HMM confidence %.2f < 0.90 — HMM VETO", bot_name, sym, hmm_confidence)
+                    self._coin_states.setdefault(sym, {}).setdefault("bot_deploy_statuses", {})[bot_id] = (
+                        f"FILTERED: HMM confidence < 90% ({hmm_confidence:.2f})"
+                    )
+                    continue
+
+                # ── NEW: BTC Chop/Sideways Global Veto ────────────────────────────
+                btc_regime = self._coin_states.get("BTCUSDT", {}).get("regime", "UNKNOWN")
+                if btc_regime in ("SIDEWAYS", "CHOP", "SIDEWAYS/CHOP", "UNKNOWN"):
+                    logger.info("⛔ [%s] %s BTC macro is %s — BTC CHOP VETO (no deployments allowed)", bot_name, sym, btc_regime)
+                    self._coin_states.setdefault(sym, {}).setdefault("bot_deploy_statuses", {})[bot_id] = (
+                        f"FILTERED: BTC Macro is {btc_regime}"
+                    )
+                    continue
+
+                # ── NEW: Momentum Alignment Veto ──────────────────────────────────
+                trade_side = top.get("side", "")
+                trend_dir = top.get("trend_direction", "UNKNOWN")
+                
+                if trade_side == "BUY" and trend_dir != "UP":
+                    logger.info("⛔ [%s] %s LONG against momentum (%s) — MOMENTUM VETO", bot_name, sym, trend_dir)
+                    self._coin_states.setdefault(sym, {}).setdefault("bot_deploy_statuses", {})[bot_id] = (
+                        f"FILTERED: Momentum conflict (LONG in {trend_dir} trend)"
+                    )
+                    continue
+                elif trade_side == "SELL" and trend_dir != "DOWN":
+                    logger.info("⛔ [%s] %s SHORT against momentum (%s) — MOMENTUM VETO", bot_name, sym, trend_dir)
+                    self._coin_states.setdefault(sym, {}).setdefault("bot_deploy_statuses", {})[bot_id] = (
+                        f"FILTERED: Momentum conflict (SHORT in {trend_dir} trend)"
+                    )
+                    continue
+
+                # ── NEW: Liquidity Sweep Veto ─────────────────────────────────────
+                exhaustion = top.get("exhaustion_tail", 0.0)
+                if trade_side == "BUY" and exhaustion < 1.0:
+                    logger.info("⛔ [%s] %s LONG lacks bullish sweep (tail %.2f < 1.0) — SWEEP VETO", bot_name, sym, exhaustion)
+                    self._coin_states.setdefault(sym, {}).setdefault("bot_deploy_statuses", {})[bot_id] = (
+                        f"FILTERED: No bullish sweep (tail {exhaustion:.2f})"
+                    )
+                    continue
+                elif trade_side == "SELL" and exhaustion > -1.0:
+                    logger.info("⛔ [%s] %s SHORT lacks bearish sweep (tail %.2f > -1.0) — SWEEP VETO", bot_name, sym, exhaustion)
+                    self._coin_states.setdefault(sym, {}).setdefault("bot_deploy_statuses", {})[bot_id] = (
+                        f"FILTERED: No bearish sweep (tail {exhaustion:.2f})"
+                    )
+                    continue
+
                 min_conv   = getattr(config, "MIN_CONVICTION_FOR_DEPLOY", 60)
                 if conviction < min_conv:
                     logger.info("⛔ [%s] %s conviction %.0f < %.0f — waterfall exhausted (remaining candidates also low)",
@@ -1801,6 +1852,12 @@ class RegimeMasterBot:
 
             current_price = float(df_1h_feat["close"].iloc[-1])
             current_atr = float(df_1h_feat["atr"].iloc[-1]) if "atr" in df_1h_feat.columns else 0.0
+            
+            # Extract strict momentum and liquidity sweep indicators
+            from feature_engine import compute_trend
+            current_trend = compute_trend(df_1h_feat)
+            exhaustion_tail = float(df_1h_feat["exhaustion_tail"].iloc[-1]) if "exhaustion_tail" in df_1h_feat.columns else 0.0
+
             regime = config.REGIME_BULL if side == "BUY" else config.REGIME_BEAR
             regime_name = config.REGIME_NAMES.get(regime, "UNKNOWN")
             # Use the average margin across agreeing TFs as confidence
@@ -1902,6 +1959,7 @@ class RegimeMasterBot:
                 "regime_summary": regime_summary,
                 "athena": athena_action,
                 "segment": get_segment_for_coin(symbol),
+                "context": {"trend_alignment": current_trend}
             }
 
             return {
@@ -1916,6 +1974,8 @@ class RegimeMasterBot:
                 "brain_cfg": brain_cfg,
                 "tf_agreement": tf_agreement,
                 "athena": athena_action,
+                "trend_direction": current_trend,
+                "exhaustion_tail": exhaustion_tail,
                 "signal_type": "REVERSAL_PULLBACK" if _is_reversal_tier2 else "TREND_FOLLOW",
                 "reason": f"MultiTF-HMM | {regime_summary} | conv={conviction:.1f} TF={tf_agreement}/3",
             }
