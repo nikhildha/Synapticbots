@@ -258,16 +258,11 @@ SEGMENT_MTF_1H_TF        = "1h"  # Intraday BTC gate candle interval
 # UI labels (trades-client.tsx): Breakeven, +5%, +10%, +15%...
 TRAILING_SL_ENABLED = True
 TRAILING_SL_STEPS = [
-    ( 7.0,  3.0),   # Step 1: trigger at +7%  PnL → lock +3% profit (covers brokerage)
-    (10.0,  5.0),   # Step 2: trigger at +10% → lock +5%
-    (15.0, 10.0),   # Step 3: trigger at +15% → lock +10%
-    (20.0, 15.0),   # Step 4: trigger at +20% → lock +15%
-    (25.0, 20.0),   # Step 5: trigger at +25% → lock +20%
-    (30.0, 25.0),   # Step 6: trigger at +30% → lock +25%
-    (35.0, 30.0),   # Step 7: trigger at +35% → lock +30%
-    (40.0, 35.0),   # Step 8: trigger at +40% → lock +35%
-    (45.0, 40.0),   # Step 9: trigger at +45% → lock +40%
-    (50.0, 45.0),   # Step 10: trigger at +50% → lock +45%
+    (15.0,  4.0),   # 1: Trigger at +15% → Move SL to Breakeven (+4%). Trade is now risk-free.
+    (25.0,  10.0),   # 2: Trigger at +25% → Lock +10% (Gives 20% breathing room for pullbacks)
+    (35.0, 15.0),   # 3: Trigger at +35% → Lock +15%
+    (45.0, 25.0),   # 4: Trigger at +45% → Lock +25%
+    (60.0, 40.0),   # 5: Trigger at +60% → Lock +40%
 ]
 
 
