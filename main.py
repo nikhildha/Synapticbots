@@ -874,12 +874,11 @@ class RegimeMasterBot:
         deployed_trades = []
         deployed = 0
         athena_calls_this_cycle = 0  # H4: track Athena calls to enforce LLM_MAX_CALLS_PER_CYCLE
-        # ── GUARD 4: Per-segment tick lock ──────────────────────────────
-        # Prevents the waterfall from cascading multiple DeFi coins across 10 bots
-        # in the same cycle (e.g. bot#1 gets COMP, bot#2 gets GMX, ..., bot#10 gets LINK).
-        # Once ANY bot deploys a coin from a segment, that segment is locked for this tick.
-        # Bots with segment_filter="ALL" are exempt (they don't share a named segment pool).
-        deployed_segments: set = set()  # segment names already served this cycle
+        # ── GUARD 4: Per-user Per-segment tick lock ──────────────────────────────
+        # Prevents the waterfall from cascading multiple DeFi coins for the SAME USER
+        # in the same cycle. If User A has 2 DeFi bots, they only deploy 1 DeFi coin
+        # per tick. Other users' bots are isolated and will also receive the deployment.
+        deployed_segments: set = set()  # set of (user_id, segment) tuples
 
         for target in _tick_active_bots:
             bot_id   = target.get("bot_id", config.ENGINE_BOT_ID)
@@ -928,7 +927,7 @@ class RegimeMasterBot:
                         if fallback_seg == bot_segment_filter or fallback_seg == "ALL":
                             continue
                         f_blocked, _ = self._is_segment_in_cooldown(fallback_seg)
-                        if not f_blocked and fallback_seg not in deployed_segments:
+                        if not f_blocked and (user_id, fallback_seg) not in deployed_segments:
                             # ── Verify scanner provided coins for this fallback segment
                             has_coins = any(r.get("segment", fallback_seg) == fallback_seg for r in raw_results if r["symbol"] in config.CRYPTO_SEGMENTS[fallback_seg])
                             if has_coins:
@@ -984,13 +983,13 @@ class RegimeMasterBot:
             max_deploys_bot = getattr(config, "MAX_DEPLOYS_PER_BOT_PER_CYCLE", 3)
 
             # ── GUARD 4: Segment tick lock ────────────────────────────────────
-            # If this bot's named segment was already served this cycle, skip the
-            # entire waterfall. This prevents 10 bots all in "DeFi" from each
+            # If this user's named segment was already served this cycle, skip the
+            # entire waterfall. This prevents 1 user's 10 bots all in "DeFi" from each
             # deploying a different DeFi coin via the waterfall in the same tick.
-            if bot_segment_filter not in ("ALL", None) and bot_segment_filter in deployed_segments:
+            if bot_segment_filter not in ("ALL", None) and (user_id, bot_segment_filter) in deployed_segments:
                 logger.info(
-                    "🔒 [%s] Segment '%s' already deployed this cycle — skip (Guard 4)",
-                    bot_name, bot_segment_filter,
+                    "🔒 [%s] Segment '%s' already deployed this cycle for user %s — skip (Guard 4)",
+                    bot_name, bot_segment_filter, user_id
                 )
                 for _cs in self._coin_states.values():
                     _cs.get("bot_deploy_statuses", {}).setdefault(bot_id, "FILTERED: segment already served this cycle")
@@ -1541,9 +1540,9 @@ class RegimeMasterBot:
                     "entry_price": entry_price,
                     "quantity": fill_qty,
                 }
-                # Guard 4: lock this segment for the rest of the cycle
+                # Guard 4: lock this segment for the rest of the cycle for THIS USER
                 if bot_segment_filter not in ("ALL", None):
-                    deployed_segments.add(bot_segment_filter)
+                    deployed_segments.add((user_id, bot_segment_filter))
                 # ── Segment Cooldown: track deployment for churn detection (Rule 4) ──
                 self._record_segment_open(seg_name)
                 # Signal Queue: step 4 — dequeue successfully deployed coin
