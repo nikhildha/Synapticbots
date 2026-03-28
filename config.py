@@ -74,7 +74,7 @@ TIMEFRAME_MACRO = "4h"        # Macro regime (legacy — replaced by Multi-TF HM
 MULTI_TF_ENABLED = True               # Use 3 separate HMM brains per coin
 MULTI_TF_TIMEFRAMES = ["4h", "1h", "15m"]  # 4h (trend anchor), 1h (swing), 15m (momentum trigger)
 MULTI_TF_CANDLE_LIMIT = 1000          # Candles per TF (1000 for GMMHMM depth limit)
-MULTI_TF_WEIGHTS = {"4h": 30, "1h": 50, "15m": 20}  # Conviction weights (sum=100)
+MULTI_TF_WEIGHTS = {"4h": 30, "1h": 45, "15m": 25}  # Conviction weights (sum=100)
 MULTI_TF_MIN_AGREEMENT = 2            # Minimum TFs agreeing on direction (2 of 3)
 MULTI_TF_MIN_MODELS = 2               # Minimum trained models required
 

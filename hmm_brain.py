@@ -396,9 +396,9 @@ class MultiTFHMMBrain:
     Multi-Timeframe HMM Brain — manages 3 separate HMMBrain instances per coin.
 
     Architecture:
-      - Daily  (1D × 1000 bars = ~2.7 yrs) → 40 pts weight (macro trend)
-      - Hourly (1H × 1000 bars = ~42 days)  → 35 pts weight (swing regime)
-      - 15min  (15m × 1000 bars = ~10 days) → 25 pts weight (momentum)
+      - Macro Brain (4 hour, 1000 bars) - Holds 30% of the voting weight
+      - Swing Brain (Hourly, 1000 bars) - Holds 45% of the voting weight
+      - Momentum Brain (15m, 1000 bars) - Holds 25% of the voting weight
 
     Combined via:
       1. Majority vote (≥2/3 TFs must agree on direction)
