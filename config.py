@@ -142,13 +142,20 @@ CAPITAL_PER_TRADE = 100        # $100 per trade, fixed
 RISK_PER_TRADE = 0.04
 KILL_SWITCH_DRAWDOWN = 0.10   # Pause bot if 10% drawdown in 24h
 MAX_LOSS_PER_TRADE_PCT = -25     # Hard max-loss per trade: -25% of capital
-MAX_PROFIT_PER_TRADE_PCT = 35    # Hard profit cap: auto-close when trade reaches +35% PnL
 MIN_LEVERAGE_FLOOR = 5           # Skip trade if leverage must drop below this
 MIN_HOLD_MINUTES = 30         # Minimum hold time before regime-change exits
 DEFAULT_QUANTITY = 0.002      # BTC quantity (overridden by position sizer)
 MARGIN_TYPE = "ISOLATED"      # Never use CROSS for high leverage
 
 # ─── Stop Loss / Take Profit ────────────────────────────────────────────────────
+
+# Percentage-based partial profit booking (Trigger PnL %, Fraction_of_Remaining_Qty, Milestone_Name)
+PARTIAL_BOOKING_STEPS = [
+    ( 30.0, 0.33, "TP1" ),   # At +30% PnL: Sell ~33% of original position.
+    ( 60.0, 0.50, "TP2" ),   # At +60% PnL: Sell 50% of remaining (another ~33% of original).
+    (100.0, 1.00, "TP3" ),   # At +100% PnL: Sell the rest (Full Close).
+]
+
 ATR_SL_MULTIPLIER = 1.5       # SL = ATR * multiplier (DEFAULT, used as fallback)
 ATR_TP_MULTIPLIER = 3.0       # TP = ATR * multiplier (DEFAULT, used as fallback)
 SLIPPAGE_BUFFER = 0.0005      # 0.05% slippage estimate

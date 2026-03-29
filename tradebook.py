@@ -845,84 +845,50 @@ def _update_single_trade(trade, book, prices, funding_rates):
         _close_trade_inline(trade, current, f"MAX_LOSS_{int(max_loss_limit)}%")
         return
 
-    # HARD MAX PROFIT GUARD — lock in profit once target % is reached
-    max_profit_limit = getattr(config, "MAX_PROFIT_PER_TRADE_PCT", 35)
-    if pnl_pct >= max_profit_limit:
-        logger.info(
-            "🏆 MAX PROFIT hit on %s (%.2f%% >= %.0f%%) — auto-closing trade %s to lock gains",
-            symbol, pnl_pct, max_profit_limit, trade["trade_id"],
-        )
-        if is_live:
-            from execution_engine import ExecutionEngine
-            ExecutionEngine.close_position_live(symbol)
-        _close_trade_inline(trade, current, f"MAX_PROFIT_{int(max_profit_limit)}%")
-        return
-
-    # ── MULTI-TARGET EXIT CHECKS (paper + live) ──
-    mt_enabled = getattr(config, 'MULTI_TARGET_ENABLED', False)
-    t1_price = trade.get("t1_price")
-    t2_price = trade.get("t2_price")
-    t3_price = trade.get("t3_price")
-
-    if mt_enabled and t1_price is not None:
-        # Initialize fields for legacy trades
-        if "t1_hit" not in trade:
-            trade["t1_hit"] = False
-        if "t2_hit" not in trade:
-            trade["t2_hit"] = False
+    # ── PARTIAL PROFIT BOOKING (T1, T2, T3) ──────────────────────────────────
+    # Replaces the old MAX_PROFIT_PER_TRADE_PCT hard close.
+    # booking_level tracks which milestones we've already hit.
+    if hasattr(config, "PARTIAL_BOOKING_STEPS") and config.PARTIAL_BOOKING_STEPS:
+        if "booking_level" not in trade:
+            trade["booking_level"] = -1
         if "original_qty" not in trade:
             trade["original_qty"] = trade["quantity"]
         if "original_capital" not in trade:
             trade["original_capital"] = trade["capital"]
 
-        # T1 check
-        if not trade["t1_hit"]:
-            t1_hit = (is_long and current >= t1_price) or (not is_long and current <= t1_price)
-            if t1_hit:
-                book_frac = config.MT_T1_BOOK_PCT  # 25%
-                # Live: partial close on exchange
-                if is_live:
-                    from execution_engine import ExecutionEngine
-                    close_qty = trade["quantity"] * book_frac
-                    ExecutionEngine.partial_close_live(symbol, trade["position"], close_qty)
-                    ExecutionEngine.modify_sl_live(symbol, trade["entry_price"])
-                _book_partial_inline(trade, book, current, book_frac, "T1")
-                trade["t1_hit"] = True
-                trade["trailing_sl"] = trade["entry_price"]  # SL → breakeven
-                trade["trailing_active"] = True
-                logger.info("🎯 T1 hit on %s — booked 25%%, SL → breakeven (%.6f)",
-                            trade["trade_id"], trade["entry_price"])
-                changed = True
-
-        # T2 check
-        if trade["t1_hit"] and not trade["t2_hit"]:
-            t2_hit = (is_long and current >= t2_price) or (not is_long and current <= t2_price)
-            if t2_hit:
-                book_frac = config.MT_T2_BOOK_PCT  # 50% of remaining
-                # Live: partial close on exchange
-                if is_live:
-                    from execution_engine import ExecutionEngine
-                    close_qty = trade["quantity"] * book_frac
-                    ExecutionEngine.partial_close_live(symbol, trade["position"], close_qty)
-                    ExecutionEngine.modify_sl_live(symbol, t1_price)
-                _book_partial_inline(trade, book, current, book_frac, "T2")
-                trade["t2_hit"] = True
-                trade["trailing_sl"] = t1_price  # SL → T1
-                logger.info("🎯 T2 hit on %s — booked 50%% remaining, SL → T1 (%.6f)",
-                            trade["trade_id"], t1_price)
-                changed = True
-
-        # T3 check (close everything remaining)
-        if trade["t2_hit"]:
-            t3_hit = (is_long and current >= t3_price) or (not is_long and current <= t3_price)
-            if t3_hit:
-                logger.info("🏆 T3 hit on %s — closing remaining position",
-                            trade["trade_id"])
-                if is_live:
-                    from execution_engine import ExecutionEngine
-                    ExecutionEngine.close_position_live(symbol)
-                _close_trade_inline(trade, current, "T3")
-                return
+        current_level = trade["booking_level"]
+        steps = getattr(config, "PARTIAL_BOOKING_STEPS", [])
+        
+        for i, (trigger_pnl, fraction, name) in enumerate(steps):
+            if i > current_level and pnl_pct >= trigger_pnl:
+                logger.info(
+                    "🎯 %s milestone hit on %s (%.2f%% >= %.0f%%)",
+                    name, trade["trade_id"], pnl_pct, trigger_pnl
+                )
+                if fraction < 1.0:
+                    # Partial close
+                    if is_live:
+                        try:
+                            from execution_engine import ExecutionEngine
+                            close_qty = trade["quantity"] * fraction
+                            ExecutionEngine.partial_close_live(symbol, trade["position"], close_qty)
+                        except Exception as e:
+                            logger.error("❌ Live partial close failed: %s", e)
+                    
+                    _book_partial_inline(trade, book, current, fraction, name)
+                    trade["booking_level"] = i
+                    changed = True
+                else:
+                    # Full close
+                    if is_live:
+                        try:
+                            from execution_engine import ExecutionEngine
+                            ExecutionEngine.close_position_live(symbol)
+                        except Exception as e:
+                            logger.error("❌ Live full close failed: %s", e)
+                    
+                    _close_trade_inline(trade, current, name)
+                    return  # Trade fully closed
 
     # Use trailing values for SL hit checks
     # (paper mode override: always auto-close when config.PAPER_TRADE=True)
@@ -939,10 +905,16 @@ def _update_single_trade(trade, book, prices, funding_rates):
             sl_n = trade.get("trail_sl_count", 0)
             step_level = trade.get("stepped_lock_level", -1)
             # Determine SL reason based on target state
-            if trade.get("t2_hit"):
-                reason = "SL_T2"  # SL hit after T2 (at T1 price)
+            b_level = trade.get("booking_level", -1)
+            steps_conf = getattr(config, 'PARTIAL_BOOKING_STEPS', [])
+            
+            if b_level >= 0 and b_level < len(steps_conf):
+                _, _, name = steps_conf[b_level]
+                reason = f"SL_AFTER_{name}"
+            elif trade.get("t2_hit"):
+                reason = "SL_T2"  # Legacy T2
             elif trade.get("t1_hit"):
-                reason = "SL_T1"  # SL hit after T1 (at breakeven)
+                reason = "SL_T1"  # Legacy T1
             elif trade["trailing_active"] and step_level >= 0:
                 # Stepped lock was active — show which level
                 steps = getattr(config, 'TRAILING_SL_STEPS', [])
@@ -960,19 +932,20 @@ def _update_single_trade(trade, book, prices, funding_rates):
             _close_trade_inline(trade, current, reason)
             return  # trade closed — stop processing this trade
 
-        # Old TP hit (only when multi-target is NOT active for this trade)
-        if not mt_enabled or t1_price is None:
-            effective_tp = trade.get("trailing_tp", trade["take_profit"])
-            tp_hit = False
-            if is_long:
-                tp_hit = current >= effective_tp
-            else:
-                tp_hit = current <= effective_tp
-            if tp_hit:
-                ext = trade["tp_extensions"]
-                reason = f"TP_EXT_{ext}" if ext > 0 else "FIXED_TP"
-                _close_trade_inline(trade, current, reason)
-                return
+        # Old TP hit (only when partial booking is NOT active for this trade)
+        if hasattr(config, "PARTIAL_BOOKING_STEPS") and not config.PARTIAL_BOOKING_STEPS:
+            effective_tp = trade.get("trailing_tp", trade.get("take_profit", getattr(config, "MAX_PROFIT_PER_TRADE_PCT", 0)))
+            if effective_tp:
+                tp_hit = False
+                if is_long:
+                    tp_hit = current >= effective_tp
+                else:
+                    tp_hit = current <= effective_tp
+                if tp_hit:
+                    ext = trade["tp_extensions"]
+                    reason = f"TP_EXT_{ext}" if ext > 0 else "FIXED_TP"
+                    _close_trade_inline(trade, current, reason)
+                    return
 
     # ── TP OVERSHOOT SAFETY NET ──────────────────────────────────────
     # Fires when price GAPS THROUGH the TP level between heartbeats.
