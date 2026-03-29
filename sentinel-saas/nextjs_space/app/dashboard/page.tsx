@@ -16,6 +16,7 @@ export default async function DashboardPage() {
     include: {
       subscription: true,
       bots: {
+        where: { status: { not: 'retired' } }, // exclude retired — lives in Segment Panel
         include: {
           config: { select: { mode: true, maxOpenTrades: true, capitalPerTrade: true } },
           _count: { select: { trades: true } },
@@ -29,10 +30,11 @@ export default async function DashboardPage() {
   // ── Data queries — wrap in try/catch for non-critical errors only ────────
   try {
     const [activeTrades, totalTrades, trades] = await Promise.all([
-      prisma.trade.count({ where: { bot: { userId: user.id }, status: 'active' } }),
-      prisma.trade.count({ where: { bot: { userId: user.id } } }),
+      // Exclude trades from retired bots — their data lives in Segment Performance panel
+      prisma.trade.count({ where: { bot: { userId: user.id, status: { not: 'retired' } }, status: 'active' } }),
+      prisma.trade.count({ where: { bot: { userId: user.id, status: { not: 'retired' } } } }),
       prisma.trade.findMany({
-        where: { bot: { userId: user.id } },
+        where: { bot: { userId: user.id, status: { not: 'retired' } } },
         orderBy: { entryTime: 'desc' },
         take: 10,
       }),
@@ -42,6 +44,17 @@ export default async function DashboardPage() {
     const activePnl = trades
       .filter((t) => t?.status === 'active')
       .reduce((sum, trade) => sum + (trade?.activePnl ?? 0), 0);
+
+    // Fetch segment performance (retired bots only) for the panel
+    let segmentPerf: any[] = [];
+    try {
+      const baseUrl = process.env.NEXTAUTH_URL || 'http://localhost:3000';
+      const segRes = await fetch(`${baseUrl}/api/performance/segment`, {
+        cache: 'no-store',
+        headers: { Cookie: '' },
+      });
+      if (segRes.ok) { const sd = await segRes.json(); segmentPerf = sd.segments || []; }
+    } catch { /* silent — non-critical */ }
 
     return (
       <DashboardClient
@@ -74,6 +87,7 @@ export default async function DashboardPage() {
           } : null,
           _count: { trades: bot?._count?.trades ?? 0 },
         }))}
+        segmentPerf={segmentPerf}
         recentTrades={trades.map((trade) => ({
           id: trade.id,
           coin: trade.coin,

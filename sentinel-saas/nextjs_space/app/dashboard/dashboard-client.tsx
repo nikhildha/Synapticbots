@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { Header } from '@/components/header';
 import { StatsCard } from '@/components/stats-card';
 import { BotCard } from '@/components/bot-card';
+import { SegmentPerformancePanel } from '@/components/segment-performance-panel';
 import { RegimeCard, PaperTradesCard, LiveTradesCard, ActivePositionsCard, BrainExecutionSummary } from '@/components/dashboard/command-center';
 
 import { AthenaPanel } from '@/components/dashboard/athena-panel';
@@ -32,6 +33,7 @@ interface DashboardClientProps {
   };
   bots: any[];
   recentTrades: any[];
+  segmentPerf?: any[];
 }
 
 interface BotState {
@@ -82,7 +84,7 @@ interface BotState {
   }>;
 }
 
-export function DashboardClient({ user, stats, bots, recentTrades }: DashboardClientProps) {
+export function DashboardClient({ user, stats, bots, recentTrades, segmentPerf = [] }: DashboardClientProps) {
   const [mounted, setMounted] = useState(false);
   const [botState, setBotState] = useState<BotState | null>(null);
   const [lastRefresh, setLastRefresh] = useState('');
@@ -229,13 +231,8 @@ export function DashboardClient({ user, stats, bots, recentTrades }: DashboardCl
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ botId, isActive: !currentStatus }),
       });
-
-      if (response.ok) {
-        window.location.reload();
-      }
-    } catch (error) {
-      console.error('Error toggling bot:', error);
-    }
+      if (response.ok) window.location.reload();
+    } catch (error) { console.error('Error toggling bot:', error); }
   };
 
   const handleDeleteBot = async (botId: string) => {
@@ -247,6 +244,18 @@ export function DashboardClient({ user, stats, bots, recentTrades }: DashboardCl
       });
       if (res.ok) window.location.reload();
     } catch (error) { console.error('Error deleting bot:', error); }
+  };
+
+  const handleRetireBot = async (botId: string) => {
+    try {
+      const res = await fetch('/api/bots/retire', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ botId }),
+      });
+      const d = await res.json().catch(() => ({}));
+      if (res.ok) window.location.reload();
+      else alert(d.error || 'Failed to retire bot.');
+    } catch { alert('Failed to retire bot. Please try again.'); }
   };
 
   if (!mounted) {
@@ -743,7 +752,7 @@ export function DashboardClient({ user, stats, bots, recentTrades }: DashboardCl
                   });
                   const displayTrades = botTrades.length > 0 ? botTrades : (bots.length === 1 ? trades : []);
                   return (
-                    <BotCard key={bot?.id} bot={bot} onToggle={handleBotToggle} onDelete={handleDeleteBot} liveTradeCount={liveActiveTrades.length} trades={displayTrades} livePrices={livePrices} />
+                    <BotCard key={bot?.id} bot={bot} onToggle={handleBotToggle} onDelete={handleDeleteBot} onRetire={handleRetireBot} liveTradeCount={liveActiveTrades.length} trades={displayTrades} livePrices={livePrices} />
                   );
                 })}
               </div>
@@ -763,6 +772,18 @@ export function DashboardClient({ user, stats, bots, recentTrades }: DashboardCl
               </div>
             )}
           </motion.div>
+
+          {/* ═══ Segment Performance Panel (retired bots history) ═══ */}
+          {segmentPerf.length > 0 && (
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.3 }}
+              className="mb-12"
+            >
+              <SegmentPerformancePanel segments={segmentPerf} />
+            </motion.div>
+          )}
 
           {/* ═══ Row 6: Brain Execution Scan Summary ═══ */}
           <motion.div
