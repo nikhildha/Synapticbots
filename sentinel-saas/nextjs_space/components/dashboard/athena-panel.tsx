@@ -107,9 +107,15 @@ export function AthenaPanel({ athena, vetoLog = [] }: Props) {
         stop_loss: d.stop_loss ?? null,
         target: d.target ?? null,
     }));
-    // Deduplicate by symbol keeping latest entry
+    // Deduplicate by symbol and filter out stale decisions (> 1 hour old)
     const seenSymbols = new Set<string>();
+    const ONE_HOUR_MS = 60 * 60 * 1000;
+    const now = Date.now();
+    
     const decisions = inMemoryMapped.filter((d) => {
+        const ageMs = now - new Date(d.ts).getTime();
+        if (ageMs > ONE_HOUR_MS) return false; // Hide stale decisions
+
         if (seenSymbols.has(d.symbol)) return false;
         seenSymbols.add(d.symbol);
         return true;
