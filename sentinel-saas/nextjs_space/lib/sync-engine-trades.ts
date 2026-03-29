@@ -257,7 +257,8 @@ export async function syncEngineTrades(
 export async function getUserTrades(userId: string, statusFilter?: string, botId?: string, modeFilter?: string) {
     const trades = await prisma.trade.findMany({
         where: {
-            bot: { userId },
+            // Exclude trades from retired bots — retired data lives in Segment Performance panel only
+            bot: { userId, status: { not: 'retired' } },
             ...(botId ? { botId } : {}),
             ...(statusFilter ? { status: statusFilter.toLowerCase() } : {}),
             ...(modeFilter ? { mode: modeFilter.toLowerCase() } : {}),

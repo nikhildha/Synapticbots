@@ -506,7 +506,7 @@ def api_close_trade():
             if trade_id and t["trade_id"] == trade_id:
                 target = t
                 break
-            if symbol and t["symbol"] == symbol:
+            if not trade_id and symbol and t["symbol"] == symbol:
                 target = t
                 break
 
@@ -523,30 +523,33 @@ def api_close_trade():
                 pos_id = target.get("position_id")
                 pair = target.get("pair")
 
-                if pos_id:
+                qty = target.get("quantity", 0)
+                side = target.get("side", "BUY")
+                
+                if not pair and symbol:
+                    pair = cdx.to_coindcx_pair(symbol)
+
+                if pair and float(qty) > 0:
+                    qty_to_close = float(qty)
+                    positions = cdx.list_positions()
+                    actual_pos = next((p for p in positions if p.get("pair") == pair and float(p.get("active_pos", 0)) != 0), None)
+                    
+                    if actual_pos:
+                        active_qty = abs(float(actual_pos.get("active_pos", 0)))
+                        if qty_to_close >= active_qty * 0.99:
+                            pos_id_real = actual_pos.get("id") or pos_id
+                            cdx.exit_position(pos_id_real)
+                            exchange_close_result = f"fully closed shared position {pos_id_real}"
+                            logger.info("📤 CLOSE-TRADE: Fully Closed CoinDCX position %s (qty >= total available)", pos_id_real)
+                        else:
+                            cdx.partial_close_position(pair, side.lower(), qty_to_close)
+                            exchange_close_result = f"partially closed {qty_to_close} of {pair}"
+                            logger.info("📤 CLOSE-TRADE: Partially Closed qty=%.6f for %s", qty_to_close, pair)
+                elif pos_id:
+                    # Fallback if entirely missing qty/pair but has pos_id
                     cdx.exit_position(pos_id)
                     exchange_close_result = f"closed position {pos_id}"
                     logger.info("📤 CLOSE-TRADE: Closed CoinDCX position %s", pos_id)
-                elif pair:
-                    # Find position by pair
-                    positions = cdx.list_positions()
-                    for p in positions:
-                        if p.get("pair") == pair and float(p.get("active_pos", 0)) != 0:
-                            cdx.exit_position(p["id"])
-                            exchange_close_result = f"closed position {p['id']}"
-                            logger.info("📤 CLOSE-TRADE: Closed CoinDCX position %s (by pair %s)", p["id"], pair)
-                            break
-                elif symbol:
-                    # Find position by symbol
-                    cdx_pair = cdx.to_coindcx_pair(symbol)
-                    if cdx_pair:
-                        positions = cdx.list_positions()
-                        for p in positions:
-                            if p.get("pair") == cdx_pair and float(p.get("active_pos", 0)) != 0:
-                                cdx.exit_position(p["id"])
-                                exchange_close_result = f"closed position {p['id']}"
-                                logger.info("📤 CLOSE-TRADE: Closed CoinDCX position by symbol %s", symbol)
-                                break
 
                 # Get actual CoinDCX exit price
                 try:

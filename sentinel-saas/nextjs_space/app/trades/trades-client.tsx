@@ -8,7 +8,7 @@ import { motion } from 'framer-motion';
 
 /* ═══ Types ═══ */
 interface Trade {
-  id: string; dbId?: string; coin: string; symbol?: string; position: string; regime: string;
+  id: string; dbId?: string; engineTradeId?: string | null; coin: string; symbol?: string; position: string; regime: string;
   confidence: number; leverage: number; capital: number;
   entryPrice: number; currentPrice?: number | null;
   exitPrice?: number | null; stopLoss: number; takeProfit: number;
@@ -113,6 +113,8 @@ function mapTrade(t: any): Trade {
 
   return {
     id: uniqueId,
+    dbId: t.dbId,
+    engineTradeId: baseId,
     coin: sym.replace('USDT', ''),
     symbol: sym,
     position: (t.side || t.position || '').toLowerCase(),
@@ -844,7 +846,7 @@ export function TradesClient({ trades: initialTrades }: TradesClientProps) {
                               <div style={{ display: 'flex', gap: '4px', justifyContent: 'center' }}>
                                 {isActive && (
                                   <button
-                                    onClick={() => closeTrade(t.id, t.dbId || t.id, t.symbol || t.coin, t.mode || 'paper')}
+                                    onClick={() => closeTrade(t.id, t.engineTradeId || t.dbId || t.id, t.symbol || t.coin, t.mode || 'paper')}
                                     disabled={closingTradeId === t.id}
                                     title="Manually Close Trade"
                                     style={{

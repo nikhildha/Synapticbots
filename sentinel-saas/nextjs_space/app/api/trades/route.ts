@@ -45,11 +45,11 @@ export async function GET(request: NextRequest) {
         const page = parseInt(searchParams.get('page') || '1');
         const limit = Math.min(parseInt(searchParams.get('limit') || '50'), 100);
 
-        // Sync engine trades into Prisma for this user's bots before reading
-        // MULTI-BOT FIX: fetch ALL bots and sync each one
+        // Sync engine trades into Prisma for this user's ACTIVE bots before reading
+        // Retired bots are excluded — their data lives in the Segment Performance panel
         const userBots = await prisma.bot.findMany({
-            where: { userId },
-            include: { config: true },  // F5 FIX: include config so mode is available
+            where: { userId, status: { not: 'retired' } },
+            include: { config: true },
             orderBy: { updatedAt: 'desc' },
         });
 

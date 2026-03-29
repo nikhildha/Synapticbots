@@ -175,23 +175,65 @@ def notify_batch_entries(trades):
 
     lines = [header, "━━━━━━━━━━━━━━━━━━"]
 
-    for i, trade in enumerate(trades, 1):
-        emoji = "🟢" if trade.get("position") == "LONG" else "🔴"
+    grouped = {}
+    for trade in trades:
         sym = trade.get("symbol", "?")
         pos = trade.get("position", "?")
-        regime = trade.get("regime", "?")
-        conf = trade.get("confidence", 0)
+        if pos == "?":
+            side = trade.get("side", "").upper()
+            pos = "LONG" if side in ("BUY", "LONG") else "SHORT" if side in ("SELL", "SHORT") else "?"
+            
         lev = trade.get("leverage", 1)
-        entry = trade.get("entry_price", 0)
-        sl = trade.get("stop_loss", 0)
-        tp = trade.get("take_profit", 0)
+        regime = trade.get("regime", "?")
+        
+        key = (sym, pos, lev, regime)
+        if key not in grouped:
+            grouped[key] = []
+        grouped[key].append(trade)
+
+    for (sym, pos, lev, regime), group in grouped.items():
+        rep_trade = group[0]
+        count_in_group = len(group)
+        
+        emoji = "🟢" if pos == "LONG" else "🔴"
+        conf = rep_trade.get("confidence", 0)
+        entry = rep_trade.get("entry_price", 0)
+        sl = rep_trade.get("stop_loss", 0)
+        tp = rep_trade.get("take_profit", 0)
+        
+        if count_in_group > 1:
+            users = set(t.get("user_id") for t in group if t.get("user_id"))
+            bots = set(t.get("bot_id") for t in group if t.get("bot_id"))
+            u_str = f"{len(users)} user{'s' if len(users) != 1 else ''}" if users else f"{count_in_group} users"
+            b_str = f"{len(bots)} bot{'s' if len(bots) != 1 else ''}" if bots else f"{count_in_group} bots"
+            deployed_msg = f"\n   👥 <i>Deployed across {u_str} · {b_str}</i>"
+        else:
+            bot_name = rep_trade.get("bot_name")
+            deployed_msg = f"\n   🤖 <i>{bot_name}</i>" if bot_name else ""
+
+        reasoning = rep_trade.get("athena_reasoning", "")
+        short_reason = ""
+        if reasoning and not reasoning.startswith("Auto-approve"):
+            sentences = re.split(r'(?<=[.!?])\s+', reasoning.strip())
+            short_reason = " ".join(sentences[:2]).strip()
+            if len(short_reason) > 400:
+                short_reason = short_reason[:397] + "…"
+        
+        athena_block = f"\n\n💡 <i>{short_reason}</i>\n" if short_reason else "\n"
 
         lines.append(
-            f"{emoji} <b>{sym}</b> {pos} {lev}× | {regime} {conf:.0%}\n"
-            f"   📈 <code>{entry:.6f}</code>  🛑 <code>{sl:.6f}</code>  🎯 <code>{tp:.6f}</code>"
+            f"{emoji} <b>{sym}</b> {pos} {lev}× | {regime} {conf:.0%}{deployed_msg}\n"
+            f"   📈 <code>{entry:.6f}</code>  🛑 <code>{sl:.6f}</code>  🎯 <code>{tp:.6f}</code>{athena_block}"
         )
 
-    lines.append(f"\n💵 Capital: $100 each  |  🕐 {datetime.utcnow().strftime('%H:%M:%S UTC')}")
+    risk_manager_block = (
+        f"🛡 <b>Risk Manager</b>: Step Trailing SL\n"
+        f"   +15% → lock +4% (Breakeven)\n"
+        f"   +25% → +10% · +35% → +15%\n"
+        f"   +45% → +25% · +60% → +40%\n"
+    )
+    lines.append(risk_manager_block)
+    lines.append(f"💵 Capital: $100 per user  |  🕐 {datetime.utcnow().strftime('%H:%M:%S UTC')}")
 
     msg = "\n".join(lines)
     send_message_async(msg)
@@ -239,9 +281,9 @@ def notify_athena_signal(sym, side, conviction_pct, entry_price, sl, tp, segment
         f"💡 <i>{short_reason}</i>\n"
         f"\n"
         f"🛡 <b>Risk Manager</b>: Step Trailing SL\n"
-        f"   +7% → lock +3% · +10% → +5%\n"
-        f"   +15% → +10% · +20% → +15%\n"
-        f"   …up to +50% → lock +45%\n"
+        f"   +15% → lock +4% (Breakeven)\n"
+        f"   +25% → +10% · +35% → +15%\n"
+        f"   +45% → +25% · +60% → +40%\n"
         f"\n"
         f"{'🤖 ' + bot_name + '  ' if bot_name else ''}"
         f"🕐 {datetime.utcnow().strftime('%H:%M:%S UTC')}"

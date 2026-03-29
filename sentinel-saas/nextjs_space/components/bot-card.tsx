@@ -1,6 +1,6 @@
 'use client';
 
-import { Play, Square, Trash2, Settings } from 'lucide-react';
+import { Play, Square, Trash2, Settings, Archive } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useState } from 'react';
 
@@ -17,6 +17,7 @@ interface BotCardProps {
   };
   onToggle: (botId: string, currentStatus: boolean) => void;
   onDelete?: (botId: string) => void;
+  onRetire?: (botId: string) => void;
   liveTradeCount?: number;
   trades?: any[];
   sessions?: any[];
@@ -65,13 +66,15 @@ function getSegmentInfo(botName: string): { name: string; icon: string; color: s
   return { name: 'ALL', ...SEGMENT_ICONS['ALL'] };
 }
 
-export function BotCard({ bot, onToggle, onDelete, trades = [], livePrices = {}, isToggling = false }: BotCardProps) {
+export function BotCard({ bot, onToggle, onDelete, onRetire, trades = [], livePrices = {}, isToggling = false }: BotCardProps) {
   const [showSettings, setShowSettings] = useState(false);
   const [settingsMode, setSettingsMode] = useState(bot?.config?.mode || 'paper');
   const [settingsCPT, setSettingsCPT] = useState(bot?.config?.capitalPerTrade || 100);
   const [settingsMaxTrades, setSettingsMaxTrades] = useState(bot?.config?.maxTrades || 25);
   const [saving, setSaving] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState(false);
+  const [retireConfirm, setRetireConfirm] = useState(false);
+  const [retiring, setRetiring] = useState(false);
 
   const isRunning = bot?.isActive ?? false;
   const brainType = (bot?.config as any)?.brainType || 'adaptive';
@@ -129,6 +132,17 @@ export function BotCard({ bot, onToggle, onDelete, trades = [], livePrices = {},
   const handleDeleteClick = () => {
     if (!deleteConfirm) { setDeleteConfirm(true); return; }
     onDelete?.(bot?.id ?? '');
+  };
+
+  const handleRetireClick = () => {
+    if (isRunning) return; // must stop first
+    if (!retireConfirm) {
+      setRetireConfirm(true);
+      setTimeout(() => setRetireConfirm(false), 4000);
+      return;
+    }
+    setRetiring(true);
+    onRetire?.(bot?.id ?? '');
   };
 
   const MetricCell = ({ label, value, color }: { label: string; value: string; color?: string }) => (
@@ -307,6 +321,26 @@ export function BotCard({ bot, onToggle, onDelete, trades = [], livePrices = {},
             border: '1px solid var(--color-border)',
           }}
         ><Settings style={{ width: 13, height: 13 }} /></button>
+
+        {/* Retire button — only visible when bot is stopped */}
+        {!isRunning && onRetire && (
+          <button
+            onClick={(e) => { e.stopPropagation(); handleRetireClick(); }}
+            title={isRunning ? 'Stop the bot first before retiring' : retireConfirm ? 'Click again to confirm retirement' : 'Retire bot (archive with history)'}
+            disabled={isRunning || retiring}
+            style={{
+              width: 32, height: 32, borderRadius: 8, cursor: isRunning ? 'not-allowed' : retiring ? 'wait' : 'pointer',
+              background: retireConfirm ? 'rgba(251,191,36,0.2)' : 'rgba(251,191,36,0.06)',
+              color: retireConfirm ? '#FCD34D' : 'rgba(251,191,36,0.5)',
+              border: `1px solid ${retireConfirm ? 'rgba(252,211,77,0.4)' : 'rgba(251,191,36,0.15)'}`,
+              display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.2s',
+              opacity: isRunning || retiring ? 0.4 : 1,
+            }}
+            onBlur={() => setTimeout(() => setRetireConfirm(false), 200)}
+          >
+            {retiring ? <span style={{ fontSize: 10 }}>…</span> : <Archive style={{ width: 12, height: 12 }} />}
+          </button>
+        )}
 
         {onDelete && (
           <button

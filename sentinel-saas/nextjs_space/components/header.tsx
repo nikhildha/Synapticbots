@@ -76,9 +76,14 @@ export function Header() {
                   </Link>
 
                   {(session.user as any)?.role === 'admin' && (
-                    <Link href="/admin" className="text-amber-400 hover:text-amber-300 transition-colors">
-                      Admin
-                    </Link>
+                    <>
+                      <Link href="/admin" className="text-amber-400 hover:text-amber-300 transition-colors">
+                        Admin
+                      </Link>
+                      <Link href="/admin/segment-intelligence" className="text-amber-400 hover:text-amber-300 transition-colors" style={{ fontSize: 13 }}>
+                        🌐 Intel
+                      </Link>
+                    </>
                   )}
                   {/* Bell icon */}
                   {session && (

@@ -21,9 +21,10 @@ export async function GET() {
 
         const userId = (session.user as any)?.id;
 
-        // Get ALL bots (including retired) for complete performance history
+        // Get only ACTIVE + STOPPED bots — retired bots are excluded from PnL cards
+        // (retired bot data lives in /api/performance/segment only)
         const userBots = await prisma.bot.findMany({
-            where: { userId },
+            where: { userId, status: { not: 'retired' } },
             select: { id: true, name: true, status: true, exchange: true },
         });
         const botIds = userBots.map(b => b.id);

@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { Header } from '@/components/header';
 import { BotCard } from '@/components/bot-card';
+import { SegmentPerformancePanel } from '@/components/segment-performance-panel';
 import {
   Rocket, X, Info, ChevronDown, ChevronRight, BookOpen
 } from 'lucide-react';
@@ -31,6 +32,7 @@ export function BotsClient({ bots: initialBots }: BotsClientProps) {
   const [livePrices, setLivePrices] = useState<Record<string, number>>({});
   const [allSessions, setAllSessions] = useState<any[]>([]);
   const [perfSummary, setPerfSummary] = useState<any>({ allTimePnl: 0, allTimeRoi: 0, totalSessions: 0 });
+  const [segmentPerf, setSegmentPerf] = useState<any[]>([]);
 
   /* ── Deploy Wizard State ── */
   const [deployType, setDeployType] = useState<'adaptive' | 'segments'>('segments');
@@ -50,15 +52,15 @@ export function BotsClient({ bots: initialBots }: BotsClientProps) {
   const fetchLiveCount = useCallback(async () => {
     if (document.hidden) return;
     try {
-      const [stateRes, perfRes] = await Promise.all([
+      const [stateRes, perfRes, segRes] = await Promise.all([
         fetch('/api/bot-state', { cache: 'no-store' }),
         fetch('/api/performance', { cache: 'no-store' }),
+        fetch('/api/performance/segment', { cache: 'no-store' }),
       ]);
       if (stateRes.ok) {
         const d = await stateRes.json();
         const trades = d?.tradebook?.trades || [];
         setTradesByBot(d?.tradesByBot || {});
-        // Extract live prices from coin_states for accurate PnL
         const cs = d?.multi?.coin_states || {};
         const prices: Record<string, number> = {};
         for (const [sym, state] of Object.entries(cs)) {
@@ -71,6 +73,10 @@ export function BotsClient({ bots: initialBots }: BotsClientProps) {
       if (perfRes.ok) {
         const d = await perfRes.json();
         if (d) { setAllSessions(d.sessions || []); setPerfSummary(d.summary || perfSummary); }
+      }
+      if (segRes.ok) {
+        const d = await segRes.json();
+        if (d?.segments) setSegmentPerf(d.segments);
       }
     } catch { /* silent */ }
   }, []);
@@ -148,6 +154,23 @@ export function BotsClient({ bots: initialBots }: BotsClientProps) {
         alert(data.error || 'Failed to delete bot. Try stopping it first.');
       }
     } catch { alert('Failed to delete bot. Please try again.'); }
+  };
+
+  const handleRetireBot = async (botId: string) => {
+    try {
+      const res = await fetch('/api/bots/retire', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ botId }),
+      });
+      const d = await res.json().catch(() => ({}));
+      if (res.ok) {
+        // Remove from active grid — it now lives in Segment Performance panel
+        setBots(prev => prev.filter((b: any) => b.id !== botId));
+        fetchLiveCount();
+      } else {
+        alert(d.error || 'Failed to retire bot.');
+      }
+    } catch { alert('Failed to retire bot. Please try again.'); }
   };
 
   const handleStopAll = async () => {
@@ -298,7 +321,7 @@ export function BotsClient({ bots: initialBots }: BotsClientProps) {
                 const displayTrades = tradesByBot[bot?.id] ?? [];
                 return (
                   <motion.div key={bot?.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.06 }}>
-                    <BotCard bot={bot} onToggle={handleBotToggle} onDelete={handleDeleteBot} liveTradeCount={liveTradeCount} trades={displayTrades} sessions={botSessions} livePrices={livePrices} isToggling={!!togglingBots[bot?.id]} />
+                    <BotCard bot={bot} onToggle={handleBotToggle} onDelete={handleDeleteBot} onRetire={handleRetireBot} liveTradeCount={liveTradeCount} trades={displayTrades} sessions={botSessions} livePrices={livePrices} isToggling={!!togglingBots[bot?.id]} />
                   </motion.div>
                 );
               })}
@@ -306,6 +329,10 @@ export function BotsClient({ bots: initialBots }: BotsClientProps) {
           )}
 
         </div>
+
+        {/* ════ SEGMENT PERFORMANCE PANEL ════ */}
+        <SegmentPerformancePanel segments={segmentPerf} />
+
       </main>
 
       {/* ════ DEPLOY BOT MODAL (LAUNCHPAD) ════ */}
