@@ -104,7 +104,7 @@ def open_trade(symbol, side, leverage, quantity, entry_price, atr,
                profile_id="standard", bot_name="Synaptic Adaptive",
                exchange=None, pair=None, position_id=None, bot_id=None, all_bot_ids=None,
                rm_id=None, override_sl=None, override_tp=None, status="ACTIVE",
-               order_type=None):
+               order_type=None, athena_reasoning=None):
     """
     Record a new trade entry in the tradebook.
 
@@ -247,6 +247,7 @@ def open_trade(symbol, side, leverage, quantity, entry_price, atr,
         "position_id":      position_id,
         "rm_id":            rm_id,
         "order_type":       order_type,
+        "athena_reasoning": athena_reasoning,
     }
 
     book["trades"].append(trade)
@@ -285,7 +286,7 @@ def close_trade(trade_id=None, symbol=None, exit_price=None, reason="MANUAL", ex
         if trade_id and trade["trade_id"] == trade_id:
             targets = [trade]
             break
-        if symbol and trade["symbol"] == symbol:
+        if not trade_id and symbol and trade["symbol"] == symbol:
             targets.append(trade)
 
     if not targets:
@@ -508,6 +509,15 @@ def _book_partial_inline(trade, book, exit_price, qty_frac, reason):
         "commission":       commission,
         "funding_cost":     0,
         "funding_payments": 0,
+        "profile_id":       trade.get("profile_id"),
+        "bot_name":         trade.get("bot_name"),
+        "bot_id":           trade.get("bot_id", ""),
+        "all_bot_ids":      trade.get("all_bot_ids", []),
+        "exchange":         trade.get("exchange"),
+        "pair":             trade.get("pair"),
+        "rm_id":            trade.get("rm_id"),
+        "order_type":       trade.get("order_type"),
+        "athena_reasoning": trade.get("athena_reasoning"),
         "last_funding_check": datetime.utcnow().isoformat(),
     }
 
@@ -877,7 +887,7 @@ def _update_single_trade(trade, book, prices, funding_rates):
                     
                     _book_partial_inline(trade, book, current, fraction, name)
                     trade["booking_level"] = i
-                    changed = True
+                    break  # only one milestone per tick — re-evaluate next cycle
                 else:
                     # Full close
                     if is_live:
@@ -934,7 +944,7 @@ def _update_single_trade(trade, book, prices, funding_rates):
 
         # Old TP hit (only when partial booking is NOT active for this trade)
         if hasattr(config, "PARTIAL_BOOKING_STEPS") and not config.PARTIAL_BOOKING_STEPS:
-            effective_tp = trade.get("trailing_tp", trade.get("take_profit", getattr(config, "MAX_PROFIT_PER_TRADE_PCT", 0)))
+            effective_tp = trade.get("trailing_tp", trade.get("take_profit", 0))
             if effective_tp:
                 tp_hit = False
                 if is_long:
@@ -969,8 +979,6 @@ def _update_single_trade(trade, book, prices, funding_rates):
                 )
                 _close_trade_inline(trade, current, "TP_OVERSHOOT")
                 return
-
-    changed = True
 
 
 

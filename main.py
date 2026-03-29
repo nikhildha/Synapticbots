@@ -131,6 +131,11 @@ def _purge_old_athena_log(days: int = 30) -> None:
 _purge_old_athena_log()  # Run once at module load
 
 
+def _build_pos_key(bot_id: str, symbol: str) -> str:
+    """Build position key: 'bot_id:symbol' if bot_id is non-empty, else 'symbol'."""
+    return f"{bot_id}:{symbol}" if bot_id else symbol
+
+
 # ─── Bot name → segment mapping (fallback when segment_filter not in ENGINE_ACTIVE_BOTS) ──
 # Handles engine restart case where bots haven't been re-registered via toggle
 def _infer_segment_from_name(bot_name: str) -> str:
@@ -880,12 +885,18 @@ class RegimeMasterBot:
         # in the same cycle. If User A has 2 DeFi bots, they only deploy 1 DeFi coin
         # per tick. Other users' bots are isolated and will also receive the deployment.
         deployed_segments: set = set()  # set of (user_id, segment) tuples
+        deployed_user_coins: set = set() # track (user_id, sym) to prevent cross-bot duplication
 
         for target in _tick_active_bots:
             bot_id   = target.get("bot_id", config.ENGINE_BOT_ID)
             bot_name = target.get("bot_name", "Synaptic Bot")
             user_id  = target.get("user_id", config.ENGINE_USER_ID)
-            bot_segment_filter = target.get("segment_filter") or _infer_segment_from_name(bot_name)
+            
+            raw_bot_segment = target.get("segment_filter", "ALL")
+            if not raw_bot_segment or raw_bot_segment == "ALL":
+                bot_segment_filter = _infer_segment_from_name(bot_name)
+            else:
+                bot_segment_filter = raw_bot_segment
 
             # ── Clear stale deploy statuses from last cycle for this bot ──────────
             # Without this, coins that were #1 last cycle (e.g. RONIN with "Conviction too low")
@@ -987,7 +998,7 @@ class RegimeMasterBot:
             # If this user's named segment was already served this cycle, skip the
             # entire waterfall. This prevents 1 user's 10 bots all in "DeFi" from each
             # deploying a different DeFi coin via the waterfall in the same tick.
-            if bot_segment_filter not in ("ALL", None) and (user_id, bot_segment_filter) in deployed_segments:
+            if bot_segment_filter and (user_id, bot_segment_filter) in deployed_segments:
                 logger.info(
                     "🔒 [%s] Segment '%s' already deployed this cycle for user %s — skip (Guard 4)",
                     bot_name, bot_segment_filter, user_id
@@ -1019,7 +1030,7 @@ class RegimeMasterBot:
                     break  # hit max deploys for this bot this cycle
 
                 sym      = top["symbol"]
-                pos_key  = f"{bot_id}:{sym}"
+                pos_key  = _build_pos_key(bot_id, sym)
                 seg_name = top.get("segment") or get_segment_for_coin(sym)
 
                 # ── SEGMENT GUARD: hard-validate coin segment vs bot segment ──
@@ -1045,6 +1056,21 @@ class RegimeMasterBot:
                     )
                     self._coin_states.setdefault(sym, {}).setdefault("bot_deploy_statuses", {})[bot_id] = (
                         "FILTERED: already active position"
+                    )
+                    continue
+
+                # ── USER-LEVEL DUPLICATE GUARD: prevent cross-bot deployment for the same user ──
+                _user_has_coin_active = any(
+                    pos.get("user_id") == user_id and pos.get("symbol") == sym
+                    for pos in self._active_positions.values()
+                )
+                if _user_has_coin_active or (user_id, sym) in deployed_user_coins:
+                    logger.debug(
+                        "⏭️  [%s] User %s already has %s active (or queued this tick) — skip cross-bot duplicate",
+                        bot_name, user_id, sym
+                    )
+                    self._coin_states.setdefault(sym, {}).setdefault("bot_deploy_statuses", {})[bot_id] = (
+                        "FILTERED: user already holds this coin in another bot"
                     )
                     continue
 
@@ -1525,6 +1551,7 @@ class RegimeMasterBot:
                     rm_id=result.get("rm_id") if result else None,
                     override_sl=fill_sl if fill_sl > 0 else None,
                     override_tp=fill_tp if fill_tp > 0 else None,
+                    athena_reasoning=athena_decision.reasoning if athena_decision else None,
                 )
 
                 _bcast("TRADEBOOK_RECORDED", self._cycle_count, bot_name, bot_id, sym,
@@ -1543,8 +1570,9 @@ class RegimeMasterBot:
                     "quantity": fill_qty,
                 }
                 # Guard 4: lock this segment for the rest of the cycle for THIS USER
-                if bot_segment_filter not in ("ALL", None):
+                if bot_segment_filter:
                     deployed_segments.add((user_id, bot_segment_filter))
+                deployed_user_coins.add((user_id, sym))
                 # ── Segment Cooldown: track deployment for churn detection (Rule 4) ──
                 self._record_segment_open(seg_name, user_id)
                 # Signal Queue: step 4 — dequeue successfully deployed coin
@@ -2309,7 +2337,7 @@ class RegimeMasterBot:
         """
         # Sync _active_positions dict (remove entries closed by SL engine).
         # We only keep keys whose 'pos_key' representation is still in active_trades
-        active_pos_keys = {f"{t.get('bot_id', '')}:{t['symbol']}" if t.get("bot_id") else t["symbol"] for t in tradebook.get_active_trades()}
+        active_pos_keys = {_build_pos_key(t.get("bot_id", ""), t["symbol"]) for t in tradebook.get_active_trades()}
         for key in list(self._active_positions.keys()):
             if key not in active_pos_keys:
                 del self._active_positions[key]
@@ -2322,7 +2350,7 @@ class RegimeMasterBot:
                 sym = t["symbol"]
                 bot_id = t.get("bot_id", "")
                 user_id = t.get("user_id", getattr(config, "ENGINE_USER_ID", "default"))
-                pos_key = f"{bot_id}:{sym}" if bot_id else sym
+                pos_key = _build_pos_key(bot_id, sym)
                 if pos_key not in self._active_positions:
                     self._active_positions[pos_key] = {
                         "user_id": user_id,
@@ -2331,6 +2359,7 @@ class RegimeMasterBot:
                         "side": t.get("side", "BUY"),
                         "leverage": t.get("leverage", 1),
                         "entry_time": t.get("entry_timestamp", ""),
+                        "symbol": sym,
                     }
             if active_trades:
                 logger.info(
@@ -2594,11 +2623,11 @@ class RegimeMasterBot:
         Remove entries from _active_positions that were auto-closed
         by the tradebook (e.g., SL/TP hit during paper-mode simulation).
         """
-        active_pos_keys = {f"{t.get('bot_id', '')}:{t['symbol']}" if t.get("bot_id") else t["symbol"] for t in tradebook.get_active_trades()}
+        active_pos_keys = {_build_pos_key(t.get("bot_id", ""), t["symbol"]) for t in tradebook.get_active_trades()}
         # Get full closed trade data to pass to _apply_cooldown
         try:
             all_trades = tradebook.get_all_trades() if hasattr(tradebook, "get_all_trades") else []
-            recent_closed = {f"{t.get('bot_id', '')}:{t['symbol']}" if t.get("bot_id") else t["symbol"]: t for t in all_trades if (t.get("status") or "").lower() != "active"}
+            recent_closed = {_build_pos_key(t.get("bot_id", ""), t["symbol"]): t for t in all_trades if (t.get("status") or "").lower() != "active"}
         except Exception:
             recent_closed = {}
 
