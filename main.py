@@ -1379,6 +1379,19 @@ class RegimeMasterBot:
                             pass
                         continue
 
+                # ── Contrarian Mode: Flip Signal AFTER Athena Approves ────────────────
+                # Athena validated the original HMM signal (quality gate intact).
+                # Now flip the direction — BUY → SELL, SELL → BUY.
+                _original_side = top.get("side", "")
+                if getattr(config, "CONTRARIAN_MODE", False):
+                    effective_side = "SELL" if _original_side.upper() == "BUY" else "BUY"
+                    logger.info(
+                        "🔄 CONTRARIAN FLIP [%s] %s: %s → %s (Athena approved original, now fading it)",
+                        bot_name, sym, _original_side, effective_side,
+                    )
+                else:
+                    effective_side = _original_side
+
                 # ── Athena EXECUTE: fire Telegram signal alert ────────────────────
                 # SL/TP from Athena suggested values (will be refined during deploy)
                 _a_sl = getattr(athena_decision, "suggested_sl", 0) or 0
@@ -1387,7 +1400,7 @@ class RegimeMasterBot:
                     import telegram as _tg
                     _tg.notify_athena_signal(
                         sym=sym,
-                        side=top.get("side", ""),
+                        side=effective_side,
                         conviction_pct=athena_decision.adjusted_confidence * 100,
                         entry_price=current_price,
                         sl=_a_sl,
@@ -1403,7 +1416,7 @@ class RegimeMasterBot:
                 # ── Athena Decision Log (EXECUTE) ─────────────────────────────────
                 _log_athena_decision(
                     cycle=self._cycle_count, symbol=sym, segment=seg_name,
-                    side=top.get("side", ""), decision="EXECUTE",
+                    side=effective_side, decision="EXECUTE",
                     conviction=athena_decision.adjusted_confidence if athena_decision else top.get("conviction", 0),
                     price=current_price,
                     sl=_a_sl, tp=_a_tp,
@@ -1421,27 +1434,30 @@ class RegimeMasterBot:
                 # Apply Athena's outputs to the trade payload (only if real LLM decision)
                 if athena_decision and not athena_decision.reasoning.startswith("Auto-approve"):
                     reason_str = f"Athena ✅ ({int(athena_decision.adjusted_confidence*100)}%): {athena_decision.reasoning[:200]}"
+                    if getattr(config, "CONTRARIAN_MODE", False):
+                        reason_str = f"[CONTRARIAN] {reason_str}"
                     final_conf = athena_decision.adjusted_confidence
 
                 # SIGNAL_DISPATCH broadcast
                 _bcast("SIGNAL_DISPATCH", self._cycle_count, bot_name, bot_id, sym,
-                       top["side"], seg_name, final_conf,
-                       f"regime={top.get('regime_name','')} lev={lev}x qty={qty:.4f} athena=APPROVED")
+                       effective_side, seg_name, final_conf,
+                       f"regime={top.get('regime_name','')} lev={lev}x qty={qty:.4f} athena=APPROVED contrarian={getattr(config,'CONTRARIAN_MODE',False)}")
 
                 self._coin_states.setdefault(sym, {}).setdefault("bot_deploy_statuses", {})[bot_id] = "DEPLOY_QUEUED"
 
                 logger.info(
                     "🔥 DEPLOYING [%s]: %s %s @ %dx | HMM %.0f%% conv | Athena ✅ %.0f%%",
-                    bot_name, top["side"], sym, lev, conviction, final_conf * 100,
+                    bot_name, effective_side, sym, lev, conviction, final_conf * 100,
                 )
 
                 # Execute
                 try:
                     result = self.executor.execute_trade(
                         symbol=sym,
-                        side=top["side"],
+                        side=effective_side,
                         leverage=lev,
                         quantity=qty,
+
                         atr=atr_val,
                         regime=top.get("regime", 0),
                         confidence=final_conf,
@@ -1453,7 +1469,7 @@ class RegimeMasterBot:
                 except Exception as exec_err:
                     logger.error("🚨 EXECUTE CRASH [%s] %s: %s", bot_name, sym, exec_err, exc_info=True)
                     _bcast("EXEC_CRASH", self._cycle_count, bot_name, bot_id, sym,
-                           top["side"], seg_name, top["confidence"],
+                           effective_side, seg_name, top["confidence"],
                            f"{type(exec_err).__name__}: {str(exec_err)[:120]}")
                     self._coin_states.setdefault(sym, {}).setdefault("bot_deploy_statuses", {})[bot_id] = "FILTERED: execute crash"
                     continue
@@ -1461,7 +1477,7 @@ class RegimeMasterBot:
                 if result is None and not config.PAPER_TRADE:
                     logger.warning("⚠️ EXEC RETURNED NONE [%s] %s — order rejected", bot_name, sym)
                     _bcast("EXEC_NULL", self._cycle_count, bot_name, bot_id, sym,
-                           top["side"], seg_name, top["confidence"],
+                           effective_side, seg_name, top["confidence"],
                            "execute_trade returned None (live mode) — order rejected")
                     self._coin_states.setdefault(sym, {}).setdefault("bot_deploy_statuses", {})[bot_id] = "FILTERED: exec returned None"
                     continue
@@ -1481,35 +1497,52 @@ class RegimeMasterBot:
                 if athena_decision and entry_price > 0:
                     a_sl = getattr(athena_decision, 'suggested_sl', 0) or 0
                     a_tp = getattr(athena_decision, 'suggested_tp', 0) or 0
-                    is_long = top["side"].upper() in ("BUY", "LONG")
 
-                    # Sanity check: SL must be on correct side and within 20% of entry
+                    # ── Contrarian SL/TP Swap ─────────────────────────────────────
+                    # Athena suggested SL/TP for the ORIGINAL signal direction.
+                    # In contrarian mode the geometry is mirrored:
+                    #   • Original SL (below entry for BUY)  → becomes TP for contrarian SELL
+                    #   • Original TP (above entry for BUY)  → becomes SL for contrarian SELL
+                    # Swapping before sanity checks means the existing side-aware
+                    # guards (sl_correct_side / tp_correct_side) will correctly
+                    # validate the flipped levels against effective_side.
+                    if getattr(config, "CONTRARIAN_MODE", False) and a_sl > 0 and a_tp > 0:
+                        a_sl, a_tp = a_tp, a_sl
+                        logger.info(
+                            "🔄 CONTRARIAN SL/TP swap [%s]: SL→%.4f (was TP) | TP→%.4f (was SL)",
+                            sym, a_sl, a_tp,
+                        )
+
+                    is_long = effective_side.upper() in ("BUY", "LONG")
+
+                    # Sanity check: SL must be on correct side and within 30% of entry
                     if a_sl > 0:
                         sl_dist_pct = abs(a_sl - entry_price) / entry_price
                         sl_correct_side = (is_long and a_sl < entry_price) or (not is_long and a_sl > entry_price)
-                        if sl_correct_side and sl_dist_pct < 0.20:
+                        if sl_correct_side and sl_dist_pct < 0.30:
                             fill_sl = a_sl
                             athena_sl_used = True
                         else:
                             logger.debug("🏛️ Athena SL rejected for %s: sl=%.4f entry=%.4f side=%s",
-                                         sym, a_sl, entry_price, top["side"])
+                                         sym, a_sl, entry_price, effective_side)
 
-                    # Sanity check: TP must be on correct side and within 30% of entry
+                    # Sanity check: TP must be on correct side and within 40% of entry
                     if a_tp > 0:
                         tp_dist_pct = abs(a_tp - entry_price) / entry_price
                         tp_correct_side = (is_long and a_tp > entry_price) or (not is_long and a_tp < entry_price)
-                        if tp_correct_side and tp_dist_pct < 0.30:
+                        if tp_correct_side and tp_dist_pct < 0.40:
                             fill_tp = a_tp
                             athena_tp_used = True
                         else:
                             logger.debug("🏛️ Athena TP rejected for %s: tp=%.4f entry=%.4f side=%s",
-                                         sym, a_tp, entry_price, top["side"])
+                                         sym, a_tp, entry_price, effective_side)
 
                     if athena_sl_used or athena_tp_used:
-                        logger.info("🏛️ Athena SL/TP override [%s]: SL=%s(%.4f) TP=%s(%.4f)",
+                        logger.info("🏛️ Athena SL/TP override [%s]: SL=%s(%.4f) TP=%s(%.4f)%s",
                                     sym,
                                     "ATHENA" if athena_sl_used else "ATR", fill_sl,
-                                    "ATHENA" if athena_tp_used else "ATR", fill_tp)
+                                    "ATHENA" if athena_tp_used else "ATR", fill_tp,
+                                    " [CONTRARIAN-SWAPPED]" if getattr(config, "CONTRARIAN_MODE", False) else "")
 
                 # H5 Fix: validate entry_price in ALL modes, not just live
                 if entry_price <= 0:
@@ -1519,7 +1552,7 @@ class RegimeMasterBot:
                         logger.warning("⚠️ PAPER zero entry_price for %s — using current_price %.6f", sym, entry_price)
                     else:
                         _bcast("EXEC_ZERO_PRICE", self._cycle_count, bot_name, bot_id, sym,
-                               top["side"], seg_name, top["confidence"], "entry_price=0")
+                               effective_side, seg_name, top["confidence"], "entry_price=0")
                         self._coin_states.setdefault(sym, {}).setdefault("bot_deploy_statuses", {})[bot_id] = "FILTERED: zero entry price"
                         continue
 
@@ -1531,7 +1564,7 @@ class RegimeMasterBot:
                 # the stored trade, so non-admin bots would open new trades every cycle.
                 tradebook.open_trade(
                     symbol=sym,
-                    side=top["side"],
+                    side=effective_side,
                     leverage=fill_lev,
                     quantity=fill_qty,
                     entry_price=entry_price,
@@ -1555,7 +1588,7 @@ class RegimeMasterBot:
                 )
 
                 _bcast("TRADEBOOK_RECORDED", self._cycle_count, bot_name, bot_id, sym,
-                       top["side"], seg_name, top["confidence"],
+                       effective_side, seg_name, top["confidence"],
                        f"entry=${entry_price:.4f} lev={fill_lev}x sl=${fill_sl:.4f} tp=${fill_tp:.4f}")
 
                 self._active_positions[pos_key] = {
@@ -1563,7 +1596,7 @@ class RegimeMasterBot:
                     "bot_name": bot_name,
                     "regime":   top.get("regime_name", ""),
                     "confidence": top["confidence"],
-                    "side":     top["side"],
+                    "side":     effective_side,
                     "entry_time": datetime.now(IST).replace(tzinfo=None).isoformat(),
                     "leverage": fill_lev,
                     "entry_price": entry_price,
@@ -1593,7 +1626,7 @@ class RegimeMasterBot:
                     "take_profit": fill_tp,
                     "profile": "segment", # fixed
                     "symbol": sym, # Add symbol for batch notification filtering
-                    "side": top["side"], # Add side for batch notification
+                    "side": effective_side, # Add side for batch notification (contrarian-flipped)
                 })
 
                 deploys_this_bot += 1  # waterfall: continues until max_deploys_bot reached

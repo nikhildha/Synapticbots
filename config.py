@@ -407,6 +407,13 @@ DEFAULT_FUNDING_RATE   = 0.0001     # 0.01% per 8h — typical Binance/CoinDCX r
 COINDCX_MIN_NOTIONAL      = 120.0   # Minimum order size in USD
 COINDCX_ORDER_SETTLE_SLEEP = 0.5    # Seconds to wait after placing order
 
+# ─── Contrarian Mode ─────────────────────────────────────────────────────────
+# When True: ALL post-Athena signals are flipped (BUY → SELL, SELL → BUY).
+# Athena still validates the ORIGINAL HMM signal (quality gate stays intact).
+# The flip happens just before execution — SL/TP, risk manager, and tradebook
+# all automatically follow since they derive direction from the flipped side.
+CONTRARIAN_MODE: bool = True
+
 # ─── Coin Scanner ────────────────────────────────────────────────────────────
 SCANNER_RATE_LIMIT_SLEEP = 1.0   # Seconds between API calls to avoid rate limiting
 
