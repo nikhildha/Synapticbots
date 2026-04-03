@@ -168,3 +168,57 @@ main.py      +~45 lines (flip block, swap block, effective_side substitutions)
 ---
 
 *Documented by Antigravity AI — 3 April 2026*
+
+---
+
+## Update 2 — Simplified Flat Exits (same day)
+
+### Motivation
+The Athena SL/TP swap geometry produces inverted risk-reward (risking 2x to make 1x).
+Replaced with two simple flat PnL% rules that are easy to reason about and audit.
+
+### New Exit Rules
+
+| Condition | Threshold | Action |
+|---|---|---|
+| PnL hits **+25%** | `MAX_PROFIT_PER_TRADE_PCT = 25` | Auto-close → log `MAX_PROFIT_25%` |
+| PnL hits **-15%** | `MAX_LOSS_PER_TRADE_PCT = -15` | Auto-close → log `MAX_LOSS_-15%` |
+
+At **$100 capital per trade**:
+- Max profit = **$25** per trade
+- Max loss = **$15** per trade
+- Risk:Reward = 15:25 = **1:1.67** ✅
+
+### Files Changed
+
+#### `config.py` — line 144
+```python
+# Before:
+MAX_LOSS_PER_TRADE_PCT = -25
+
+# After:
+MAX_LOSS_PER_TRADE_PCT   = -15   # Hard max-loss per trade
+MAX_PROFIT_PER_TRADE_PCT =  25   # Hard max-profit per trade
+```
+
+#### `tradebook.py` — after MAX_LOSS guard (~line 857)
+Added a symmetric `MAX_PROFIT` guard:
+```python
+max_profit_limit = getattr(config, "MAX_PROFIT_PER_TRADE_PCT", None)
+if max_profit_limit and pnl_pct >= max_profit_limit:
+    _close_trade_inline(trade, current, f"MAX_PROFIT_{int(max_profit_limit)}%")
+    return
+```
+
+### What Still Runs
+- **Trailing SL steps** still active — at +15% PnL the SL moves to breakeven, protecting against reversal before the +25% TP fires
+- **Athena SL/TP swap** still in code but largely bypassed — flat % exits fire first in practice
+- **CONTRARIAN_MODE = True** — signal direction flip unchanged
+
+### To Revert This Update Only
+```python
+# config.py
+MAX_LOSS_PER_TRADE_PCT   = -25   # restore original
+# delete MAX_PROFIT_PER_TRADE_PCT line
+```
+And remove the MAX_PROFIT guard block from `tradebook.py`.

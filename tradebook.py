@@ -855,6 +855,22 @@ def _update_single_trade(trade, book, prices, funding_rates):
         _close_trade_inline(trade, current, f"MAX_LOSS_{int(max_loss_limit)}%")
         return
 
+    # HARD MAX PROFIT GUARD — symmetric to MAX LOSS
+    # Simple flat exit: close when PnL% hits the profit ceiling.
+    # Trailing SL steps still run first (lock profit at +15%/+25%),
+    # this fires as the absolute ceiling to bank the gain.
+    max_profit_limit = getattr(config, "MAX_PROFIT_PER_TRADE_PCT", None)
+    if max_profit_limit and pnl_pct >= max_profit_limit:
+        logger.info(
+            "🎯 MAX PROFIT hit on %s (%.2f%% >= %.0f%%) — auto-closing trade %s",
+            symbol, pnl_pct, max_profit_limit, trade["trade_id"],
+        )
+        if is_live:
+            from execution_engine import ExecutionEngine
+            ExecutionEngine.close_position_live(symbol)
+        _close_trade_inline(trade, current, f"MAX_PROFIT_{int(max_profit_limit)}%")
+        return
+
     # ── PARTIAL PROFIT BOOKING (T1, T2, T3) ──────────────────────────────────
     # Replaces the old MAX_PROFIT_PER_TRADE_PCT hard close.
     # booking_level tracks which milestones we've already hit.
