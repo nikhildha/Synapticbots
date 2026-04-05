@@ -35,14 +35,14 @@ Provide statistical reasoning for your proposed parameter changes.""",
         llm_config=llm_config,
     )
 
-    # 3. Risk Controller
-    risk = autogen.AssistantAgent(
-        name="Risk_Controller",
-        system_message="""You are the Chief Risk Officer. 
+    # 3. Athena (Executive Framework)
+    athena = autogen.AssistantAgent(
+        name="Athena",
+        system_message="""You are Athena, the ultimate execution and risk management engine of Synaptic.
 You must rigorously review the Quant_Director's proposed config changes.
 Ensure they do not increase maximum drawdown risk. Veto them if they suggest raising leverage or position caps.
 Approve them if they are risk-neutral or risk-reducing. 
-Once approved, compile the findings into a final `Strategy_Report.md` file using a Python script, or just output the exact text.
+Once approved, compile the findings into a final `Strategy_Report.md` file summarizing your newly adopted rules.
 After the report is finalized, YOU MUST output the exact word 'TERMINATE' to end the session.""",
         llm_config=llm_config,
     )
@@ -63,7 +63,7 @@ After the report is finalized, YOU MUST output the exact word 'TERMINATE' to end
 
     # Group Chat definition
     groupchat = autogen.GroupChat(
-        agents=[user_proxy, analyst, quant, risk],
+        agents=[user_proxy, analyst, quant, athena],
         messages=[],
         max_round=15
     )
@@ -76,7 +76,7 @@ After the report is finalized, YOU MUST output the exact word 'TERMINATE' to end
         "Hello Team! Let's review our Synaptic engine performance.\n"
         "Analyst, please write a python script to load '../data/tradebook.json' "
         "and calculate total PnL and win rates. Then Quant, propose config fixes based on the real data. "
-        "Risk Controller, review it. Produce a final `strategy_report.md` file containing your recommended config changes, and then output TERMINATE."
+        "Athena, review it. Produce a final `strategy_report.md` file containing your recommended config changes, and then output TERMINATE."
     )
     
     chat_result = user_proxy.initiate_chat(
