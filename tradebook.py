@@ -755,7 +755,8 @@ def _update_single_trade(trade, book, prices, funding_rates):
 
     # Duration
     entry_time = datetime.fromisoformat(trade["entry_timestamp"])
-    duration = (datetime.utcnow() - entry_time).total_seconds() / 60
+    entry_time_aware = entry_time if entry_time.tzinfo else entry_time.replace(tzinfo=timezone.utc)
+    duration = (datetime.now(timezone.utc) - entry_time_aware).total_seconds() / 60
 
     trade["current_price"] = current
     trade["unrealized_pnl"] = net_pnl
