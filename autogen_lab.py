@@ -79,10 +79,18 @@ After the report is finalized, YOU MUST output the exact word 'TERMINATE' to end
         "Risk Controller, review it. Produce a final `strategy_report.md` file containing your recommended config changes, and then output TERMINATE."
     )
     
-    user_proxy.initiate_chat(
+    chat_result = user_proxy.initiate_chat(
         manager,
         message=initial_prompt
     )
+
+    # Save the entire debate transcript to a file for review
+    import json
+    with open("autogen_workspace/debate_transcript.json", "w") as f:
+        json.dump(chat_result.chat_history, f, indent=4)
+    
+    print("\n✅ Debate completed! Transcript saved to autogen_workspace/debate_transcript.json")
+    print("✅ Final decision saved by the Risk Controller in autogen_workspace/Strategy_Report.md")
 
 if __name__ == "__main__":
     main()
