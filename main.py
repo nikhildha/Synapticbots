@@ -1416,18 +1416,8 @@ class RegimeMasterBot:
                             pass
                         continue
 
-                # ── Contrarian Mode: Flip Signal AFTER Athena Approves ────────────────
-                # Athena validated the original HMM signal (quality gate intact).
-                # Now flip the direction — BUY → SELL, SELL → BUY.
-                _original_side = top.get("side", "")
-                if getattr(config, "CONTRARIAN_MODE", False):
-                    effective_side = "SELL" if _original_side.upper() == "BUY" else "BUY"
-                    logger.info(
-                        "🔄 CONTRARIAN FLIP [%s] %s: %s → %s (Athena approved original, now fading it)",
-                        bot_name, sym, _original_side, effective_side,
-                    )
-                else:
-                    effective_side = _original_side
+                # Use the HMM signal direction directly
+                effective_side = top.get("side", "")
 
                 # ── Athena EXECUTE: fire Telegram signal alert ────────────────────
                 # SL/TP from Athena suggested values (will be refined during deploy)
@@ -1471,14 +1461,12 @@ class RegimeMasterBot:
                 # Apply Athena's outputs to the trade payload (only if real LLM decision)
                 if athena_decision and not athena_decision.reasoning.startswith("Auto-approve"):
                     reason_str = f"Athena ✅ ({int(athena_decision.adjusted_confidence*100)}%): {athena_decision.reasoning[:200]}"
-                    if getattr(config, "CONTRARIAN_MODE", False):
-                        reason_str = f"[CONTRARIAN] {reason_str}"
                     final_conf = athena_decision.adjusted_confidence
 
                 # SIGNAL_DISPATCH broadcast
                 _bcast("SIGNAL_DISPATCH", self._cycle_count, bot_name, bot_id, sym,
                        effective_side, seg_name, final_conf,
-                       f"regime={top.get('regime_name','')} lev={lev}x qty={qty:.4f} athena=APPROVED contrarian={getattr(config,'CONTRARIAN_MODE',False)}")
+                       f"regime={top.get('regime_name','')} lev={lev}x qty={qty:.4f} athena=APPROVED")
 
                 self._coin_states.setdefault(sym, {}).setdefault("bot_deploy_statuses", {})[bot_id] = "DEPLOY_QUEUED"
 
@@ -1535,21 +1523,6 @@ class RegimeMasterBot:
                     a_sl = getattr(athena_decision, 'suggested_sl', 0) or 0
                     a_tp = getattr(athena_decision, 'suggested_tp', 0) or 0
 
-                    # ── Contrarian SL/TP Swap ─────────────────────────────────────
-                    # Athena suggested SL/TP for the ORIGINAL signal direction.
-                    # In contrarian mode the geometry is mirrored:
-                    #   • Original SL (below entry for BUY)  → becomes TP for contrarian SELL
-                    #   • Original TP (above entry for BUY)  → becomes SL for contrarian SELL
-                    # Swapping before sanity checks means the existing side-aware
-                    # guards (sl_correct_side / tp_correct_side) will correctly
-                    # validate the flipped levels against effective_side.
-                    if getattr(config, "CONTRARIAN_MODE", False) and a_sl > 0 and a_tp > 0:
-                        a_sl, a_tp = a_tp, a_sl
-                        logger.info(
-                            "🔄 CONTRARIAN SL/TP swap [%s]: SL→%.4f (was TP) | TP→%.4f (was SL)",
-                            sym, a_sl, a_tp,
-                        )
-
                     is_long = effective_side.upper() in ("BUY", "LONG")
 
                     # Sanity check: SL must be on correct side and within 30% of entry
@@ -1579,7 +1552,7 @@ class RegimeMasterBot:
                                     sym,
                                     "ATHENA" if athena_sl_used else "ATR", fill_sl,
                                     "ATHENA" if athena_tp_used else "ATR", fill_tp,
-                                    " [CONTRARIAN-SWAPPED]" if getattr(config, "CONTRARIAN_MODE", False) else "")
+                                    )
 
                 # H5 Fix: validate entry_price in ALL modes, not just live
                 if entry_price <= 0:
@@ -1663,7 +1636,7 @@ class RegimeMasterBot:
                     "take_profit": fill_tp,
                     "profile": "segment", # fixed
                     "symbol": sym, # Add symbol for batch notification filtering
-                    "side": effective_side, # Add side for batch notification (contrarian-flipped)
+                    "side": effective_side,
                 })
 
                 deploys_this_bot += 1  # waterfall: continues until max_deploys_bot reached

@@ -127,7 +127,7 @@ REGIME_NAMES = {
 # ─── Leverage Tiers ─────────────────────────────────────────────────────────────
 # FIX-L1: Contrarian mode fades high-conviction signals → higher uncertainty →
 # max leverage capped at 15x (35x would wipe capital on a 2.86% adverse move).
-LEVERAGE_HIGH     = 15   # Confidence margin > 0.30 → 15x  (capped from 35x for contrarian safety)
+LEVERAGE_HIGH     = 15   # Confidence margin > 0.30 → 15x
 LEVERAGE_MODERATE = 10   # Confidence margin 0.20–0.30 → 10x  (capped from 25x)
 LEVERAGE_LOW      =  7   # Confidence margin 0.10–0.20 → 7x   (capped from 15x)
 LEVERAGE_NONE     =  1   # Observation mode
@@ -146,8 +146,8 @@ CAPITAL_PER_TRADE = 100        # $100 per trade, fixed
 # ─── Risk Management ────────────────────────────────────────────────────────────
 RISK_PER_TRADE = 0.04
 KILL_SWITCH_DRAWDOWN = 0.10   # Pause bot if 10% drawdown in 24h
-MAX_LOSS_PER_TRADE_PCT   = -15   # Hard max-loss per trade: -15% of capital (contrarian mode)
-MAX_PROFIT_PER_TRADE_PCT =  25   # Hard max-profit per trade: +25% of capital (contrarian mode)
+MAX_LOSS_PER_TRADE_PCT   = -15   # Hard max-loss per trade: -15% of capital
+MAX_PROFIT_PER_TRADE_PCT =  25   # Hard max-profit per trade: +25% of capital
 MIN_LEVERAGE_FLOOR = 3           # Skip trade if leverage must drop below this (lowered: 7x min is new floor)
 MIN_HOLD_MINUTES = 30         # Minimum hold time before regime-change exits
 DEFAULT_QUANTITY = 0.002      # BTC quantity (overridden by position sizer)
@@ -173,23 +173,12 @@ REGIME_EXIT_HOLD_CYCLES    = 2    # Require N consecutive adverse regime cycles 
 # ─── Stop Loss / Take Profit ────────────────────────────────────────────────────
 
 # Percentage-based partial profit booking (Trigger PnL %, Fraction_of_Remaining_Qty, Milestone_Name)
-# H7 FIX: CONTRARIAN_MODE has MAX_PROFIT_PER_TRADE_PCT = +25%, so the standard steps
-# (TP1 @ +30%, TP2 @ +60%, TP3 @ +100%) will NEVER fire — the hard cap closes first.
-# Use contrarian-adapted steps instead: smaller, more frequent bookings within the +25% window.
-# NOTE: This block is overridden at the bottom of config.py once CONTRARIAN_MODE is known.
-# Standard (non-contrarian) booking ladder:
-_PARTIAL_BOOKING_STEPS_STANDARD = [
+# Standard booking ladder — locks profit incrementally, lets winners run to full TP.
+PARTIAL_BOOKING_STEPS = [
     ( 30.0, 0.33, "TP1" ),   # At +30% PnL: Sell ~33% of original position.
     ( 60.0, 0.50, "TP2" ),   # At +60% PnL: Sell 50% of remaining (another ~33% of original).
     (100.0, 1.00, "TP3" ),   # At +100% PnL: Sell the rest (Full Close).
 ]
-# Contrarian booking ladder — adapted to the tighter +25% MAX_PROFIT window:
-_PARTIAL_BOOKING_STEPS_CONTRARIAN = [
-    ( 10.0, 0.33, "TP1" ),   # At +10% PnL: Lock 33% early (contrarian mode — quick booking)
-    ( 18.0, 0.50, "TP2" ),   # At +18% PnL: Lock 50% of remaining
-    ( 25.0, 1.00, "TP3" ),   # At +25% PnL: Full close (mirrors MAX_PROFIT_PER_TRADE_PCT)
-]
-# Resolved below after CONTRARIAN_MODE is defined — do not set PARTIAL_BOOKING_STEPS here directly.
 
 ATR_SL_MULTIPLIER = 1.5       # SL = ATR * multiplier (DEFAULT, used as fallback)
 ATR_TP_MULTIPLIER = 3.0       # TP = ATR * multiplier (DEFAULT, used as fallback)
@@ -398,10 +387,9 @@ ORDERFLOW_LARGE_ORDER_USD  = 50_000    # USD threshold to flag a single order as
 
 # ─── Conviction Score Weights (must sum to 100) ───────────────────────────────
 # EXP 4 IC-guided weight optimization (300 trials) — Sharpe +0.2442 improvement
-CONVICTION_WEIGHT_HMM       = 60   # HMM regime confidence 
-CONVICTION_WEIGHT_FUNDING   = 15   # Funding rate (contrarian signal)
+CONVICTION_WEIGHT_HMM       = 60   # HMM regime confidence
+CONVICTION_WEIGHT_FUNDING   = 15   # Funding rate carry signal
 CONVICTION_WEIGHT_OI        = 10   # Open Interest change
-CONVICTION_WEIGHT_ORDERFLOW = 15   # Live L2 / Limit Liquidity Tracker
 CONVICTION_WEIGHT_ORDERFLOW = 15   # Live L2 / Limit Liquidity Tracker
 
 # ─── Conviction Score: Leverage Bands ────────────────────────────────────────
@@ -446,20 +434,7 @@ DEFAULT_FUNDING_RATE   = 0.0001     # 0.01% per 8h — typical Binance/CoinDCX r
 COINDCX_MIN_NOTIONAL      = 120.0   # Minimum order size in USD
 COINDCX_ORDER_SETTLE_SLEEP = 0.5    # Seconds to wait after placing order
 
-# ─── Contrarian Mode ─────────────────────────────────────────────────────────
-# When True: ALL post-Athena signals are flipped (BUY → SELL, SELL → BUY).
-# Athena still validates the ORIGINAL HMM signal (quality gate stays intact).
-# The flip happens just before execution — SL/TP, risk manager, and tradebook
-# all automatically follow since they derive direction from the flipped side.
-CONTRARIAN_MODE: bool = True
 
-# H7 FIX: Resolve the active booking ladder based on the final CONTRARIAN_MODE value.
-# In contrarian mode, MAX_PROFIT is +25% so we use condensed steps (10%/18%/25%).
-# In standard mode, we use the full ladder (30%/60%/100%).
-PARTIAL_BOOKING_STEPS = (
-    _PARTIAL_BOOKING_STEPS_CONTRARIAN if CONTRARIAN_MODE
-    else _PARTIAL_BOOKING_STEPS_STANDARD
-)
 
 # ─── Coin Scanner ────────────────────────────────────────────────────────────
 SCANNER_RATE_LIMIT_SLEEP = 1.0   # Seconds between API calls to avoid rate limiting
