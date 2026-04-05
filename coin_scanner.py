@@ -162,8 +162,14 @@ def get_hottest_segments(segment_limit=2, blocked_segments=None):
                 # 4h return: kline preferred, fallback to 24h ticker
                 ret_4h = coin_4h.get(symbol, float(t.get("priceChangePercent", 0)))
                 ret_1h = coin_1h.get(symbol, 0.0)
+                
+                h = float(t.get("highPrice", 0))
+                l = float(t.get("lowPrice", 0))
+                c = float(t.get("lastPrice", 0))
+                atr_proxy = ((h - l) / c * 100) if c > 0 else 0.0
+                
                 valid_coins.append({"symbol": symbol, "ret_4h": ret_4h,
-                                     "ret_1h": ret_1h, "volume": volume})
+                                     "ret_1h": ret_1h, "volume": volume, "atr": atr_proxy})
             except (ValueError, TypeError):
                 pass
 
@@ -175,8 +181,10 @@ def get_hottest_segments(segment_limit=2, blocked_segments=None):
         # Pillar 1: Volume-weighted 4h return
         if total_vol > 0:
             vw_4h = sum(c["ret_4h"] * (c["volume"] / total_vol) for c in valid_coins)
+            vw_atr = sum(c["atr"] * (c["volume"] / total_vol) for c in valid_coins)
         else:
             vw_4h = sum(c["ret_4h"] for c in valid_coins) / len(valid_coins)
+            vw_atr = sum(c["atr"] for c in valid_coins) / len(valid_coins)
 
         # Pillar 2: 1h participation breadth (% moving in same direction as segment)
         direction = 1 if vw_4h >= 0 else -1
@@ -187,12 +195,17 @@ def get_hottest_segments(segment_limit=2, blocked_segments=None):
         breadth_1h = (participating / len(valid_coins)) * 100 if valid_coins else 0.0
 
         # Blended score: 50% raw momentum + 50% breadth-attenuated momentum
-        blended = 0.5 * vw_4h + 0.5 * (vw_4h * breadth_1h / 100.0)
+        raw_blended = 0.5 * vw_4h + 0.5 * (vw_4h * breadth_1h / 100.0)
+        
+        # Pillar 3: ATR Volatility Multiplier
+        multiplier = 1.0 + (vw_atr / 10.0)
+        blended = raw_blended * multiplier
 
         segment_data.append({
             "segment":       segment,
             "vw_4h":         round(vw_4h, 2),
             "breadth_1h":    round(breadth_1h, 1),
+            "vw_atr":        round(vw_atr, 2),
             "blended_score": round(blended, 2),
             "abs_score":     abs(blended),
             "direction":     "LONG" if blended >= 0 else "SHORT",
@@ -208,18 +221,18 @@ def get_hottest_segments(segment_limit=2, blocked_segments=None):
         with open(heatmap_file, "w") as f:
             json.dump({
                 "timestamp": datetime.utcnow().isoformat() + "Z",
-                "scoring":   "4h_return(50pct)+1h_breadth(50pct)",
+                "scoring":   "4h_return(P1) + 1h_breadth(P2) * atr_multiplier(P3)",
                 "segments":  segment_data,
             }, f, indent=2)
     except Exception as e:
         logger.error("Failed to save segment heatmap: %s", e)
 
-    logger.info("🔥 Segment Heatmap [4h+1h blended]:")
+    logger.info("🔥 Segment Heatmap [Mom + Breadth + ATR Multiplier]:")
     for i, seg in enumerate(segment_data):
         _cd_flag = " [COOLDOWN]" if seg.get("is_cooldown") else ""
         logger.info(
-            "   #%d %-10s : 4h=%+.2f%% | 1h_breadth=%.0f%% | Score=%+.2f [%s]%s",
-            i + 1, seg["segment"], seg["vw_4h"], seg["breadth_1h"],
+            "   #%d %-10s : 4h=%+.2f%% | 1h_breadth=%.0f%% | atr=%.1f%% | Score=%+.2f [%s]%s",
+            i + 1, seg["segment"], seg["vw_4h"], seg["breadth_1h"], seg["vw_atr"],
             seg["blended_score"], seg["direction"], _cd_flag
         )
 
