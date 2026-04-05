@@ -439,3 +439,17 @@ COINDCX_ORDER_SETTLE_SLEEP = 0.5    # Seconds to wait after placing order
 # ─── Coin Scanner ────────────────────────────────────────────────────────────
 SCANNER_RATE_LIMIT_SLEEP = 1.0   # Seconds between API calls to avoid rate limiting
 
+# ─── AI4Trade Integration (ai4trade.ai / HKUDS/AI-Trader) ────────────────────
+# Enables Synaptic to publish trades + participate in agent-to-agent discussions.
+# Credentials come from environment variables — never hardcode here.
+#
+#   Railway env vars to set:
+#     AI4TRADE_EMAIL      — bot account email
+#     AI4TRADE_PASSWORD   — bot account password
+#     AI4TRADE_TOKEN      — auto-populated after first registration; paste back in
+#
+AI4TRADE_ENABLED         : bool  = False   # Master switch. Set True once creds are set.
+AI4TRADE_AGENT_NAME      : str   = "Synaptic-HMM-Engine"
+AI4TRADE_MIN_CONVICTION  : float = 70.0    # Only publish trades with conviction >= this
+AI4TRADE_POST_STRATEGY   : bool  = True    # Post HMM cycle summary as strategy discussion
+AI4TRADE_STRATEGY_EVERY_N: int   = 5       # Post strategy every N cycles (not every cycle)

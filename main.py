@@ -324,6 +324,16 @@ class RegimeMasterBot:
             logger.warning("⚠️ PriceStream failed to start: %s — will fall back to REST", e)
             self._price_stream = None
 
+        # ── AI4Trade Integration (ai4trade.ai) ─────────────────────────
+        self._ai4trade = None
+        if getattr(config, "AI4TRADE_ENABLED", False):
+            try:
+                from ai4trade_client import AI4TradeClient
+                self._ai4trade = AI4TradeClient()
+                config.AI4TRADE_CLIENT = self._ai4trade
+            except Exception as e:
+                logger.warning("⚠️  AI4Trade client failed to init: %s", e)
+
     # ─── Main Loop ───────────────────────────────────────────────────────────
 
     def run(self):
@@ -1290,6 +1300,8 @@ class RegimeMasterBot:
                             "nearest_bearish_ob": top.get("nearest_bearish_ob"),  # supply zone
                             "nearest_bid_wall":   top.get("nearest_bid_wall"),    # bid wall price
                             "nearest_ask_wall":   top.get("nearest_ask_wall"),    # ask wall price
+                            # ── Community intelligence (AI4Trade) ────────
+                            "community_context":  self._ai4trade.get_community_context(sym) if self._ai4trade else "",
                         }
                         athena_decision = self._athena.validate_signal(llm_ctx)
                         # Only count REAL Gemini API calls — cached decisions are free.
@@ -1601,6 +1613,24 @@ class RegimeMasterBot:
                        effective_side, seg_name, top["confidence"],
                        f"entry=${entry_price:.4f} lev={fill_lev}x sl=${fill_sl:.4f} tp=${fill_tp:.4f}")
 
+                # ── AI4Trade: Publish Trade Signal ────────────────────
+                if self._ai4trade and getattr(config, "AI4TRADE_ENABLED", False):
+                    min_conv = getattr(config, "AI4TRADE_MIN_CONVICTION", 70.0)
+                    if top["confidence"] >= min_conv:
+                        try:
+                            self._ai4trade.publish_trade_open(
+                                symbol=sym,
+                                side=effective_side,
+                                entry_price=entry_price,
+                                quantity=fill_qty,
+                                conviction=top["confidence"],
+                                regime=top.get("regime_name", "UNKNOWN"),
+                                reasoning=reason_str,
+                                entry_timestamp=datetime.now(timezone.utc).isoformat(),
+                            )
+                        except Exception as e:
+                            logger.debug("AI4Trade publish failed: %s", e)
+
                 self._active_positions[pos_key] = {
                     "user_id":  user_id,
                     "bot_name": bot_name,
@@ -1671,6 +1701,24 @@ class RegimeMasterBot:
             self._cycle_count, len(symbols), deployed,
             len(tradebook.get_active_trades()),
         )
+
+        # ── 8. AI4Trade: Publish Strategy Summary ─────────────────────
+        if self._ai4trade and getattr(config, "AI4TRADE_POST_STRATEGY", False):
+            cycle_n = getattr(config, "AI4TRADE_STRATEGY_EVERY_N", 5)
+            if self._cycle_count % cycle_n == 0:
+                top_coin = self._coin_states.get(config.PRIMARY_SYMBOL, {})
+                btc_reg = self._coin_states.get("BTCUSDT", {}).get("regime", "UNKNOWN")
+                try:
+                    self._ai4trade.publish_cycle_strategy(
+                        cycle=self._cycle_count,
+                        btc_regime=btc_reg,
+                        top_coin=config.PRIMARY_SYMBOL.replace("USDT", ""),
+                        top_side=top_coin.get("action", "SCAN"),
+                        top_conviction=top_coin.get("confidence", 0.0),
+                        n_deployed=deployed
+                    )
+                except Exception as e:
+                    logger.debug("AI4Trade strategy post failed: %s", e)
 
     def _post_cycle_snapshot(self, cycle_duration: float, deployed_trades: list, deployed: int):
         """POST per-cycle signal archive to dashboard /api/cycle-snapshot for DB persistence."""

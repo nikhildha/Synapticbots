@@ -375,6 +375,25 @@ def close_trade(trade_id=None, symbol=None, exit_price=None, reason="MANUAL", ex
         logger.info("📕 Tradebook CLOSE: %s %s %s @ %.6f → %.6f | P&L: $%.4f (%.2f%%)",
                     target["trade_id"], target["position"], target["symbol"],
                     entry, px, net_pnl, pnl_pct)
+
+        # ── AI4Trade: Publish Trade Close ─────────────────────────────
+        ai4trade = getattr(config, "AI4TRADE_CLIENT", None)
+        if ai4trade and getattr(config, "AI4TRADE_ENABLED", False):
+            # Only publish closes for trades that had high enough conviction to open
+            min_conv = getattr(config, "AI4TRADE_MIN_CONVICTION", 70.0)
+            if target.get("confidence", 0) >= min_conv:
+                try:
+                    ai4trade.publish_trade_close(
+                        symbol=target["symbol"],
+                        side_was=target["position"],
+                        close_price=px,
+                        quantity=target["quantity"],
+                        pnl_pct=pnl_pct,
+                        close_reason=reason
+                    )
+                except Exception as e:
+                    logger.debug("AI4Trade close publish failed: %s", e)
+
         closed.append(target)
 
     _compute_summary(book)
