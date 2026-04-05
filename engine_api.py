@@ -121,8 +121,8 @@ def _wait_for_old_engine_to_die(timeout: int = 45) -> bool:
 logger = logging.getLogger("EngineAPI")
 
 # ─── Persistent crash log (survives process restarts) ─────────────────
-CRASH_LOG_FILE = "engine_crashes.json"
-BOOT_COUNT_FILE = "engine_boot_count.json"
+CRASH_LOG_FILE = os.path.join(config.DATA_DIR, "engine_crashes.json")  # I8 FIX: use DATA_DIR, not cwd
+BOOT_COUNT_FILE = os.path.join(config.DATA_DIR, "engine_boot_count.json")
 
 def _load_crash_log():
     """Load persistent crash history from disk."""
@@ -594,7 +594,7 @@ def api_close_trade():
 def api_close_all():
     """Write a CLOSE_ALL command so main.py closes all open positions on next cycle."""
     try:
-        cmd = {"command": "CLOSE_ALL", "timestamp": datetime.utcnow().isoformat()}
+        cmd = {"command": "CLOSE_ALL", "timestamp": datetime.now(timezone.utc).isoformat()}
         with open(config.COMMANDS_FILE, "w") as f:
             json.dump(cmd, f)
         return jsonify({"success": True, "message": "CLOSE_ALL command queued"})
@@ -846,7 +846,7 @@ def api_set_mode():
     mode_config = {
         "mode": mode,
         "exchange": exchange,
-        "set_at": datetime.utcnow().isoformat(),
+        "set_at": datetime.now(timezone.utc).isoformat(),
     }
     try:
         path = os.path.join(config.DATA_DIR, "engine_mode.json")
@@ -1572,7 +1572,7 @@ def api_exchange_health():
             "exchange": None,
             "balance": 0,
             "openPositions": 0,
-            "checkedAt": datetime.utcnow().isoformat() + "Z",
+            "checkedAt": datetime.now(timezone.utc).isoformat() + "Z",
         })
     try:
         import coindcx_client as cdx
@@ -1588,7 +1588,7 @@ def api_exchange_health():
             "exchange": config.EXCHANGE_LIVE or "coindcx",
             "balance": balance,
             "openPositions": pos_count,
-            "checkedAt": datetime.utcnow().isoformat() + "Z",
+            "checkedAt": datetime.now(timezone.utc).isoformat() + "Z",
         })
     except Exception as e:
         logger.warning("exchange-health: CoinDCX call failed: %s", e)
@@ -1599,5 +1599,5 @@ def api_exchange_health():
             "balance": 0,
             "openPositions": 0,
             "error": str(e),
-            "checkedAt": datetime.utcnow().isoformat() + "Z",
+            "checkedAt": datetime.now(timezone.utc).isoformat() + "Z",
         })

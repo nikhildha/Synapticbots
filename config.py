@@ -14,7 +14,7 @@ TESTNET = os.getenv("TESTNET", "true").lower() == "true"
 PAPER_TRADE = os.getenv("PAPER_TRADE", "true").lower() == "true"
 PAPER_USE_MAINNET           = True      # Use Binance MAINNET prices for paper trades (fixes testnet price divergence)
 PAPER_SIMULATED_SLIPPAGE_PCT = 0.05     # ±0.05% simulated market slippage on paper fills
-ENGINE_USER_ID = "cmmbvbo2l0000j1xo3rqvkfhz"  # Default user for engine trades (admin)
+ENGINE_USER_ID = os.getenv("ENGINE_USER_ID", "cmmbvbo2l0000j1xo3rqvkfhz")  # B3 FIX: Admin user — set ENGINE_USER_ID env var in Railway to avoid hardcoding
 ENGINE_BOT_ID  = os.getenv("ENGINE_BOT_ID", "")    # DB Bot.id — set in Railway per deployment
 ENGINE_BOT_NAME = os.getenv("ENGINE_BOT_NAME", "") # Human-readable bot name shown in trades UI
 ENGINE_ACTIVE_BOTS = []  # List of {bot_id, user_id, segment_filter} — refreshed every cycle from SaaS DB
@@ -151,11 +151,23 @@ MARGIN_TYPE = "ISOLATED"      # Never use CROSS for high leverage
 # ─── Stop Loss / Take Profit ────────────────────────────────────────────────────
 
 # Percentage-based partial profit booking (Trigger PnL %, Fraction_of_Remaining_Qty, Milestone_Name)
-PARTIAL_BOOKING_STEPS = [
+# H7 FIX: CONTRARIAN_MODE has MAX_PROFIT_PER_TRADE_PCT = +25%, so the standard steps
+# (TP1 @ +30%, TP2 @ +60%, TP3 @ +100%) will NEVER fire — the hard cap closes first.
+# Use contrarian-adapted steps instead: smaller, more frequent bookings within the +25% window.
+# NOTE: This block is overridden at the bottom of config.py once CONTRARIAN_MODE is known.
+# Standard (non-contrarian) booking ladder:
+_PARTIAL_BOOKING_STEPS_STANDARD = [
     ( 30.0, 0.33, "TP1" ),   # At +30% PnL: Sell ~33% of original position.
     ( 60.0, 0.50, "TP2" ),   # At +60% PnL: Sell 50% of remaining (another ~33% of original).
     (100.0, 1.00, "TP3" ),   # At +100% PnL: Sell the rest (Full Close).
 ]
+# Contrarian booking ladder — adapted to the tighter +25% MAX_PROFIT window:
+_PARTIAL_BOOKING_STEPS_CONTRARIAN = [
+    ( 10.0, 0.33, "TP1" ),   # At +10% PnL: Lock 33% early (contrarian mode — quick booking)
+    ( 18.0, 0.50, "TP2" ),   # At +18% PnL: Lock 50% of remaining
+    ( 25.0, 1.00, "TP3" ),   # At +25% PnL: Full close (mirrors MAX_PROFIT_PER_TRADE_PCT)
+]
+# Resolved below after CONTRARIAN_MODE is defined — do not set PARTIAL_BOOKING_STEPS here directly.
 
 ATR_SL_MULTIPLIER = 1.5       # SL = ATR * multiplier (DEFAULT, used as fallback)
 ATR_TP_MULTIPLIER = 3.0       # TP = ATR * multiplier (DEFAULT, used as fallback)
@@ -414,6 +426,14 @@ COINDCX_ORDER_SETTLE_SLEEP = 0.5    # Seconds to wait after placing order
 # The flip happens just before execution — SL/TP, risk manager, and tradebook
 # all automatically follow since they derive direction from the flipped side.
 CONTRARIAN_MODE: bool = True
+
+# H7 FIX: Resolve the active booking ladder based on the final CONTRARIAN_MODE value.
+# In contrarian mode, MAX_PROFIT is +25% so we use condensed steps (10%/18%/25%).
+# In standard mode, we use the full ladder (30%/60%/100%).
+PARTIAL_BOOKING_STEPS = (
+    _PARTIAL_BOOKING_STEPS_CONTRARIAN if CONTRARIAN_MODE
+    else _PARTIAL_BOOKING_STEPS_STANDARD
+)
 
 # ─── Coin Scanner ────────────────────────────────────────────────────────────
 SCANNER_RATE_LIMIT_SLEEP = 1.0   # Seconds between API calls to avoid rate limiting

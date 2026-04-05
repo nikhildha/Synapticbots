@@ -7,7 +7,7 @@ import json
 import os
 import logging
 import threading
-from datetime import datetime
+from datetime import datetime, timezone
 from data_pipeline import get_current_price
 import config
 import telegram as tg
@@ -16,30 +16,50 @@ logger = logging.getLogger("Tradebook")
 
 TRADEBOOK_FILE = os.path.join(config.DATA_DIR, "tradebook.json")
 
-# H2 FIX: Thread lock for concurrent file access safety
-_book_lock = threading.Lock()
+# B1 FIX: Single lock guards the full load-modify-save cycle (TOCTOU fix).
+# Do NOT hold the lock separately in _load_book or _save_book — always use
+# _atomic_update() for any operation that reads AND writes the tradebook.
+_book_lock = threading.RLock()  # RLock: allows re-entrant calls from the same thread
 
 
 def _load_book():
-    """Load tradebook from disk (thread-safe)."""
-    with _book_lock:
-        if not os.path.exists(TRADEBOOK_FILE):
-            return {"trades": [], "summary": {}}
-        try:
-            with open(TRADEBOOK_FILE, "r") as f:
-                return json.load(f)
-        except Exception:
-            return {"trades": [], "summary": {}}
+    """Load tradebook from disk. MUST be called while holding _book_lock."""
+    if not os.path.exists(TRADEBOOK_FILE):
+        return {"trades": [], "summary": {}}
+    try:
+        with open(TRADEBOOK_FILE, "r") as f:
+            return json.load(f)
+    except Exception:
+        return {"trades": [], "summary": {}}
 
 
 def _save_book(book):
-    """Save tradebook to disk (thread-safe)."""
+    """Save tradebook to disk. MUST be called while holding _book_lock."""
+    try:
+        with open(TRADEBOOK_FILE, "w") as f:
+            json.dump(book, f, indent=2)
+    except Exception as e:
+        logger.error("Failed to save tradebook: %s", e)
+
+
+def _atomic_update(fn):
+    """
+    B1 FIX: Atomic read-modify-write pattern.
+    Holds _book_lock for the ENTIRE load → fn(book) → save cycle.
+    All public functions that mutate the tradebook MUST call this.
+
+    Usage:
+        def _do_something():
+            with _book_lock:
+                book = _load_book()
+                # ... mutate book ...
+                _save_book(book)
+    """
     with _book_lock:
-        try:
-            with open(TRADEBOOK_FILE, "w") as f:
-                json.dump(book, f, indent=2)
-        except Exception as e:
-            logger.error("Failed to save tradebook: %s", e)
+        book = _load_book()
+        result = fn(book)
+        _save_book(book)
+        return result
 
 
 def _next_id(book):
@@ -91,7 +111,7 @@ def _compute_summary(book):
         "best_trade": round(max((t.get("realized_pnl", 0) for t in closed), default=0), 4),
         "worst_trade": round(min((t.get("realized_pnl", 0) for t in closed), default=0), 4),
         "avg_leverage": round(sum(t.get("leverage", 1) for t in trades) / total, 1) if total else 0,
-        "last_updated": datetime.utcnow().isoformat(),
+        "last_updated": datetime.now(timezone.utc).isoformat(),
     }
 
 
@@ -189,7 +209,7 @@ def open_trade(symbol, side, leverage, quantity, entry_price, atr,
             t2_price = None
             t3_price = None
 
-    now_iso = datetime.utcnow().isoformat()
+    now_iso = datetime.now(timezone.utc).isoformat()
     trade = {
         "trade_id":         trade_id,
         "entry_timestamp":  now_iso,
@@ -337,9 +357,9 @@ def close_trade(trade_id=None, symbol=None, exit_price=None, reason="MANUAL", ex
 
         # Duration
         entry_time = datetime.fromisoformat(target["entry_timestamp"])
-        duration = (datetime.utcnow() - entry_time).total_seconds() / 60
+        duration = (datetime.now(timezone.utc) - entry_time.replace(tzinfo=timezone.utc) if entry_time.tzinfo is None else datetime.now(timezone.utc) - entry_time).total_seconds() / 60
 
-        target["exit_timestamp"] = datetime.utcnow().isoformat()
+        target["exit_timestamp"] = datetime.now(timezone.utc).isoformat()
         target["exit_price"] = px
         target["current_price"] = px
         target["status"] = "CLOSED"
@@ -371,7 +391,7 @@ def cancel_trade(trade_id, reason="CANCELLED"):
         if trade["status"] == "OPEN" and trade["trade_id"] == trade_id:
             trade["status"] = "CANCELLED"
             trade["exit_reason"] = reason
-            trade["exit_timestamp"] = datetime.utcnow().isoformat()
+            trade["exit_timestamp"] = datetime.now(timezone.utc).isoformat()
             logger.info("🚫 Tradebook CANCEL: %s [%s]", trade_id, reason)
             cancelled = trade
             break
@@ -400,7 +420,7 @@ def activate_limit_order(trade_id, fill_price, fill_qty):
             trade["original_capital"] = trade["capital"]
             
             # Shift entry timestamp to when it actually filled
-            trade["entry_timestamp"] = datetime.utcnow().isoformat()
+            trade["entry_timestamp"] = datetime.now(timezone.utc).isoformat()
 
             logger.info("🟢 Tradebook ACTIVATE: %s filled @ %.6f (qty: %.6f) — now ACTIVE", 
                         trade_id, fill_price, fill_qty)
@@ -458,7 +478,7 @@ def _book_partial_inline(trade, book, exit_price, qty_frac, reason):
     pnl_pct = round(net_pnl / book_capital * 100, 2) if book_capital else 0
 
     entry_time = datetime.fromisoformat(trade["entry_timestamp"])
-    duration = (datetime.utcnow() - entry_time).total_seconds() / 60
+    duration = (datetime.now(timezone.utc) - (entry_time if entry_time.tzinfo else entry_time.replace(tzinfo=timezone.utc))).total_seconds() / 60
 
     # Create child trade ID
     child_id = f"{trade['trade_id']}-{reason}"
@@ -467,7 +487,7 @@ def _book_partial_inline(trade, book, exit_price, qty_frac, reason):
         "trade_id":         child_id,
         "parent_trade_id":  trade["trade_id"],
         "entry_timestamp":  trade["entry_timestamp"],
-        "exit_timestamp":   datetime.utcnow().isoformat(),
+        "exit_timestamp":   datetime.now(timezone.utc).isoformat(),
         "symbol":           trade["symbol"],
         "position":         trade["position"],
         "side":             trade["side"],
@@ -518,7 +538,7 @@ def _book_partial_inline(trade, book, exit_price, qty_frac, reason):
         "rm_id":            trade.get("rm_id"),
         "order_type":       trade.get("order_type"),
         "athena_reasoning": trade.get("athena_reasoning"),
-        "last_funding_check": datetime.utcnow().isoformat(),
+        "last_funding_check": datetime.now(timezone.utc).isoformat(),
     }
 
     # Add child trade to the tradebook
@@ -567,9 +587,9 @@ def _close_trade_inline(trade, exit_price, reason):
     pnl_pct = round(net_pnl / capital * 100, 2) if capital else 0
 
     entry_time = datetime.fromisoformat(trade["entry_timestamp"])
-    duration = (datetime.utcnow() - entry_time).total_seconds() / 60
+    duration = (datetime.now(timezone.utc) - (entry_time if entry_time.tzinfo else entry_time.replace(tzinfo=timezone.utc))).total_seconds() / 60
 
-    trade["exit_timestamp"] = datetime.utcnow().isoformat()
+    trade["exit_timestamp"] = datetime.now(timezone.utc).isoformat()
     trade["exit_price"] = px
     trade["current_price"] = px
     trade["status"] = "CLOSED"
@@ -672,7 +692,7 @@ def _update_single_trade(trade, book, prices, funding_rates):
 
     try:
         last_check = datetime.fromisoformat(trade["last_funding_check"])
-        hours_since = (datetime.utcnow() - last_check).total_seconds() / 3600
+        hours_since = (datetime.now(timezone.utc) - (last_check if last_check.tzinfo else last_check.replace(tzinfo=timezone.utc))).total_seconds() / 3600
         intervals = int(hours_since / config.FUNDING_INTERVAL_HOURS)
         if intervals > 0:
             # Use live funding rate if available, else default
@@ -685,7 +705,7 @@ def _update_single_trade(trade, book, prices, funding_rates):
             new_cost = round(cost_per_interval * intervals, 6)
             trade["funding_cost"] = round(trade["funding_cost"] + new_cost, 6)
             trade["funding_payments"] += intervals
-            trade["last_funding_check"] = datetime.utcnow().isoformat()
+            trade["last_funding_check"] = datetime.now(timezone.utc).isoformat()
     except Exception:
         pass
 
