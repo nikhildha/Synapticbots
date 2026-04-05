@@ -891,6 +891,32 @@ def _update_single_trade(trade, book, prices, funding_rates):
         _close_trade_inline(trade, current, f"MAX_PROFIT_{int(max_profit_limit)}%")
         return
 
+    # ── FIX-D1: TRADE DURATION CAP (Stall Exit) ──────────────────────────────
+    # If a trade is STUCK (small PnL, going nowhere) after TRADE_MAX_AGE_HOURS,
+    # close it to free capital for better opportunities.
+    # Condition: age >= max AND |pnl_pct| <= stuck threshold (not a winner/loser).
+    _max_age_hours = getattr(config, "TRADE_MAX_AGE_HOURS", None)
+    _stuck_pnl_pct = getattr(config, "TRADE_STUCK_PNL_PCT", 5.0)
+    if _max_age_hours and should_auto_close:
+        try:
+            _entry_time = datetime.fromisoformat(trade["entry_timestamp"])
+            if _entry_time.tzinfo is None:
+                _entry_time = _entry_time.replace(tzinfo=timezone.utc)
+            _age_hours = (datetime.now(timezone.utc) - _entry_time).total_seconds() / 3600
+            _is_stuck = abs(pnl_pct) <= _stuck_pnl_pct
+            if _age_hours >= _max_age_hours and _is_stuck:
+                logger.info(
+                    "⏰ STALL EXIT on %s — age=%.1fh >= %.0fh cap, PnL=%.2f%% within ±%.0f%% stuck band",
+                    symbol, _age_hours, _max_age_hours, pnl_pct, _stuck_pnl_pct,
+                )
+                if is_live:
+                    from execution_engine import ExecutionEngine
+                    ExecutionEngine.close_position_live(symbol)
+                _close_trade_inline(trade, current, f"STALL_EXIT_{_max_age_hours}H")
+                return
+        except Exception as _te:
+            logger.debug("Stall exit age check failed for %s: %s", symbol, _te)
+
     # ── PARTIAL PROFIT BOOKING (T1, T2, T3) ──────────────────────────────────
     # Replaces the old MAX_PROFIT_PER_TRADE_PCT hard close.
     # booking_level tracks which milestones we've already hit.

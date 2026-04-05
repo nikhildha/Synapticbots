@@ -125,15 +125,20 @@ REGIME_NAMES = {
 }
 
 # ─── Leverage Tiers ─────────────────────────────────────────────────────────────
-LEVERAGE_HIGH = 35       # Confidence > 95%
-LEVERAGE_MODERATE = 25   # Confidence 91–95%
-LEVERAGE_LOW = 15        # Confidence 85–90%
-LEVERAGE_NONE = 1        # Observation mode
+# FIX-L1: Contrarian mode fades high-conviction signals → higher uncertainty →
+# max leverage capped at 15x (35x would wipe capital on a 2.86% adverse move).
+LEVERAGE_HIGH     = 15   # Confidence margin > 0.30 → 15x  (capped from 35x for contrarian safety)
+LEVERAGE_MODERATE = 10   # Confidence margin 0.20–0.30 → 10x  (capped from 25x)
+LEVERAGE_LOW      =  7   # Confidence margin 0.10–0.20 → 7x   (capped from 15x)
+LEVERAGE_NONE     =  1   # Observation mode
 
 # ─── Confidence Thresholds ──────────────────────────────────────────────────────
-CONFIDENCE_HIGH = 0.99   # Above 99% → 35x  (optimized from 0.95)
-CONFIDENCE_MEDIUM = 0.96 # 96–99% → 25x  (optimized from 0.91)
-CONFIDENCE_LOW = 0.92    # 92–96% → 15x  (optimized from 0.85, below 92% = no deploy)
+# FIX-C1: HMM margin confidence (best_prob - 2nd_best_prob) rarely exceeds 0.40
+# on crypto in practice. Previous values (0.99/0.96/0.92) effectively blocked
+# ALL trades from reaching the 35x/25x leverage tiers. Recalibrated to reality.
+CONFIDENCE_HIGH   = 0.30  # Margin > 0.30 → 15x  (previously 0.99 — unreachable)
+CONFIDENCE_MEDIUM = 0.20  # Margin 0.20–0.30 → 10x  (previously 0.96 — unreachable)
+CONFIDENCE_LOW    = 0.10  # Margin 0.10–0.20 → 7x   (previously 0.92 — unreachable)
 
 # ─── Capital per trade (used by all bots — uniform sizing) ─────────────────────
 CAPITAL_PER_TRADE = 100        # $100 per trade, fixed
@@ -143,10 +148,27 @@ RISK_PER_TRADE = 0.04
 KILL_SWITCH_DRAWDOWN = 0.10   # Pause bot if 10% drawdown in 24h
 MAX_LOSS_PER_TRADE_PCT   = -15   # Hard max-loss per trade: -15% of capital (contrarian mode)
 MAX_PROFIT_PER_TRADE_PCT =  25   # Hard max-profit per trade: +25% of capital (contrarian mode)
-MIN_LEVERAGE_FLOOR = 5           # Skip trade if leverage must drop below this
+MIN_LEVERAGE_FLOOR = 3           # Skip trade if leverage must drop below this (lowered: 7x min is new floor)
 MIN_HOLD_MINUTES = 30         # Minimum hold time before regime-change exits
 DEFAULT_QUANTITY = 0.002      # BTC quantity (overridden by position sizer)
 MARGIN_TYPE = "ISOLATED"      # Never use CROSS for high leverage
+
+# ─── Trade Duration Cap (Stall Exit) ────────────────────────────────────────────
+# FIX-D1: Trades that are stuck (PnL between -STUCK% and +STUCK%) after MAX_AGE hours
+# are burning capital. Auto-close them to free margin for better opportunities.
+# The stall exit fires only when BOTH conditions are met:
+#   1. Trade age >= TRADE_MAX_AGE_HOURS
+#   2. Absolute PnL% <= TRADE_STUCK_PNL_PCT (trade going nowhere)
+TRADE_MAX_AGE_HOURS    = 4     # Close stalled trades after 4 hours
+TRADE_STUCK_PNL_PCT    = 5.0   # Only exit if PnL is within ±5% (not running, not crashing)
+
+# ─── Mid-Trade Regime Exit ───────────────────────────────────────────────────────
+# FIX-R1: If HMM regime flips AGAINST the trade direction while the trade is open,
+# soft-close the position after REGIME_EXIT_HOLD_CYCLES cycles of confirmation.
+# Prevents holding LONG positions through a BULL→BEAR regime transition.
+REGIME_EXIT_ENABLED        = True
+REGIME_EXIT_HOLD_CYCLES    = 2    # Require N consecutive adverse regime cycles before closing
+                                   # (avoids exiting on single-candle regime noise)
 
 # ─── Stop Loss / Take Profit ────────────────────────────────────────────────────
 
@@ -232,7 +254,11 @@ ATHENA_WATERFALL_DEPTH = 4        # How many coins to send to Athena per bot (fa
 MAX_DEPLOYS_PER_BOT_PER_CYCLE = 3 # Deploy up to N coins per bot per cycle (prevents signal loss on segment rotation)
 
 # ─── Multi-Coin Trading ──────────────────────────────────────────────────────────
-MAX_CONCURRENT_POSITIONS = 10   # Max symbols traded at once (reduced from 15)
+# FIX-E1: Portfolio exposure ceiling. All altcoins are ~0.85 correlated to BTC.
+# 25 open positions at 25x ≈ 85% of capital wiped on a single 4% BTC crash.
+# Cap at 6 concurrent max. With 10 segments × 1 trade max = natural max is 10,
+# but exposure ceiling enforces hard stop at 6.
+MAX_CONCURRENT_POSITIONS = 6    # Portfolio exposure ceiling (down from 10 — exposure-coach fix)
 MAX_OPEN_TRADES = 25            # User-configurable max (overridden by /api/set-config at bot start)
 TOP_COINS_LIMIT = 50            # Max coins to scan (brain switcher may reduce: 15/30/50)
 CAPITAL_PER_COIN_PCT = 0.05     # 5% of balance per coin (max 15 = 75% deployed)

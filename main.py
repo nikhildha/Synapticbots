@@ -483,6 +483,43 @@ class RegimeMasterBot:
         except Exception as e:
             logger.warning("⚠️ Tradebook unrealized update error (max-loss/SL/TP guards may not have run): %s", e, exc_info=True)
 
+        # ── FIX-R1: Mid-Trade Regime Exit ────────────────────────────────────
+        # If HMM flips AGAINST an open trade for N consecutive cycles → close it.
+        # Runs every heartbeat (10s) so regime changes are caught quickly.
+        if getattr(config, "REGIME_EXIT_ENABLED", False):
+            try:
+                _hold_cycles = getattr(config, "REGIME_EXIT_HOLD_CYCLES", 2)
+                _open_trades = tradebook.get_active_trades()
+                for _ot in _open_trades:
+                    _sym   = _ot.get("symbol")
+                    _dir   = _ot.get("direction", "").upper()   # "LONG" or "SHORT"
+                    if not _sym or not _dir:
+                        continue
+                    # Look up current HMM consensus from coin_states cache
+                    _state = self._coin_states.get(_sym, {})
+                    _hmm_side = _state.get("action", "")   # "BUY" / "SELL" / other
+                    # Determine if current regime is adverse to the open trade
+                    _adverse = (
+                        (_dir == "LONG"  and _hmm_side == "SELL") or
+                        (_dir == "SHORT" and _hmm_side == "BUY")
+                    )
+                    if _adverse:
+                        _ot["_regime_adverse_count"] = _ot.get("_regime_adverse_count", 0) + 1
+                        if _ot["_regime_adverse_count"] >= _hold_cycles:
+                            logger.info(
+                                "🔄 REGIME EXIT on %s — %s trade open but HMM=%s for %d cycles. Closing.",
+                                _sym, _dir, _hmm_side, _ot["_regime_adverse_count"],
+                            )
+                            tradebook.close_trade(
+                                _ot["trade_id"], reason=f"REGIME_FLIP_{_hmm_side}"
+                            )
+                    else:
+                        # Reset counter if regime aligns again (handle regime noise)
+                        _ot["_regime_adverse_count"] = 0
+            except Exception as _re:
+                logger.debug("Regime exit check error: %s", _re)
+
+
         # Live mode: sync CoinDCX positions → tradebook → trailing SL/TP
         if not config.PAPER_TRADE:
             try:
