@@ -448,7 +448,7 @@ SCANNER_RATE_LIMIT_SLEEP = 1.0   # Seconds between API calls to avoid rate limit
 #     AI4TRADE_PASSWORD   — bot account password
 #     AI4TRADE_TOKEN      — auto-populated after first registration; paste back in
 #
-AI4TRADE_ENABLED         : bool  = False   # Master switch. Set True once creds are set.
+AI4TRADE_ENABLED         : bool  = True    # Master switch. Set True once creds are set.
 AI4TRADE_AGENT_NAME      : str   = "Synaptic-HMM-Engine"
 AI4TRADE_MIN_CONVICTION  : float = 70.0    # Only publish trades with conviction >= this
 AI4TRADE_POST_STRATEGY   : bool  = True    # Post HMM cycle summary as strategy discussion
