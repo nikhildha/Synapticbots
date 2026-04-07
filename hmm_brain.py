@@ -373,12 +373,36 @@ class HMMBrain:
 
     # ─── Auto-Retrain ────────────────────────────────────────────────────────
 
-    def needs_retrain(self):
-        """Check if the model is stale and needs retraining."""
+    # Minimum candle period in hours per TF — retraining before a new candle
+    # forms is always wasted (same data). This prevents 4h TF from retraining
+    # 4× per training cycle on identical data.
+    _TF_MIN_RETRAIN_HOURS = {
+        "1m": 0.017,   # 1 min
+        "5m": 0.083,   # 5 min
+        "15m": 0.25,
+        "30m": 0.5,
+        "1h": 1.0,
+        "2h": 2.0,
+        "4h": 4.0,
+        "8h": 8.0,
+        "12h": 12.0,
+        "1d": 24.0,
+    }
+
+    def needs_retrain(self, timeframe: str = "1h") -> bool:
+        """Check if the model is stale and needs retraining.
+
+        Respects a minimum retrain floor equal to the TF candle period so that
+        4h brains don't retrain 4× on identical data within one engine cycle.
+        """
         if not self._is_trained or self._last_trained is None:
             return True
         hours_since = (datetime.utcnow() - self._last_trained).total_seconds() / 3600
-        return hours_since >= config.HMM_RETRAIN_HOURS
+        # Use the larger of: global retrain interval or TF candle period
+        tf_floor = self._TF_MIN_RETRAIN_HOURS.get(timeframe, 1.0)
+        effective_interval = max(config.HMM_RETRAIN_HOURS, tf_floor)
+        return hours_since >= effective_interval
+
 
     # ─── Helpers ─────────────────────────────────────────────────────────────
 

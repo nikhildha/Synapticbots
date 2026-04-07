@@ -1138,8 +1138,16 @@ class RegimeMasterBot:
                     continue
 
                 # ── NEW: BTC Chop/Sideways Global Veto ────────────────────────────
-                btc_regime = self._coin_states.get("BTCUSDT", {}).get("regime", "UNKNOWN")
-                if btc_regime in ("SIDEWAYS", "CHOP", "SIDEWAYS/CHOP", "UNKNOWN"):
+                # FIX: use regime integer constants, not fragile string comparison
+                _btc_state = self._coin_states.get("BTCUSDT", {})
+                btc_regime = _btc_state.get("regime", "UNKNOWN")
+                _btc_regime_int = _btc_state.get("regime_int")  # set by _analyze_coin
+                _btc_is_chop = (
+                    _btc_regime_int == config.REGIME_CHOP
+                    if _btc_regime_int is not None
+                    else btc_regime in ("SIDEWAYS", "CHOP", "SIDEWAYS/CHOP", "UNKNOWN")
+                )
+                if _btc_is_chop:
                     logger.info("⛔ [%s] %s BTC macro is %s — BTC CHOP VETO (no deployments allowed)", bot_name, sym, btc_regime)
                     self._coin_states.setdefault(sym, {}).setdefault("bot_deploy_statuses", {})[bot_id] = (
                         f"FILTERED: BTC Macro is {btc_regime}"
@@ -1530,22 +1538,25 @@ class RegimeMasterBot:
 
                     is_long = effective_side.upper() in ("BUY", "LONG")
 
-                    # Sanity check: SL must be on correct side and within 30% of entry
+                    # Sanity check: SL must be on correct side and within leverage-aware max-loss cap
+                    # FIX: 30% was dangerously wide at 10x (= 300% margin loss). Cap at MAX_LOSS/leverage.
+                    _max_sl_dist = abs(config.MAX_LOSS_PER_TRADE_PCT) / (fill_lev * 100)  # e.g. 20/(10*100)=2%
+                    _max_sl_dist = max(_max_sl_dist, 0.005)  # floor at 0.5% to avoid rejecting all SLs
                     if a_sl > 0:
                         sl_dist_pct = abs(a_sl - entry_price) / entry_price
                         sl_correct_side = (is_long and a_sl < entry_price) or (not is_long and a_sl > entry_price)
-                        if sl_correct_side and sl_dist_pct < 0.30:
+                        if sl_correct_side and sl_dist_pct < _max_sl_dist:
                             fill_sl = a_sl
                             athena_sl_used = True
                         else:
-                            logger.debug("🏛️ Athena SL rejected for %s: sl=%.4f entry=%.4f side=%s",
-                                         sym, a_sl, entry_price, effective_side)
+                            logger.debug("🏛️ Athena SL rejected for %s: sl=%.4f entry=%.4f dist=%.2f%% max=%.2f%%",
+                                         sym, a_sl, entry_price, sl_dist_pct * 100, _max_sl_dist * 100)
 
-                    # Sanity check: TP must be on correct side and within 40% of entry
+                    # Sanity check: TP must be on correct side and within 25% of entry (tightened from 40%)
                     if a_tp > 0:
                         tp_dist_pct = abs(a_tp - entry_price) / entry_price
                         tp_correct_side = (is_long and a_tp > entry_price) or (not is_long and a_tp < entry_price)
-                        if tp_correct_side and tp_dist_pct < 0.40:
+                        if tp_correct_side and tp_dist_pct < 0.25:
                             fill_tp = a_tp
                             athena_tp_used = True
                         else:
@@ -1844,8 +1855,8 @@ class RegimeMasterBot:
         # Compute features
         df_1h_feat = compute_all_features(df_1h)
 
-        # Train if needed
-        if brain.needs_retrain():
+        # Train if needed (1h brain — default TF floor)
+        if brain.needs_retrain(timeframe=config.TIMEFRAME_CONFIRMATION):
             brain.train(df_1h_feat)
 
         if not brain.is_trained:
@@ -1878,7 +1889,7 @@ class RegimeMasterBot:
                     df_tf = fetch_klines(symbol, tf, limit=config.MULTI_TF_CANDLE_LIMIT)
                     if df_tf is not None and len(df_tf) >= 60:
                         df_tf_feat = compute_all_features(df_tf)
-                        if tf_brain.needs_retrain():
+                        if tf_brain.needs_retrain(timeframe=tf):
                             logger.info("🧠 [%s] Training %s TF brain (%d bars)...", symbol, tf, len(df_tf))
                             tf_brain.train(df_tf_feat)
                         if tf_brain.is_trained:
@@ -2050,6 +2061,7 @@ class RegimeMasterBot:
             self._coin_states[symbol] = {
                 "symbol": symbol,
                 "regime": regime_name,
+                "regime_int": regime,          # FIX: integer constant for type-safe BTC chop veto
                 "confidence": round(conf, 4),
                 "price": current_price,
                 "action": f"ELIGIBLE_{side}",
