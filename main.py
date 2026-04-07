@@ -514,21 +514,21 @@ class RegimeMasterBot:
                         continue
                     # Look up current HMM consensus from coin_states cache
                     _state = self._coin_states.get(_sym, {})
-                    _hmm_side = _state.get("action", "")   # "BUY" / "SELL" / other
+                    _regime_int = _state.get("regime_int", config.REGIME_SIDEWAYS)
                     # Determine if current regime is adverse to the open trade
                     _adverse = (
-                        (_dir == "LONG"  and _hmm_side == "SELL") or
-                        (_dir == "SHORT" and _hmm_side == "BUY")
+                        (_dir == "LONG"  and _regime_int == config.REGIME_BEAR) or
+                        (_dir == "SHORT" and _regime_int == config.REGIME_BULL)
                     )
                     if _adverse:
                         _ot["_regime_adverse_count"] = _ot.get("_regime_adverse_count", 0) + 1
                         if _ot["_regime_adverse_count"] >= _hold_cycles:
                             logger.info(
-                                "🔄 REGIME EXIT on %s — %s trade open but HMM=%s for %d cycles. Closing.",
-                                _sym, _dir, _hmm_side, _ot["_regime_adverse_count"],
+                                "🔄 REGIME EXIT on %s — %s trade open but HMM regime adverse for %d cycles. Closing.",
+                                _sym, _dir, _ot["_regime_adverse_count"],
                             )
                             tradebook.close_trade(
-                                _ot["trade_id"], reason=f"REGIME_FLIP_{_hmm_side}"
+                                _ot["trade_id"], reason=f"REGIME_FLIP"
                             )
                     else:
                         # Reset counter if regime aligns again (handle regime noise)
@@ -1159,6 +1159,19 @@ class RegimeMasterBot:
                     self._coin_states.setdefault(sym, {}).setdefault("bot_deploy_statuses", {})[bot_id] = (
                         f"FILTERED: BTC Macro is {btc_regime}"
                     )
+                    try:
+                        get_svs().log_signal(
+                            symbol=sym, side=top.get("side", ""),
+                            signal_type=top.get("signal_type", "TREND_FOLLOW"),
+                            segment=seg_name, conviction=conviction,
+                            hmm_conf=top.get("confidence", 0),
+                            entry_price=current_price,
+                            deployed=False, gate_vetoed="BTC_CHOP",
+                            cycle=self._cycle_count,
+                            rsi_1h=self._coin_states.get(sym, {}).get("rsi_1h", 50.0),
+                        )
+                    except Exception:
+                        pass
                     continue
 
                 # ── NEW: Momentum Alignment Veto ──────────────────────────────────
@@ -1170,12 +1183,38 @@ class RegimeMasterBot:
                     self._coin_states.setdefault(sym, {}).setdefault("bot_deploy_statuses", {})[bot_id] = (
                         f"FILTERED: Momentum conflict (LONG in {trend_dir} trend)"
                     )
+                    try:
+                        get_svs().log_signal(
+                            symbol=sym, side=top.get("side", ""),
+                            signal_type=top.get("signal_type", "TREND_FOLLOW"),
+                            segment=seg_name, conviction=conviction,
+                            hmm_conf=top.get("confidence", 0),
+                            entry_price=current_price,
+                            deployed=False, gate_vetoed="MOMENTUM_VETO",
+                            cycle=self._cycle_count,
+                            rsi_1h=self._coin_states.get(sym, {}).get("rsi_1h", 50.0),
+                        )
+                    except Exception:
+                        pass
                     continue
                 elif trade_side == "SELL" and trend_dir != "DOWN":
                     logger.info("⛔ [%s] %s SHORT against momentum (%s) — MOMENTUM VETO", bot_name, sym, trend_dir)
                     self._coin_states.setdefault(sym, {}).setdefault("bot_deploy_statuses", {})[bot_id] = (
                         f"FILTERED: Momentum conflict (SHORT in {trend_dir} trend)"
                     )
+                    try:
+                        get_svs().log_signal(
+                            symbol=sym, side=top.get("side", ""),
+                            signal_type=top.get("signal_type", "TREND_FOLLOW"),
+                            segment=seg_name, conviction=conviction,
+                            hmm_conf=top.get("confidence", 0),
+                            entry_price=current_price,
+                            deployed=False, gate_vetoed="MOMENTUM_VETO",
+                            cycle=self._cycle_count,
+                            rsi_1h=self._coin_states.get(sym, {}).get("rsi_1h", 50.0),
+                        )
+                    except Exception:
+                        pass
                     continue
                 # ── NEW: RSI Overextension Gate ───────────────────────────────
                 # Prevent entries when 1h RSI is extreme (buying into overbought,
@@ -1187,6 +1226,19 @@ class RegimeMasterBot:
                     self._coin_states.setdefault(sym, {}).setdefault("bot_deploy_statuses", {})[bot_id] = (
                         f"FILTERED: RSI overextended LONG ({_rsi_gate:.0f})"
                     )
+                    try:
+                        get_svs().log_signal(
+                            symbol=sym, side=top.get("side", ""),
+                            signal_type=top.get("signal_type", "TREND_FOLLOW"),
+                            segment=seg_name, conviction=conviction,
+                            hmm_conf=top.get("confidence", 0),
+                            entry_price=current_price,
+                            deployed=False, gate_vetoed="RSI_EXTENDED",
+                            cycle=self._cycle_count,
+                            rsi_1h=self._coin_states.get(sym, {}).get("rsi_1h", 50.0),
+                        )
+                    except Exception:
+                        pass
                     continue
                 if trade_side == "SELL" and _rsi_gate < 27.0:
                     logger.info("⛔ [%s] %s RSI %.1f < 27 (oversold) — RSI GATE skip",
@@ -1194,6 +1246,19 @@ class RegimeMasterBot:
                     self._coin_states.setdefault(sym, {}).setdefault("bot_deploy_statuses", {})[bot_id] = (
                         f"FILTERED: RSI overextended SHORT ({_rsi_gate:.0f})"
                     )
+                    try:
+                        get_svs().log_signal(
+                            symbol=sym, side=top.get("side", ""),
+                            signal_type=top.get("signal_type", "TREND_FOLLOW"),
+                            segment=seg_name, conviction=conviction,
+                            hmm_conf=top.get("confidence", 0),
+                            entry_price=current_price,
+                            deployed=False, gate_vetoed="RSI_EXTENDED",
+                            cycle=self._cycle_count,
+                            rsi_1h=self._coin_states.get(sym, {}).get("rsi_1h", 50.0),
+                        )
+                    except Exception:
+                        pass
                     continue
 
 
@@ -1201,12 +1266,25 @@ class RegimeMasterBot:
                 if conviction < min_conv:
                     logger.info("⛔ [%s] %s conviction %.0f < %.0f — waterfall exhausted (remaining candidates also low)",
                                  bot_name, sym, conviction, min_conv)
-                    # All remaining candidates will also fail — break out
-                    break
                     self._coin_states.setdefault(sym, {}).setdefault("bot_deploy_statuses", {})[bot_id] = (
                         f"FILTERED: low conviction ({conviction:.0f} < {min_conv:.0f})"
                     )
+                    try:
+                        get_svs().log_signal(
+                            symbol=sym, side=top.get("side", ""),
+                            signal_type=top.get("signal_type", "TREND_FOLLOW"),
+                            segment=seg_name, conviction=conviction,
+                            hmm_conf=top.get("confidence", 0),
+                            entry_price=current_price,
+                            deployed=False, gate_vetoed="LOW_CONVICTION",
+                            cycle=self._cycle_count,
+                            rsi_1h=self._coin_states.get(sym, {}).get("rsi_1h", 50.0),
+                        )
+                    except Exception:
+                        pass
                     continue
+                    # All remaining candidates will also fail — break out
+                    break
 
                 # ── C4 Fix: Enforce MAX_OPEN_TRADES cap ──────────────────────────
                 max_trades = getattr(config, "MAX_OPEN_TRADES", 25)
@@ -1219,6 +1297,19 @@ class RegimeMasterBot:
                     self._coin_states.setdefault(sym, {}).setdefault("bot_deploy_statuses", {})[bot_id] = (
                         f"FILTERED: max open trades cap ({max_trades}) reached"
                     )
+                    try:
+                        get_svs().log_signal(
+                            symbol=sym, side=top.get("side", ""),
+                            signal_type=top.get("signal_type", "TREND_FOLLOW"),
+                            segment=seg_name, conviction=conviction,
+                            hmm_conf=top.get("confidence", 0),
+                            entry_price=current_price,
+                            deployed=False, gate_vetoed="MAX_OPEN_TRADES",
+                            cycle=self._cycle_count,
+                            rsi_1h=self._coin_states.get(sym, {}).get("rsi_1h", 50.0),
+                        )
+                    except Exception:
+                        pass
                     continue
 
                 if self.risk.check_kill_switch():
@@ -1490,7 +1581,16 @@ class RegimeMasterBot:
                 )
 
                 # ── Build trade dict ──────────────────────────────────────────────
-                capital     = target.get("capital_per_trade") or getattr(config, "CAPITAL_PER_TRADE", 100.0)
+                base_capital = target.get("capital_per_trade") or getattr(config, "CAPITAL_PER_TRADE", 100.0)
+                
+                # Conviction-weighted sizing (+25% for high conviction, -25% for low)
+                if conviction >= 80:
+                    capital = base_capital * 1.25
+                elif conviction >= 60:
+                    capital = base_capital
+                else:
+                    capital = base_capital * 0.75
+                
                 qty         = (capital * lev) / max(current_price, 0.0001)
                 
                 # Base math reason

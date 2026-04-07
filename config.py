@@ -74,7 +74,7 @@ TIMEFRAME_MACRO = "4h"        # Macro regime (legacy — replaced by Multi-TF HM
 MULTI_TF_ENABLED = True               # Use 3 separate HMM brains per coin
 MULTI_TF_TIMEFRAMES = ["4h", "1h", "15m"]  # 4h (trend anchor), 1h (swing), 15m (momentum trigger)
 MULTI_TF_CANDLE_LIMIT = 1000          # Candles per TF (1000 for GMMHMM depth limit)
-MULTI_TF_WEIGHTS = {"4h": 30, "1h": 45, "15m": 25}  # Conviction weights (sum=100)
+MULTI_TF_WEIGHTS = {"4h": 45, "1h": 35, "15m": 20}  # Conviction weights (sum=100)
 MULTI_TF_MIN_AGREEMENT = 2            # Minimum TFs agreeing on direction (2 of 3)
 MULTI_TF_MIN_MODELS = 2               # Minimum trained models required
 
@@ -174,9 +174,9 @@ REGIME_EXIT_HOLD_CYCLES    = 3    # Require 3 consecutive adverse regime cycles 
 # Percentage-based partial profit booking (Trigger PnL %, Fraction_of_Remaining_Qty, Milestone_Name)
 # Standard booking ladder — locks profit incrementally, lets winners run to full TP.
 PARTIAL_BOOKING_STEPS = [
-    ( 30.0, 0.33, "TP1" ),   # At +30% PnL: Sell ~33% of original position.
-    ( 60.0, 0.50, "TP2" ),   # At +60% PnL: Sell 50% of remaining (another ~33% of original).
-    (100.0, 1.00, "TP3" ),   # At +100% PnL: Sell the rest (Full Close).
+    ( 20.0, 0.33, "TP1" ),   # +20% leveraged PnL (~2% price move at 10x): Book a third early
+    ( 35.0, 0.50, "TP2" ),   # +35% leveraged PnL (~3.5% price move at 10x): Half of remaining
+    ( 60.0, 1.00, "TP3" ),   # +60% leveraged PnL (~6% price move at 10x): Full close
 ]
 
 ATR_SL_MULTIPLIER = 1.5       # SL = ATR * multiplier (DEFAULT, used as fallback)

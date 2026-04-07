@@ -692,7 +692,9 @@ class AthenaEngine:
         derivatives_block = (
             f"- Funding Rate     : {fr_str}\n"
             f"- OI Change        : {oi_str}\n"
-            f"- Orderflow Score  : {of_str}"
+            f"- Orderflow Score  : {of_str}\n"
+            f"- RSI (1h)         : {ctx.get('rsi_1h', 'N/A')}  "
+            f"({'⚠️ overbought' if (ctx.get('rsi_1h') or 50) > 65 else '⚠️ oversold' if (ctx.get('rsi_1h') or 50) < 35 else 'neutral'})"
         )
 
         return f"""## Signal Under Review: {ctx.get('ticker', 'N/A')}
@@ -703,6 +705,7 @@ class AthenaEngine:
 - HMM Confidence   : {ctx.get('hmm_confidence', 0):.4f}  (margin best vs 2nd-best state)
 - Multi-TF Conviction: {conv:.1f}/100  [{conv_label}]
 - TF Agreement     : {ctx.get('tf_agreement', 0)}/3 timeframes agree
+- Loss Streak      : {ctx.get('loss_streak', 0)} consecutive losses (0 = clean slate)
 
 ### ── Per-Timeframe Breakdown ──
 {tf_str}
