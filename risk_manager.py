@@ -125,7 +125,7 @@ class RiskManager:
             quantity=0 means trade should be skipped (risk too high even at floor)
         """
         max_risk = max_risk_pct or abs(config.MAX_LOSS_PER_TRADE_PCT)
-        leverage_tiers = [35, 25, 15, 10, 5]
+        leverage_tiers = [10, 5]  # Max 10x flat — no higher tiers permitted
 
         final_leverage = 0
         for lev in leverage_tiers:

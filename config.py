@@ -127,9 +127,9 @@ REGIME_NAMES = {
 # ─── Leverage Tiers ─────────────────────────────────────────────────────────────
 # FIX-L1: Contrarian mode fades high-conviction signals → higher uncertainty →
 # max leverage capped at 15x (35x would wipe capital on a 2.86% adverse move).
-LEVERAGE_HIGH     = 15   # Confidence margin > 0.30 → 15x
-LEVERAGE_MODERATE = 10   # Confidence margin 0.20–0.30 → 10x  (capped from 25x)
-LEVERAGE_LOW      =  7   # Confidence margin 0.10–0.20 → 7x   (capped from 15x)
+LEVERAGE_HIGH     = 10   # Flat 10x across all conviction tiers
+LEVERAGE_MODERATE = 10   # Flat 10x across all conviction tiers
+LEVERAGE_LOW      = 10   # Flat 10x across all conviction tiers
 LEVERAGE_NONE     =  1   # Observation mode
 
 # ─── Confidence Thresholds ──────────────────────────────────────────────────────
@@ -146,7 +146,7 @@ CAPITAL_PER_TRADE = 100        # $100 per trade, fixed
 # ─── Risk Management ────────────────────────────────────────────────────────────
 RISK_PER_TRADE = 0.04
 KILL_SWITCH_DRAWDOWN = 0.10   # Pause bot if 10% drawdown in 24h
-MAX_LOSS_PER_TRADE_PCT   = -15   # Hard max-loss per trade: -15% of capital
+MAX_LOSS_PER_TRADE_PCT   = -20   # Hard max-loss per trade: -20% of capital
 MAX_PROFIT_PER_TRADE_PCT =  25   # Hard max-profit per trade: +25% of capital
 MIN_LEVERAGE_FLOOR = 3           # Skip trade if leverage must drop below this (lowered: 7x min is new floor)
 MIN_HOLD_MINUTES = 30         # Minimum hold time before regime-change exits
@@ -227,15 +227,15 @@ BB_STD = 2.0
 RSI_LENGTH = 14
 RSI_OVERSOLD = 35
 RSI_OVERBOUGHT = 65
-SIDEWAYS_POSITION_REDUCTION = 0.30  # 30% smaller positions in chop
+SIDEWAYS_POSITION_REDUCTION = 0.15  # 15% smaller positions in chop (adjusted by Athena Swarm)
 
 # ─── Bot Loop ────────────────────────────────────────────────────────────────────
 LOOP_INTERVAL_SECONDS = 10        # 10-second heartbeat (faster trailing SL sync)
-ANALYSIS_INTERVAL_SECONDS = 900   # 15-minute full analysis cycle
+ANALYSIS_INTERVAL_SECONDS = 600   # 10-minute full analysis cycle
 ERROR_RETRY_SECONDS = 60          # Retry after error
 
 # Min HMM conviction to pass to Athena (below this, coin is skipped before Athena call)
-MIN_CONVICTION_FOR_DEPLOY = 65    # 65 out of 100 — matches MultiTFHMMBrain conviction scale (0-100)
+MIN_CONVICTION_FOR_DEPLOY = 60    # 60 out of 100 — matches MultiTFHMMBrain conviction scale (0-100)
 TOP_COINS_PER_SEGMENT = 1         # Athena evaluates the single highest-HMM coin per segment
 
 # ─── Deploy Waterfall ────────────────────────────────────────────────────────────
@@ -248,7 +248,7 @@ MAX_DEPLOYS_PER_BOT_PER_CYCLE = 3 # Deploy up to N coins per bot per cycle (prev
 # Cap at 6 concurrent max. With 10 segments × 1 trade max = natural max is 10,
 # but exposure ceiling enforces hard stop at 6.
 MAX_CONCURRENT_POSITIONS = 6    # Portfolio exposure ceiling (down from 10 — exposure-coach fix)
-MAX_OPEN_TRADES = 25            # User-configurable max (overridden by /api/set-config at bot start)
+MAX_OPEN_TRADES = 10            # User-configurable max (overridden by /api/set-config at bot start)
 TOP_COINS_LIMIT = 50            # Max coins to scan (brain switcher may reduce: 15/30/50)
 CAPITAL_PER_COIN_PCT = 0.05     # 5% of balance per coin (max 15 = 75% deployed)
 SCAN_INTERVAL_CYCLES = 4        # Re-scan top coins every N analysis cycles (4 × 15m = 1h)
@@ -393,7 +393,7 @@ CONVICTION_WEIGHT_OI        = 10   # Open Interest change
 CONVICTION_WEIGHT_ORDERFLOW = 15   # Live L2 / Limit Liquidity Tracker
 
 # ─── Conviction Score: Leverage Bands ────────────────────────────────────────
-CONVICTION_MIN_TRADE   = 65   # Below this → no trade (leverage = 0)
+CONVICTION_MIN_TRADE   = 60   # Below this → no trade (leverage = 0)
 CONVICTION_BAND_LOW    = 75   # 65–74  → 15x leverage
 CONVICTION_BAND_MED    = 95   # 75–94  → 25x leverage; 95+ → 35x leverage
 

@@ -1193,15 +1193,8 @@ class RegimeMasterBot:
                     return
 
                 # ── Conviction-based leverage ─────────────────────────────────────
-                # H2 Fix: 4-tier scale — borderline signals (65–69) get reduced leverage
-                if conviction >= 95:
-                    lev, fallback_lev = 25, 10
-                elif conviction >= 80:
-                    lev, fallback_lev = 20, 10
-                elif conviction >= 70:
-                    lev, fallback_lev = 15, 5
-                else:
-                    lev, fallback_lev = 10, 5
+                # Flat 10x across all conviction tiers (user setting)
+                lev, fallback_lev = 10, 5
 
                 # ── Segment Cooldown Gate: block entire segment under cooldown ────────
                 _seg_blocked, _seg_reason = self._is_segment_in_cooldown(seg_name, user_id)
