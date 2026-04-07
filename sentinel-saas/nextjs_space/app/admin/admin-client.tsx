@@ -7,7 +7,7 @@ import {
     Users, Bot, BarChart3, Activity, Shield, Settings,
     ArrowLeft, RefreshCw, TrendingUp, TrendingDown,
     AlertTriangle, CheckCircle2, XCircle,
-    FileText, CreditCard, Heart, LineChart, DollarSign, Brain
+    FileText, CreditCard, Heart, LineChart, DollarSign, Brain, Target
 } from 'lucide-react';
 
 // Tab components
@@ -19,6 +19,7 @@ import UserAnalytics from './components/user-analytics';
 import RevenueDashboard from './components/revenue-dashboard';
 import UserBotMonitor from './components/user-bot-monitor';
 import AthenaDebug from './components/athena-debug';
+import SignalValidationSystem from './components/signal-validation-system';
 
 interface UserData {
     id: string;
@@ -41,7 +42,7 @@ interface SystemStats {
     revenueEstimate: number;
 }
 
-type TabId = 'overview' | 'users' | 'engine' | 'botMonitor' | 'subscriptions' | 'analytics' | 'revenue' | 'audit' | 'health' | 'athena';
+type TabId = 'overview' | 'users' | 'engine' | 'botMonitor' | 'subscriptions' | 'analytics' | 'revenue' | 'audit' | 'health' | 'athena' | 'svs';
 
 export default function AdminDashboard() {
     const { data: session } = useSession();
@@ -80,6 +81,7 @@ export default function AdminDashboard() {
         { id: 'audit' as TabId, label: 'Audit', icon: FileText },
         { id: 'health' as TabId, label: 'Health', icon: Heart },
         { id: 'athena' as TabId, label: 'Athena', icon: Brain },
+        { id: 'svs' as TabId, label: 'Validation', icon: Target },
     ];
 
     return (
@@ -257,6 +259,7 @@ export default function AdminDashboard() {
             {activeTab === 'audit' && <AuditLog />}
             {activeTab === 'health' && <SystemHealth />}
             {activeTab === 'athena' && <AthenaDebug />}
+            {activeTab === 'svs' && <SignalValidationSystem />}
 
             {loading && !stats && (
                 <div className="flex items-center justify-center py-20">
