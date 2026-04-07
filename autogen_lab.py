@@ -1,12 +1,12 @@
 import os
 import autogen
+import config
 
 def main():
-    # Attempt to load LLM API key from config or environment
-    openai_api_key = os.environ.get("OPENAI_API_KEY")
+    # Load LLM API key from Synaptic config (which maps GEMINI_API_KEY -> OpenAI Key)
+    openai_api_key = config.LLM_API_KEY
     if not openai_api_key:
-        print("⚠️ OPENAI_API_KEY environment variable is not set. Please set it before running the lab.")
-        print("You can run it like this: OPENAI_API_KEY=your_key python3 autogen_lab.py")
+        print("⚠️ LLM_API_KEY is missing in config.py. Please set it before running the lab.")
         return
 
     llm_config = {

@@ -29,6 +29,7 @@ import coindcx_client as cdx
 from llm_reasoning import AthenaEngine
 from price_stream import get_price_stream, shutdown_price_stream
 from segment_features import get_segment_for_coin  # promoted from inline import — needed at line ~1350
+from signal_validator import get_svs  # Signal Validation System
 # ─── Logging Setup ───────────────────────────────────────────────────────────────
 logging.basicConfig(
     level=logging.INFO,
@@ -492,6 +493,12 @@ class RegimeMasterBot:
             tradebook.update_unrealized(funding_rates=funding_rates, prices=ws_prices or None)
         except Exception as e:
             logger.warning("⚠️ Tradebook unrealized update error (max-loss/SL/TP guards may not have run): %s", e, exc_info=True)
+
+        # ── SVS: evaluate pending signals whose window has elapsed ───────────
+        try:
+            get_svs().evaluate_pending()
+        except Exception as _svs_e:
+            logger.debug("SVS evaluate_pending error: %s", _svs_e)
 
         # ── FIX-R1: Mid-Trade Regime Exit ────────────────────────────────────
         # If HMM flips AGAINST an open trade for N consecutive cycles → close it.
@@ -1170,7 +1177,24 @@ class RegimeMasterBot:
                         f"FILTERED: Momentum conflict (SHORT in {trend_dir} trend)"
                     )
                     continue
-
+                # ── NEW: RSI Overextension Gate ───────────────────────────────
+                # Prevent entries when 1h RSI is extreme (buying into overbought,
+                # selling into oversold). At 10x leverage these are very high-risk entries.
+                _rsi_gate = self._coin_states.get(sym, {}).get("rsi_1h", 50.0)
+                if trade_side == "BUY"  and _rsi_gate > 73.0:
+                    logger.info("⛔ [%s] %s RSI %.1f > 73 (overbought) — RSI GATE skip",
+                                bot_name, sym, _rsi_gate)
+                    self._coin_states.setdefault(sym, {}).setdefault("bot_deploy_statuses", {})[bot_id] = (
+                        f"FILTERED: RSI overextended LONG ({_rsi_gate:.0f})"
+                    )
+                    continue
+                if trade_side == "SELL" and _rsi_gate < 27.0:
+                    logger.info("⛔ [%s] %s RSI %.1f < 27 (oversold) — RSI GATE skip",
+                                bot_name, sym, _rsi_gate)
+                    self._coin_states.setdefault(sym, {}).setdefault("bot_deploy_statuses", {})[bot_id] = (
+                        f"FILTERED: RSI overextended SHORT ({_rsi_gate:.0f})"
+                    )
+                    continue
 
 
                 min_conv   = getattr(config, "MIN_CONVICTION_FOR_DEPLOY", 60)
@@ -1303,6 +1327,8 @@ class RegimeMasterBot:
                             "nearest_ask_wall":   top.get("nearest_ask_wall"),    # ask wall price
                             # ── Community intelligence (AI4Trade) ────────
                             "community_context":  self._ai4trade.get_community_context(sym) if self._ai4trade else "",
+                            # ── Loss streak for Athena drawdown guardrail (Rule 13) ──
+                            "loss_streak": tradebook.get_current_loss_streak()[0],
                         }
                         athena_decision = self._athena.validate_signal(llm_ctx)
                         # Only count REAL Gemini API calls — cached decisions are free.
@@ -1482,6 +1508,20 @@ class RegimeMasterBot:
                        f"regime={top.get('regime_name','')} lev={lev}x qty={qty:.4f} athena=APPROVED")
 
                 self._coin_states.setdefault(sym, {}).setdefault("bot_deploy_statuses", {})[bot_id] = "DEPLOY_QUEUED"
+                # SVS: log successful deploy for forward accuracy measurement
+                try:
+                    get_svs().log_signal(
+                        symbol=sym, side=effective_side,
+                        signal_type=top.get("signal_type", "TREND_FOLLOW"),
+                        segment=seg_name, conviction=conviction,
+                        hmm_conf=top.get("confidence", 0),
+                        entry_price=current_price,
+                        deployed=True, gate_vetoed="DEPLOYED",
+                        cycle=self._cycle_count,
+                        rsi_1h=self._coin_states.get(sym, {}).get("rsi_1h", 50.0),
+                    )
+                except Exception:
+                    pass
 
                 logger.info(
                     "🔥 DEPLOYING [%s]: %s %s @ %dx | HMM %.0f%% conv | Athena ✅ %.0f%%",
@@ -1999,10 +2039,49 @@ class RegimeMasterBot:
                         btc_regime_str = "BEAR"
                     btc_margin = btc_m
 
-            # No fallback brain profile needed — BRAIN_PROFILES removed
             brain_cfg = {}  # sizing comes from CAPITAL_PER_TRADE in deploy loop
             brain_id = "MultiTF-HMM"
-            _is_reversal_tier2 = False  # set here; legacy tier2 logic (line ~1318) is unreachable from multi-TF path
+
+            # ── FIX: Signal type from real TF divergence (not hardcoded False) ──
+            # REVERSAL: 4h regime OPPOSES direction (macro counter-trend) while
+            # 1h + 15m are building momentum in trade direction.
+            # TREND_FOLLOW: all frames aligned (classic breakout continuation).
+            _tf_preds = mtf_brain._predictions  # {"4h": (regime_int, margin), ...}
+            _r4h  = _tf_preds.get("4h",  (config.REGIME_CHOP, 0))[0]
+            _r1h  = _tf_preds.get("1h",  (config.REGIME_CHOP, 0))[0]
+            _r15m = _tf_preds.get("15m", (config.REGIME_CHOP, 0))[0]
+            _macro_opposing = (
+                (side == "BUY"  and _r4h == config.REGIME_BEAR) or
+                (side == "SELL" and _r4h == config.REGIME_BULL)
+            )
+            _short_tfs_agree = (
+                _r1h  != config.REGIME_CHOP and
+                _r15m != config.REGIME_CHOP
+            )
+            _exhaustion_sig = exhaustion_tail > 1.5  # seller/buyer fatigue on 1h
+            _is_reversal = _macro_opposing and (_short_tfs_agree or _exhaustion_sig)
+
+            # ── FIX: Composite conviction — overlay funding rate + OI adjustments ──
+            # These signals are available in df_1h_feat but were previously
+            # only passed to Athena. Now they influence the conviction gate directly.
+            try:
+                _fr = float(df_1h_feat["funding_rate"].iloc[-1]) if "funding_rate" in df_1h_feat.columns else None
+                _oi = float(df_1h_feat["oi_change"].iloc[-1])    if "oi_change"    in df_1h_feat.columns else None
+                # Crowded longs (high +FR) → reduce conviction (crowded trade, mean-revert risk)
+                _fr_adj = -8 if (_fr is not None and side == "BUY"  and _fr >  0.0003) else \
+                           4 if (_fr is not None and side == "SELL" and _fr >  0.0003) else \
+                           4 if (_fr is not None and _fr < -0.0001) else 0
+                # OI rising in direction = institutional follow-through
+                _oi_adj =  5 if (_oi is not None and side == "BUY"  and _oi >  0.02) else \
+                          -5 if (_oi is not None and side == "BUY"  and _oi < -0.02) else \
+                           5 if (_oi is not None and side == "SELL" and _oi >  0.02) else \
+                          -5 if (_oi is not None and side == "SELL" and _oi < -0.02) else 0
+                conviction = float(max(0.0, min(100.0, conviction + _fr_adj + _oi_adj)))
+                if _fr_adj != 0 or _oi_adj != 0:
+                    logger.debug("📈 Conviction overlay [%s]: FR_adj=%+d OI_adj=%+d → conv=%.1f",
+                                 symbol, _fr_adj, _oi_adj, conviction)
+            except Exception as _conv_err:
+                logger.debug("Conviction overlay error [%s]: %s", symbol, _conv_err)
 
             # Weekend skip
             if config.WEEKEND_SKIP_ENABLED:
@@ -2057,6 +2136,9 @@ class RegimeMasterBot:
             athena_action = None
 
 
+            # Stamp RSI on coin_states so the deploy waterfall RSI gate can read it
+            _rsi_1h = float(df_1h_feat["rsi"].iloc[-1]) if "rsi" in df_1h_feat.columns else 50.0
+
             # Update coin state for dashboard
             self._coin_states[symbol] = {
                 "symbol": symbol,
@@ -2071,7 +2153,9 @@ class RegimeMasterBot:
                 "regime_summary": regime_summary,
                 "athena": athena_action,
                 "segment": get_segment_for_coin(symbol),
-                "context": {"trend_alignment": current_trend}
+                "context": {"trend_alignment": current_trend},
+                "rsi_1h": round(_rsi_1h, 1),   # For RSI deploy gate
+                "signal_type": "REVERSAL_PULLBACK" if _is_reversal else "TREND_FOLLOW",
             }
 
             return {
@@ -2088,7 +2172,8 @@ class RegimeMasterBot:
                 "athena": athena_action,
                 "trend_direction": current_trend,
                 "exhaustion_tail": exhaustion_tail,
-                "signal_type": "REVERSAL_PULLBACK" if _is_reversal_tier2 else "TREND_FOLLOW",
+                "rsi_1h": _rsi_1h,
+                "signal_type": "REVERSAL_PULLBACK" if _is_reversal else "TREND_FOLLOW",
                 "reason": f"MultiTF-HMM | {regime_summary} | conv={conviction:.1f} TF={tf_agreement}/3",
             }
 

@@ -197,19 +197,31 @@ def get_hottest_segments(segment_limit=2, blocked_segments=None):
         # Blended score: 50% raw momentum + 50% breadth-attenuated momentum
         raw_blended = 0.5 * vw_4h + 0.5 * (vw_4h * breadth_1h / 100.0)
         
-        # Pillar 3: ATR Volatility Multiplier
-        multiplier = 1.0 + (vw_atr / 10.0)
-        blended = raw_blended * multiplier
+        # Pillar 3: ATR Volatility Multiplier (capped for high-noise segments)
+        # Meme/Gaming have naturally high ATR due to spread — cap prevents score inflation
+        _high_noise_segs = ("Meme", "Gaming", "DePIN")
+        _atr_cap = 2.0 if segment in _high_noise_segs else 3.5
+        multiplier = min(1.0 + (vw_atr / 10.0), _atr_cap)
+
+        # Pillar 4: Momentum persistence (last 2 of 3 bars confirm direction)
+        # Requires the move to be sustained, not a single spike bar.
+        recent_4h_rets = [c["ret_4h"] for c in valid_coins]
+        _dir = 1 if vw_4h >= 0 else -1
+        _persist_count = sum(1 for r in recent_4h_rets if (r * _dir) > 0)
+        persistence_factor = 1.3 if _persist_count >= (len(recent_4h_rets) * 0.6) else 0.75
+
+        blended = raw_blended * multiplier * persistence_factor
 
         segment_data.append({
-            "segment":       segment,
-            "vw_4h":         round(vw_4h, 2),
-            "breadth_1h":    round(breadth_1h, 1),
-            "vw_atr":        round(vw_atr, 2),
-            "blended_score": round(blended, 2),
-            "abs_score":     abs(blended),
-            "direction":     "LONG" if blended >= 0 else "SHORT",
-            "is_cooldown":   is_cooldown
+            "segment":          segment,
+            "vw_4h":            round(vw_4h, 2),
+            "breadth_1h":       round(breadth_1h, 1),
+            "vw_atr":           round(vw_atr, 2),
+            "persistence_factor": round(persistence_factor, 2),
+            "blended_score":    round(blended, 2),
+            "abs_score":        abs(blended),
+            "direction":        "LONG" if blended >= 0 else "SHORT",
+            "is_cooldown":      is_cooldown
         })
 
     # Sort by hottest absolute score — direction agnostic

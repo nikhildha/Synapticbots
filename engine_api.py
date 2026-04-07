@@ -1557,6 +1557,40 @@ if __name__ == "__main__":
     app.run(host="0.0.0.0", port=port, debug=False, use_reloader=False)
 
 
+# ─── Signal Validation System API ───────────────────────────────────────────
+
+@app.route("/api/signal-validation", methods=["GET"])
+def api_signal_validation():
+    """
+    Return SVS rolling accuracy report + recent signals.
+
+    Query params:
+      report  — ?report=1 (default) → full accuracy report JSON
+      signals — ?signals=1          → recent N signals (raw JSONL)
+      limit   — max signals to return (default 50, max 200)
+    """
+    try:
+        from signal_validator import get_svs
+        svs = get_svs()
+
+        want_signals = request.args.get("signals", "0") == "1"
+        limit = min(int(request.args.get("limit", 50)), 200)
+
+        if want_signals:
+            signals = svs.get_recent_signals(limit=limit)
+            return jsonify({
+                "signals": signals,
+                "count": len(signals),
+            })
+
+        report = svs.get_report()
+        return jsonify(report)
+
+    except Exception as e:
+        logger.error("signal-validation error: %s", e)
+        return jsonify({"error": str(e)}), 500
+
+
 # ─── Trade Journal: Exchange Health ──────────────────────────────────────────
 # Called by Next.js /api/journal/health every 15s.
 # Returns live exchange connectivity, balance, and open position count.

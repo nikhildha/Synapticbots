@@ -159,16 +159,15 @@ MARGIN_TYPE = "ISOLATED"      # Never use CROSS for high leverage
 # The stall exit fires only when BOTH conditions are met:
 #   1. Trade age >= TRADE_MAX_AGE_HOURS
 #   2. Absolute PnL% <= TRADE_STUCK_PNL_PCT (trade going nowhere)
-TRADE_MAX_AGE_HOURS    = 4     # Close stalled trades after 4 hours
-TRADE_STUCK_PNL_PCT    = 5.0   # Only exit if PnL is within ±5% (not running, not crashing)
+TRADE_MAX_AGE_HOURS    = 24    # Close stalled trades after 24h (4h was too short at 10x — most swings need time)
+TRADE_STUCK_PNL_PCT    = 15.0  # Only exit if |PnL%| < 15% (= <1.5% price move at 10x). Wider band = fewer false stalls.
 
 # ─── Mid-Trade Regime Exit ───────────────────────────────────────────────────────
 # FIX-R1: If HMM regime flips AGAINST the trade direction while the trade is open,
 # soft-close the position after REGIME_EXIT_HOLD_CYCLES cycles of confirmation.
 # Prevents holding LONG positions through a BULL→BEAR regime transition.
 REGIME_EXIT_ENABLED        = True
-REGIME_EXIT_HOLD_CYCLES    = 2    # Require N consecutive adverse regime cycles before closing
-                                   # (avoids exiting on single-candle regime noise)
+REGIME_EXIT_HOLD_CYCLES    = 3    # Require 3 consecutive adverse regime cycles (was 2). Avoids noise-driven exits.
 
 # ─── Stop Loss / Take Profit ────────────────────────────────────────────────────
 
