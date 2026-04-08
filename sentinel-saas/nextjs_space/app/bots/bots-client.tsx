@@ -35,8 +35,7 @@ export function BotsClient({ bots: initialBots }: BotsClientProps) {
   const [segmentPerf, setSegmentPerf] = useState<any[]>([]);
 
   /* ── Deploy Wizard State ── */
-  const [deployType, setDeployType] = useState<'adaptive' | 'segments'>('segments');
-  const [selectedSegments, setSelectedSegments] = useState<string[]>([]);
+
   
   const [deployExchange, setDeployExchange] = useState('binance');
   const [deployMode, setDeployMode] = useState('paper');
@@ -111,18 +110,7 @@ export function BotsClient({ bots: initialBots }: BotsClientProps) {
     try {
       let deployments: any[] = [];
       
-      if (deployType === 'adaptive') {
-        deployments.push({ name: 'ALL', segment: 'ALL', coinList: [] });
-      } else if (deployType === 'segments') {
-        if (selectedSegments.length === 0) { alert('Please select at least one segment.'); setLoading(false); return; }
-        selectedSegments.forEach(segId => {
-          deployments.push({ 
-            name: segId,
-            segment: segId, 
-            coinList: [] 
-          });
-        });
-      }
+      deployments.push({ name: 'Synaptic Engine', segment: 'ALL', coinList: [] });
 
       const res = await fetch('/api/bots/create', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -221,7 +209,7 @@ export function BotsClient({ bots: initialBots }: BotsClientProps) {
   const stoppedBots = activeBots.filter((b: any) => !b?.isActive);
 
   // Derived Values
-  const botMultiplier = deployType === 'adaptive' ? 1 : Math.max(1, selectedSegments.length);
+  const botMultiplier = 1;
   const totalMaxExposure = botMultiplier * deployMaxTrades * deployCapitalPerTrade;
 
   const intelData = useMemo(() => SEGMENT_KNOWLEDGE.find(s => s.id === intelSegmentId), [intelSegmentId]);
@@ -284,9 +272,11 @@ export function BotsClient({ bots: initialBots }: BotsClientProps) {
                 <button onClick={handlePurgeTrades} disabled={purgeTradesLoading} className="btn-ghost" style={{ fontSize: 'var(--text-sm)', padding: '10px 16px', color: purgeTradesConfirm ? '#FCD34D' : '#9CA3AF', border: `1px solid ${purgeTradesConfirm ? 'rgba(252,211,77,0.5)' : 'rgba(156,163,175,0.2)'}`, opacity: purgeTradesLoading ? 0.6 : 1, transition: 'all 0.2s' }}>
                   {purgeTradesLoading ? 'Purging…' : purgeTradesConfirm ? '⚠️ Confirm Purge Trades' : '🧹 Purge All Trades'}
                 </button>
-                <button onClick={() => setShowDeployModal(true)} className="btn-success" style={{ fontSize: 'var(--text-base)', padding: '11px 22px' }}>
-                  <Rocket style={{ width: 16, height: 16 }} /> Deploy Launchpad
-                </button>
+                {activeBots.length === 0 && (
+                  <button onClick={() => setShowDeployModal(true)} className="btn-success" style={{ fontSize: 'var(--text-base)', padding: '11px 22px' }}>
+                    <Rocket style={{ width: 16, height: 16 }} /> Deploy Launchpad
+                  </button>
+                )}
               </div>
             </div>
           </motion.div>
@@ -384,80 +374,22 @@ export function BotsClient({ bots: initialBots }: BotsClientProps) {
 
                 <div style={{ overflowY: 'auto', padding: '20px 24px', flex: 1 }}>
                   
-                  {/* Tab Selector */}
-                  <div style={{ display: 'flex', background: 'rgba(0,0,0,0.3)', borderRadius: 'var(--radius-md)', padding: 4, marginBottom: 24, border: '1px solid var(--color-border)' }}>
-                    {[{id: 'adaptive', label: 'Adaptive All-Market'}, {id: 'segments', label: 'By Segments'}].map(tab => (
-                      <button key={tab.id} onClick={() => setDeployType(tab.id as any)} style={{
-                        flex: 1, padding: '10px 0', fontSize: 'var(--text-xs)', fontWeight: 700, borderRadius: 'calc(var(--radius-md) - 2px)',
-                        background: deployType === tab.id ? 'rgba(34,197,94,0.15)' : 'transparent',
-                        color: deployType === tab.id ? '#4ADE80' : 'var(--color-text-secondary)',
-                        border: deployType === tab.id ? '1px solid rgba(34,197,94,0.3)' : '1px solid transparent',
-                        transition: 'all 0.2s'
-                      }}>{tab.label}</button>
-                    ))}
-                  </div>
-
-                  {/* Tab Contents */}
-                  <div style={{ minHeight: 180, marginBottom: 32 }}>
-
-                    {/* ADAPTIVE TYPE */}
-                    {deployType === 'adaptive' && (
-                      <div style={{
-                        padding: 24, borderRadius: 'var(--radius-lg)', background: 'linear-gradient(145deg, rgba(34,197,94,0.08) 0%, rgba(16,185,129,0.02) 100%)',
-                        border: '1px solid rgba(34,197,94,0.2)'
-                      }}>
-                        <div style={{ display: 'flex', gap: 16 }}>
-                          <div style={{ fontSize: 32 }}>🧠</div>
-                          <div>
-                            <h3 style={{ fontSize: 'var(--text-base)', fontWeight: 700, color: '#4ADE80', margin: '0 0 6px 0' }}>Synaptic Adaptive Protocol</h3>
-                            <p style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-secondary)', lineHeight: 1.5, margin: 0 }}>
-                              Deploys one master bot. It intelligently scans the entire market every cycle, computes the Institutional Segment Heatmap, and dynamically allocates its risk <i>only</i> to the Top 2 hottest segments on the market.
-                            </p>
-                          </div>
+                  {/* ADAPTIVE TYPE */}
+                  <div style={{ minHeight: 120, marginBottom: 32 }}>
+                    <div style={{
+                      padding: 24, borderRadius: 'var(--radius-lg)', background: 'linear-gradient(145deg, rgba(34,197,94,0.08) 0%, rgba(16,185,129,0.02) 100%)',
+                      border: '1px solid rgba(34,197,94,0.2)'
+                    }}>
+                      <div style={{ display: 'flex', gap: 16 }}>
+                        <div style={{ fontSize: 32 }}>🧠</div>
+                        <div>
+                          <h3 style={{ fontSize: 'var(--text-base)', fontWeight: 700, color: '#4ADE80', margin: '0 0 6px 0' }}>Synaptic Adaptive Protocol</h3>
+                          <p style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-secondary)', lineHeight: 1.5, margin: 0 }}>
+                            Deploys one master bot. It intelligently scans the entire market every cycle, computes the Institutional Segment Heatmap, and dynamically allocates its risk <i>only</i> to the Top 2 hottest segments on the market.
+                          </p>
                         </div>
                       </div>
-                    )}
-
-                    {/* SEGMENTS TYPE */}
-                    {deployType === 'segments' && (
-                      <div>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-                          <span className="section-title" style={{ margin: 0 }}>Select target segments</span>
-                          <button onClick={() => setSelectedSegments(SEGMENT_KNOWLEDGE.filter(s => s.id !== 'ALL').map(s => s.id))} className="text-btn" style={{ fontSize: 12 }}>Select All</button>
-                        </div>
-                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 12 }}>
-                          {SEGMENT_KNOWLEDGE.filter(s => s.id !== 'ALL').map(seg => {
-                            const active = selectedSegments.includes(seg.id);
-                            return (
-                              <div key={seg.id} style={{
-                                display: 'flex', alignItems: 'center', gap: 12, padding: '12px 14px', borderRadius: 'var(--radius-md)', cursor: 'pointer',
-                                background: active ? 'rgba(34,197,94,0.1)' : 'rgba(255,255,255,0.03)',
-                                border: `1px solid ${active ? 'var(--color-success)' : 'var(--color-border)'}`, transition: 'all 0.2s', position: 'relative'
-                              }} onClick={() => setSelectedSegments(prev => active ? prev.filter(id => id !== seg.id) : [...prev, seg.id])}>
-                                <div style={{ fontSize: 20 }}>{seg.icon}</div>
-                                <div style={{ flex: 1, minWidth: 0 }}>
-                                  <div style={{ fontSize: 'var(--text-sm)', fontWeight: 700, color: active ? 'var(--color-success)' : 'var(--color-text)' }}>{seg.name}</div>
-                                  <div style={{ fontSize: 10, color: 'var(--color-text-muted)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{seg.coins.length} coins tracked</div>
-                                </div>
-                                
-                                {/* Intel Trigger */}
-                                <button 
-                                  onClick={(e) => { e.stopPropagation(); setIntelSegmentId(seg.id); }}
-                                  style={{
-                                    background: 'transparent', border: 'none', color: 'var(--color-info)', cursor: 'pointer', padding: 4, opacity: 0.7
-                                  }}
-                                  title="Learn about this segment"
-                                >
-                                  <Info size={16} />
-                                </button>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    )}
-
-
+                    </div>
                   </div>
 
                   <hr style={{ border: 'none', borderTop: '1px solid var(--color-border)', margin: '0 0 24px 0' }} />
@@ -531,7 +463,7 @@ export function BotsClient({ bots: initialBots }: BotsClientProps) {
                 <div style={{ display: 'flex', gap: 12, padding: '16px 24px 20px', borderTop: '1px solid var(--color-border)', background: 'rgba(13,20,32,0.8)' }}>
                   <button onClick={() => setShowDeployModal(false)} className="btn-ghost" style={{ flex: 1, padding: '12px 0' }}>Cancel</button>
                   <button onClick={handleDeployBots} disabled={loading} className="btn-success" style={{ flex: 2, padding: '12px 0', fontSize: 15, opacity: loading ? 0.7 : 1 }}>
-                    <Rocket style={{ width: 16, height: 16 }} /> {loading ? 'Launching Matrix...' : `Deploy ${botMultiplier} Bot${botMultiplier !== 1? 's':''}`}
+                    <Rocket style={{ width: 16, height: 16 }} /> {loading ? 'Launching Matrix...' : 'Deploy Master Engine'}
                   </button>
                 </div>
               </div>
