@@ -226,13 +226,6 @@ def notify_batch_entries(trades):
             f"   📈 <code>{entry:.6f}</code>  🛑 <code>{sl:.6f}</code>  🎯 <code>{tp:.6f}</code>{athena_block}"
         )
 
-    risk_manager_block = (
-        f"🛡 <b>Risk Manager</b>: Step Trailing SL\n"
-        f"   +15% → lock +4% (Breakeven)\n"
-        f"   +25% → +10% · +35% → +15%\n"
-        f"   +45% → +25% · +60% → +40%\n"
-    )
-    lines.append(risk_manager_block)
     lines.append(f"💵 Capital: $100 per user  |  🕐 {datetime.utcnow().strftime('%H:%M:%S UTC')}")
 
     msg = "\n".join(lines)
@@ -279,11 +272,6 @@ def notify_athena_signal(sym, side, conviction_pct, entry_price, sl, tp, segment
         f"🎯 TP:     <code>{fmt(tp)}</code>  <i>(+{tp_pct:.1f}%)</i>\n"
         f"\n"
         f"💡 <i>{short_reason}</i>\n"
-        f"\n"
-        f"🛡 <b>Risk Manager</b>: Step Trailing SL\n"
-        f"   +15% → lock +4% (Breakeven)\n"
-        f"   +25% → +10% · +35% → +15%\n"
-        f"   +45% → +25% · +60% → +40%\n"
         f"\n"
         f"{'🤖 ' + bot_name + '  ' if bot_name else ''}"
         f"🕐 {datetime.utcnow().strftime('%H:%M:%S UTC')}"
