@@ -39,32 +39,6 @@ const getBrain = (name = '', brainType = '') => {
   return BRAIN_META.adaptive;
 };
 
-// Segment icon - extract segment name from bot name
-const SEGMENT_ICONS: Record<string, { icon: string; color: string }> = {
-  'L1':      { icon: '🔷', color: '#A78BFA' },
-  'L2':      { icon: '🔗', color: '#22D3EE' },
-  'DeFi':    { icon: '🌊', color: '#34D399' },
-  'Gaming':  { icon: '🎮', color: '#FBBF24' },
-  'AI':      { icon: '🤖', color: '#F472B6' },
-  'RWA':     { icon: '🏦', color: '#60A5FA' },
-  'Meme':    { icon: '🐸', color: '#FCD34D' },
-  'DePIN':   { icon: '📡', color: '#F97316' },
-  'Modular': { icon: '🧩', color: '#8B5CF6' },
-  'ALL':     { icon: '⚡', color: '#22C55E' },
-};
-function getSegmentInfo(botName: string): { name: string; icon: string; color: string } {
-  const n = (botName || '').toLowerCase();
-  if (n.includes('l1') || n.includes('layer 1') || n.includes('layer1')) return { name: 'L1', ...SEGMENT_ICONS['L1'] };
-  if (n.includes('l2') || n.includes('layer 2') || n.includes('layer2')) return { name: 'L2', ...SEGMENT_ICONS['L2'] };
-  if (n.includes('defi') || n.includes('de-fi')) return { name: 'DeFi', ...SEGMENT_ICONS['DeFi'] };
-  if (n.includes('gaming') || n.includes('game') || n.includes('metaverse')) return { name: 'Gaming', ...SEGMENT_ICONS['Gaming'] };
-  if (n.includes('ai') || n.includes('intelligence') || n.includes('neural')) return { name: 'AI', ...SEGMENT_ICONS['AI'] };
-  if (n.includes('rwa') || n.includes('real world') || n.includes('asset')) return { name: 'RWA', ...SEGMENT_ICONS['RWA'] };
-  if (n.includes('meme')) return { name: 'Meme', ...SEGMENT_ICONS['Meme'] };
-  if (n.includes('depin')) return { name: 'DePIN', ...SEGMENT_ICONS['DePIN'] };
-  if (n.includes('modular')) return { name: 'Modular', ...SEGMENT_ICONS['Modular'] };
-  return { name: 'ALL', ...SEGMENT_ICONS['ALL'] };
-}
 
 export function BotCard({ bot, onToggle, onDelete, onRetire, trades = [], livePrices = {}, isToggling = false }: BotCardProps) {
   const [showSettings, setShowSettings] = useState(false);
@@ -83,7 +57,7 @@ export function BotCard({ bot, onToggle, onDelete, onRetire, trades = [], livePr
   const capitalPerTrade = bot?.config?.capitalPerTrade || 100;
   const maxTrades = bot?.config?.maxTrades || 25;
   const maxCapital = maxTrades * capitalPerTrade;
-  const segment = getSegmentInfo(bot?.name || '');
+
 
   const activeTrades = trades.filter((t: any) => (t.status || '').toLowerCase() === 'active');
   const closedTrades = trades.filter((t: any) => (t.status || '').toLowerCase() !== 'active');
@@ -193,22 +167,21 @@ export function BotCard({ bot, onToggle, onDelete, onRetire, trades = [], livePr
       {/* ── Header: Segment + Name + Status ── */}
       <div style={{ padding: '14px 14px 0', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
-          {/* Segment icon */}
           <div style={{
             width: 34, height: 34, borderRadius: 10, flexShrink: 0,
-            background: `${segment.color}15`,
-            border: `1px solid ${segment.color}30`,
+            background: `${brain.color}15`,
+            border: `1px solid ${brain.color}30`,
             display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontSize: 16,
+            fontSize: 18,
           }}>
-            {segment.icon}
+            🧠
           </div>
           <div style={{ minWidth: 0 }}>
             <div style={{
               fontSize: '13px', fontWeight: 700, color: 'var(--color-text)',
               whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
             }}>
-              {segment.name}
+              {bot.name || 'Synaptic Engine'}
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 2 }}>
               {isRunning && <span className="live-dot" />}
