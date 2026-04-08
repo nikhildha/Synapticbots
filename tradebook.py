@@ -1025,62 +1025,74 @@ def _update_single_trade(trade, book, prices, funding_rates):
                     _close_trade_inline(trade, current, name)
                     return  # Trade fully closed
 
-    # Use trailing values for SL hit checks
-    # (paper mode override: always auto-close when config.PAPER_TRADE=True)
-    if should_auto_close:
-        effective_sl = trade.get("trailing_sl", trade["stop_loss"])
-
-        sl_hit = False
+    # ── SL SAFETY NET (Paper & Live) ─────────────────────
+    # For LIVE trades, the exchange manages the SL limit order natively.
+    # However, wicks, exchange downtime, or tracking bugs can cause SL to be breached
+    # without local sync. The engine acts as the ultimate safety net.
+    effective_sl = trade.get("trailing_sl", trade["stop_loss"])
+    sl_hit = False
+    
+    if effective_sl > 0:
         if is_long:
             sl_hit = current <= effective_sl
         else:
             sl_hit = current >= effective_sl
 
-        if sl_hit:
-            sl_n = trade.get("trail_sl_count", 0)
-            step_level = trade.get("stepped_lock_level", -1)
-            # Determine SL reason based on target state
-            b_level = trade.get("booking_level", -1)
-            steps_conf = getattr(config, 'PARTIAL_BOOKING_STEPS', [])
-            
-            if b_level >= 0 and b_level < len(steps_conf):
-                _, _, name = steps_conf[b_level]
-                reason = f"SL_AFTER_{name}"
-            elif trade.get("t2_hit"):
-                reason = "SL_T2"  # Legacy T2
-            elif trade.get("t1_hit"):
-                reason = "SL_T1"  # Legacy T1
-            elif trade["trailing_active"] and step_level >= 0:
-                # Stepped lock was active — show which level
-                steps = getattr(config, 'TRAILING_SL_STEPS', [])
-                if step_level < len(steps):
-                    _, lock_pnl = steps[step_level]
-                    if lock_pnl == 0:
-                        lock_tag = " (BEV)"
-                    else:
-                        lock_tag = f" (+{lock_pnl:.0f}% Locked)"
-                else:
-                    lock_tag = ""
-                reason = f"STEPPED_SL_{sl_n}{lock_tag}"
+    if sl_hit:
+        sl_n = trade.get("trail_sl_count", 0)
+        step_level = trade.get("stepped_lock_level", -1)
+        b_level = trade.get("booking_level", -1)
+        steps_conf = getattr(config, 'PARTIAL_BOOKING_STEPS', [])
+        
+        if b_level >= 0 and b_level < len(steps_conf):
+            _, _, name = steps_conf[b_level]
+            reason = f"SL_AFTER_{name}"
+        elif trade.get("t2_hit"):
+            reason = "SL_T2"
+        elif trade.get("t1_hit"):
+            reason = "SL_T1"
+        elif trade["trailing_active"] and step_level >= 0:
+            steps = getattr(config, 'TRAILING_SL_STEPS', [])
+            if step_level < len(steps):
+                _, lock_pnl = steps[step_level]
+                lock_tag = " (BEV)" if lock_pnl == 0 else f" (+{lock_pnl:.0f}% Locked)"
             else:
-                reason = "FIXED_SL"
-            _close_trade_inline(trade, current, reason)
-            return  # trade closed — stop processing this trade
+                lock_tag = ""
+            reason = f"STEPPED_SL_{sl_n}{lock_tag}"
+        else:
+            reason = "FIXED_SL"
 
-        # Old TP hit (only when partial booking is NOT active for this trade)
-        if hasattr(config, "PARTIAL_BOOKING_STEPS") and not config.PARTIAL_BOOKING_STEPS:
-            effective_tp = trade.get("trailing_tp", trade.get("take_profit", 0))
-            if effective_tp:
-                tp_hit = False
-                if is_long:
-                    tp_hit = current >= effective_tp
-                else:
-                    tp_hit = current <= effective_tp
-                if tp_hit:
-                    ext = trade["tp_extensions"]
-                    reason = f"TP_EXT_{ext}" if ext > 0 else "FIXED_TP"
-                    _close_trade_inline(trade, current, reason)
-                    return
+        if is_live:
+            logger.warning("🚨 SL SAFETY NET triggered for %s at %.6f (Reason: %s). Forcing close via ExecutionEngine.", symbol, current, reason)
+            try:
+                from execution_engine import ExecutionEngine
+                ExecutionEngine.close_position_live(symbol)
+            except Exception as e:
+                logger.error("Failed safety net live close: %s", e)
+
+        _close_trade_inline(trade, current, reason)
+        return  # trade closed — stop processing this trade
+
+    # Old TP hit safety net
+    if hasattr(config, "PARTIAL_BOOKING_STEPS") and not config.PARTIAL_BOOKING_STEPS:
+        effective_tp = trade.get("trailing_tp", trade.get("take_profit", 0))
+        if effective_tp:
+            tp_hit = False
+            if is_long:
+                tp_hit = current >= effective_tp
+            else:
+                tp_hit = current <= effective_tp
+            if tp_hit:
+                ext = trade["tp_extensions"]
+                reason = f"TP_EXT_{ext}" if ext > 0 else "FIXED_TP"
+                if is_live:
+                    try:
+                        from execution_engine import ExecutionEngine
+                        ExecutionEngine.close_position_live(symbol)
+                    except Exception:
+                        pass
+                _close_trade_inline(trade, current, reason)
+                return
 
     # ── TP OVERSHOOT SAFETY NET ──────────────────────────────────────
     # Fires when price GAPS THROUGH the TP level between heartbeats.
