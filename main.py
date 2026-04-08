@@ -1585,13 +1585,18 @@ class RegimeMasterBot:
                 
                 # Conviction-weighted sizing (+25% for high conviction, -25% for low)
                 if conviction >= 80:
-                    capital = base_capital * 1.25
+                    target_capital = base_capital * 1.25
                 elif conviction >= 60:
-                    capital = base_capital
+                    target_capital = base_capital
                 else:
-                    capital = base_capital * 0.75
+                    target_capital = base_capital * 0.75
                 
-                qty         = (capital * lev) / max(current_price, 0.0001)
+                # ─── 3-Phase DCA Strategy ─────────────────────────────────────────
+                # Deploy ONLY Phase 1 capital upfront (the rest is loaded via tradebook DCA engine)
+                dca_phases = getattr(config, "DCA_PHASES", [{"alloc_pct": 1.0}])
+                phase_1_capital = target_capital * dca_phases[0]["alloc_pct"]
+                
+                qty         = (phase_1_capital * lev) / max(current_price, 0.0001)
                 
                 # Base math reason
                 reason_str  = top.get("reason", f"{top.get('regime_name','')} {int(top['confidence']*100)}%")
@@ -1663,7 +1668,7 @@ class RegimeMasterBot:
                 entry_price  = result.get("entry_price", 0) if result else 0
                 fill_qty     = result.get("quantity",   qty)    if result else qty
                 fill_lev     = result.get("leverage",   lev)    if result else lev
-                fill_capital = result.get("capital",    capital) if result else capital
+                fill_capital = result.get("capital",    phase_1_capital) if result else phase_1_capital
                 fill_sl      = result.get("stop_loss",  0)      if result else 0
                 fill_tp      = result.get("take_profit", 0)     if result else 0
 
@@ -1738,7 +1743,8 @@ class RegimeMasterBot:
                     regime=top.get("regime_name", ""),
                     confidence=top["confidence"],
                     reason=reason_str,
-                    capital=fill_capital,
+                    capital=fill_capital,          # This is the Phase 1 deployed capital
+                    target_capital=target_capital, # Handover Total intend capital to DCA tracker
                     user_id=user_id,
                     profile_id="segment",
                     bot_name=bot_name,

@@ -124,7 +124,7 @@ def open_trade(symbol, side, leverage, quantity, entry_price, atr,
                profile_id="standard", bot_name="Synaptic Adaptive",
                exchange=None, pair=None, position_id=None, bot_id=None, all_bot_ids=None,
                rm_id=None, override_sl=None, override_tp=None, status="ACTIVE",
-               order_type=None, athena_reasoning=None):
+               order_type=None, athena_reasoning=None, target_capital=None, dca_level=1):
     """
     Record a new trade entry in the tradebook.
 
@@ -221,6 +221,8 @@ def open_trade(symbol, side, leverage, quantity, entry_price, atr,
         "confidence":       round(confidence, 4) if confidence else 0,
         "leverage":         leverage,
         "capital":          capital,
+        "target_capital":   target_capital or capital,
+        "dca_level":        dca_level,
         "quantity":         round(quantity, 6),
         "entry_price":      round(entry_price, 6),
         "exit_price":       None,
@@ -882,17 +884,58 @@ def _update_single_trade(trade, book, prices, funding_rates):
         current,
     )
 
-    # HARD MAX LOSS GUARD (paper + live safety net)
-    max_loss_limit = config.MAX_LOSS_PER_TRADE_PCT
+    # ── DCA PHASE TRIGGER ─────────────────────────────────────────
+    # If the trade is in the red, check if we've hit a new DCA phase trigger.
+    dca_phases = getattr(config, "DCA_PHASES", [])
+    current_level = trade.get("dca_level", 1)
+    
+    if len(dca_phases) > current_level:
+        next_phase = dca_phases[current_level]
+        if pnl_pct <= next_phase["trigger_pnl_pct"]:
+            # Trigger DCA! Calculate the quantity to add
+            target_cap = trade.get("target_capital") or trade.get("capital", 100.0)
+            alloc_pct = next_phase["alloc_pct"]
+            capital_to_add = target_cap * alloc_pct
+            
+            try:
+                qty_to_add = (capital_to_add * lev) / current
+                
+                # If LIVE, send the buy order via execution engine
+                if is_live:
+                    from execution_engine import ExecutionEngine
+                    ExecutionEngine.add_to_position_live(symbol, trade.get("side"), qty_to_add)
+                
+                # State update
+                trade["dca_level"] = next_phase["level"]
+                old_cap = trade.get("capital", 0.0)
+                old_qty = trade.get("quantity", 0.0)
+                old_entry = trade.get("entry_price", 0.0)
+                
+                trade["capital"] = old_cap + capital_to_add
+                trade["quantity"] = old_qty + qty_to_add
+                
+                # Calculate new blended average entry price
+                trade["entry_price"] = ((old_entry * old_qty) + (current * qty_to_add)) / trade["quantity"]
+                
+                logger.info(
+                    "📉 DCA %s hit for %s (pnl %.2f%% <= %.2f%%). Added $%.1f. New avg entry: %.6f",
+                    next_phase["name"], symbol, pnl_pct, next_phase["trigger_pnl_pct"], capital_to_add, trade["entry_price"]
+                )
+                return  # Skip SL check on the cycle we averaged down to allow PnL to recalculate naturally on next heartbeat
+            except Exception as dca_err:
+                logger.error("❌ Failed DCA execution for %s: %s", symbol, dca_err)
+
+    # ── CATASTROPHIC STOP LOSS (Blended) ──────────────────────────
+    max_loss_limit = getattr(config, "DCA_HARD_STOP_PCT", -60.0)
     if pnl_pct <= max_loss_limit:
         logger.warning(
-            "🛑 MAX LOSS hit on %s (%.2f%% <= %.0f%%) — auto-closing trade %s",
+            "🛑 CATASTROPHIC LOSS hit on %s (%.2f%% <= %.0f%%) — auto-closing trade %s",
             symbol, pnl_pct, max_loss_limit, trade["trade_id"],
         )
         if is_live:
             from execution_engine import ExecutionEngine
             ExecutionEngine.close_position_live(symbol)
-        _close_trade_inline(trade, current, f"MAX_LOSS_{int(max_loss_limit)}%")
+        _close_trade_inline(trade, current, f"DCA_MAX_LOSS_{int(max_loss_limit)}%")
         return
 
     # HARD MAX PROFIT GUARD — symmetric to MAX LOSS

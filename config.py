@@ -146,7 +146,14 @@ CAPITAL_PER_TRADE = 100        # $100 per trade, fixed
 # ─── Risk Management ────────────────────────────────────────────────────────────
 RISK_PER_TRADE = 0.04
 KILL_SWITCH_DRAWDOWN = 0.10   # Pause bot if 10% drawdown in 24h
-MAX_LOSS_PER_TRADE_PCT   = -20   # Hard max-loss per trade: -20% of capital
+
+# ─── 3-Phase DCA Strategy ──────────────────────────────────────────────────────────
+DCA_PHASES = [
+    { "level": 1, "trigger_pnl_pct":   0.0, "alloc_pct": 0.30, "name": "Signal Entry" },
+    { "level": 2, "trigger_pnl_pct": -15.0, "alloc_pct": 0.30, "name": "Minor Sweep" },
+    { "level": 3, "trigger_pnl_pct": -35.0, "alloc_pct": 0.40, "name": "Deep Buy" }
+]
+DCA_HARD_STOP_PCT = -60.0    # Catastrophic stop-loss applied to blended PnL
 MAX_PROFIT_PER_TRADE_PCT =  25   # Hard max-profit per trade: +25% of capital
 MIN_LEVERAGE_FLOOR = 3           # Skip trade if leverage must drop below this (lowered: 7x min is new floor)
 MIN_HOLD_MINUTES = 30         # Minimum hold time before regime-change exits

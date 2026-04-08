@@ -268,6 +268,36 @@ class ExecutionEngine:
             logger.warning("No exchange client — cannot close %s", symbol)
             return False
         return client.close_position(symbol)
+
+    @staticmethod
+    def add_to_position_live(symbol, side, quantity):
+        """Add to a live position (for DCA averaging down)."""
+        client = get_exchange_client()
+        if not client:
+            logger.warning("No exchange client — cannot add to %s", symbol)
+            return None
+            
+        exchange = getattr(config, 'EXCHANGE_LIVE', '').lower()
+        try:
+            if exchange == 'coindcx':
+                import coindcx_client as cdx
+                pair = cdx.to_coindcx_pair(symbol)
+                step = CoinDCXExchangeClient._qty_step(cdx.get_current_price(pair) or 1)
+                quantity = CoinDCXExchangeClient._round_to_step(quantity, step)
+                return client.create_order(
+                    pair=pair, side=side.lower(), order_type="market_order",
+                    quantity=quantity, leverage=None, price=None,
+                    take_profit_price=None, stop_loss_price=None
+                )
+            elif exchange == 'binance':
+                return client.open_position(
+                    symbol=symbol, side=side, quantity=quantity,
+                    leverage=None, sl_price=None, tp_price=None,
+                    order_type="MARKET"
+                )
+        except Exception as e:
+            logger.error("Failed to add to position live for %s: %s", symbol, e)
+            return None
     # ─── CoinDCX helpers ──────────────────────────────────────────────────────
 
     @staticmethod
