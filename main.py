@@ -1148,11 +1148,12 @@ class RegimeMasterBot:
                 conviction = top.get("conviction", 0)
                 hmm_confidence = top.get("confidence", 0)
                 
-                # ── NEW: HMM 80% Absolute Minimum ─────────────────────────────────
-                if hmm_confidence < 0.80:
-                    logger.info("⛔ [%s] %s HMM confidence %.2f < 0.80 — HMM VETO", bot_name, sym, hmm_confidence)
+                # ── NEW: Dynamic HMM Minimum ──────────────────────────────────────
+                hmm_threshold = getattr(config, "MIN_CONVICTION_FOR_DEPLOY", 60) / 100.0
+                if hmm_confidence < hmm_threshold:
+                    logger.info("⛔ [%s] %s HMM confidence %.2f < %.2f — HMM VETO", bot_name, sym, hmm_confidence, hmm_threshold)
                     self._coin_states.setdefault(sym, {}).setdefault("bot_deploy_statuses", {})[bot_id] = (
-                        f"FILTERED: HMM confidence < 80% ({hmm_confidence:.2f})"
+                        f"FILTERED: HMM confidence < {int(hmm_threshold*100)}% ({hmm_confidence:.2f})"
                     )
                     continue
 
