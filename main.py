@@ -607,9 +607,6 @@ class RegimeMasterBot:
             s: v for s, v in self._coin_states.items()
             if s in _active_syms
         }
-        
-        # Deduplication tracking for Telegram signal alerts (reset every cycle)
-        self._notified_athena_signals = set()
 
         # ── DEPLOYED SEED: ensure active trades always appear in Brain Summary ──
         # On engine restart, _coin_states is empty — deployed coins are excluded
@@ -1556,25 +1553,6 @@ class RegimeMasterBot:
                 # SL/TP from Athena suggested values (will be refined during deploy)
                 _a_sl = getattr(athena_decision, "suggested_sl", 0) or 0
                 _a_tp = getattr(athena_decision, "suggested_tp", 0) or 0
-                try:
-                    import telegram as _tg
-                    _alert_key = (sym, effective_side)
-                    if hasattr(self, '_notified_athena_signals') and _alert_key not in self._notified_athena_signals:
-                        _tg.notify_athena_signal(
-                            sym=sym,
-                            side=effective_side,
-                            conviction_pct=athena_decision.adjusted_confidence * 100,
-                            entry_price=current_price,
-                            sl=_a_sl,
-                            tp=_a_tp,
-                            segment=seg_name,
-                            reasoning=athena_decision.reasoning or "",
-                            bot_name=bot_name,
-                            leverage=lev,
-                        )
-                        self._notified_athena_signals.add(_alert_key)
-                except Exception as _tg_err:
-                    logger.warning("⚠️ Athena EXECUTE telegram failed: %s", _tg_err)
 
                 # ── Athena Decision Log (EXECUTE) ─────────────────────────────────
                 _log_athena_decision(

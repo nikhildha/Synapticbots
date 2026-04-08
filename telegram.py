@@ -232,51 +232,7 @@ def notify_batch_entries(trades):
     send_message_async(msg)
 
 
-def notify_athena_signal(sym, side, conviction_pct, entry_price, sl, tp, segment, reasoning, bot_name="", leverage=0):
-    """
-    Fire when Athena approves a coin — before the trade actually deploys.
-    This is the 'signal' alert; notify_batch_entries fires on confirmed deploy.
-    """
-    if not _read_env_val("TELEGRAM_NOTIFY_TRADES", "true").lower() == "true":
-        return
 
-    emoji = "🟢" if side in ("BUY", "LONG") else "🔴"
-    dir_label = "LONG ↑" if side in ("BUY", "LONG") else "SHORT ↓"
-
-    # Split on true sentence boundaries (". " not ".") to avoid cutting at decimal points.
-    # e.g. "confidence of 0.82" would wrongly split → "confidence of 0" with the old method.
-    sentences = re.split(r'(?<=[.!?])\s+', (reasoning or "").strip())
-    short_reason = " ".join(sentences[:2]).strip()  # up to 2 full sentences
-    if len(short_reason) > 400:
-        short_reason = short_reason[:397] + "…"
-
-    # Format prices — use 6dp for small prices, 2dp for large
-    def fmt(p):
-        if p and p > 0:
-            return f"{p:.6f}" if p < 10 else f"{p:.2f}"
-        return "N/A"
-
-    sl_pct = abs((sl - entry_price) / entry_price * 100) if entry_price and sl else 0
-    tp_pct = abs((tp - entry_price) / entry_price * 100) if entry_price and tp else 0
-    lev_str = f" · {leverage}×" if leverage else ""
-    coin_name = sym.replace('USDT', '')
-
-    msg = (
-        f"🏛️ <b>ATHENA SIGNAL</b>\n"
-        f"━━━━━━━━━━━━━━━━━━\n"
-        f"{emoji} <b>{coin_name}</b>{lev_str} · {dir_label} · <b>{conviction_pct:.0f}%</b>\n"
-        f"📂 Segment: {segment}\n"
-        f"\n"
-        f"📍 Entry:  <code>{fmt(entry_price)}</code>\n"
-        f"🛑 SL:     <code>{fmt(sl)}</code>  <i>(-{sl_pct:.1f}%)</i>\n"
-        f"🎯 TP:     <code>{fmt(tp)}</code>  <i>(+{tp_pct:.1f}%)</i>\n"
-        f"\n"
-        f"💡 <i>{short_reason}</i>\n"
-        f"\n"
-        f"{'🤖 ' + bot_name + '  ' if bot_name else ''}"
-        f"🕐 {datetime.utcnow().strftime('%H:%M:%S UTC')}"
-    )
-    send_message_async(msg)
 
 
 def notify_athena_veto(sym, side, conviction_pct, reasoning, segment):
