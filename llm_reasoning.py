@@ -57,6 +57,7 @@ class AthenaDecision:
     cached: bool = False    # Whether this was a cache hit
     suggested_sl: float = 0.0   # Athena's recommended stop-loss (0 = not provided)
     suggested_tp: float = 0.0   # Athena's recommended target/take-profit (0 = not provided)
+    recommended_leverage: int = 0  # 3-10x leverage as dynamically commanded by Athena
     timestamp: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
 
 
@@ -518,6 +519,17 @@ class AthenaEngine:
         suggested_sl = _parse_price(data.get("stop_loss"))
         suggested_tp = _parse_price(data.get("target"))
 
+        rec_lev = 0
+        if data.get("leverage_recommendation"):
+            try:
+                import re
+                s = str(data["leverage_recommendation"])
+                m = re.search(r'\d+', s)
+                if m:
+                    rec_lev = int(m.group(0))
+            except Exception:
+                pass
+
         decision = AthenaDecision(
             action=action,
             adjusted_confidence=adj_conf,
@@ -528,6 +540,7 @@ class AthenaEngine:
             latency_ms=latency_ms,
             suggested_sl=suggested_sl,
             suggested_tp=suggested_tp,
+            recommended_leverage=rec_lev,
         )
         # Store entry price for logging/display
         suggested_entry = _parse_price(data.get("entry_price"))

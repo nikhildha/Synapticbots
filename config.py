@@ -237,7 +237,7 @@ SIDEWAYS_POSITION_REDUCTION = 0.15  # 15% smaller positions in chop (adjusted by
 
 # ─── Bot Loop ────────────────────────────────────────────────────────────────────
 LOOP_INTERVAL_SECONDS = 10        # 10-second heartbeat (faster trailing SL sync)
-ANALYSIS_INTERVAL_SECONDS = 600   # 10-minute full analysis cycle
+ANALYSIS_INTERVAL_SECONDS = 300   # 5-minute full analysis cycle
 ERROR_RETRY_SECONDS = 60          # Retry after error
 
 # Min HMM conviction to pass to Athena (below this, coin is skipped before Athena call)
@@ -344,7 +344,7 @@ LLM_API_KEY                 = os.getenv("GEMINI_API_KEY", "")  # Env var name un
 LLM_MODEL                   = "gpt-4o"                         # Strongest reasoning, excellent JSON adherence
 LLM_CACHE_MINUTES           = 10                               # Cache per-coin LLM decisions
 LLM_TIMEOUT_SECONDS         = 30                               # API timeout
-LLM_VETO_THRESHOLD          = 0.80                             # Below this → LLM vetoes the trade (raised from 0.65)
+LLM_VETO_THRESHOLD          = 0.60                             # Below this → LLM vetoes the trade (dropped to 0.60 for scaled execution)
 BTC_MACRO_COUNTER_THRESHOLD = 0.80                             # Counter-macro trades need ≥80% Athena conf (LONG in bearish / SHORT in bullish)
 LLM_CONFIDENCE_WEIGHT       = 0.20                             # LLM can adjust conviction by ±20%
 LLM_MAX_CALLS_PER_CYCLE     = 10                               # Rate limit: max N Athena calls per cycle

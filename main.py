@@ -1575,13 +1575,6 @@ class RegimeMasterBot:
                 else:
                     target_capital = base_capital * 0.75
                 
-                # ─── 3-Phase DCA Strategy ─────────────────────────────────────────
-                # Deploy ONLY Phase 1 capital upfront (the rest is loaded via tradebook DCA engine)
-                dca_phases = getattr(config, "DCA_PHASES", [{"alloc_pct": 1.0}])
-                phase_1_capital = target_capital * dca_phases[0]["alloc_pct"]
-                
-                qty         = (phase_1_capital * lev) / max(current_price, 0.0001)
-                
                 # Base math reason
                 reason_str  = top.get("reason", f"{top.get('regime_name','')} {int(top['confidence']*100)}%")
                 final_conf  = top["confidence"]
@@ -1590,6 +1583,19 @@ class RegimeMasterBot:
                 if athena_decision and not athena_decision.reasoning.startswith("Auto-approve"):
                     reason_str = f"Athena ✅ ({int(athena_decision.adjusted_confidence*100)}%): {athena_decision.reasoning[:200]}"
                     final_conf = athena_decision.adjusted_confidence
+                    
+                    # Natively dynamically slash margin capital based on Athena's institutional grading
+                    target_capital = target_capital * athena_decision.adjusted_confidence
+                    
+                    if hasattr(athena_decision, "recommended_leverage") and athena_decision.recommended_leverage > 0:
+                        lev = athena_decision.recommended_leverage
+
+                # ─── 3-Phase DCA Strategy ─────────────────────────────────────────
+                # Deploy ONLY Phase 1 capital upfront (the rest is loaded via tradebook DCA engine)
+                dca_phases = getattr(config, "DCA_PHASES", [{"alloc_pct": 1.0}])
+                phase_1_capital = target_capital * dca_phases[0]["alloc_pct"]
+                
+                qty         = (phase_1_capital * lev) / max(current_price, 0.0001)
 
                 # SIGNAL_DISPATCH broadcast
                 _bcast("SIGNAL_DISPATCH", self._cycle_count, bot_name, bot_id, sym,

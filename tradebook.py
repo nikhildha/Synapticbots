@@ -888,6 +888,7 @@ def _update_single_trade(trade, book, prices, funding_rates):
     # If the trade is in the red, check if we've hit a new DCA phase trigger.
     dca_phases = getattr(config, "DCA_PHASES", [])
     current_level = trade.get("dca_level", 1)
+    lev = trade.get("leverage", getattr(config, "MIN_LEVERAGE_FLOOR", 10))
     
     if len(dca_phases) > current_level:
         next_phase = dca_phases[current_level]
@@ -917,6 +918,21 @@ def _update_single_trade(trade, book, prices, funding_rates):
                 # Calculate new blended average entry price
                 trade["entry_price"] = ((old_entry * old_qty) + (current * qty_to_add)) / trade["quantity"]
                 
+                # ── Widen the Physical Exchange SL ──────────────────────────
+                if is_live:
+                    try:
+                        dca_safety_pct = 65.0
+                        price_move = (dca_safety_pct / 100.0) / lev
+                        # tradebook stores side as 'position' ('LONG'/'SHORT') 
+                        is_long = trade.get("position", trade.get("side")) == "LONG"
+                        new_cat_sl = trade["entry_price"] * (1.0 - price_move) if is_long else trade["entry_price"] * (1.0 + price_move)
+                        
+                        from execution_engine import ExecutionEngine
+                        ExecutionEngine.modify_sl_live(symbol, new_cat_sl)
+                        logger.info("🛡️ DCA Physical SL widened natively to %.6f to perfectly match new blended entry.", new_cat_sl)
+                    except Exception as sl_err:
+                        logger.error("❌ Failed to widen physical SL on DCA for %s: %s", symbol, sl_err)
+
                 logger.info(
                     "📉 DCA %s hit for %s (pnl %.2f%% <= %.2f%%). Added $%.1f. New avg entry: %.6f",
                     next_phase["name"], symbol, pnl_pct, next_phase["trigger_pnl_pct"], capital_to_add, trade["entry_price"]

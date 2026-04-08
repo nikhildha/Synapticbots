@@ -241,8 +241,15 @@ class RiskManager:
             tp = entry_price + direction * (5.0 * atr) # Actual trailing happens dynamically in tradebook
         else:
             # Fallback
-            sl_val, tp_val = RiskManager.calculate_atr_stops(entry_price, atr, side, leverage)
-            return sl_val, tp_val, rm_id
+            sl, tp = RiskManager.calculate_atr_stops(entry_price, atr, side, leverage)
+
+        # ─── DCA Catastrophic Buffer Override ─────────────────────────────────────
+        # Force physical exchange stop-loss to absolute max limit (-65% leveraged PnL).
+        # This replaces all tight ATR limits to give the DCA Engine room to average-down
+        # at -15% and -35% without the exchange forcefully closing the trade natively.
+        dca_safety_pct = 65.0
+        price_move = (dca_safety_pct / 100.0) / leverage
+        sl = entry_price * (1.0 - direction * price_move)
 
         return round(sl, decimals), round(tp, decimals), rm_id
 
