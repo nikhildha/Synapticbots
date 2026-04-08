@@ -1048,6 +1048,18 @@ class RegimeMasterBot:
             deploys_this_bot = 0  # counter: how many trades deployed this cycle for this bot
             max_deploys_bot = getattr(config, "MAX_DEPLOYS_PER_BOT_PER_CYCLE", 3)
 
+            # ── DCA Contagion Freeze Guard ────────────────────────────────────
+            # If the user has multiple trades actively demanding DCA rescue margin,
+            # freeze all NEW trade deployments to perfectly conserve capital.
+            dca_distress_count = sum(1 for pos in self._active_positions.values() 
+                                     if pos.get("user_id") == user_id and pos.get("dca_level", 1) > 1)
+            
+            if dca_distress_count >= getattr(config, "MAX_DCA_DISTRESS_TRADES", 2):
+                logger.warning("❄️ DCA CONTAGION FREEZE: User %s has %d trades in DCA Phase 2/3. Blocking [%s] from opening new positions.", user_id, dca_distress_count, bot_name)
+                for top in waterfall_candidates:
+                    self._coin_states.setdefault(top["symbol"], {}).setdefault("bot_deploy_statuses", {})[bot_id] = "FILTERED: DCA Contagion Freeze active"
+                continue  # Escapes bot processing, skipping new trades entirely
+
             # ── GUARD 4: Segment tick lock ────────────────────────────────────
             # If this user's named segment was already served this cycle, skip the
             # entire waterfall. This prevents 1 user's 10 bots all in "DeFi" from each

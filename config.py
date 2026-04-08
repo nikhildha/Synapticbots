@@ -255,6 +255,7 @@ MAX_DEPLOYS_PER_BOT_PER_CYCLE = 3 # Deploy up to N coins per bot per cycle (prev
 # but exposure ceiling enforces hard stop at 6.
 MAX_CONCURRENT_POSITIONS = 6    # Portfolio exposure ceiling (down from 10 — exposure-coach fix)
 MAX_OPEN_TRADES = 10            # User-configurable max (overridden by /api/set-config at bot start)
+MAX_DCA_DISTRESS_TRADES = 2     # Max number of trades allowed in DCA Phase 2/3 before system freezes new entries
 TOP_COINS_LIMIT = 50            # Max coins to scan (brain switcher may reduce: 15/30/50)
 CAPITAL_PER_COIN_PCT = 0.05     # 5% of balance per coin (max 15 = 75% deployed)
 SCAN_INTERVAL_CYCLES = 4        # Re-scan top coins every N analysis cycles (4 × 15m = 1h)
