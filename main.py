@@ -1158,19 +1158,23 @@ class RegimeMasterBot:
                     continue
 
                 # ── NEW: BTC Chop/Sideways Global Veto ────────────────────────────
-                # FIX: use regime integer constants, not fragile string comparison
                 _btc_state = self._coin_states.get("BTCUSDT", {})
-                btc_regime = _btc_state.get("regime", "UNKNOWN")
+                btc_regime_str = _btc_state.get("regime", "UNKNOWN")
                 _btc_regime_int = _btc_state.get("regime_int")  # set by _analyze_coin
-                _btc_is_chop = (
-                    _btc_regime_int == config.REGIME_CHOP
-                    if _btc_regime_int is not None
-                    else btc_regime in ("SIDEWAYS", "CHOP", "SIDEWAYS/CHOP", "UNKNOWN")
-                )
+
+                _btc_is_chop = False
+                if _btc_regime_int is not None:
+                    _btc_is_chop = (_btc_regime_int == config.REGIME_CHOP)
+                else:
+                    if "4h=SIDEWAYS/CHOP" in btc_regime_str or "4h=CHOP" in btc_regime_str:
+                         _btc_is_chop = True
+                    elif btc_regime_str in ("SIDEWAYS", "CHOP", "SIDEWAYS/CHOP", "UNKNOWN"):
+                         _btc_is_chop = True
+
                 if _btc_is_chop:
-                    logger.info("⛔ [%s] %s BTC macro is %s — BTC CHOP VETO (no deployments allowed)", bot_name, sym, btc_regime)
+                    logger.info("⛔ [%s] %s BTC macro is %s — BTC CHOP VETO (no deployments allowed)", bot_name, sym, btc_regime_str)
                     self._coin_states.setdefault(sym, {}).setdefault("bot_deploy_statuses", {})[bot_id] = (
-                        f"FILTERED: BTC Macro is {btc_regime}"
+                        f"FILTERED: BTC Macro is {btc_regime_str}"
                     )
                     try:
                         get_svs().log_signal(
