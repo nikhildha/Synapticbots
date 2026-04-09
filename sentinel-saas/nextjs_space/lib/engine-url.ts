@@ -9,8 +9,10 @@
  */
 
 const LIVE_URL = process.env.ENGINE_API_URL || process.env.PYTHON_ENGINE_URL || '';
-// M1 FIX: Paper URL must NOT fall back to live — prevents accidental live trading
-const PAPER_URL = process.env.ENGINE_API_URL_PAPER || '';
+// Revert M1 FIX: In the current single-engine infrastructure, PAPER trades and LIVE trades
+// are served from the same Engine API. Removing the fallback broke the dashboard sync
+// because ENGINE_API_URL_PAPER is not set in Railway.
+const PAPER_URL = process.env.ENGINE_API_URL_PAPER || LIVE_URL;
 
 export type EngineMode = 'live' | 'paper';
 
