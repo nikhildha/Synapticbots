@@ -1191,7 +1191,7 @@ class RegimeMasterBot:
                 trade_side = top.get("side", "")
                 trend_dir = top.get("trend_direction", "UNKNOWN")
                 
-                if trade_side == "BUY" and trend_dir != "UP":
+                if trade_side == "BUY" and trend_dir == "DOWN":
                     logger.info("⛔ [%s] %s LONG against momentum (%s) — MOMENTUM VETO", bot_name, sym, trend_dir)
                     self._coin_states.setdefault(sym, {}).setdefault("bot_deploy_statuses", {})[bot_id] = (
                         f"FILTERED: Momentum conflict (LONG in {trend_dir} trend)"
@@ -1210,7 +1210,7 @@ class RegimeMasterBot:
                     except Exception:
                         pass
                     continue
-                elif trade_side == "SELL" and trend_dir != "DOWN":
+                elif trade_side == "SELL" and trend_dir == "UP":
                     logger.info("⛔ [%s] %s SHORT against momentum (%s) — MOMENTUM VETO", bot_name, sym, trend_dir)
                     self._coin_states.setdefault(sym, {}).setdefault("bot_deploy_statuses", {})[bot_id] = (
                         f"FILTERED: Momentum conflict (SHORT in {trend_dir} trend)"
