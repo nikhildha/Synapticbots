@@ -108,23 +108,25 @@ export function BotsClient({ bots: initialBots }: BotsClientProps) {
   const handleDeployBots = async () => {
     setLoading(true);
     try {
-      let deployments: any[] = [];
-      
-      deployments.push({ name: 'Synaptic Engine', segment: 'ALL', coinList: [] });
+      const deployments = [
+        { name: 'Titan (Slow)',       segment: 'ALL', coinList: [] },
+        { name: 'Vanguard (Moderate)', segment: 'ALL', coinList: [] },
+        { name: 'Rogue (Aggressive)',  segment: 'ALL', coinList: [] },
+      ];
 
       const res = await fetch('/api/bots/create', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          exchange: deployExchange, 
+          exchange: deployExchange,
           mode: deployMode,
-          maxTrades: deployMaxTrades, 
+          maxTrades: deployMaxTrades,
           capitalPerTrade: deployCapitalPerTrade,
-          deployments
+          deployments,
         }),
       });
       if (res.ok) { setShowDeployModal(false); window.location.reload(); }
       else { const data = await res.json(); alert(data.error || 'Failed to deploy bots'); }
-    } catch (error) { console.error('Error deploying bot:', error); }
+    } catch (error) { console.error('Error deploying bots:', error); }
     finally { setLoading(false); }
   };
 
@@ -209,7 +211,7 @@ export function BotsClient({ bots: initialBots }: BotsClientProps) {
   const stoppedBots = activeBots.filter((b: any) => !b?.isActive);
 
   // Derived Values
-  const botMultiplier = 1;
+  const botMultiplier = 3; // 3 risk-tier bots deployed simultaneously
   const totalMaxExposure = botMultiplier * deployMaxTrades * deployCapitalPerTrade;
 
   const intelData = useMemo(() => SEGMENT_KNOWLEDGE.find(s => s.id === intelSegmentId), [intelSegmentId]);
@@ -374,21 +376,38 @@ export function BotsClient({ bots: initialBots }: BotsClientProps) {
 
                 <div style={{ overflowY: 'auto', padding: '20px 24px', flex: 1 }}>
                   
-                  {/* ADAPTIVE TYPE */}
-                  <div style={{ minHeight: 120, marginBottom: 32 }}>
-                    <div style={{
-                      padding: 24, borderRadius: 'var(--radius-lg)', background: 'linear-gradient(145deg, rgba(34,197,94,0.08) 0%, rgba(16,185,129,0.02) 100%)',
-                      border: '1px solid rgba(34,197,94,0.2)'
-                    }}>
-                      <div style={{ display: 'flex', gap: 16 }}>
-                        <div style={{ fontSize: 32 }}>🧠</div>
+                  {/* THREE TIER BOTS */}
+                  <div style={{ marginBottom: 24 }}>
+                    <div style={{ fontSize: 'var(--text-xs)', fontWeight: 700, color: 'var(--color-text-muted)', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 12 }}>3 Bots Will Be Deployed</div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+
+                      {/* Titan */}
+                      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 14, padding: '14px 16px', borderRadius: 'var(--radius-lg)', background: 'rgba(59,130,246,0.06)', border: '1px solid rgba(59,130,246,0.2)' }}>
+                        <div style={{ fontSize: 24, flexShrink: 0 }}>🏛️</div>
                         <div>
-                          <h3 style={{ fontSize: 'var(--text-base)', fontWeight: 700, color: '#4ADE80', margin: '0 0 6px 0' }}>Synaptic Adaptive Protocol</h3>
-                          <p style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-secondary)', lineHeight: 1.5, margin: 0 }}>
-                            Deploys one master bot. It intelligently scans the entire market every cycle, computes the Institutional Segment Heatmap, and dynamically allocates its risk <i>only</i> to the Top 2 hottest segments on the market.
-                          </p>
+                          <div style={{ fontWeight: 700, fontSize: 'var(--text-sm)', color: '#60A5FA', marginBottom: 3 }}>Titan <span style={{ color: 'var(--color-text-muted)', fontWeight: 400 }}>(Slow)</span></div>
+                          <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-secondary)', lineHeight: 1.5 }}>Full protection mode. BTC chop veto + momentum veto both active. Only deploys in clear trending markets with strong HMM conviction ≥60%.</div>
                         </div>
                       </div>
+
+                      {/* Vanguard */}
+                      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 14, padding: '14px 16px', borderRadius: 'var(--radius-lg)', background: 'rgba(234,179,8,0.06)', border: '1px solid rgba(234,179,8,0.2)' }}>
+                        <div style={{ fontSize: 24, flexShrink: 0 }}>🛡️</div>
+                        <div>
+                          <div style={{ fontWeight: 700, fontSize: 'var(--text-sm)', color: '#FCD34D', marginBottom: 3 }}>Vanguard <span style={{ color: 'var(--color-text-muted)', fontWeight: 400 }}>(Moderate)</span></div>
+                          <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-secondary)', lineHeight: 1.5 }}>BTC sideways veto bypassed — trades even during BTC chop. Momentum alignment still enforced to avoid counter-trend entries.</div>
+                        </div>
+                      </div>
+
+                      {/* Rogue */}
+                      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 14, padding: '14px 16px', borderRadius: 'var(--radius-lg)', background: 'rgba(239,68,68,0.06)', border: '1px solid rgba(239,68,68,0.2)' }}>
+                        <div style={{ fontSize: 24, flexShrink: 0 }}>⚡</div>
+                        <div>
+                          <div style={{ fontWeight: 700, fontSize: 'var(--text-sm)', color: '#F87171', marginBottom: 3 }}>Rogue <span style={{ color: 'var(--color-text-muted)', fontWeight: 400 }}>(Aggressive)</span></div>
+                          <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-secondary)', lineHeight: 1.5 }}>All macro vetoes disabled. Pure HMM signal execution. Highest risk, highest opportunity. Operates in any market condition.</div>
+                        </div>
+                      </div>
+
                     </div>
                   </div>
 
@@ -452,7 +471,7 @@ export function BotsClient({ bots: initialBots }: BotsClientProps) {
                       <span style={{ color: 'var(--color-text-secondary)' }}>Maximum Total Exposure</span>
                       <div style={{ textAlign: 'right' }}>
                         <span style={{ fontFamily: 'monospace', fontWeight: 800, color: 'var(--color-info)', fontSize: 18 }}>${totalMaxExposure.toLocaleString()}</span>
-                        <div style={{ fontSize: 10, color: 'var(--color-text-muted)', marginTop: 2 }}>{botMultiplier} Bots × {deployMaxTrades} Trades × ${deployCapitalPerTrade}</div>
+                        <div style={{ fontSize: 10, color: 'var(--color-text-muted)', marginTop: 2 }}>3 Bots × {deployMaxTrades} Trades × ${deployCapitalPerTrade}</div>
                       </div>
                     </div>
                   </div>
@@ -463,7 +482,7 @@ export function BotsClient({ bots: initialBots }: BotsClientProps) {
                 <div style={{ display: 'flex', gap: 12, padding: '16px 24px 20px', borderTop: '1px solid var(--color-border)', background: 'rgba(13,20,32,0.8)' }}>
                   <button onClick={() => setShowDeployModal(false)} className="btn-ghost" style={{ flex: 1, padding: '12px 0' }}>Cancel</button>
                   <button onClick={handleDeployBots} disabled={loading} className="btn-success" style={{ flex: 2, padding: '12px 0', fontSize: 15, opacity: loading ? 0.7 : 1 }}>
-                    <Rocket style={{ width: 16, height: 16 }} /> {loading ? 'Launching Matrix...' : 'Deploy Master Engine'}
+                    <Rocket style={{ width: 16, height: 16 }} /> {loading ? 'Deploying 3 Bots...' : 'Deploy All 3 Bots'}
                   </button>
                 </div>
               </div>
