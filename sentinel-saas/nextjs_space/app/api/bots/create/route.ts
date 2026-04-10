@@ -22,15 +22,15 @@ export async function POST(request: Request) {
       );
     }
 
-    const { name, exchange, mode, maxTrades, capitalPerTrade } = await request.json();
+    const { name, exchange, mode, maxTrades, capitalPerTrade, deployments = [] } = await request.json();
 
     // Determine basic validation
     if (!exchange) {
       return NextResponse.json({ error: 'Missing required fields: exchange is required.' }, { status: 400 });
     }
 
-    // Force single global deployment regardless of frontend payload
-    const deployments = [{
+    // Use frontend deployments or fallback to single engine
+    const finalDeployments = deployments.length > 0 ? deployments : [{
       name: name || 'Synaptic Engine',
       segment: 'ALL',
       coinList: []
@@ -45,10 +45,10 @@ export async function POST(request: Request) {
     const limits = TIER_LIMITS[subStatus.tier];
     const maxBots = limits.maxBots;
     
-    // Hard check: absolutely no more than 1 bot
-    if (user && user.bots.length >= maxBots) {
+    // Hard check: Ensure not exceeding limits
+    if (user && (user.bots.length + finalDeployments.length) > maxBots) {
       return NextResponse.json(
-        { error: `Bot limit reached. You can only deploy 1 master engine.` },
+        { error: `Bot limit reached. Max allowed is ${maxBots}.` },
         { status: 403 }
       );
     }
@@ -62,7 +62,7 @@ export async function POST(request: Request) {
 
     // Use Prisma transaction to create all requested bots safely
     const createdBots = await prisma.$transaction(
-      deployments.map((dep: any) => {
+      finalDeployments.map((dep: any) => {
         // Enforce the coin scans limit if a custom list is provided, otherwise default to top 5
         const defaultCoins = ['BTCUSDT', 'ETHUSDT', 'BNBUSDT', 'SOLUSDT', 'DOGEUSDT'];
         const _coins = dep.coinList && Array.isArray(dep.coinList) && dep.coinList.length > 0
