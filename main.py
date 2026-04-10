@@ -814,12 +814,10 @@ class RegimeMasterBot:
         tradebook_active_count = len(tradebook_active)
         raw_results = []
 
-        # Scan ALL symbols — do NOT skip based on other bots' deployed coins.
-        # Each bot has its own position check (pos_key = bot_id:symbol).
-        # If Synaptic Adaptive deployed ETH, L1 Specialist should still scan + deploy it.
-        # BTCUSDT is the macro regime reference for every coin's conviction score.
-        # It must be analyzed on EVERY cycle regardless of which batch rotation is active.
-        scan_symbols = symbols if "BTCUSDT" in symbols else ["BTCUSDT"] + list(symbols)
+        # Ensure BTCUSDT is evaluated FIRST for the short-circuit optimization.
+        scan_symbols = [s for s in symbols if s != "BTCUSDT"]
+        scan_symbols.insert(0, "BTCUSDT")
+
         logger.info("📡 Initial Scan list: %d coins | active trades in book: %d",
                     len(scan_symbols), tradebook_active_count)
 
@@ -851,6 +849,43 @@ class RegimeMasterBot:
                 continue
             try:
                 result = self._analyze_coin(symbol, balance, btc_flash_crash=btc_flash_crash)
+
+                # ── NEW: Short-circuit optimization for BTC Chop ──
+                # If BTC evaluated to CHOP, do NOT waste 2-3 minutes analyzing 30 altcoins.
+                # Abort the loop, as the deployments will be blocked downstream anyway.
+                if symbol == "BTCUSDT":
+                    _btc_state = self._coin_states.get("BTCUSDT", {})
+                    _btc_regime_str = _btc_state.get("regime", "UNKNOWN")
+                    _btc_regime_int = _btc_state.get("regime_int")
+                    
+                    if _btc_regime_int is not None:
+                        _btc_is_chop = (_btc_regime_int == config.REGIME_CHOP)
+                    else:
+                        if "4h=SIDEWAYS/CHOP" in _btc_regime_str or "4h=CHOP" in _btc_regime_str:
+                             _btc_is_chop = True
+                        elif _btc_regime_str in ("SIDEWAYS", "CHOP", "SIDEWAYS/CHOP", "UNKNOWN"):
+                             _btc_is_chop = True
+                             
+                    bots = self._get_active_bots()
+                    bot_names = [b.get("bot_name", "").lower() for b in bots]
+                    allow_btc_bypass = any("rogue" in bn or "vanguard" in bn for bn in bot_names)
+                             
+                    if _btc_is_chop and not allow_btc_bypass:
+                        logger.warning("⛔ MACRO VETO OPTIMIZATION: Bitcoin is CHOP (%s). Aborting HMM analysis for remaining %d coins to save cycle time.", _btc_regime_str, len(scan_symbols) - 1)
+                        # Set dashboard placeholder for skipped coins
+                        for remaining_sym in scan_symbols[1:]:
+                            if remaining_sym in config.EXCLUDED_COINS:
+                                continue
+                            self._coin_states[remaining_sym] = {
+                                "symbol": remaining_sym,
+                                "action": "FILTERED (MACRO VETO)",
+                                "regime": "N/A (Skipped)",
+                                "confidence": 0,
+                                "price": 0,
+                                "segment": get_segment_for_coin(remaining_sym),
+                            }
+                        break # Short-circuit the loop!
+
                 if result:
                     # ── Stamp segment onto every result at scan time ──────────
                     # This is the single source of truth for which segment a coin
@@ -1144,16 +1179,35 @@ class RegimeMasterBot:
                     logger.info("⬇️  WATERFALL [%s] candidate #%d: %s (prev vetoed/skipped)",
                                 bot_name, _wf_idx + 1, sym)
 
-                # Conviction threshold — skip before Athena call if too low
+                # ── TIER EXTRACTOR: Route logic based on UI Setting ────────────────
+                bot_name_lower = bot_name.lower()
+                if "rogue" in bot_name_lower or "aggressive" in bot_name_lower:
+                    bot_tier = "AGGRESSIVE"
+                elif "vanguard" in bot_name_lower or "moderate" in bot_name_lower:
+                    bot_tier = "MODERATE"
+                else:
+                    bot_tier = "STRICT"
+                    
+                # Conviction threshold — dynamic per tier
                 conviction = top.get("conviction", 0)
                 hmm_confidence = top.get("confidence", 0)
+                tf_agreement = top.get("tf_agreement", 0)
                 
                 # ── NEW: Dynamic HMM Minimum ──────────────────────────────────────
-                hmm_threshold = getattr(config, "MIN_CONVICTION_FOR_DEPLOY", 60) / 100.0
-                if hmm_confidence < hmm_threshold:
-                    logger.info("⛔ [%s] %s HMM confidence %.2f < %.2f — HMM VETO", bot_name, sym, hmm_confidence, hmm_threshold)
+                if bot_tier == "AGGRESSIVE":
+                    hmm_threshold = 0.60
+                    req_conviction = 45 # Lower bound to let coins through
+                elif bot_tier == "MODERATE":
+                    hmm_threshold = 0.45 if tf_agreement >= 3 else 0.60
+                    req_conviction = 45 if tf_agreement >= 3 else 60
+                else:
+                    hmm_threshold = getattr(config, "MIN_CONVICTION_FOR_DEPLOY", 60) / 100.0
+                    req_conviction = getattr(config, "MIN_CONVICTION_FOR_DEPLOY", 60)
+                    
+                if hmm_confidence < hmm_threshold or conviction < req_conviction:
+                    logger.info("⛔ [%s] %s HMM conf %.2f/conv %.1f < req: %.2f/%.1f — HMM VETO", bot_name, sym, hmm_confidence, conviction, hmm_threshold, req_conviction)
                     self._coin_states.setdefault(sym, {}).setdefault("bot_deploy_statuses", {})[bot_id] = (
-                        f"FILTERED: HMM confidence < {int(hmm_threshold*100)}% ({hmm_confidence:.2f})"
+                        f"FILTERED: HMM confidence too low for tier ({hmm_confidence:.2f})"
                     )
                     continue
 
@@ -1172,67 +1226,73 @@ class RegimeMasterBot:
                          _btc_is_chop = True
 
                 if _btc_is_chop:
-                    logger.info("⛔ [%s] %s BTC macro is %s — BTC CHOP VETO (no deployments allowed)", bot_name, sym, btc_regime_str)
-                    self._coin_states.setdefault(sym, {}).setdefault("bot_deploy_statuses", {})[bot_id] = (
-                        f"FILTERED: BTC Macro is {btc_regime_str}"
-                    )
-                    try:
-                        get_svs().log_signal(
-                            symbol=sym, side=top.get("side", ""),
-                            signal_type=top.get("signal_type", "TREND_FOLLOW"),
-                            segment=seg_name, conviction=conviction,
-                            hmm_conf=top.get("confidence", 0),
-                            entry_price=current_price,
-                            deployed=False, gate_vetoed="BTC_CHOP",
-                            cycle=self._cycle_count,
-                            rsi_1h=self._coin_states.get(sym, {}).get("rsi_1h", 50.0),
+                    if bot_tier in ("MODERATE", "AGGRESSIVE"):
+                        logger.info("✅ [%s] %s Bypassing BTC Macro Veto (Tier: %s)", bot_name, sym, bot_tier)
+                    else:
+                        logger.info("⛔ [%s] %s BTC macro is %s — BTC CHOP VETO (no deployments allowed)", bot_name, sym, btc_regime_str)
+                        self._coin_states.setdefault(sym, {}).setdefault("bot_deploy_statuses", {})[bot_id] = (
+                            f"FILTERED: BTC Macro is {btc_regime_str}"
                         )
-                    except Exception:
-                        pass
-                    continue
+                        try:
+                            get_svs().log_signal(
+                                symbol=sym, side=top.get("side", ""),
+                                signal_type=top.get("signal_type", "TREND_FOLLOW"),
+                                segment=seg_name, conviction=conviction,
+                                hmm_conf=top.get("confidence", 0),
+                                entry_price=current_price,
+                                deployed=False, gate_vetoed="BTC_CHOP",
+                                cycle=self._cycle_count,
+                                rsi_1h=self._coin_states.get(sym, {}).get("rsi_1h", 50.0),
+                            )
+                        except Exception:
+                            pass
+                        continue
 
                 # ── NEW: Momentum Alignment Veto ──────────────────────────────────
                 trade_side = top.get("side", "")
                 trend_dir = top.get("trend_direction", "UNKNOWN")
                 
-                if trade_side == "BUY" and trend_dir == "DOWN":
-                    logger.info("⛔ [%s] %s LONG against momentum (%s) — MOMENTUM VETO", bot_name, sym, trend_dir)
-                    self._coin_states.setdefault(sym, {}).setdefault("bot_deploy_statuses", {})[bot_id] = (
-                        f"FILTERED: Momentum conflict (LONG in {trend_dir} trend)"
-                    )
-                    try:
-                        get_svs().log_signal(
-                            symbol=sym, side=top.get("side", ""),
-                            signal_type=top.get("signal_type", "TREND_FOLLOW"),
-                            segment=seg_name, conviction=conviction,
-                            hmm_conf=top.get("confidence", 0),
-                            entry_price=current_price,
-                            deployed=False, gate_vetoed="MOMENTUM_VETO",
-                            cycle=self._cycle_count,
-                            rsi_1h=self._coin_states.get(sym, {}).get("rsi_1h", 50.0),
+                if bot_tier == "AGGRESSIVE":
+                    pass # Rogue completely ignores momentum
+                else:
+                    if trade_side == "BUY" and trend_dir == "DOWN":
+                        logger.info("⛔ [%s] %s LONG against momentum (%s) — MOMENTUM VETO", bot_name, sym, trend_dir)
+                        self._coin_states.setdefault(sym, {}).setdefault("bot_deploy_statuses", {})[bot_id] = (
+                            f"FILTERED: Momentum conflict (LONG in {trend_dir} trend)"
                         )
-                    except Exception:
-                        pass
-                    continue
-                elif trade_side == "SELL" and trend_dir == "UP":
-                    logger.info("⛔ [%s] %s SHORT against momentum (%s) — MOMENTUM VETO", bot_name, sym, trend_dir)
-                    self._coin_states.setdefault(sym, {}).setdefault("bot_deploy_statuses", {})[bot_id] = (
-                        f"FILTERED: Momentum conflict (SHORT in {trend_dir} trend)"
-                    )
-                    try:
-                        get_svs().log_signal(
-                            symbol=sym, side=top.get("side", ""),
-                            signal_type=top.get("signal_type", "TREND_FOLLOW"),
-                            segment=seg_name, conviction=conviction,
-                            hmm_conf=top.get("confidence", 0),
-                            entry_price=current_price,
-                            deployed=False, gate_vetoed="MOMENTUM_VETO",
-                            cycle=self._cycle_count,
-                            rsi_1h=self._coin_states.get(sym, {}).get("rsi_1h", 50.0),
+                        try:
+                            get_svs().log_signal(
+                                symbol=sym, side=top.get("side", ""),
+                                signal_type=top.get("signal_type", "TREND_FOLLOW"),
+                                segment=seg_name, conviction=conviction,
+                                hmm_conf=top.get("confidence", 0),
+                                entry_price=current_price,
+                                deployed=False, gate_vetoed="MOMENTUM_VETO",
+                                cycle=self._cycle_count,
+                                rsi_1h=self._coin_states.get(sym, {}).get("rsi_1h", 50.0),
+                            )
+                        except Exception:
+                            pass
+                        continue
+                    elif trade_side == "SELL" and trend_dir == "UP":
+                        logger.info("⛔ [%s] %s SHORT against momentum (%s) — MOMENTUM VETO", bot_name, sym, trend_dir)
+                        self._coin_states.setdefault(sym, {}).setdefault("bot_deploy_statuses", {})[bot_id] = (
+                            f"FILTERED: Momentum conflict (SHORT in {trend_dir} trend)"
                         )
-                    except Exception:
-                        pass
-                    continue
+                        try:
+                            get_svs().log_signal(
+                                symbol=sym, side=top.get("side", ""),
+                                signal_type=top.get("signal_type", "TREND_FOLLOW"),
+                                segment=seg_name, conviction=conviction,
+                                hmm_conf=top.get("confidence", 0),
+                                entry_price=current_price,
+                                deployed=False, gate_vetoed="MOMENTUM_VETO",
+                                cycle=self._cycle_count,
+                                rsi_1h=self._coin_states.get(sym, {}).get("rsi_1h", 50.0),
+                            )
+                        except Exception:
+                            pass
+                        continue
                 # ── NEW: RSI Overextension Gate ───────────────────────────────
                 # Prevent entries when 1h RSI is extreme (buying into overbought,
                 # selling into oversold). At 10x leverage these are very high-risk entries.
@@ -2119,7 +2179,17 @@ class RegimeMasterBot:
             
             # Extract strict momentum and liquidity sweep indicators
             from feature_engine import compute_trend
-            current_trend = compute_trend(df_1h_feat)
+            from data_pipeline import fetch_klines
+            
+            # User request: Check momentum trend on 5m timeframe for faster entry alignment
+            df_5m = fetch_klines(symbol, "5m", limit=100)
+            if df_5m is not None and len(df_5m) >= 60:
+                current_trend = compute_trend(df_5m)
+            else:
+                # Fallback to shortest available fetched TF if 5m fails
+                df_fallback = tf_data.get("15m") if "15m" in tf_data else df_1h_feat
+                current_trend = compute_trend(df_fallback)
+                
             exhaustion_tail = float(df_1h_feat["exhaustion_tail"].iloc[-1]) if "exhaustion_tail" in df_1h_feat.columns else 0.0
 
             regime = config.REGIME_BULL if side == "BUY" else config.REGIME_BEAR
@@ -2230,7 +2300,8 @@ class RegimeMasterBot:
 
             # Conviction threshold check — single source: config.MIN_CONVICTION_FOR_DEPLOY
             # (removed brain_cfg["conviction_min"] duplicate — was a second gate with same value)
-            conv_min = config.MIN_CONVICTION_FOR_DEPLOY
+            # Conviction threshold check — dynamic routing handled in bot loop
+            conv_min = min(45, config.MIN_CONVICTION_FOR_DEPLOY - 15)
             if conviction < conv_min:
                 self._coin_states[symbol] = {
                     "symbol": symbol, "regime": regime_summary,
