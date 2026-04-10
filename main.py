@@ -866,7 +866,7 @@ class RegimeMasterBot:
                         elif _btc_regime_str in ("SIDEWAYS", "CHOP", "SIDEWAYS/CHOP", "UNKNOWN"):
                              _btc_is_chop = True
                              
-                    bots = self._get_active_bots()
+                    bots = config.ENGINE_ACTIVE_BOTS
                     bot_names = [b.get("bot_name", "").lower() for b in bots]
                     allow_btc_bypass = any("rogue" in bn or "vanguard" in bn for bn in bot_names)
                              
@@ -1752,7 +1752,7 @@ class RegimeMasterBot:
 
                     # Sanity check: SL must be on correct side and within leverage-aware max-loss cap
                     # FIX: 30% was dangerously wide at 10x (= 300% margin loss). Cap at MAX_LOSS/leverage.
-                    _max_sl_dist = abs(config.MAX_LOSS_PER_TRADE_PCT) / (fill_lev * 100)  # e.g. 20/(10*100)=2%
+                    _max_sl_dist = abs(getattr(config, 'MAX_LOSS_PER_TRADE_PCT', 20)) / (fill_lev * 100)  # e.g. 20/(10*100)=2%
                     _max_sl_dist = max(_max_sl_dist, 0.005)  # floor at 0.5% to avoid rejecting all SLs
                     if a_sl > 0:
                         sl_dist_pct = abs(a_sl - entry_price) / entry_price
