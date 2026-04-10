@@ -170,7 +170,8 @@ class StrategyRunner:
             return
 
         # Fetch open trades for this bot
-        open_trades = tradebook.get_open_trades(bot_id=bot_id, mode=mode)
+        all_active = tradebook.get_active_trades()
+        open_trades = [t for t in all_active if t.get("bot_id") == bot_id]
 
         # Risk gate
         can_open, reason = rm.can_deploy(sym, open_trades)
@@ -188,28 +189,30 @@ class StrategyRunner:
             strategy, side, sym, price, sl, tp, qty, rm.leverage, mode.upper()
         )
 
-        # Write to tradebook (same structure as HMM trades)
+        # Write to tradebook — aligned with exact open_trade() signature
         try:
             tradebook.open_trade(
-                bot_id=bot_id,
-                user_id=user_id,
-                coin=sym,
+                symbol=sym,
                 side=side,
-                entry_price=price,
-                stop_loss=sl,
-                take_profit=tp,
-                quantity=qty,
                 leverage=rm.leverage,
-                capital=leveraged_capital,
-                mode=mode,
+                quantity=qty,
+                entry_price=price,
+                atr=atr,
                 regime=f"STRATEGY:{strategy}",
                 confidence=conviction / 100.0,
-                signal_type=f"{strategy}_SIGNAL",
-                segment=strategy,
+                reason=f"{strategy} signal",
+                capital=leveraged_capital,
+                mode=mode,
+                user_id=user_id,
+                bot_id=bot_id,
+                bot_name=bot.get("bot_name", strategy),
+                override_sl=sl,
+                override_tp=tp,
             )
         except Exception as e:
             logger.error("[%s] tradebook.open_trade failed for %s: %s", strategy, sym, e)
             return
+
 
         # Log to signal validator
         try:

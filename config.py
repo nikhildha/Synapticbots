@@ -116,6 +116,7 @@ REGIME_BULL = 0
 REGIME_BEAR = 1
 REGIME_CHOP = 2
 REGIME_CRASH = 3              # Legacy — unused with HMM_N_STATES=3 (kept for backtester compat)
+REGIME_SIDEWAYS = REGIME_CHOP  # Alias used in _tick() regime fallback (main.py:517)
 
 REGIME_NAMES = {
     REGIME_BULL:  "BULLISH",
@@ -131,6 +132,10 @@ LEVERAGE_HIGH     = 10   # Flat 10x across all conviction tiers
 LEVERAGE_MODERATE = 10   # Flat 10x across all conviction tiers
 LEVERAGE_LOW      = 10   # Flat 10x across all conviction tiers
 LEVERAGE_NONE     =  1   # Observation mode
+
+# ─── Risk Constants ─────────────────────────────────────────────────────────────
+MAX_LOSS_PER_TRADE_PCT  : int   = 20   # Max % loss per trade before SL enforcement (used in Athena SL gate)
+STRATEGY_BOT_CAPITAL    : float = 1000.0  # Capital per trade for Pyxis/Axiom/Ratio independent bots
 
 # ─── Confidence Thresholds ──────────────────────────────────────────────────────
 # FIX-C1: HMM margin confidence (best_prob - 2nd_best_prob) rarely exceeds 0.40
