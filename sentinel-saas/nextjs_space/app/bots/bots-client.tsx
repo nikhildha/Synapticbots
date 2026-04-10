@@ -109,9 +109,9 @@ export function BotsClient({ bots: initialBots }: BotsClientProps) {
     setLoading(true);
     try {
       const deployments = [
-        { name: 'Titan (Slow)',       segment: 'ALL', coinList: [] },
-        { name: 'Vanguard (Moderate)', segment: 'ALL', coinList: [] },
-        { name: 'Rogue (Aggressive)',  segment: 'ALL', coinList: [] },
+        { name: 'Pyxis (Systematic)', segment: 'Systematic', coinList: [] },
+        { name: 'Axiom (Momentum)',   segment: 'Momentum', coinList: [] },
+        { name: 'Ratio (Stat Arb)',   segment: 'Stat Arb', coinList: [] },
       ];
 
       const res = await fetch('/api/bots/create', {
@@ -381,30 +381,30 @@ export function BotsClient({ bots: initialBots }: BotsClientProps) {
                     <div style={{ fontSize: 'var(--text-xs)', fontWeight: 700, color: 'var(--color-text-muted)', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 12 }}>3 Bots Will Be Deployed</div>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
 
-                      {/* Titan */}
+                      {/* Pyxis */}
                       <div style={{ display: 'flex', alignItems: 'flex-start', gap: 14, padding: '14px 16px', borderRadius: 'var(--radius-lg)', background: 'rgba(59,130,246,0.06)', border: '1px solid rgba(59,130,246,0.2)' }}>
-                        <div style={{ fontSize: 24, flexShrink: 0 }}>🏛️</div>
+                        <div style={{ fontSize: 24, flexShrink: 0 }}>🧭</div>
                         <div>
-                          <div style={{ fontWeight: 700, fontSize: 'var(--text-sm)', color: '#60A5FA', marginBottom: 3 }}>Titan <span style={{ color: 'var(--color-text-muted)', fontWeight: 400 }}>(Slow)</span></div>
-                          <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-secondary)', lineHeight: 1.5 }}>Full protection mode. BTC chop veto + momentum veto both active. Only deploys in clear trending markets with strong HMM conviction ≥60%.</div>
+                          <div style={{ fontWeight: 700, fontSize: 'var(--text-sm)', color: '#60A5FA', marginBottom: 3 }}>Pyxis <span style={{ color: 'var(--color-text-muted)', fontWeight: 400 }}>(Systematic)</span></div>
+                          <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-secondary)', lineHeight: 1.5 }}>Independent SMA crossover strategy. Runs autonomously on a 1h frequency. Isolated risk manager (1.5x ATR SL, 5x leverage).</div>
                         </div>
                       </div>
 
-                      {/* Vanguard */}
+                      {/* Axiom */}
                       <div style={{ display: 'flex', alignItems: 'flex-start', gap: 14, padding: '14px 16px', borderRadius: 'var(--radius-lg)', background: 'rgba(234,179,8,0.06)', border: '1px solid rgba(234,179,8,0.2)' }}>
-                        <div style={{ fontSize: 24, flexShrink: 0 }}>🛡️</div>
+                        <div style={{ fontSize: 24, flexShrink: 0 }}>📈</div>
                         <div>
-                          <div style={{ fontWeight: 700, fontSize: 'var(--text-sm)', color: '#FCD34D', marginBottom: 3 }}>Vanguard <span style={{ color: 'var(--color-text-muted)', fontWeight: 400 }}>(Moderate)</span></div>
-                          <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-secondary)', lineHeight: 1.5 }}>BTC sideways veto bypassed — trades even during BTC chop. Momentum alignment still enforced to avoid counter-trend entries.</div>
+                          <div style={{ fontWeight: 700, fontSize: 'var(--text-sm)', color: '#FCD34D', marginBottom: 3 }}>Axiom <span style={{ color: 'var(--color-text-muted)', fontWeight: 400 }}>(Momentum)</span></div>
+                          <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-secondary)', lineHeight: 1.5 }}>Fast-cycle MACD/RSI/Bollinger momentum strategy. Runs on a 15m frequency. Isolated risk manager (1.2x ATR SL, 7x leverage).</div>
                         </div>
                       </div>
 
-                      {/* Rogue */}
+                      {/* Ratio */}
                       <div style={{ display: 'flex', alignItems: 'flex-start', gap: 14, padding: '14px 16px', borderRadius: 'var(--radius-lg)', background: 'rgba(239,68,68,0.06)', border: '1px solid rgba(239,68,68,0.2)' }}>
-                        <div style={{ fontSize: 24, flexShrink: 0 }}>⚡</div>
+                        <div style={{ fontSize: 24, flexShrink: 0 }}>⚖️</div>
                         <div>
-                          <div style={{ fontWeight: 700, fontSize: 'var(--text-sm)', color: '#F87171', marginBottom: 3 }}>Rogue <span style={{ color: 'var(--color-text-muted)', fontWeight: 400 }}>(Aggressive)</span></div>
-                          <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-secondary)', lineHeight: 1.5 }}>All macro vetoes disabled. Pure HMM signal execution. Highest risk, highest opportunity. Operates in any market condition.</div>
+                          <div style={{ fontWeight: 700, fontSize: 'var(--text-sm)', color: '#F87171', marginBottom: 3 }}>Ratio <span style={{ color: 'var(--color-text-muted)', fontWeight: 400 }}>(Stat Arb)</span></div>
+                          <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-secondary)', lineHeight: 1.5 }}>Cross-asset rolling return statistical arbitrage. Runs on a 4h frequency. Isolated risk manager (2.0x ATR SL, 3x leverage).</div>
                         </div>
                       </div>
 
