@@ -3388,5 +3388,23 @@ class RegimeMasterBot:
 # ─── Entry Point ─────────────────────────────────────────────────────────────────
 
 if __name__ == "__main__":
+    # ── Launch independent strategy bots (Pyxis / Axiom / Ratio) ──────────────
+    # These run on separate cycles (15m / 60m / 4h) and have NO dependency
+    # on the HMM engine, Athena, or any veto gate below.
+    try:
+        from strategies.strategy_runner import StrategyRunner
+        _sr = StrategyRunner()
+        _sr_thread = threading.Thread(
+            target=_sr.run_forever,
+            daemon=True,
+            name="StrategyRunner"
+        )
+        _sr_thread.start()
+        logger.info("🤖 StrategyRunner launched (Pyxis/60m | Axiom/15m | Ratio/4h)")
+    except Exception as _sr_err:
+        logger.warning("⚠️  StrategyRunner failed to start (non-critical): %s", _sr_err)
+
+    # ── Launch main HMM engine (Titan / Vanguard / Rogue) ─────────────────────
     bot = RegimeMasterBot()
     bot.run()
+

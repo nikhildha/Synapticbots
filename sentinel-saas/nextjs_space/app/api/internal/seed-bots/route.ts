@@ -15,9 +15,18 @@ export async function GET(request: Request) {
         let botsSkipped = 0;
 
         const templates = [
-            { name: "Titan (Slow)" },
-            { name: "Vanguard (Moderate)" },
-            { name: "Rogue (Aggressive)" },
+            // ── Track A: HMM Tier Bots ──────────────────────────────────────
+            { name: "Titan (Slow)",          mode: "paper", maxTrades: 5,  capital: 1000, segment: "ALL" },
+            { name: "Vanguard (Moderate)",   mode: "paper", maxTrades: 5,  capital: 1000, segment: "ALL" },
+            { name: "Rogue (Aggressive)",    mode: "paper", maxTrades: 5,  capital: 1000, segment: "ALL" },
+
+            // ── Track B: Independent Strategy Bots (paper + live) ───────────
+            { name: "Pyxis (Systematic) Paper", mode: "paper", maxTrades: 3, capital: 1000, segment: "ALL" },
+            { name: "Pyxis (Systematic) Live",  mode: "live",  maxTrades: 3, capital: 1000, segment: "ALL" },
+            { name: "Axiom (Momentum) Paper",   mode: "paper", maxTrades: 5, capital: 1000, segment: "ALL" },
+            { name: "Axiom (Momentum) Live",    mode: "live",  maxTrades: 5, capital: 1000, segment: "ALL" },
+            { name: "Ratio (Stat Arb) Paper",   mode: "paper", maxTrades: 4, capital: 1000, segment: "ALL" },
+            { name: "Ratio (Stat Arb) Live",    mode: "live",  maxTrades: 4, capital: 1000, segment: "ALL" },
         ];
 
         for (const user of users) {
@@ -43,18 +52,18 @@ export async function GET(request: Request) {
                     }
                 });
 
-                // Create BotConfig
+                // Create BotConfig — use per-template settings
                 await prisma.botConfig.create({
                     data: {
                         botId: bot.id,
-                        mode: "paper",
-                        capitalPerTrade: 1000,
-                        maxOpenTrades: 5,
+                        mode: (t as any).mode ?? "paper",
+                        capitalPerTrade: (t as any).capital ?? 1000,
+                        maxOpenTrades: (t as any).maxTrades ?? 5,
                         slMultiplier: 0.8,
                         tpMultiplier: 1.0,
                         maxLossPct: -15,
                         brainType: "adaptive",
-                        segment: "ALL",
+                        segment: (t as any).segment ?? "ALL",
                         coinList: "[]"
                     }
                 });
