@@ -1464,34 +1464,7 @@ class RegimeMasterBot:
                     break
 
                 # ── C4 Fix: Enforce MAX_OPEN_TRADES cap ──────────────────────────
-                max_trades = getattr(config, "MAX_OPEN_TRADES", 25)
-                if tradebook_active_count + deployed >= max_trades:
-                    logger.warning(
-                        "🛑 MAX_OPEN_TRADES cap reached (%d open + %d this tick = %d >= limit %d) — "
-                        "skipping [%s] %s", tradebook_active_count, deployed,
-                        tradebook_active_count + deployed, max_trades, bot_name, sym
-                    )
-                    self._coin_states.setdefault(sym, {}).setdefault("bot_deploy_statuses", {})[bot_id] = (
-                        f"FILTERED: max open trades cap ({max_trades}) reached"
-                    )
-                    try:
-                        get_svs().log_signal(
-                            symbol=sym, side=top.get("side", ""),
-                            signal_type=top.get("signal_type", "TREND_FOLLOW"),
-                            segment=seg_name, conviction=conviction,
-                            hmm_conf=top.get("confidence", 0),
-                            entry_price=current_price,
-                            deployed=False, gate_vetoed="MAX_OPEN_TRADES",
-                            cycle=self._cycle_count,
-                            rsi_1h=self._coin_states.get(sym, {}).get("rsi_1h", 50.0),
-                        )
-                    except Exception as e:
-                        try:
-                            logger.debug('Exception caught: %s', e, exc_info=True)
-                        except NameError:
-                            pass
-                        pass
-                    continue
+                # MAX_OPEN_TRADES cap removed to allow unlimited multi-bot deployment velocity
 
                 if self.risk.check_kill_switch():
                     return
