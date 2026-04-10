@@ -41,7 +41,16 @@ export function BotsClient({ bots: initialBots }: BotsClientProps) {
   const [deployMode, setDeployMode] = useState('paper');
   const [deployMaxTrades, setDeployMaxTrades] = useState(10);
   const [deployCapitalPerTrade, setDeployCapitalPerTrade] = useState(100);
-  const [selectedBots, setSelectedBots] = useState<string[]>(['Systematic', 'Momentum', 'Stat Arb']);
+  const [selectedBots, setSelectedBots] = useState<string[]>(['Titan', 'Vanguard', 'Rogue', 'Systematic', 'Momentum', 'Stat Arb']);
+
+  const availableBots = [
+    { id: 'Titan', name: 'Titan', subtitle: '(Slow)', icon: '🏛️', color: '#60A5FA', bgRef: 'rgba(59,130,246,0.1)', borderRef: 'rgba(59,130,246,0.5)', desc: 'Full protection mode. BTC chop & momentum veto active. Deploys in clear trends with HMM conviction ≥60%.' },
+    { id: 'Vanguard', name: 'Vanguard', subtitle: '(Moderate)', icon: '🛡️', color: '#FCD34D', bgRef: 'rgba(234,179,8,0.1)', borderRef: 'rgba(234,179,8,0.5)', desc: 'BTC sideways veto bypassed — trades during chop. Momentum alignment still enforced.' },
+    { id: 'Rogue', name: 'Rogue', subtitle: '(Aggressive)', icon: '⚡', color: '#F87171', bgRef: 'rgba(239,68,68,0.1)', borderRef: 'rgba(239,68,68,0.5)', desc: 'All macro vetoes disabled. Pure HMM execution. Highest risk. Operates in any condition.' },
+    { id: 'Systematic', name: 'Pyxis', subtitle: '(Systematic)', icon: '🧭', color: '#60A5FA', bgRef: 'rgba(59,130,246,0.1)', borderRef: 'rgba(59,130,246,0.5)', desc: 'Independent SMA crossover strategy. Runs autonomously on a 1h frequency. Isolated risk (1.5x SL).' },
+    { id: 'Momentum', name: 'Axiom', subtitle: '(Momentum)', icon: '📈', color: '#FCD34D', bgRef: 'rgba(234,179,8,0.1)', borderRef: 'rgba(234,179,8,0.5)', desc: 'Fast-cycle MACD/RSI/Bollinger momentum. Runs autonomously on a 15m frequency. Isolated risk (1.2x SL).' },
+    { id: 'Stat Arb', name: 'Ratio', subtitle: '(Stat Arb)', icon: '⚖️', color: '#F87171', bgRef: 'rgba(239,68,68,0.1)', borderRef: 'rgba(239,68,68,0.5)', desc: 'Cross-asset rolling return statistical arbitrage. Runs on a 4h frequency. Isolated risk (2.0x SL).' },
+  ];
   
   /* ── Intel Drawer State ── */
   const [intelSegmentId, setIntelSegmentId] = useState<string | null>(null);
@@ -109,11 +118,9 @@ export function BotsClient({ bots: initialBots }: BotsClientProps) {
   const handleDeployBots = async () => {
     setLoading(true);
     try {
-      const allDeployments = [
-        { name: 'Pyxis (Systematic)', segment: 'Systematic', coinList: [] },
-        { name: 'Axiom (Momentum)',   segment: 'Momentum', coinList: [] },
-        { name: 'Ratio (Stat Arb)',   segment: 'Stat Arb', coinList: [] },
-      ];
+      const allDeployments = availableBots.map(b => ({
+        name: `${b.name} ${b.subtitle}`, segment: b.id, coinList: []
+      }));
       const deployments = allDeployments.filter(d => selectedBots.includes(d.segment));
 
       const res = await fetch('/api/bots/create', {
@@ -378,38 +385,19 @@ export function BotsClient({ bots: initialBots }: BotsClientProps) {
 
                 <div style={{ overflowY: 'auto', padding: '20px 24px', flex: 1 }}>
                   
-                  {/* THREE TIER BOTS */}
+                  {/* SIX TIER BOTS */}
                   <div style={{ marginBottom: 24 }}>
                     <div style={{ fontSize: 'var(--text-xs)', fontWeight: 700, color: 'var(--color-text-muted)', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 12 }}>{selectedBots.length} BOTS WILL BE DEPLOYED</div>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-
-                      {/* Pyxis */}
-                      <div onClick={() => setSelectedBots(prev => prev.includes('Systematic') ? prev.filter(b => b !== 'Systematic') : [...prev, 'Systematic'])} style={{ cursor: 'pointer', display: 'flex', alignItems: 'flex-start', gap: 14, padding: '14px 16px', borderRadius: 'var(--radius-lg)', background: selectedBots.includes('Systematic') ? 'rgba(59,130,246,0.1)' : 'rgba(255,255,255,0.02)', border: selectedBots.includes('Systematic') ? '1px solid rgba(59,130,246,0.5)' : '1px solid var(--color-border)', transition: 'all 0.2s' }}>
-                        <div style={{ fontSize: 24, flexShrink: 0, opacity: selectedBots.includes('Systematic') ? 1 : 0.3, transition: 'all 0.2s' }}>🧭</div>
-                        <div style={{ opacity: selectedBots.includes('Systematic') ? 1 : 0.5, transition: 'all 0.2s' }}>
-                          <div style={{ fontWeight: 700, fontSize: 'var(--text-sm)', color: '#60A5FA', marginBottom: 3 }}>Pyxis <span style={{ color: 'var(--color-text-muted)', fontWeight: 400 }}>(Systematic)</span></div>
-                          <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-secondary)', lineHeight: 1.5 }}>Independent SMA crossover strategy. Runs autonomously on a 1h frequency. Isolated risk manager (1.5x ATR SL, 5x leverage).</div>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                      {availableBots.map(bot => (
+                        <div key={bot.id} onClick={() => setSelectedBots(prev => prev.includes(bot.id) ? prev.filter(b => b !== bot.id) : [...prev, bot.id])} style={{ cursor: 'pointer', display: 'flex', alignItems: 'flex-start', gap: 12, padding: '12px 14px', borderRadius: 'var(--radius-lg)', background: selectedBots.includes(bot.id) ? bot.bgRef : 'rgba(255,255,255,0.02)', border: selectedBots.includes(bot.id) ? `1px solid ${bot.borderRef}` : '1px solid var(--color-border)', transition: 'all 0.2s' }}>
+                          <div style={{ fontSize: 20, flexShrink: 0, opacity: selectedBots.includes(bot.id) ? 1 : 0.3, transition: 'all 0.2s' }}>{bot.icon}</div>
+                          <div style={{ opacity: selectedBots.includes(bot.id) ? 1 : 0.5, transition: 'all 0.2s' }}>
+                            <div style={{ fontWeight: 700, fontSize: 'var(--text-sm)', color: bot.color, marginBottom: 2 }}>{bot.name} <span style={{ color: 'var(--color-text-muted)', fontWeight: 400 }}>{bot.subtitle}</span></div>
+                            <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-secondary)', lineHeight: 1.4 }}>{bot.desc}</div>
+                          </div>
                         </div>
-                      </div>
-
-                      {/* Axiom */}
-                      <div onClick={() => setSelectedBots(prev => prev.includes('Momentum') ? prev.filter(b => b !== 'Momentum') : [...prev, 'Momentum'])} style={{ cursor: 'pointer', display: 'flex', alignItems: 'flex-start', gap: 14, padding: '14px 16px', borderRadius: 'var(--radius-lg)', background: selectedBots.includes('Momentum') ? 'rgba(234,179,8,0.1)' : 'rgba(255,255,255,0.02)', border: selectedBots.includes('Momentum') ? '1px solid rgba(234,179,8,0.5)' : '1px solid var(--color-border)', transition: 'all 0.2s' }}>
-                        <div style={{ fontSize: 24, flexShrink: 0, opacity: selectedBots.includes('Momentum') ? 1 : 0.3, transition: 'all 0.2s' }}>📈</div>
-                        <div style={{ opacity: selectedBots.includes('Momentum') ? 1 : 0.5, transition: 'all 0.2s' }}>
-                          <div style={{ fontWeight: 700, fontSize: 'var(--text-sm)', color: '#FCD34D', marginBottom: 3 }}>Axiom <span style={{ color: 'var(--color-text-muted)', fontWeight: 400 }}>(Momentum)</span></div>
-                          <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-secondary)', lineHeight: 1.5 }}>Fast-cycle MACD/RSI/Bollinger momentum strategy. Runs on a 15m frequency. Isolated risk manager (1.2x ATR SL, 7x leverage).</div>
-                        </div>
-                      </div>
-
-                      {/* Ratio */}
-                      <div onClick={() => setSelectedBots(prev => prev.includes('Stat Arb') ? prev.filter(b => b !== 'Stat Arb') : [...prev, 'Stat Arb'])} style={{ cursor: 'pointer', display: 'flex', alignItems: 'flex-start', gap: 14, padding: '14px 16px', borderRadius: 'var(--radius-lg)', background: selectedBots.includes('Stat Arb') ? 'rgba(239,68,68,0.1)' : 'rgba(255,255,255,0.02)', border: selectedBots.includes('Stat Arb') ? '1px solid rgba(239,68,68,0.5)' : '1px solid var(--color-border)', transition: 'all 0.2s' }}>
-                        <div style={{ fontSize: 24, flexShrink: 0, opacity: selectedBots.includes('Stat Arb') ? 1 : 0.3, transition: 'all 0.2s' }}>⚖️</div>
-                        <div style={{ opacity: selectedBots.includes('Stat Arb') ? 1 : 0.5, transition: 'all 0.2s' }}>
-                          <div style={{ fontWeight: 700, fontSize: 'var(--text-sm)', color: '#F87171', marginBottom: 3 }}>Ratio <span style={{ color: 'var(--color-text-muted)', fontWeight: 400 }}>(Stat Arb)</span></div>
-                          <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-secondary)', lineHeight: 1.5 }}>Cross-asset rolling return statistical arbitrage. Runs on a 4h frequency. Isolated risk manager (2.0x ATR SL, 3x leverage).</div>
-                        </div>
-                      </div>
-
+                      ))}
                     </div>
                   </div>
 
