@@ -41,6 +41,7 @@ export function BotsClient({ bots: initialBots }: BotsClientProps) {
   const [deployMode, setDeployMode] = useState('paper');
   const [deployMaxTrades, setDeployMaxTrades] = useState(10);
   const [deployCapitalPerTrade, setDeployCapitalPerTrade] = useState(100);
+  const [selectedBots, setSelectedBots] = useState<string[]>(['Systematic', 'Momentum', 'Stat Arb']);
   
   /* ── Intel Drawer State ── */
   const [intelSegmentId, setIntelSegmentId] = useState<string | null>(null);
@@ -108,11 +109,12 @@ export function BotsClient({ bots: initialBots }: BotsClientProps) {
   const handleDeployBots = async () => {
     setLoading(true);
     try {
-      const deployments = [
+      const allDeployments = [
         { name: 'Pyxis (Systematic)', segment: 'Systematic', coinList: [] },
         { name: 'Axiom (Momentum)',   segment: 'Momentum', coinList: [] },
         { name: 'Ratio (Stat Arb)',   segment: 'Stat Arb', coinList: [] },
       ];
+      const deployments = allDeployments.filter(d => selectedBots.includes(d.segment));
 
       const res = await fetch('/api/bots/create', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -211,7 +213,7 @@ export function BotsClient({ bots: initialBots }: BotsClientProps) {
   const stoppedBots = activeBots.filter((b: any) => !b?.isActive);
 
   // Derived Values
-  const botMultiplier = 3; // 3 risk-tier bots deployed simultaneously
+  const botMultiplier = selectedBots.length; // deploy selected sum
   const totalMaxExposure = botMultiplier * deployMaxTrades * deployCapitalPerTrade;
 
   const intelData = useMemo(() => SEGMENT_KNOWLEDGE.find(s => s.id === intelSegmentId), [intelSegmentId]);
@@ -378,31 +380,31 @@ export function BotsClient({ bots: initialBots }: BotsClientProps) {
                   
                   {/* THREE TIER BOTS */}
                   <div style={{ marginBottom: 24 }}>
-                    <div style={{ fontSize: 'var(--text-xs)', fontWeight: 700, color: 'var(--color-text-muted)', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 12 }}>3 Bots Will Be Deployed</div>
+                    <div style={{ fontSize: 'var(--text-xs)', fontWeight: 700, color: 'var(--color-text-muted)', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 12 }}>{selectedBots.length} BOTS WILL BE DEPLOYED</div>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
 
                       {/* Pyxis */}
-                      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 14, padding: '14px 16px', borderRadius: 'var(--radius-lg)', background: 'rgba(59,130,246,0.06)', border: '1px solid rgba(59,130,246,0.2)' }}>
-                        <div style={{ fontSize: 24, flexShrink: 0 }}>🧭</div>
-                        <div>
+                      <div onClick={() => setSelectedBots(prev => prev.includes('Systematic') ? prev.filter(b => b !== 'Systematic') : [...prev, 'Systematic'])} style={{ cursor: 'pointer', display: 'flex', alignItems: 'flex-start', gap: 14, padding: '14px 16px', borderRadius: 'var(--radius-lg)', background: selectedBots.includes('Systematic') ? 'rgba(59,130,246,0.1)' : 'rgba(255,255,255,0.02)', border: selectedBots.includes('Systematic') ? '1px solid rgba(59,130,246,0.5)' : '1px solid var(--color-border)', transition: 'all 0.2s' }}>
+                        <div style={{ fontSize: 24, flexShrink: 0, opacity: selectedBots.includes('Systematic') ? 1 : 0.3, transition: 'all 0.2s' }}>🧭</div>
+                        <div style={{ opacity: selectedBots.includes('Systematic') ? 1 : 0.5, transition: 'all 0.2s' }}>
                           <div style={{ fontWeight: 700, fontSize: 'var(--text-sm)', color: '#60A5FA', marginBottom: 3 }}>Pyxis <span style={{ color: 'var(--color-text-muted)', fontWeight: 400 }}>(Systematic)</span></div>
                           <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-secondary)', lineHeight: 1.5 }}>Independent SMA crossover strategy. Runs autonomously on a 1h frequency. Isolated risk manager (1.5x ATR SL, 5x leverage).</div>
                         </div>
                       </div>
 
                       {/* Axiom */}
-                      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 14, padding: '14px 16px', borderRadius: 'var(--radius-lg)', background: 'rgba(234,179,8,0.06)', border: '1px solid rgba(234,179,8,0.2)' }}>
-                        <div style={{ fontSize: 24, flexShrink: 0 }}>📈</div>
-                        <div>
+                      <div onClick={() => setSelectedBots(prev => prev.includes('Momentum') ? prev.filter(b => b !== 'Momentum') : [...prev, 'Momentum'])} style={{ cursor: 'pointer', display: 'flex', alignItems: 'flex-start', gap: 14, padding: '14px 16px', borderRadius: 'var(--radius-lg)', background: selectedBots.includes('Momentum') ? 'rgba(234,179,8,0.1)' : 'rgba(255,255,255,0.02)', border: selectedBots.includes('Momentum') ? '1px solid rgba(234,179,8,0.5)' : '1px solid var(--color-border)', transition: 'all 0.2s' }}>
+                        <div style={{ fontSize: 24, flexShrink: 0, opacity: selectedBots.includes('Momentum') ? 1 : 0.3, transition: 'all 0.2s' }}>📈</div>
+                        <div style={{ opacity: selectedBots.includes('Momentum') ? 1 : 0.5, transition: 'all 0.2s' }}>
                           <div style={{ fontWeight: 700, fontSize: 'var(--text-sm)', color: '#FCD34D', marginBottom: 3 }}>Axiom <span style={{ color: 'var(--color-text-muted)', fontWeight: 400 }}>(Momentum)</span></div>
                           <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-secondary)', lineHeight: 1.5 }}>Fast-cycle MACD/RSI/Bollinger momentum strategy. Runs on a 15m frequency. Isolated risk manager (1.2x ATR SL, 7x leverage).</div>
                         </div>
                       </div>
 
                       {/* Ratio */}
-                      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 14, padding: '14px 16px', borderRadius: 'var(--radius-lg)', background: 'rgba(239,68,68,0.06)', border: '1px solid rgba(239,68,68,0.2)' }}>
-                        <div style={{ fontSize: 24, flexShrink: 0 }}>⚖️</div>
-                        <div>
+                      <div onClick={() => setSelectedBots(prev => prev.includes('Stat Arb') ? prev.filter(b => b !== 'Stat Arb') : [...prev, 'Stat Arb'])} style={{ cursor: 'pointer', display: 'flex', alignItems: 'flex-start', gap: 14, padding: '14px 16px', borderRadius: 'var(--radius-lg)', background: selectedBots.includes('Stat Arb') ? 'rgba(239,68,68,0.1)' : 'rgba(255,255,255,0.02)', border: selectedBots.includes('Stat Arb') ? '1px solid rgba(239,68,68,0.5)' : '1px solid var(--color-border)', transition: 'all 0.2s' }}>
+                        <div style={{ fontSize: 24, flexShrink: 0, opacity: selectedBots.includes('Stat Arb') ? 1 : 0.3, transition: 'all 0.2s' }}>⚖️</div>
+                        <div style={{ opacity: selectedBots.includes('Stat Arb') ? 1 : 0.5, transition: 'all 0.2s' }}>
                           <div style={{ fontWeight: 700, fontSize: 'var(--text-sm)', color: '#F87171', marginBottom: 3 }}>Ratio <span style={{ color: 'var(--color-text-muted)', fontWeight: 400 }}>(Stat Arb)</span></div>
                           <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-secondary)', lineHeight: 1.5 }}>Cross-asset rolling return statistical arbitrage. Runs on a 4h frequency. Isolated risk manager (2.0x ATR SL, 3x leverage).</div>
                         </div>
@@ -471,7 +473,7 @@ export function BotsClient({ bots: initialBots }: BotsClientProps) {
                       <span style={{ color: 'var(--color-text-secondary)' }}>Maximum Total Exposure</span>
                       <div style={{ textAlign: 'right' }}>
                         <span style={{ fontFamily: 'monospace', fontWeight: 800, color: 'var(--color-info)', fontSize: 18 }}>${totalMaxExposure.toLocaleString()}</span>
-                        <div style={{ fontSize: 10, color: 'var(--color-text-muted)', marginTop: 2 }}>3 Bots × {deployMaxTrades} Trades × ${deployCapitalPerTrade}</div>
+                        <div style={{ fontSize: 10, color: 'var(--color-text-muted)', marginTop: 2 }}>{selectedBots.length} Bot{selectedBots.length === 1 ? '' : 's'} × {deployMaxTrades} Trades × ${deployCapitalPerTrade}</div>
                       </div>
                     </div>
                   </div>
@@ -481,8 +483,8 @@ export function BotsClient({ bots: initialBots }: BotsClientProps) {
                 {/* Footer Controls */}
                 <div style={{ display: 'flex', gap: 12, padding: '16px 24px 20px', borderTop: '1px solid var(--color-border)', background: 'rgba(13,20,32,0.8)' }}>
                   <button onClick={() => setShowDeployModal(false)} className="btn-ghost" style={{ flex: 1, padding: '12px 0' }}>Cancel</button>
-                  <button onClick={handleDeployBots} disabled={loading} className="btn-success" style={{ flex: 2, padding: '12px 0', fontSize: 15, opacity: loading ? 0.7 : 1 }}>
-                    <Rocket style={{ width: 16, height: 16 }} /> {loading ? 'Deploying 3 Bots...' : 'Deploy All 3 Bots'}
+                  <button onClick={handleDeployBots} disabled={loading || selectedBots.length === 0} className="btn-success" style={{ flex: 2, padding: '12px 0', fontSize: 15, opacity: (loading || selectedBots.length === 0) ? 0.7 : 1 }}>
+                    <Rocket style={{ width: 16, height: 16 }} /> {loading ? `Deploying ${selectedBots.length} Bots...` : `Deploy ${selectedBots.length} Bot${selectedBots.length === 1 ? '' : 's'}`}
                   </button>
                 </div>
               </div>
