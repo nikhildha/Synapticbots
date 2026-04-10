@@ -2179,7 +2179,6 @@ class RegimeMasterBot:
             
             # Extract strict momentum and liquidity sweep indicators
             from feature_engine import compute_trend
-            from data_pipeline import fetch_klines
             
             # User request: Check momentum trend on 5m timeframe for faster entry alignment
             df_5m = fetch_klines(symbol, "5m", limit=100)
