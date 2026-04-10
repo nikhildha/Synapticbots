@@ -18,6 +18,34 @@ import config
 from hmm_brain import HMMBrain, MultiTFHMMBrain
 from data_pipeline import fetch_klines, get_multi_timeframe_data, _get_binance_client
 from feature_engine import compute_all_features, compute_hmm_features, compute_trend, compute_ema
+
+# ── Hoisted Local Imports ──
+from ai4trade_client import AI4TradeClient
+from coin_scanner import get_hottest_segments as _refresh_heatmap
+from data_pipeline import fetch_klines
+from data_pipeline import fetch_klines as _fk
+from data_pipeline import fetch_klines as _prefetch
+from datetime import timezone
+from dateutil import parser as _dp
+from engine_api import pull_active_bots_from_saas
+from feature_engine import compute_all_features
+from feature_engine import compute_trend
+from strategies.strategy_runner import StrategyRunner
+import coindcx_client as cdx
+import datetime as _dt
+import json
+import json as _jl, datetime as _dl
+import json as _jp, datetime as _dp
+import json as _json
+import json as _json_tmp
+import json as _jvl
+import numpy as _np
+import os
+import re
+import requests as _req
+import telegram as _tg
+import time as _t
+
 from execution_engine import ExecutionEngine
 from risk_manager import RiskManager
 from coin_scanner import get_top_coins_by_volume, get_active_bot_segment_pool
@@ -61,6 +89,7 @@ _bcast_handler.setFormatter(logging.Formatter("%(asctime)s %(message)s", datefmt
 broadcast_logger = logging.getLogger("signal_broadcast")
 broadcast_logger.setLevel(logging.INFO)
 broadcast_logger.addHandler(_bcast_handler)
+broadcast_logger.propagate = False  # Don't duplicate to root bot.log
 broadcast_logger.propagate = False  # Don't duplicate to bot.log
 
 def _bcast(event: str, cycle: int, bot_name: str, bot_id: str, sym: str, side: str = "",
@@ -83,7 +112,7 @@ def _log_athena_decision(
     price: float, sl: float, tp: float, summary: str,
 ) -> None:
     """Append one JSONL record to the Athena decision history log."""
-    import json as _jl, datetime as _dl
+
     record = {
         "ts":         _dl.datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ"),
         "cycle":      cycle,
@@ -101,13 +130,17 @@ def _log_athena_decision(
         os.makedirs(os.path.dirname(_ATHENA_LOG_FILE) or ".", exist_ok=True)
         with open(_ATHENA_LOG_FILE, "a", encoding="utf-8") as _af:
             _af.write(_jl.dumps(record) + "\n")
-    except Exception:
+    except Exception as e:
+        try:
+            logger.debug('Exception caught: %s', e, exc_info=True)
+        except NameError:
+            pass
         pass  # Never block engine on log write failure
 
 
 def _purge_old_athena_log(days: int = 30) -> None:
     """Remove entries older than `days` from the Athena decision JSONL on startup."""
-    import json as _jp, datetime as _dp
+
     if not os.path.exists(_ATHENA_LOG_FILE):
         return
     cutoff = _dp.datetime.utcnow() - _dp.timedelta(days=days)
@@ -120,12 +153,20 @@ def _purge_old_athena_log(days: int = 30) -> None:
                 ts_str = _jp.loads(ln).get("ts", "")
                 if ts_str and _dp.datetime.strptime(ts_str, "%Y-%m-%dT%H:%M:%SZ") >= cutoff:
                     kept.append(ln)
-            except Exception:
+            except Exception as e:
+                try:
+                    logger.debug('Exception caught: %s', e, exc_info=True)
+                except NameError:
+                    pass
                 kept.append(ln)  # Keep malformed lines rather than lose data
         if len(kept) < len(lines):
             with open(_ATHENA_LOG_FILE, "w", encoding="utf-8") as _f:
                 _f.writelines(kept)
-    except Exception:
+    except Exception as e:
+        try:
+            logger.debug('Exception caught: %s', e, exc_info=True)
+        except NameError:
+            pass
         pass
 
 
@@ -213,7 +254,7 @@ class RegimeMasterBot:
         self._multi_tf_brains = {}   # symbol → MultiTFHMMBrain (3 TFs per coin)
         self._coin_states = {}       # symbol → latest state dict (for dashboard)
         self._live_prices = {}       # symbol → {ls, fr, ...} (fetched each cycle)
-        self._BRAIN_CACHE_MAX = 5    # LRU eviction cap (down from 20) — strict limit protects Railway 300MB RAM tier from OOM kills
+        self._BRAIN_CACHE_MAX = 40   # LRU eviction cap — elevated to 40 for 32-coin array handling
 
         # ── Signal Queue ────────────────────────────────────────────────────────
         # Stores HMM-qualified signals that couldn't deploy this cycle (no bots,
@@ -247,7 +288,7 @@ class RegimeMasterBot:
         try:
             _state_path = getattr(config, "MULTI_STATE_FILE", None)
             if _state_path and os.path.exists(_state_path):
-                import json as _json_tmp
+
                 with open(_state_path, "r") as _f:
                     _stale = _json_tmp.load(_f)
                 _stale["pending_signals_count"] = 0
@@ -255,7 +296,11 @@ class RegimeMasterBot:
                 with open(_state_path, "w") as _f:
                     _json_tmp.dump(_stale, _f, indent=2)
                 logger.info("🧹 Startup: cleared stale signal queue from persisted state")
-        except Exception:
+        except Exception as e:
+            try:
+                logger.debug('Exception caught: %s', e, exc_info=True)
+            except NameError:
+                pass
             pass  # Non-fatal — state will be overwritten after first cycle anyway
 
         # ── Veto Log ────────────────────────────────────────────────────────────
@@ -269,7 +314,7 @@ class RegimeMasterBot:
         try:
             _vl_path = getattr(config, "MULTI_STATE_FILE", None)
             if _vl_path and os.path.exists(_vl_path):
-                import json as _jvl
+
                 with open(_vl_path, "r") as _fv:
                     _persisted = _jvl.load(_fv)
                 _saved_vetoes = _persisted.get("veto_log", [])
@@ -277,7 +322,11 @@ class RegimeMasterBot:
                     # State file stores newest-first (reversed); restore to oldest-first for append
                     self._veto_log = list(reversed(_saved_vetoes))[-self._VETO_LOG_MAX:]
                     logger.info("🔁 Restored %d veto log entries from previous session", len(self._veto_log))
-        except Exception:
+        except Exception as e:
+            try:
+                logger.debug('Exception caught: %s', e, exc_info=True)
+            except NameError:
+                pass
             pass  # Non-fatal — clean veto log is acceptable fallback
 
 
@@ -329,7 +378,7 @@ class RegimeMasterBot:
         self._ai4trade = None
         if getattr(config, "AI4TRADE_ENABLED", False):
             try:
-                from ai4trade_client import AI4TradeClient
+
                 self._ai4trade = AI4TradeClient()
                 config.AI4TRADE_CLIENT = self._ai4trade
             except Exception as e:
@@ -365,7 +414,7 @@ class RegimeMasterBot:
                 err_str = str(e)
                 # ── Binance IP ban: parse expiry and sleep until it passes ──
                 if 'banned until' in err_str and '-1003' in err_str:
-                    import re
+
                     m = re.search(r'banned until (\d+)', err_str)
                     if m:
                         ban_until_ms = int(m.group(1))
@@ -410,7 +459,11 @@ class RegimeMasterBot:
                                     logger.warning("⏸️  Engine HALTED: %s (%.0f min remaining)", reason, remaining)
                                     self._pause_logged = True
                                 return  # Still halted
-                        except Exception:
+                        except Exception as e:
+                            try:
+                                logger.debug('Exception caught: %s', e, exc_info=True)
+                            except NameError:
+                                pass
                             pass
                     else:
                         # Manual pause (no expiry)
@@ -419,7 +472,11 @@ class RegimeMasterBot:
                             self._pause_logged = True
                         return  # Skip entire heartbeat
             self._pause_logged = False
-        except Exception:
+        except Exception as e:
+            try:
+                logger.debug('Exception caught: %s', e, exc_info=True)
+            except NameError:
+                pass
             pass
 
         # Always: process commands (kill switch / reset)
@@ -441,7 +498,11 @@ class RegimeMasterBot:
                     fr = float(info.get("fr", 0)) or float(info.get("efr", 0))
                     if fr != 0:
                         funding_rates[sym] = fr
-                except Exception:
+                except Exception as e:
+                    try:
+                        logger.debug('Exception caught: %s', e, exc_info=True)
+                    except NameError:
+                        pass
                     pass
 
             # ── WebSocket price feed: ensure active symbols are subscribed ──
@@ -472,8 +533,8 @@ class RegimeMasterBot:
                 all_active_syms = list({t['symbol'] for t in tradebook.get_active_trades() if t.get('symbol')})
                 missing_syms = [s for s in all_active_syms if s not in ws_prices]
                 if missing_syms:
-                    import requests as _req
-                    import json as _json
+
+
                     _resp = _req.get(
                         "https://api.binance.com/api/v3/ticker/price",
                         params={"symbols": _json.dumps(missing_syms)},
@@ -554,7 +615,11 @@ class RegimeMasterBot:
         if force:
             try:
                 os.remove(trigger_file)
-            except Exception:
+            except Exception as e:
+                try:
+                    logger.debug('Exception caught: %s', e, exc_info=True)
+                except NameError:
+                    pass
                 pass
             logger.info("⚡ Manual cycle trigger received from dashboard!")
 
@@ -584,7 +649,11 @@ class RegimeMasterBot:
             multi["analysis_interval_seconds"] = config.ANALYSIS_INTERVAL_SECONDS
             with open(config.MULTI_STATE_FILE, "w") as f:
                 json.dump(multi, f, indent=2)
-        except Exception:
+        except Exception as e:
+            try:
+                logger.debug('Exception caught: %s', e, exc_info=True)
+            except NameError:
+                pass
             pass
 
     def _tick(self):
@@ -649,7 +718,7 @@ class RegimeMasterBot:
         # Engine is the pull side — no push/registration required.
         # This self-heals after every Railway redeploy without any dashboard visit.
         try:
-            from engine_api import pull_active_bots_from_saas
+
             pull_active_bots_from_saas()
         except Exception as _pab_err:
             logger.warning("⚠️  Bot pull failed: %s", _pab_err)
@@ -670,7 +739,7 @@ class RegimeMasterBot:
             # Pre-warm BTC 1h kline cache before analysis to avoid race conditions
             # (two engine threads both try to fetch BTCUSDT:1h simultaneously on fresh start)
             try:
-                from data_pipeline import fetch_klines as _prefetch
+
                 _btc_warm = _prefetch("BTCUSDT", config.TIMEFRAME_CONFIRMATION, limit=config.HMM_LOOKBACK)
                 if _btc_warm is not None and len(_btc_warm) >= 60:
                     logger.debug("🔥 BTC 1h klines pre-warmed (%d candles)", len(_btc_warm))
@@ -685,8 +754,7 @@ class RegimeMasterBot:
             try:
                 # Find which segments are currently blocked across the engine
                 blocked_segments = {seg for seg in config.CRYPTO_SEGMENTS.keys() if self._is_segment_in_cooldown(seg)[0]}
-                
-                from coin_scanner import get_hottest_segments as _refresh_heatmap
+
                 _refresh_heatmap(getattr(config, "SEGMENT_SCAN_LIMIT", 2), blocked_segments)
             except Exception as _he:
                 logger.warning("⚠️  Heatmap refresh failed (non-fatal): %s", _he)
@@ -781,7 +849,11 @@ class RegimeMasterBot:
                     "• Invalid API keys\n"
                     "• CoinDCX API downtime"
                 )
-            except Exception:
+            except Exception as e:
+                try:
+                    logger.debug('Exception caught: %s', e, exc_info=True)
+                except NameError:
+                    pass
                 pass
             # Still run exits and state save, but skip new deployments
             self._check_exits(symbols)
@@ -797,7 +869,11 @@ class RegimeMasterBot:
                 current = self.risk.equity_history[-1][1] if self.risk.equity_history else 0
                 dd = (peak - current) / peak * 100 if peak > 0 else 0
                 tg.notify_kill_switch(dd, peak, current)
-            except Exception:
+            except Exception as e:
+                try:
+                    logger.debug('Exception caught: %s', e, exc_info=True)
+                except NameError:
+                    pass
                 pass
             for sym in list(self._active_positions.keys()):
                 tradebook.close_trade(symbol=sym, reason="KILL_SWITCH")
@@ -1005,8 +1081,8 @@ class RegimeMasterBot:
                 is_blocked, _ = self._is_segment_in_cooldown(target_segment, user_id)
 
                 if is_blocked:
-                    import json
-                    import os
+
+
                     logger.info("🔄 [%s] Primary segment '%s' in cooldown, looking for fallback...", bot_name, target_segment)
                     fallback_found = False
                     
@@ -1244,7 +1320,11 @@ class RegimeMasterBot:
                                 cycle=self._cycle_count,
                                 rsi_1h=self._coin_states.get(sym, {}).get("rsi_1h", 50.0),
                             )
-                        except Exception:
+                        except Exception as e:
+                            try:
+                                logger.debug('Exception caught: %s', e, exc_info=True)
+                            except NameError:
+                                pass
                             pass
                         continue
 
@@ -1271,7 +1351,11 @@ class RegimeMasterBot:
                                 cycle=self._cycle_count,
                                 rsi_1h=self._coin_states.get(sym, {}).get("rsi_1h", 50.0),
                             )
-                        except Exception:
+                        except Exception as e:
+                            try:
+                                logger.debug('Exception caught: %s', e, exc_info=True)
+                            except NameError:
+                                pass
                             pass
                         continue
                     elif trade_side == "SELL" and trend_dir == "UP":
@@ -1290,7 +1374,11 @@ class RegimeMasterBot:
                                 cycle=self._cycle_count,
                                 rsi_1h=self._coin_states.get(sym, {}).get("rsi_1h", 50.0),
                             )
-                        except Exception:
+                        except Exception as e:
+                            try:
+                                logger.debug('Exception caught: %s', e, exc_info=True)
+                            except NameError:
+                                pass
                             pass
                         continue
                 # ── NEW: RSI Overextension Gate ───────────────────────────────
@@ -1314,7 +1402,11 @@ class RegimeMasterBot:
                             cycle=self._cycle_count,
                             rsi_1h=self._coin_states.get(sym, {}).get("rsi_1h", 50.0),
                         )
-                    except Exception:
+                    except Exception as e:
+                        try:
+                            logger.debug('Exception caught: %s', e, exc_info=True)
+                        except NameError:
+                            pass
                         pass
                     continue
                 if trade_side == "SELL" and _rsi_gate < 27.0:
@@ -1334,7 +1426,11 @@ class RegimeMasterBot:
                             cycle=self._cycle_count,
                             rsi_1h=self._coin_states.get(sym, {}).get("rsi_1h", 50.0),
                         )
-                    except Exception:
+                    except Exception as e:
+                        try:
+                            logger.debug('Exception caught: %s', e, exc_info=True)
+                        except NameError:
+                            pass
                         pass
                     continue
 
@@ -1357,7 +1453,11 @@ class RegimeMasterBot:
                             cycle=self._cycle_count,
                             rsi_1h=self._coin_states.get(sym, {}).get("rsi_1h", 50.0),
                         )
-                    except Exception:
+                    except Exception as e:
+                        try:
+                            logger.debug('Exception caught: %s', e, exc_info=True)
+                        except NameError:
+                            pass
                         pass
                     continue
                     # All remaining candidates will also fail — break out
@@ -1385,7 +1485,11 @@ class RegimeMasterBot:
                             cycle=self._cycle_count,
                             rsi_1h=self._coin_states.get(sym, {}).get("rsi_1h", 50.0),
                         )
-                    except Exception:
+                    except Exception as e:
+                        try:
+                            logger.debug('Exception caught: %s', e, exc_info=True)
+                        except NameError:
+                            pass
                         pass
                     continue
 
@@ -1448,11 +1552,11 @@ class RegimeMasterBot:
                         # Low-β coins (≤0.50): trade on own signal, BTC less relevant.
                         _btc_correlation = None
                         try:
-                            from data_pipeline import fetch_klines as _fk
+
                             _c_df  = _fk(sym,      "1h", 100)
                             _b_df  = _fk("BTCUSDT", "1h", 100)
                             if _c_df is not None and _b_df is not None and len(_c_df) >= 20 and len(_b_df) >= 20:
-                                import numpy as _np
+
                                 _c_ret = _c_df["close"].pct_change().dropna()
                                 _b_ret = _b_df["close"].pct_change().dropna()
                                 _n = min(len(_c_ret), len(_b_ret))
@@ -1460,7 +1564,11 @@ class RegimeMasterBot:
                                     _c_ret.iloc[-_n:].values,
                                     _b_ret.iloc[-_n:].values
                                 )[0, 1]), 3)
-                        except Exception:
+                        except Exception as e:
+                            try:
+                                logger.debug('Exception caught: %s', e, exc_info=True)
+                            except NameError:
+                                pass
                             pass  # Non-fatal — Athena will see N/A
 
                         llm_ctx = {
@@ -1532,7 +1640,7 @@ class RegimeMasterBot:
                            top["side"], seg_name, top.get("confidence", 0),
                            f"Athena vetoed: {athena_decision.action} — {athena_decision.reasoning[:80]}")
                     # ── Veto Log: record for retrospective analysis ─────────────────────────
-                    import datetime as _dt
+
                     self._veto_log.append({
                         "symbol":     sym,
                         "price":      current_price,
@@ -1562,7 +1670,7 @@ class RegimeMasterBot:
                         del self._pending_signals[sym]
                     # ── Telegram VETO alert ────────────────────────────────────────
                     try:
-                        import telegram as _tg
+
                         _tg.notify_athena_veto(
                             sym=sym,
                             side=top.get("side", ""),
@@ -1611,7 +1719,7 @@ class RegimeMasterBot:
                             "suggested_tp": getattr(athena_decision, "suggested_tp", 0),
                         }
                         try:
-                            import telegram as _tg
+
                             _tg.notify_athena_veto(
                                 sym=sym,
                                 side=trade_side,
@@ -1619,7 +1727,11 @@ class RegimeMasterBot:
                                 reasoning=f"BTC MACRO VETO: {_direction} blocked — BTC is {btc_regime}, needs ≥{btc_counter_threshold*100:.0f}%",
                                 segment=seg_name,
                             )
-                        except Exception:
+                        except Exception as e:
+                            try:
+                                logger.debug('Exception caught: %s', e, exc_info=True)
+                            except NameError:
+                                pass
                             pass
                         continue
 
@@ -1692,7 +1804,11 @@ class RegimeMasterBot:
                         cycle=self._cycle_count,
                         rsi_1h=self._coin_states.get(sym, {}).get("rsi_1h", 50.0),
                     )
-                except Exception:
+                except Exception as e:
+                    try:
+                        logger.debug('Exception caught: %s', e, exc_info=True)
+                    except NameError:
+                        pass
                     pass
 
                 logger.info(
@@ -1897,7 +2013,11 @@ class RegimeMasterBot:
                 full_records = [t for t in active if t["symbol"] in deployed_syms]
                 # Use full records if available (has SL/TP), else use collected data
                 tg.notify_batch_entries(full_records if full_records else deployed_trades)
-            except Exception:
+            except Exception as e:
+                try:
+                    logger.debug('Exception caught: %s', e, exc_info=True)
+                except NameError:
+                    pass
                 pass
 
         # ── 6. Save state for dashboard ──────────────────────────
@@ -1944,7 +2064,7 @@ class RegimeMasterBot:
             if not dashboard_url:
                 return  # no dashboard URL configured — silent skip
 
-            secret = os.environ.get("ENGINE_INTERNAL_SECRET", "synaptic-internal-2024")
+            secret = os.environ.get("ENGINE_INTERNAL_SECRET", "")
 
             # Collect per-coin scan results from _coin_states
             coin_results = []
@@ -1995,7 +2115,11 @@ class RegimeMasterBot:
                         "segments": segments_list,
                         "btc_24h": btc_24h
                     }
-            except Exception:
+            except Exception as e:
+                try:
+                    logger.debug('Exception caught: %s', e, exc_info=True)
+                except NameError:
+                    pass
                 pass
 
             # BTC state for market context
@@ -2050,7 +2174,7 @@ class RegimeMasterBot:
         df_1h = fetch_klines(symbol, config.TIMEFRAME_CONFIRMATION, limit=config.HMM_LOOKBACK)
         if (df_1h is None or len(df_1h) < 60) and symbol == "BTCUSDT":
             # Retry once after a short delay before declaring STALE
-            import time as _t
+
             _t.sleep(2)
             df_1h = fetch_klines(symbol, config.TIMEFRAME_CONFIRMATION, limit=config.HMM_LOOKBACK)
         if df_1h is None or len(df_1h) < 60:
@@ -2178,7 +2302,7 @@ class RegimeMasterBot:
             current_atr = float(df_1h_feat["atr"].iloc[-1]) if "atr" in df_1h_feat.columns else 0.0
             
             # Extract strict momentum and liquidity sweep indicators
-            from feature_engine import compute_trend
+
             
             # User request: Check momentum trend on 5m timeframe for faster entry alignment
             df_5m = fetch_klines(symbol, "5m", limit=100)
@@ -2387,7 +2511,11 @@ class RegimeMasterBot:
                 "oi_change":     0.0, # Not available in API
                 "funding":       round(live_fund, 8),
             }
-        except Exception:
+        except Exception as e:
+            try:
+                logger.debug('Exception caught: %s', e, exc_info=True)
+            except NameError:
+                pass
             pass
         # Fetch real Binance 24h volume for this coin
         _volume_24h = 0.0
@@ -2395,7 +2523,11 @@ class RegimeMasterBot:
             client = _get_binance_client()
             ticker = client.get_ticker(symbol=symbol)
             _volume_24h = round(float(ticker.get("quoteVolume", 0)), 2)
-        except Exception:
+        except Exception as e:
+            try:
+                logger.debug('Exception caught: %s', e, exc_info=True)
+            except NameError:
+                pass
             # Fallback: compute from 1h candles
             try:
                 vol_col = "volume" if "volume" in df_1h_feat.columns else None
@@ -2403,7 +2535,11 @@ class RegimeMasterBot:
                     close_col = df_1h_feat["close"].tail(24)
                     vol_vals = df_1h_feat[vol_col].tail(24)
                     _volume_24h = round(float((close_col * vol_vals).sum()), 2)
-            except Exception:
+            except Exception as e:
+                try:
+                    logger.debug('Exception caught: %s', e, exc_info=True)
+                except NameError:
+                    pass
                 pass
 
         self._coin_states[symbol] = {
@@ -2580,7 +2716,11 @@ class RegimeMasterBot:
                 df_5m_feat = compute_all_features(df_5m)
                 price_now   = float(df_5m_feat["close"].iloc[-1])
                 price_5_ago = float(df_5m_feat["close"].iloc[-5])
-        except Exception:
+        except Exception as e:
+            try:
+                logger.debug('Exception caught: %s', e, exc_info=True)
+            except NameError:
+                pass
             pass
 
         if self._orderflow:
@@ -2633,7 +2773,11 @@ class RegimeMasterBot:
                 if side == "SELL" and price_now >= price_5_ago:
                     self._coin_states[symbol]["action"] = "5M_FILTER_SKIP"
                     return None
-            except Exception:
+            except Exception as e:
+                try:
+                    logger.debug('Exception caught: %s', e, exc_info=True)
+                except NameError:
+                    pass
                 pass
 
         # 5. Full 4-factor conviction score
@@ -2761,12 +2905,16 @@ class RegimeMasterBot:
         if opened_at:
             try:
                 if isinstance(opened_at, str):
-                    from dateutil import parser as _dp
+
                     opened_dt = _dp.parse(opened_at.replace("Z", "+00:00")).replace(tzinfo=None)
                 else:
                     opened_dt = opened_at
                 hold_mins = (now - opened_dt).total_seconds() / 60
-            except Exception:
+            except Exception as e:
+                try:
+                    logger.debug('Exception caught: %s', e, exc_info=True)
+                except NameError:
+                    pass
                 pass
 
         cooldown_mins = 0
@@ -2804,7 +2952,7 @@ class RegimeMasterBot:
         # Rule 5: daily cap exceeded → block to UTC midnight
         daily_cap = getattr(config, "COOLDOWN_DAILY_CAP_TRADES", 3)
         if len(self._coin_daily_trades[sym]) >= daily_cap:
-            from datetime import timezone
+
             midnight = (now + timedelta(days=1)).replace(hour=0, minute=0, second=0, microsecond=0)
             mins_to_midnight = (midnight - now).total_seconds() / 60
             if mins_to_midnight > cooldown_mins:
@@ -2992,7 +3140,11 @@ class RegimeMasterBot:
         try:
             all_trades = tradebook.get_all_trades() if hasattr(tradebook, "get_all_trades") else []
             recent_closed = {_build_pos_key(t.get("bot_id", ""), t["symbol"]): t for t in all_trades if (t.get("status") or "").lower() != "active"}
-        except Exception:
+        except Exception as e:
+            try:
+                logger.debug('Exception caught: %s', e, exc_info=True)
+            except NameError:
+                pass
             recent_closed = {}
 
         closed_out = [key for key in self._active_positions if key not in active_pos_keys]
@@ -3020,7 +3172,7 @@ class RegimeMasterBot:
           3. Detects exchange-side closures → close in tradebook
           4. Updates mark prices for P&L calculation
         """
-        import coindcx_client as cdx
+
 
         try:
             cdx_positions = cdx.list_positions()
@@ -3037,7 +3189,11 @@ class RegimeMasterBot:
             pair = p.get("pair", "")
             try:
                 symbol = cdx.from_coindcx_pair(pair)
-            except Exception:
+            except Exception as e:
+                try:
+                    logger.debug('Exception caught: %s', e, exc_info=True)
+                except NameError:
+                    pass
                 continue
             cdx_active[symbol] = {
                 "pair":          pair,
@@ -3123,12 +3279,16 @@ class RegimeMasterBot:
 
             # Compute ATR (best-effort) for trailing
             try:
-                from data_pipeline import fetch_klines
-                from feature_engine import compute_all_features
+
+
                 df = fetch_klines(sym, "1h", limit=200)
                 df_feat = compute_all_features(df)
                 atr = float(df_feat["atr"].iloc[-1])
-            except Exception:
+            except Exception as e:
+                try:
+                    logger.debug('Exception caught: %s', e, exc_info=True)
+                except NameError:
+                    pass
                 atr = pos["avg_price"] * 0.015  # fallback 1.5%
 
             capital = pos["locked_margin"] if pos["locked_margin"] > 0 else 100.0
@@ -3207,7 +3367,11 @@ class RegimeMasterBot:
                 try:
                     with open(config.MULTI_STATE_FILE, "r") as f:
                         existing = json.load(f)
-                except Exception:
+                except Exception as e:
+                    try:
+                        logger.debug('Exception caught: %s', e, exc_info=True)
+                    except NameError:
+                        pass
                     existing = {}
 
             # Merge: keep all existing coin_states, overlay active-trade updates
@@ -3279,7 +3443,11 @@ class RegimeMasterBot:
         try:
             with open(config.STATE_FILE, "w") as f:
                 json.dump(legacy_state, f, indent=2)
-        except Exception:
+        except Exception as e:
+            try:
+                logger.debug('Exception caught: %s', e, exc_info=True)
+            except NameError:
+                pass
             pass
 
         # Multi-coin state
@@ -3349,7 +3517,7 @@ class RegimeMasterBot:
 
     def _process_commands(self):
         """Check for external commands (from dashboard kill switch)."""
-        import os
+
         try:
             if not os.path.exists(config.COMMANDS_FILE):
                 return
@@ -3391,7 +3559,7 @@ if __name__ == "__main__":
     # These run on separate cycles (15m / 60m / 4h) and have NO dependency
     # on the HMM engine, Athena, or any veto gate below.
     try:
-        from strategies.strategy_runner import StrategyRunner
+
         _sr = StrategyRunner()
         _sr_thread = threading.Thread(
             target=_sr.run_forever,

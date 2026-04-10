@@ -29,7 +29,11 @@ def _load_book():
     try:
         with open(TRADEBOOK_FILE, "r") as f:
             return json.load(f)
-    except Exception:
+    except Exception as e:
+        try:
+            logger.debug('Exception caught: %s', e, exc_info=True)
+        except NameError:
+            pass
         return {"trades": [], "summary": {}}
 
 
@@ -326,7 +330,11 @@ def close_trade(trade_id=None, symbol=None, exit_price=None, reason="MANUAL", ex
                     cdx_pair = target.get("pair") or cdx.to_coindcx_pair(target["symbol"])
                     if cdx_pair:
                         px = cdx.get_current_price(cdx_pair)
-                except Exception:
+                except Exception as e:
+                    try:
+                        logger.debug('Exception caught: %s', e, exc_info=True)
+                    except NameError:
+                        pass
                     pass
             if px is None:
                 px = get_current_price(target["symbol"]) or target["entry_price"]
@@ -576,7 +584,11 @@ def _book_partial_inline(trade, book, exit_price, qty_frac, reason):
     # Telegram notification
     try:
         tg.notify_trade_close(child_trade)
-    except Exception:
+    except Exception as e:
+        try:
+            logger.debug('Exception caught: %s', e, exc_info=True)
+        except NameError:
+            pass
         pass
 
     return child_trade
@@ -631,7 +643,11 @@ def _close_trade_inline(trade, exit_price, reason):
         tg.notify_trade_close(trade)
         if reason == "MAX_LOSS":
             tg.notify_max_loss(trade["symbol"], pnl_pct, trade["trade_id"])
-    except Exception:
+    except Exception as e:
+        try:
+            logger.debug('Exception caught: %s', e, exc_info=True)
+        except NameError:
+            pass
         pass
 
 
@@ -683,7 +699,11 @@ def _update_single_trade(trade, book, prices, funding_rates):
                 cdx_pair = trade.get("pair") or cdx.to_coindcx_pair(symbol)
                 if cdx_pair:
                     current = cdx.get_current_price(cdx_pair)
-            except Exception:
+            except Exception as e:
+                try:
+                    logger.debug('Exception caught: %s', e, exc_info=True)
+                except NameError:
+                    pass
                 current = None
         else:
             current = None
@@ -727,7 +747,11 @@ def _update_single_trade(trade, book, prices, funding_rates):
             trade["funding_cost"] = round(trade["funding_cost"] + new_cost, 6)
             trade["funding_payments"] += intervals
             trade["last_funding_check"] = datetime.now(timezone.utc).isoformat()
-    except Exception:
+    except Exception as e:
+        try:
+            logger.debug('Exception caught: %s', e, exc_info=True)
+        except NameError:
+            pass
         pass
 
     funding_cost = trade.get("funding_cost", 0)
@@ -1105,7 +1129,11 @@ def _update_single_trade(trade, book, prices, funding_rates):
                     try:
                         from execution_engine import ExecutionEngine
                         ExecutionEngine.close_position_live(symbol)
-                    except Exception:
+                    except Exception as e:
+                        try:
+                            logger.debug('Exception caught: %s', e, exc_info=True)
+                        except NameError:
+                            pass
                         pass
                 _close_trade_inline(trade, current, reason)
                 return

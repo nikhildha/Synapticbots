@@ -63,7 +63,11 @@ def _clear_pid_lock():
     try:
         if os.path.exists(ENGINE_PID_FILE):
             os.remove(ENGINE_PID_FILE)
-    except Exception:
+    except Exception as e:
+        try:
+            logger.debug('Exception caught: %s', e, exc_info=True)
+        except NameError:
+            pass
         pass
 
 
@@ -74,7 +78,11 @@ def _is_pid_alive(pid: int) -> bool:
         return True
     except (ProcessLookupError, PermissionError):
         return False
-    except Exception:
+    except Exception as e:
+        try:
+            logger.debug('Exception caught: %s', e, exc_info=True)
+        except NameError:
+            pass
         return False
 
 
@@ -89,7 +97,11 @@ def _wait_for_old_engine_to_die(timeout: int = 45) -> bool:
     try:
         with open(ENGINE_PID_FILE) as f:
             old_pid = int(f.read().strip())
-    except Exception:
+    except Exception as e:
+        try:
+            logger.debug('Exception caught: %s', e, exc_info=True)
+        except NameError:
+            pass
         return True  # Unreadable lock → assume safe
 
     if old_pid == os.getpid():
@@ -130,7 +142,11 @@ def _load_crash_log():
         if os.path.exists(CRASH_LOG_FILE):
             with open(CRASH_LOG_FILE, "r") as f:
                 return json.loads(f.read())
-    except Exception:
+    except Exception as e:
+        try:
+            logger.debug('Exception caught: %s', e, exc_info=True)
+        except NameError:
+            pass
         pass
     return {"boots": 0, "total_crashes": 0, "crashes": []}
 
@@ -161,7 +177,11 @@ def _increment_boot_count():
         with open(CRASH_LOG_FILE, "w") as f:
             f.write(json.dumps(log, indent=2))
         return log["boots"]
-    except Exception:
+    except Exception as e:
+        try:
+            logger.debug('Exception caught: %s', e, exc_info=True)
+        except NameError:
+            pass
         return 0
 
 def _get_memory_mb():
@@ -173,14 +193,22 @@ def _get_memory_mb():
         if os.uname().sysname == "Darwin":
             return round(rusage.ru_maxrss / 1024 / 1024, 1)
         return round(rusage.ru_maxrss / 1024, 1)
-    except Exception:
+    except Exception as e:
+        try:
+            logger.debug('Exception caught: %s', e, exc_info=True)
+        except NameError:
+            pass
         try:
             # Fallback: read /proc/self/status on Linux
             with open("/proc/self/status") as f:
                 for line in f:
                     if line.startswith("VmRSS:"):
                         return round(int(line.split()[1]) / 1024, 1)
-        except Exception:
+        except Exception as e:
+            try:
+                logger.debug('Exception caught: %s', e, exc_info=True)
+            except NameError:
+                pass
             pass
     return 0
 
@@ -207,7 +235,11 @@ class _BufferHandler(logging.Handler):
             msg = f"[{ts}] {record.getMessage()}"
             with _log_lock:
                 _log_buffer.append(msg)
-        except Exception:
+        except Exception as e:
+            try:
+                logger.debug('Exception caught: %s', e, exc_info=True)
+            except NameError:
+                pass
             pass
 
 # Install buffer handler on root logger so ALL engine output is captured
@@ -558,7 +590,11 @@ def api_close_trade():
                         ticker = cdx.get_ticker(cdx_pair)
                         if ticker:
                             actual_exit_price = float(ticker.get("last_price", 0))
-                except Exception:
+                except Exception as e:
+                    try:
+                        logger.debug('Exception caught: %s', e, exc_info=True)
+                    except NameError:
+                        pass
                     pass
 
             except Exception as e:
@@ -1143,7 +1179,11 @@ def _run_engine_inner():
                 f"Total crashes this boot: {_engine_crash_count}\n\n"
                 "⏳ Auto-recovery in 5 minutes..."
             )
-        except Exception:
+        except Exception as e:
+            try:
+                logger.debug('Exception caught: %s', e, exc_info=True)
+            except NameError:
+                pass
             pass
 
         # Wait 5 minutes then try again (infinite recovery)
@@ -1159,7 +1199,11 @@ def _setup_sigterm_handler():
         if _engine_bot:
             try:
                 _engine_bot._running = False
-            except Exception:
+            except Exception as e:
+                try:
+                    logger.debug('Exception caught: %s', e, exc_info=True)
+                except NameError:
+                    pass
                 pass
         # Give the engine thread 15s to wind down
         if _engine_thread and _engine_thread.is_alive():
@@ -1168,7 +1212,11 @@ def _setup_sigterm_handler():
         try:
             if os.path.exists(_STARTUP_LOCK_FILE):
                 os.remove(_STARTUP_LOCK_FILE)
-        except Exception:
+        except Exception as e:
+            try:
+                logger.debug('Exception caught: %s', e, exc_info=True)
+            except NameError:
+                pass
             pass
         logger.info("👋 Engine shut down cleanly after SIGTERM")
         sys.exit(0)
@@ -1243,7 +1291,11 @@ def api_force_signal():
                 df2 = compute_all_features(df)
                 if "atr" in df2.columns:
                     atr = float(df2["atr"].iloc[-1])
-        except Exception:
+        except Exception as e:
+            try:
+                logger.debug('Exception caught: %s', e, exc_info=True)
+            except NameError:
+                pass
             pass
 
         quantity = (capital * leverage) / max(price, 0.0001)
@@ -1344,7 +1396,11 @@ def api_athena_log():
                 continue
             try:
                 rec = json.loads(ln)
-            except Exception:
+            except Exception as e:
+                try:
+                    logger.debug('Exception caught: %s', e, exc_info=True)
+                except NameError:
+                    pass
                 continue
             if symbol   and rec.get("symbol", "") != symbol:
                 continue
@@ -1356,7 +1412,11 @@ def api_athena_log():
                 try:
                     if rec.get("ts", "")[:10] < from_str[:10]:
                         continue
-                except Exception:
+                except Exception as e:
+                    try:
+                        logger.debug('Exception caught: %s', e, exc_info=True)
+                    except NameError:
+                        pass
                     pass
             rows.append(rec)
             if len(rows) >= limit:
@@ -1420,7 +1480,11 @@ def api_broadcast_log():
                     # Apply bot_id filter — skip lines that don't match allowed bots
                     if allowed_bot_ids and entry["bot_id"] and entry["bot_id"] not in allowed_bot_ids:
                         continue
-            except Exception:
+            except Exception as e:
+                try:
+                    logger.debug('Exception caught: %s', e, exc_info=True)
+                except NameError:
+                    pass
                 pass
             parsed.append(entry)
             if len(parsed) >= n:
@@ -1448,7 +1512,11 @@ def api_restart():
     if _engine_bot:
         try:
             _engine_bot._running = False
-        except Exception:
+        except Exception as e:
+            try:
+                logger.debug('Exception caught: %s', e, exc_info=True)
+            except NameError:
+                pass
             pass
 
     # Wait briefly for thread to die
@@ -1492,7 +1560,11 @@ def _engine_watchdog():
                     "Engine thread was found dead.\n"
                     "Auto-restarting now..."
                 )
-            except Exception:
+            except Exception as e:
+                try:
+                    logger.debug('Exception caught: %s', e, exc_info=True)
+                except NameError:
+                    pass
                 pass
             start_engine()
 
@@ -1614,7 +1686,11 @@ def api_exchange_health():
         try:
             positions = cdx.list_positions()
             pos_count = len(positions) if isinstance(positions, list) else 0
-        except Exception:
+        except Exception as e:
+            try:
+                logger.debug('Exception caught: %s', e, exc_info=True)
+            except NameError:
+                pass
             pos_count = -1  # -1 = could not fetch position count
         return jsonify({
             "mode": "live",

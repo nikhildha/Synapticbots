@@ -4,7 +4,7 @@ import { prisma } from '@/lib/prisma';
 export const dynamic = 'force-dynamic';
 
 // Internal engine-to-dashboard secret (set ENGINE_INTERNAL_SECRET in Railway env)
-const INTERNAL_SECRET = process.env.ENGINE_INTERNAL_SECRET || 'synaptic-internal-2024';
+const INTERNAL_SECRET = process.env.ENGINE_INTERNAL_SECRET || '';
 
 export async function POST(req: NextRequest) {
     // Lightweight auth: shared secret header
