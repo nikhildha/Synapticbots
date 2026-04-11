@@ -67,23 +67,23 @@ export async function syncEngineTrades(
 
     let synced = 0;
 
-    for (const t of engineTrades) {
+    await Promise.all(engineTrades.map(async (t) => {
         try {
             // Parse entry time — engine uses "entry_timestamp", fallback to other names
             const rawTime = t.entry_timestamp || t.entry_time || t.entryTime || t.timestamp || '';
             const sanitized = String(rawTime).replace(/(\.\d{3})\d+/, '$1');
             const entryTime = rawTime ? new Date(sanitized) : new Date();
-            if (isNaN(entryTime.getTime())) continue;
+            if (isNaN(entryTime.getTime())) return;
 
             // Only sync trades after bot was started
-            if (botStartedAt && entryTime < botStartedAt) continue;
+            if (botStartedAt && entryTime < botStartedAt) return;
 
             const engineTradeId = t.trade_id || t.id;
-            if (!engineTradeId) continue;
+            if (!engineTradeId) return;
 
             // ── Excluded coin guard ──────────────────────────────────────────
             const tradeCoinRaw = (t.symbol || t.coin || '').toUpperCase();
-            if (COIN_EXCLUDE.has(tradeCoinRaw)) continue;
+            if (COIN_EXCLUDE.has(tradeCoinRaw)) return;
 
             const status = (t.status || 'active').toLowerCase();
             const side = (t.side || t.position || '').toLowerCase();
@@ -98,24 +98,19 @@ export async function syncEngineTrades(
             }
 
             // ── PRIMARY FILTER: bot_id ownership ─────────────────────────────────
-            // Engine stamps bot_id on every trade at deploy time (tradebook.py line 242).
-            // Only sync this trade to the bot that actually deployed it.
-            // If bot_id is missing (legacy trades before multi-bot), fall through to segment filter.
             const tradeBotId = (t.bot_id || t.botId || '').trim();
             if (tradeBotId) {
-                if (tradeBotId !== botId) continue;   // belongs to a different bot — skip
+                if (tradeBotId !== botId) return;   // belongs to a different bot — skip
             } else {
                 // ── FALLBACK: segment filter for legacy trades without bot_id ─────
                 if (botSegment && botSegment !== 'ALL') {
                     const pool = SEGMENT_POOLS[botSegment] || [];
                     const tradeCoin = (t.symbol || t.coin || '').toUpperCase();
-                    if (pool.length > 0 && !pool.includes(tradeCoin)) continue;
+                    if (pool.length > 0 && !pool.includes(tradeCoin)) return;
                 }
             }
 
             // ── SL/TP Sanity Check (fixes engine-side cross-contamination bug) ──
-            // Engine's tradebook.json has SL/TP AND atr_at_entry from wrong trades.
-            // We use percentage-based defaults relative to entry_price as fallback.
             const entryPrice = t.entry_price || t.entryPrice || 0;
             const leverage = t.leverage || 1;
             const isLong = side === 'buy' || side === 'long';
@@ -152,9 +147,6 @@ export async function syncEngineTrades(
                 }
             }
 
-            // trailing_sl: always use raw engine value — never apply sanity recalc.
-            // The engine sets this at runtime as price moves (breakeven, locked profit, etc.)
-            // It may equal the entry price for profitable stepped trades — that is intentional.
             const rawTrailingSl: number | null = t.trailing_sl ?? null;
 
             // Upsert: create if not exists, update PNL/status if exists
@@ -169,7 +161,6 @@ export async function syncEngineTrades(
                     position: side === 'buy' || side === 'long' ? 'long' : 'short',
                     regime: t.regime || '',
                     confidence: t.confidence || 0,
-                    // S9 FIX: normalize mode — strip exchange suffix (LIVE-COINDCX → live)
                     mode: (t.mode || 'paper').toLowerCase().startsWith('live') ? 'live' : 'paper',
                     leverage: t.leverage || 1,
                     capital: t.capital || t.position_size || 100,
@@ -185,14 +176,13 @@ export async function syncEngineTrades(
                     activePnlPercent: t.unrealized_pnl_pct || t.activePnlPercent || 0,
                     totalPnl: status === 'closed'
                         ? (t.realized_pnl || t.pnl || t.total_pnl || 0)
-                        : 0,  // Active trades start with 0 realized PnL (set on close)
+                        : 0,
                     totalPnlPercent: status === 'closed' ? (t.realized_pnl_pct || t.pnl_pct || 0) : 0,
                     exitReason: t.exit_reason || t.exitReason || null,
                     exitPercent: t.exit_percent || null,
                     exchangeOrderId: String(engineTradeId),
                     entryTime,
                     exitTime,
-                    // Multi-target fields (engine stores flat: t1_price, t2_price, t3_price)
                     t1Price: t.t1_price || null,
                     t2Price: t.t2_price || null,
                     t3Price: t.t3_price || null,
@@ -202,23 +192,17 @@ export async function syncEngineTrades(
                     trailingActive: t.trailing_active ?? false,
                     trailSlCount: t.trail_sl_count ?? 0,
                     steppedLockLevel: t.stepped_lock_level ?? -1,
-                    // Exit guard state — stamped every heartbeat by tradebook.py
                     exitGuardActive: t.exit_guard_active ?? true,
                     exitCheckAt:     t.exit_check_at ? new Date(t.exit_check_at) : null,
                     exitCheckPrice:  t.exit_check_price ?? null,
                     sessionId: activeSession?.id ?? null,
                 },
                 update: {
-                    // Only overwrite status when engine says 'closed'.
-                    // If engine says 'active', leave DB status alone — preserves MANUAL_CLOSE / BOT_STOPPED.
                     ...(status === 'closed' ? { status: 'closed' } : {}),
                     currentPrice: t.current_price || t.currentPrice || null,
                     exitPrice: t.exit_price || t.exitPrice || null,
                     activePnl: t.unrealized_pnl || t.active_pnl || 0,
                     activePnlPercent: t.unrealized_pnl_pct || t.activePnlPercent || 0,
-                    // BUG-1 FIX: Only overwrite totalPnl when engine reports closed.
-                    // If active, leave Prisma value untouched (undefined = no-op) so a race
-                    // condition between close-tick and active-tick doesn't wipe realized PnL.
                     ...(status === 'closed' ? {
                         totalPnl: t.realized_pnl || t.pnl || t.total_pnl || 0,
                         totalPnlPercent: t.realized_pnl_pct || t.pnl_pct || 0,
@@ -234,7 +218,6 @@ export async function syncEngineTrades(
                     trailingActive: t.trailing_active ?? false,
                     trailSlCount: t.trail_sl_count ?? 0,
                     steppedLockLevel: t.stepped_lock_level ?? -1,
-                    // Exit guard state — update every heartbeat
                     exitGuardActive: t.exit_guard_active ?? true,
                     exitCheckAt:     t.exit_check_at ? new Date(t.exit_check_at) : null,
                     exitCheckPrice:  t.exit_check_price ?? null,
@@ -243,10 +226,9 @@ export async function syncEngineTrades(
 
             synced++;
         } catch (err) {
-            // Log but don't fail the sync for one bad trade
             console.error(`[sync] Failed to sync trade ${t.trade_id}:`, err);
         }
-    }
+    }));
 
     return synced;
 }
@@ -364,9 +346,9 @@ export async function syncAthenaDecisions(
 
     let synced = 0;
 
-    for (const [symbol, state] of Object.entries(coinStates)) {
+    await Promise.all(Object.entries(coinStates).map(async ([symbol, state]) => {
         const athena = state?.athena_state;
-        if (!athena || !athena.action) continue;
+        if (!athena || !athena.action) return;
 
         // Derive segment from bot_deploy_statuses or pool_status
         const segment = state?.segment || state?.pool_segment || null;
@@ -428,7 +410,7 @@ export async function syncAthenaDecisions(
         } catch (err) {
             console.error(`[athena-sync] Failed for ${symbol} cycle ${cycle}:`, err);
         }
-    }
+    }));
 
     // ── Backfill P&L from closed trades ──
     try {

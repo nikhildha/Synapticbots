@@ -138,7 +138,7 @@ export function DashboardClient({ user, stats, bots, recentTrades, segmentPerf =
   useEffect(() => {
     setMounted(true);
     fetchBotState();
-    const interval = setInterval(fetchBotState, 15000); // refresh every 15s
+    const interval = setInterval(fetchBotState, 5000); // refresh every 5s
 
     // Fetch wallet balances once on mount, then every 60s
     const fetchWalletBalance = async () => {
@@ -431,11 +431,14 @@ export function DashboardClient({ user, stats, bots, recentTrades, segmentPerf =
   const paperPnlPct = paperCapital > 0 ? (paperTotalPnl / paperCapital * 100) : 0;
   const livePnlPct = liveCapital > 0 ? (liveTotalModePnl / liveCapital * 100) : 0;
 
-  const usedCapital = liveActiveTrades.length * CAPITAL_PER_TRADE;
-
   // Capital deployed: paper + live (active trades only)
-  const paperCapitalDeployed = paperActiveTrades.length * CAPITAL_PER_TRADE;
-  const liveCapitalDeployed = liveModeTrades.length * CAPITAL_PER_TRADE;
+  const calcDeployedCapital = (tradesList: any[]) => {
+    return tradesList.reduce((sum: number, t: any) => sum + (parseFloat(t.capital) || parseFloat(t.position_size) || 100), 0);
+  };
+
+  const usedCapital = calcDeployedCapital(liveActiveTrades);
+  const paperCapitalDeployed = calcDeployedCapital(paperActiveTrades);
+  const liveCapitalDeployed = calcDeployedCapital(liveModeTrades);
   const totalCapitalDeployed = paperCapitalDeployed + liveCapitalDeployed;
 
   // Detect trading mode — live if any active bot is live or live-mode trades exist
