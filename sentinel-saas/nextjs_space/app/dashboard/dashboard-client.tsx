@@ -5,7 +5,7 @@ import { Header } from '@/components/header';
 import { StatsCard } from '@/components/stats-card';
 import { BotCard } from '@/components/bot-card';
 import { SegmentPerformancePanel } from '@/components/segment-performance-panel';
-import { RegimeCard, PaperTradesCard, LiveTradesCard, ActivePositionsCard, BrainExecutionSummary } from '@/components/dashboard/command-center';
+import { RegimeCard, PaperTradesCard, LiveTradesCard, ActivePositionsCard } from '@/components/dashboard/command-center';
 
 import { AthenaPanel } from '@/components/dashboard/athena-panel';
 import { AthenaCockpit } from '@/components/dashboard/athena-cockpit';
@@ -801,18 +801,6 @@ export function DashboardClient({ user, stats, bots, recentTrades, segmentPerf =
               <SegmentPerformancePanel segments={segmentPerf} />
             </motion.div>
           )}
-
-          {/* ═══ Row 6: Brain Execution Scan Summary ═══ */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.35 }}
-            className="mt-8"
-          >
-            <BrainExecutionSummary coinStates={multi?.coin_states || {}} multi={multi} heatmap={botState?.heatmap || null} botId={bots.find(b => b.isActive)?.id || bots[0]?.id} pendingSignals={multi?.pending_signals_detail || []} />
-          </motion.div>
-
-
 
         </div>
       </main>
