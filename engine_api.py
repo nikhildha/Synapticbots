@@ -459,13 +459,12 @@ def api_all():
         tradebook = book
         
     engine = _read_json("engine_state.json", {"status": "running"})
-    heatmap = _read_json("segment_heatmap.json", {"segments": []})
+    legacy = _read_json("legacy_portfolio.json", {})
 
     return jsonify({
         "multi": multi,
         "tradebook": tradebook,
         "engine": engine,
-        "heatmap": heatmap,
         # Athena LLM Reasoning Layer state (from live bot object, not disk)
         "athena": _engine_bot._athena.get_state() if _engine_bot and hasattr(_engine_bot, '_athena') and _engine_bot._athena else {"enabled": False},
         # List of bot IDs currently registered with the engine (cleared on restart).

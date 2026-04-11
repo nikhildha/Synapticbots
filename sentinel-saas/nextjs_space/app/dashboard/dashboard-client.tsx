@@ -9,7 +9,6 @@ import { RegimeCard, PaperTradesCard, LiveTradesCard, ActivePositionsCard } from
 
 import { AthenaIntelligenceFeed } from '@/components/dashboard/athena-stream';
 import { MarketStructurePanel } from '@/components/dashboard/market-structure';
-import { SegmentHeatmap } from '@/components/dashboard/segment-heatmap';
 import { Bot, TrendingUp, Activity, DollarSign, Zap } from 'lucide-react';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
@@ -689,7 +688,7 @@ export function DashboardClient({ user, stats, bots, recentTrades, segmentPerf =
 
 
 
-          {/* ═══ Row 4: Segment Heatmap & Athena Intelligence ═══ */}
+          {/* ═══ Row 4: Athena Intelligence ═══ */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -697,9 +696,6 @@ export function DashboardClient({ user, stats, bots, recentTrades, segmentPerf =
             className="mb-8"
           >
             <div className="flex flex-col gap-8 w-full">
-              <SegmentHeatmap
-                heatmapData={botState?.heatmap || null}
-              />
               <AthenaIntelligenceFeed vetoLog={botState?.multi?.veto_log || []} />
             </div>
           </motion.div>

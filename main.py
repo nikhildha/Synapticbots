@@ -22,7 +22,6 @@ from feature_engine import compute_all_features, compute_hmm_features, compute_t
 
 # ── Hoisted Local Imports ──
 from ai4trade_client import AI4TradeClient
-from coin_scanner import get_hottest_segments as _refresh_heatmap
 from state_manager import StateManager
 from coin_analyzer import CoinAnalyzer
 from risk_manager import RiskManager
@@ -566,7 +565,16 @@ class RegimeMasterBot:
             except Exception as _rest_err:
                 logger.debug("REST supplement price fetch failed: %s", _rest_err)
 
-            # Pass combined prices (WS + REST supplement) to update_unrealized
+            # Merge the engine's global live prices (which contains Paper/CoinDCX feeds)
+            # over the Binance ws_prices to guarantee no paper-trade fallback latency.
+            if hasattr(self, '_live_prices') and isinstance(self._live_prices, dict):
+                for _k, _v in self._live_prices.items():
+                    if _k not in ws_prices and 'price' in _v:
+                        ws_prices[_k] = float(_v['price'])
+                    elif _k not in ws_prices and isinstance(_v, (int, float)):
+                         ws_prices[_k] = float(_v)
+
+            # Pass combined prices (WS + REST supplement + Live Cache) to update_unrealized
             tradebook.update_unrealized(funding_rates=funding_rates, prices=ws_prices or None)
         except Exception as e:
             logger.warning("⚠️ Tradebook unrealized update error (max-loss/SL/TP guards may not have run): %s", e, exc_info=True)
@@ -764,16 +772,6 @@ class RegimeMasterBot:
                                    len(_btc_warm) if _btc_warm is not None else "None")
             except Exception as _pw_err:
                 logger.warning("⚠️  BTC 1h pre-warm exception: %s", _pw_err)
-
-            # Always refresh the segment heatmap JSON every cycle (cheap Binance ticker call)
-            # This keeps the dashboard heatmap live even when the pool is not being rebuilt
-            try:
-                # Find which segments are currently blocked across the engine
-                blocked_segments = {seg for seg in config.CRYPTO_SEGMENTS.keys() if self.risk_manager.is_segment_in_cooldown(seg)[0]}
-
-                _refresh_heatmap(getattr(config, "SEGMENT_SCAN_LIMIT", 2), blocked_segments)
-            except Exception as _he:
-                logger.warning("⚠️  Heatmap refresh failed (non-fatal): %s", _he)
 
             # ── Market Structure Analysis (Removed) ─────────────
 
@@ -1993,40 +1991,6 @@ class RegimeMasterBot:
                     "athena_decision": state.get("athena_decision"),
                 })
 
-            # Collect segment heatmap data
-            heatmap = {}
-            try:
-                heatmap_file = getattr(config, "HEATMAP_STATE_FILE", "data/segment_heatmap.json")
-                if os.path.exists(heatmap_file):
-                    with open(heatmap_file, "r") as f:
-                        hmap = json.load(f)
-                    segs = hmap.get("segments", [])
-                    btc_24h = hmap.get("btc_24h", 0)
-                    selected = {s.get("segment") for s in segs[:2]}  # top-2 are selected
-                    
-                    segments_list = []
-                    for i, seg in enumerate(segs):
-                        segments_list.append({
-                            "segment":         seg.get("segment"),
-                            "composite_score": seg.get("composite_score"),
-                            "vw_rr":           seg.get("vw_rr"),
-                            "btc_alpha":       seg.get("btc_alpha"),
-                            "breadth_pct":     seg.get("breadth_pct"),
-                            "is_selected":     seg.get("segment") in selected,
-                            "rank":            i + 1,
-                        })
-                    
-                    heatmap = {
-                        "segments": segments_list,
-                        "btc_24h": btc_24h
-                    }
-            except Exception as e:
-                try:
-                    logger.debug('Exception caught: %s', e, exc_info=True)
-                except NameError:
-                    pass
-                pass
-
             # BTC state for market context
             btc_state = self._coin_states.get("BTCUSDT", {})
             active_bots = list(config.ENGINE_ACTIVE_BOTS)
@@ -2048,7 +2012,6 @@ class RegimeMasterBot:
                 "deployed_count": deployed,
                 "filtered_count": max(0, len(self._coin_states) - len(deployed_trades)),
                 "coin_results":   coin_results,
-                "heatmap":        heatmap,
             }
 
             data = json.dumps(payload).encode("utf-8")
