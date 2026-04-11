@@ -1111,6 +1111,17 @@ def _run_engine():
     _write_pid_lock()
     logger.info("🔒 Engine PID lock acquired (PID %d)", os.getpid())
 
+    # ── Start Independent Strategy Runner ─────────────────────────────
+    try:
+        from strategies.strategy_runner import StrategyRunner
+        import threading
+        _sr = StrategyRunner()
+        _sr_thread = threading.Thread(target=_sr.run_forever, daemon=True, name="StrategyRunner")
+        _sr_thread.start()
+        logger.info("✅ StrategyRunner thread spawned (Pyxis/Axiom/Ratio)")
+    except Exception as e:
+        logger.error("❌ Failed to start StrategyRunner: %s", e)
+
     try:
       _run_engine_inner()
     finally:
