@@ -502,6 +502,22 @@ def api_gemini_health():
         return jsonify({"status": "error", "message": f"Key validation failed: {str(e)[:200]}", "key_set": True})
 
 
+@app.route("/api/exchange-positions", methods=["GET"])
+def api_exchange_positions():
+    """Securely proxy real-time position data natively from the active exchange."""
+    if config.PAPER_TRADE:
+        return jsonify({"positions": [], "mode": "paper", "message": "Cannot fetch exchange data in Paper Mode"})
+    
+    try:
+        import coindcx_client as cdx
+        pos_list = cdx.list_positions()
+        return jsonify({"positions": pos_list, "mode": "live", "error": None})
+    except Exception as e:
+        logger.error(f"Failed to fetch exchange positions: {e}")
+        return jsonify({"positions": [], "mode": "live", "error": str(e)})
+
+
+
 @app.route("/api/health", methods=["GET"])
 def api_health():
     """Engine health check with uptime and status."""

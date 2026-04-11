@@ -1,9 +1,14 @@
-import { PrismaClient } from '@prisma/client';
-const prisma = new PrismaClient();
+import { PrismaClient } from '@prisma/client'
+
+const prisma = new PrismaClient()
+
 async function main() {
   const bots = await prisma.bot.findMany({
-    where: { isActive: true },
-  });
-  console.log(bots.length + " active bots found");
+    select: { id: true, name: true }
+  })
+  console.log(JSON.stringify(bots, null, 2))
 }
-main().catch(console.error).finally(() => prisma.$disconnect());
+
+main()
+  .catch(e => console.error(e))
+  .finally(async () => await prisma.$disconnect())

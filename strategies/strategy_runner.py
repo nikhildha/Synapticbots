@@ -217,9 +217,11 @@ class StrategyRunner:
             qty = exec_result.get("quantity", qty)
             rm_id = exec_result.get("rm_id")
             exchange = exec_result.get("exchange", "coindcx")
+            deployed_capital = exec_result.get("capital", user_capital)
         else:
             rm_id = None
             exchange = None
+            deployed_capital = user_capital
 
         # Write to tradebook — aligned with exact open_trade() signature
         try:
@@ -233,7 +235,7 @@ class StrategyRunner:
                 regime=f"STRATEGY:{strategy}",
                 confidence=conviction / 100.0,
                 reason=f"{strategy} signal",
-                capital=user_capital,
+                capital=deployed_capital,
                 mode=mode,
                 user_id=user_id,
                 bot_id=bot_id,
