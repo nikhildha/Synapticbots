@@ -9,6 +9,39 @@ logger = logging.getLogger("RiskManager")
 class RiskManager:
     def __init__(self, engine):
         self.engine = engine
+        self.is_killed = False
+        self._equity_history = []  # List of (timestamp, equity)
+
+    def record_equity(self, balance: float) -> None:
+        """Record equity point for drawdown calculation."""
+        now = datetime.utcnow()
+        self._equity_history.append((now, balance))
+        # Keep last 24h
+        cutoff = now - timedelta(hours=24)
+        self._equity_history = [(t, e) for t, e in self._equity_history if t >= cutoff]
+
+    def check_kill_switch(self) -> bool:
+        """Check if 24h drawdown exceeds 10% KILL_SWITCH_DRAWDOWN."""
+        if self.is_killed:
+            return True
+
+        if not self._equity_history:
+            return False
+
+        max_equity = max(e for _, e in self._equity_history)
+        current_equity = self._equity_history[-1][1]
+        drawdown_pct = (max_equity - current_equity) / max_equity if max_equity > 0 else 0
+
+        threshold = getattr(config, 'KILL_SWITCH_DRAWDOWN', 0.10)
+        if drawdown_pct >= threshold:
+            logger.critical("🚨 KILL SWITCH TRIGGERED: Drawdown %.1f%% (Max: $%.2f, Now: $%.2f)", drawdown_pct * 100, max_equity, current_equity)
+            self.is_killed = True
+            return True
+        return False
+
+    def reset_kill_switch(self) -> None:
+        """Reset the kill switch."""
+        self.is_killed = False
 
     def apply_cooldown(self, sym: str, trade: dict) -> None:
         if not getattr(config, "COOLDOWN_ENABLED", True):
