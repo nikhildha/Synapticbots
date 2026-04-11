@@ -310,12 +310,16 @@ export function DashboardClient({ user, stats, bots, recentTrades, segmentPerf =
     bot_name: 'Synaptic Adaptive',
     mode: t.mode || 'paper',
   }));
-  // Priority: Prisma trades → raw engine trades → SSR trades
-  const trades = apiTrades.length > 0
-    ? apiTrades
-    : rawEngineActiveTrades.length > 0
-      ? rawEngineActiveTrades
-      : ssrTradesNormalized;
+  // Priority Merge: Combine Prisma API trades with raw engine active trades (to catch instantly deploying trades before DB sync)
+  const apiTradeIds = new Set(apiTrades.map((t: any) => t.trade_id || t.id));
+  const newEngineTrades = rawEngineActiveTrades.filter((t: any) => !apiTradeIds.has(t.trade_id));
+  
+  const trades = [
+    ...apiTrades, 
+    ...newEngineTrades
+  ].length > 0 
+    ? [...apiTrades, ...newEngineTrades]
+    : ssrTradesNormalized;
 
   // Extract BTC multi-timeframe data for regime card — prefer coin_states over stale state
   const btcState = multi?.coin_states?.['BTCUSDT'] || {};
@@ -338,7 +342,7 @@ export function DashboardClient({ user, stats, bots, recentTrades, segmentPerf =
 
   // Apply session scope filter
   const liveTrades = pnlScope === 'session' && currentSessionId
-    ? allTrades.filter((t: any) => t.sessionId === currentSessionId)
+    ? allTrades.filter((t: any) => t.sessionId === currentSessionId || t._source === 'engine_raw')
     : allTrades;
 
   const liveActiveTrades = liveTrades.filter((t: any) => (t.status || '').toUpperCase() === 'ACTIVE');
