@@ -7,8 +7,7 @@ import { BotCard } from '@/components/bot-card';
 import { SegmentPerformancePanel } from '@/components/segment-performance-panel';
 import { RegimeCard, PaperTradesCard, LiveTradesCard, ActivePositionsCard } from '@/components/dashboard/command-center';
 
-import { AthenaPanel } from '@/components/dashboard/athena-panel';
-import { AthenaCockpit } from '@/components/dashboard/athena-cockpit';
+
 import { MarketStructurePanel } from '@/components/dashboard/market-structure';
 import { SegmentHeatmap } from '@/components/dashboard/segment-heatmap';
 import { Bot, TrendingUp, Activity, DollarSign, Zap } from 'lucide-react';
@@ -690,30 +689,17 @@ export function DashboardClient({ user, stats, bots, recentTrades, segmentPerf =
 
 
 
-          {/* ═══ Row 4: Segment Heatmap (left) + Athena Intelligence (right) ═══ */}
+          {/* ═══ Row 4: Segment Heatmap ═══ */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.22 }}
             className="mb-8"
           >
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '20px', alignItems: 'start' }}>
-              {/* Segment Heatmap — 33% width (left) */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '20px', alignItems: 'start' }}>
               <SegmentHeatmap
                 heatmapData={botState?.heatmap || null}
               />
-
-              {/* Athena Panel — 67% width (right) */}
-              {(botState?.athena?.enabled || bots?.some((b: any) => (b.name || '').toLowerCase().includes('athena'))) && (
-                <div className="flex flex-col w-full">
-                  <AthenaPanel
-                    athena={botState?.athena || { enabled: true, recent_decisions: [], model: 'gemini-2.5-flash' }}
-                    coinStates={multi?.coin_states}
-                    perBot={botState?.perBot || {}}
-                    vetoLog={multi?.veto_log || []}
-                  />
-                </div>
-              )}
             </div>
           </motion.div>
 
@@ -774,21 +760,7 @@ export function DashboardClient({ user, stats, bots, recentTrades, segmentPerf =
             )}
           </motion.div>
 
-          {/* ═══ Athena Cockpit — Bot Status + Reset All Bots ═══ */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.29 }}
-            className="mb-8"
-          >
-            <AthenaCockpit
-              bots={bots}
-              athena={botState?.athena}
-              trades={trades}
-              coinStates={multi?.coin_states}
-              multi={multi}
-            />
-          </motion.div>
+
 
           {/* ═══ Segment Performance Panel (retired bots history) ═══ */}
           {segmentPerf.length > 0 && (
