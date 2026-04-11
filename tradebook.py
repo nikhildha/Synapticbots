@@ -986,22 +986,6 @@ def _update_single_trade(trade, book, prices, funding_rates):
             except Exception as dca_err:
                 logger.error("❌ Failed DCA execution for %s: %s", symbol, dca_err)
 
-    # ── AUTO-LIQUIDATION (DEAD MOMENTUM) ──────────────────────────
-    # Culls trades that sit underwater wasting margin fees for days without moving.
-    # Default: cull if held > 4 days (5760 mins) and PnL is between 0% and -5%
-    dead_mins = getattr(config, "DEAD_MOMENTUM_MINUTES", 5760)
-    dead_pnl_thresh = getattr(config, "DEAD_MOMENTUM_MAX_PNL", 0.5)
-    if duration > dead_mins and pnl_pct <= dead_pnl_thresh:
-        logger.warning(
-            "⏳ DEAD MOMENTUM hit on %s (held %.0f mins > %.0f) with PnL %.2f%% — auto-liquidating %s",
-            symbol, duration, dead_mins, pnl_pct, trade["trade_id"]
-        )
-        if is_live:
-            from execution_engine import ExecutionEngine
-            ExecutionEngine.close_position_live(symbol)
-        _close_trade_inline(trade, current, "DEAD_MOMENTUM_TIMEOUT")
-        return
-
     # ── CATASTROPHIC STOP LOSS (Blended) ──────────────────────────
     max_loss_limit = getattr(config, "DCA_HARD_STOP_PCT", -60.0)
     if pnl_pct <= max_loss_limit:
