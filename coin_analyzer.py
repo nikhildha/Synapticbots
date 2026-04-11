@@ -6,7 +6,7 @@ import config
 from data_pipeline import fetch_klines, _get_binance_client
 from hmm_brain import HMMBrain, MultiTFHMMBrain
 from feature_engine import compute_all_features, compute_trend, compute_ema
-from coin_scanner import get_segment_for_coin
+from segment_features import get_segment_for_coin
 
 logger = logging.getLogger("CoinAnalyzer")
 
