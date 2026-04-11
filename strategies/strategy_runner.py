@@ -181,8 +181,13 @@ class StrategyRunner:
 
         # SL / TP from risk manager
         sl, tp = rm.get_sl_tp(price, side, atr)
+        
+        # Calculate quantity based on this specific user's configured capital
+        user_capital = float(bot.get("capital_per_trade", 100.0))
+        old_cap = rm.capital_per_trade
+        rm.capital_per_trade = user_capital
         qty    = rm.get_position_size(price, atr)
-        leveraged_capital = rm.capital_per_trade * rm.leverage
+        rm.capital_per_trade = old_cap
 
         logger.info(
             "🚀 [%s] %s %s | price=%.4f SL=%.4f TP=%.4f qty=%.6f lev=%dx [%s]",
@@ -201,7 +206,7 @@ class StrategyRunner:
                 regime=f"STRATEGY:{strategy}",
                 confidence=conviction / 100.0,
                 reason=f"{strategy} signal",
-                capital=leveraged_capital,
+                capital=user_capital,
                 mode=mode,
                 user_id=user_id,
                 bot_id=bot_id,
