@@ -26,8 +26,8 @@ interface BotCardProps {
 }
 
 /* ── helpers ── */
-const pnlColor = (v: number) => v >= 0 ? '#22C55E' : '#EF4444';
-const sign = (v: number) => v >= 0 ? '+' : '';
+const pnlColor = (v: number) => Math.abs(v) < 0.01 ? '#9CA3AF' : (v >= 0 ? '#22C55E' : '#EF4444');
+const sign = (v: number) => Math.abs(v) < 0.01 ? '' : (v >= 0 ? '+' : '-');
 
 const BRAIN_META: Record<string, { label: string; color: string; glow: string }> = {
   adaptive: { label: 'Synaptic Adaptive', color: '#22C55E', glow: 'rgba(34,197,94,0.18)' },
@@ -65,8 +65,10 @@ export function BotCard({ bot, onToggle, onDelete, onRetire, trades = [], livePr
   const winRate = closedTrades.length > 0 ? (winCount / closedTrades.length * 100) : null;
 
   const totalPnl = (() => {
-    const realized = closedTrades.reduce((s: number, t: any) =>
-      s + (parseFloat(t.realized_pnl) || parseFloat(t.totalPnl) || parseFloat(t.pnl) || 0), 0);
+    const realized = closedTrades.reduce((s: number, t: any) => {
+      const p = parseFloat(t.realized_pnl) || parseFloat(t.totalPnl) || parseFloat(t.pnl) || 0;
+      return s + (Math.abs(p) > 50000 ? 0 : p); // Filter out garbage test artifacts
+    }, 0);
     const unrealized = activeTrades.reduce((s: number, t: any) => {
       const sym = (t.symbol || (t.coin || '') + 'USDT').toUpperCase();
       const cp = livePrices[sym] || t.current_price || t.currentPrice || t.entry_price || t.entryPrice;
@@ -77,7 +79,9 @@ export function BotCard({ bot, onToggle, onDelete, onRetire, trades = [], livePr
       const pos = (t.side || t.position || '').toLowerCase();
       const isLong = pos === 'long' || pos === 'buy';
       const diff = isLong ? (cp - entry) : (entry - cp);
-      return s + Math.round(diff / entry * lev * cap * 10000) / 10000;
+      const rawTradePnl = diff / entry * lev * cap;
+      if (Math.abs(rawTradePnl) > 50000) return s; // Filter severe symbol map mismatches (e.g. PEPE vs 1000PEPE)
+      return s + Math.round(rawTradePnl * 10000) / 10000;
     }, 0);
     return realized + unrealized;
   })();
