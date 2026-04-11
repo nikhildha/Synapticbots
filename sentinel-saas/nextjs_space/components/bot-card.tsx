@@ -54,8 +54,9 @@ export function BotCard({ bot, onToggle, onDelete, onRetire, trades = [], livePr
   const brain = getBrain(bot?.name, brainType);
   const botMode = bot?.config?.mode || 'paper';
   const capitalPerTrade = bot?.config?.capitalPerTrade || 100;
-  const maxTrades = bot?.config?.maxTrades || 25;
-  const maxCapital = maxTrades * capitalPerTrade;
+  // Paper mode: cap at 10 concurrent trades per bot ($100×10=$1000 max exposure per bot)
+  const maxTrades = bot?.config?.maxTrades || 10;
+  const maxCapital = maxTrades * capitalPerTrade; // $1000 per bot in paper mode
 
   const activeTrades = trades.filter((t: any) => (t.status || '').toLowerCase() === 'active');
   const closedTrades = trades.filter((t: any) => (t.status || '').toLowerCase() !== 'active');

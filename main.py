@@ -1050,7 +1050,7 @@ class RegimeMasterBot:
         # in the same cycle. If User A has 2 DeFi bots, they only deploy 1 DeFi coin
         # per tick. Other users' bots are isolated and will also receive the deployment.
         deployed_segments: set = set()  # set of (user_id, segment) tuples
-        deployed_user_coins: set = set() # track (user_id, sym) to prevent cross-bot duplication
+        deployed_user_coins: set = set() # track (user_id, bot_id, sym) to prevent same-bot same-tick duplication
 
         for target in _tick_active_bots:
             bot_id   = target.get("bot_id", config.ENGINE_BOT_ID)
@@ -1236,18 +1236,18 @@ class RegimeMasterBot:
                     )
                     continue
 
-                # ── USER-LEVEL DUPLICATE GUARD: prevent cross-bot deployment for the same user ──
-                _user_has_coin_active = any(
-                    pos.get("user_id") == user_id and pos.get("symbol") == sym
-                    for pos in self._active_positions.values()
-                )
-                if _user_has_coin_active or (user_id, sym) in deployed_user_coins:
+                # ── USER-LEVEL DUPLICATE GUARD: prevent the SAME BOT from deploying a coin it already holds ──
+                # NOTE: cross-bot deployment of the same coin is ALLOWED — each strategy (Titan/Vanguard/Rogue
+                # vs Pyxis/Axiom/Ratio) uses a different model and the user gets diversified exposure.
+                # Only block (user_id, sym) within the SAME TICK to prevent double-fire of the very same
+                # bot-level position this cycle (deployed_user_coins tracks current-tick fires only).
+                if (user_id, bot_id, sym) in deployed_user_coins:
                     logger.debug(
-                        "⏭️  [%s] User %s already has %s active (or queued this tick) — skip cross-bot duplicate",
-                        bot_name, user_id, sym
+                        "⏭️  [%s] Bot %s already fired %s this tick for user %s — skip duplicate tick",
+                        bot_name, bot_id, sym, user_id
                     )
                     self._coin_states.setdefault(sym, {}).setdefault("bot_deploy_statuses", {})[bot_id] = (
-                        "FILTERED: user already holds this coin in another bot"
+                        "FILTERED: already fired this tick"
                     )
                     continue
 
@@ -1957,7 +1957,7 @@ class RegimeMasterBot:
                 # Guard 4: lock this segment for the rest of the cycle for THIS USER
                 if bot_segment_filter:
                     deployed_segments.add((user_id, bot_segment_filter))
-                deployed_user_coins.add((user_id, sym))
+                deployed_user_coins.add((user_id, bot_id, sym))
                 # ── Segment Cooldown: track deployment for churn detection (Rule 4) ──
                 self._record_segment_open(seg_name, user_id)
                 # Signal Queue: step 4 — dequeue successfully deployed coin

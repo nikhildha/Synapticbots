@@ -261,6 +261,49 @@ function DecisionsTab({ engineUrl }: { engineUrl: string }) {
     );
 }
 
+// ─── Reset All Bots Button (admin) ───────────────────────────────────────────
+function ResetAllBotsButton() {
+    const [confirm, setConfirm] = useState(false);
+    const [loading, setLoading] = useState(false);
+    const [result, setResult] = useState<string | null>(null);
+
+    const handleClick = async () => {
+        if (!confirm) { setConfirm(true); setTimeout(() => setConfirm(false), 4000); return; }
+        setLoading(true); setConfirm(false);
+        try {
+            const res = await window.fetch('/api/admin/reset-all-bots', { method: 'POST' });
+            const d = await res.json();
+            if (res.ok) {
+                setResult(`✅ ${d.botsStopped} bots reset · ${d.tradesClosed} trades closed`);
+            } else {
+                setResult(`❌ ${d.error || 'Failed'}`);
+            }
+        } catch { setResult('❌ Network error'); }
+        setLoading(false);
+        setTimeout(() => setResult(null), 5000);
+    };
+
+    return (
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            {result && (
+                <span style={{ fontSize: '11px', fontFamily: 'var(--font-mono)', color: result.startsWith('✅') ? EMERALD : RED }}>
+                    {result}
+                </span>
+            )}
+            <button onClick={handleClick} disabled={loading} style={{
+                padding: '6px 14px', borderRadius: '8px', fontSize: '11px', fontWeight: 700,
+                cursor: loading ? 'wait' : 'pointer', transition: 'all 0.2s',
+                background: confirm ? 'rgba(239,68,68,0.2)' : 'rgba(239,68,68,0.08)',
+                color: confirm ? '#F87171' : 'rgba(239,68,68,0.6)',
+                border: `1px solid ${confirm ? 'rgba(239,68,68,0.4)' : 'rgba(239,68,68,0.15)'}`,
+                opacity: loading ? 0.6 : 1,
+            }}>
+                {loading ? '…' : confirm ? '⚠️ Confirm Reset?' : '🔄 Reset All Bots'}
+            </button>
+        </div>
+    );
+}
+
 // ─── Main Cockpit ─────────────────────────────────────────────────────────────
 export function AthenaCockpit({ bots, athena, trades, coinStates, multi }: AthenaCockpitProps) {
     const [tab, setTab] = useState<'stats' | 'decisions'>('stats');
@@ -311,14 +354,15 @@ export function AthenaCockpit({ bots, athena, trades, coinStates, multi }: Athen
     );
 
     return (
-        <div style={{ display: 'grid', gridTemplateColumns: '3fr 2fr', gap: '20px', marginTop: '20px' }}>
-            {/* ── Left: Tabbed Cockpit Panel ── */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', marginTop: '20px' }}>
+
+            {/* ── Cockpit Panel (full width) ── */}
             <div style={{
                 background: 'linear-gradient(135deg, rgba(10,15,26,0.95) 0%, rgba(6,10,18,0.98) 100%)',
                 backdropFilter: 'blur(16px)',
                 border: '1px solid rgba(0,229,255,0.12)', borderRadius: '18px',
                 padding: '20px 24px', position: 'relative', overflow: 'hidden',
-                display: 'flex', flexDirection: 'column', minHeight: '320px',
+                display: 'flex', flexDirection: 'column', minHeight: '220px',
             }}>
                 <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '2px', background: `linear-gradient(90deg, ${CYAN}, ${CYAN}44, transparent)` }} />
 
@@ -381,43 +425,142 @@ export function AthenaCockpit({ bots, athena, trades, coinStates, multi }: Athen
                 </div>
             </div>
 
-            {/* ── Right: Notifications Panel ── */}
+            {/* ── Bot Status Strip (horizontal rows, same style as Bots page) ── */}
             <div style={{
                 background: 'linear-gradient(135deg, rgba(10,15,26,0.95) 0%, rgba(6,10,18,0.98) 100%)',
                 backdropFilter: 'blur(16px)',
-                border: '1px solid rgba(255,179,0,0.12)', borderRadius: '18px',
-                padding: '20px 20px', position: 'relative', overflow: 'hidden',
+                border: '1px solid rgba(255,255,255,0.06)', borderRadius: '18px',
+                padding: '18px 24px', position: 'relative', overflow: 'hidden',
             }}>
-                <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '2px', background: `linear-gradient(90deg, ${AMBER}, ${AMBER}44, transparent)` }} />
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '14px' }}>
-                    <span style={{ fontSize: '16px' }}>🔔</span>
-                    <span style={{ fontSize: '14px', fontWeight: 700, color: AMBER, textShadow: `0 0 8px rgba(255,179,0,0.4)` }}>Notifications</span>
+                <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '2px', background: `linear-gradient(90deg, rgba(167,139,250,0.8), rgba(167,139,250,0.2), transparent)` }} />
+
+                {/* Section header */}
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <span style={{ fontSize: '16px' }}>🤖</span>
+                        <span style={{ fontSize: '14px', fontWeight: 700, color: '#A78BFA' }}>Bot Status</span>
+                        <span style={{ fontSize: '11px', color: '#4B5563', fontFamily: 'var(--font-mono)' }}>
+                            {bots?.filter((b: any) => b.isActive).length || 0}/{bots?.length || 0} running
+                        </span>
+                    </div>
+                    <ResetAllBotsButton />
                 </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                    {notifications.length === 0 ? (
-                        <div style={{ color: '#4B5563', fontSize: '12px', textAlign: 'center', padding: '24px 0' }}>No notifications yet…</div>
-                    ) : notifications.map((n, i) => {
-                        const dotColor = n.type === 'engine' ? EMERALD : n.type === 'trade' ? CYAN : n.type === 'ai' ? AMBER : RED;
+
+                {/* Bot rows */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    {(bots || []).map((bot: any) => {
+                        const isRunning = bot.isActive ?? false;
+                        const botTrades = trades.filter((t: any) => t.botId === bot.id || t.bot_id === bot.id);
+                        const activeBotTrades = botTrades.filter((t: any) => (t.status || '').toUpperCase() === 'ACTIVE');
+                        const capitalPerTrade = bot.config?.capitalPerTrade || 100;
+                        const maxTrades = bot.config?.maxTrades || 10;
+                        const maxCapital = maxTrades * capitalPerTrade;
+                        const capitalDeployed = activeBotTrades.length * capitalPerTrade;
+                        const deployedPct = maxCapital > 0 ? Math.min(100, (capitalDeployed / maxCapital) * 100) : 0;
+                        const closedBotTrades = botTrades.filter((t: any) => (t.status || '').toUpperCase() !== 'ACTIVE');
+                        const wins = closedBotTrades.filter((t: any) => (parseFloat(t.pnl) || parseFloat(t.realized_pnl) || 0) > 0).length;
+                        const winRate = closedBotTrades.length > 0 ? (wins / closedBotTrades.length * 100) : null;
+                        const totalPnl = closedBotTrades.reduce((s: number, t: any) => s + (parseFloat(t.pnl) || parseFloat(t.realized_pnl) || 0), 0);
+                        const botMode = bot.config?.mode || 'paper';
+                        const barColor = deployedPct > 75
+                            ? 'linear-gradient(90deg, #F59E0B, #D97706)'
+                            : 'linear-gradient(90deg, #06B6D4, #22D3EE)';
+
+                        // Bot-type color
+                        const nameLower = (bot.name || '').toLowerCase();
+                        const accentColor = nameLower.includes('titan') ? '#A78BFA'
+                            : nameLower.includes('vanguard') ? '#22D3EE'
+                            : nameLower.includes('rogue') ? '#F59E0B'
+                            : nameLower.includes('pyxis') ? '#34D399'
+                            : nameLower.includes('axiom') ? '#F472B6'
+                            : nameLower.includes('ratio') ? '#60A5FA'
+                            : '#22C55E';
+
                         return (
-                            <div key={n.id} style={{
-                                display: 'flex', alignItems: 'flex-start', gap: '10px',
-                                padding: '10px 12px',
-                                background: i === 0 ? `rgba(0,229,255,0.04)` : 'rgba(255,255,255,0.02)',
-                                borderRadius: '10px',
-                                border: `1px solid ${i === 0 ? 'rgba(0,229,255,0.1)' : 'rgba(255,255,255,0.03)'}`,
-                                animation: i === 0 ? 'terminalSlideIn 0.4s ease both' : 'none',
+                            <div key={bot.id} style={{
+                                display: 'flex', alignItems: 'center', gap: 0,
+                                background: `rgba(255,255,255,0.02)`,
+                                border: `1px solid ${isRunning ? accentColor + '20' : 'rgba(255,255,255,0.04)'}`,
+                                borderRadius: '12px', padding: '10px 14px 10px 16px',
+                                position: 'relative', overflow: 'hidden',
                             }}>
-                                <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: dotColor, flexShrink: 0, marginTop: '3px', boxShadow: `0 0 6px ${dotColor}88`, animation: i === 0 ? 'livePulse 2s ease-in-out infinite' : 'none' }} />
-                                <div style={{ flex: 1, minWidth: 0 }}>
-                                    {n.bot && <div style={{ fontSize: '10px', color: AMBER, fontWeight: 700, marginBottom: '2px', fontFamily: 'var(--font-mono)' }}>{n.bot}</div>}
-                                    <div style={{ fontSize: '12px', color: '#CBD5E1', lineHeight: 1.4 }}>{n.text}</div>
+                                {/* Left accent */}
+                                <div style={{
+                                    position: 'absolute', top: 0, left: 0, bottom: 0, width: 2,
+                                    background: isRunning ? `linear-gradient(180deg, ${accentColor}cc, ${accentColor}33)` : 'rgba(255,255,255,0.06)',
+                                    borderRadius: '12px 0 0 12px',
+                                }} />
+
+                                {/* Bot name */}
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 180, flexShrink: 0 }}>
+                                    <div style={{
+                                        width: 30, height: 30, borderRadius: 8, flexShrink: 0,
+                                        background: `${accentColor}15`, border: `1px solid ${accentColor}30`,
+                                        display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14,
+                                    }}>🧠</div>
+                                    <div>
+                                        <div style={{ fontSize: 12, fontWeight: 700, color: '#E8EDF5', lineHeight: 1.2 }}>{bot.name}</div>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 2 }}>
+                                            {isRunning && <span style={{ width: 5, height: 5, borderRadius: '50%', background: accentColor, display: 'inline-block', animation: 'livePulse 2s ease-in-out infinite' }} />}
+                                            <span style={{ fontSize: 9, fontWeight: 600, color: isRunning ? accentColor : '#6B7280' }}>
+                                                {isRunning ? 'Running' : 'Stopped'}
+                                            </span>
+                                            <span style={{
+                                                fontSize: 8, fontWeight: 700, padding: '1px 5px', borderRadius: 3,
+                                                background: botMode === 'live' ? 'rgba(239,68,68,0.12)' : 'rgba(6,182,212,0.1)',
+                                                color: botMode === 'live' ? '#EF4444' : '#06B6D4',
+                                            }}>{botMode === 'live' ? 'Live' : 'Paper'}</span>
+                                        </div>
+                                    </div>
                                 </div>
-                                <div style={{ fontSize: '10px', color: '#4B5563', flexShrink: 0, fontFamily: 'var(--font-mono)', marginTop: '1px' }}>({n.time})</div>
+
+                                <div style={{ width: 1, height: 32, background: 'rgba(255,255,255,0.06)', marginRight: 20, flexShrink: 0 }} />
+
+                                {/* Metrics */}
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 24, flex: 1 }}>
+                                    {/* PnL */}
+                                    <div style={{ minWidth: 72 }}>
+                                        <div style={{ fontSize: 14, fontWeight: 800, fontFamily: 'monospace', color: totalPnl >= 0 ? '#22C55E' : '#EF4444', lineHeight: 1 }}>
+                                            {totalPnl >= 0 ? '+' : ''}{totalPnl.toFixed(2)}$
+                                        </div>
+                                        <div style={{ fontSize: 8, fontWeight: 700, color: '#4B5563', letterSpacing: '0.6px', textTransform: 'uppercase', marginTop: 2 }}>P&L</div>
+                                    </div>
+                                    {/* Win rate */}
+                                    <div style={{ textAlign: 'center' }}>
+                                        <div style={{ fontSize: 12, fontWeight: 800, fontFamily: 'monospace', color: winRate !== null && winRate >= 50 ? '#22C55E' : '#9CA3AF' }}>
+                                            {winRate !== null ? `${winRate.toFixed(0)}%` : '—'}
+                                        </div>
+                                        <div style={{ fontSize: 8, fontWeight: 700, color: '#4B5563', letterSpacing: '0.6px', textTransform: 'uppercase', marginTop: 2 }}>Win Rate</div>
+                                    </div>
+                                    {/* Active */}
+                                    <div style={{ textAlign: 'center' }}>
+                                        <div style={{ fontSize: 12, fontWeight: 800, fontFamily: 'monospace', color: activeBotTrades.length > 0 ? CYAN : '#9CA3AF' }}>
+                                            {activeBotTrades.length}
+                                        </div>
+                                        <div style={{ fontSize: 8, fontWeight: 700, color: '#4B5563', letterSpacing: '0.6px', textTransform: 'uppercase', marginTop: 2 }}>Active</div>
+                                    </div>
+                                    {/* Capital bar */}
+                                    <div style={{ flex: 1, minWidth: 100 }}>
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+                                            <span style={{ fontSize: 8, fontWeight: 700, color: '#4B5563', letterSpacing: '0.6px', textTransform: 'uppercase' }}>Capital</span>
+                                            <span style={{ fontSize: 9, fontWeight: 700, fontFamily: 'monospace', color: '#6B7280' }}>
+                                                ${capitalDeployed}<span style={{ opacity: 0.5 }}>/${maxCapital}</span>
+                                            </span>
+                                        </div>
+                                        <div style={{ height: 4, borderRadius: 3, background: 'rgba(255,255,255,0.06)', overflow: 'hidden' }}>
+                                            <div style={{ height: '100%', borderRadius: 3, width: `${deployedPct}%`, background: barColor, transition: 'width 0.5s ease' }} />
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
                         );
                     })}
+                    {(!bots || bots.length === 0) && (
+                        <div style={{ textAlign: 'center', color: '#4B5563', padding: '20px 0', fontSize: '12px' }}>No bots configured yet.</div>
+                    )}
                 </div>
             </div>
         </div>
     );
 }
+
