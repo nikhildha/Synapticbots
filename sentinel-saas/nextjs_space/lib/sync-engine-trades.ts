@@ -64,6 +64,11 @@ export async function syncEngineTrades(
 
     // Look up active session once per sync call (not per trade)
     const activeSession = await getActiveBotSession(botId);
+    
+    // Look up the bot's mode so we never sync paper trades to a live bot (and vice versa)
+    const bot = await prisma.bot.findUnique({ where: { id: botId }, include: { config: true } });
+    if (!bot) return 0;
+    const expectedMode = (bot.config?.mode || 'paper').toLowerCase().startsWith('live') ? 'live' : 'paper';
 
     let synced = 0;
 
@@ -96,6 +101,10 @@ export async function syncEngineTrades(
                 const d = new Date(sanitizedExit);
                 if (!isNaN(d.getTime())) exitTime = d;
             }
+
+            // ── MODE ISOLATION FILTER ───────────────────────────────────────────
+            const tradeMode = (t.mode || 'paper').toLowerCase().startsWith('live') ? 'live' : 'paper';
+            if (tradeMode !== expectedMode) return;
 
             // ── PRIMARY FILTER: bot_id ownership ─────────────────────────────────
             const tradeBotId = (t.bot_id || t.botId || '').trim();
