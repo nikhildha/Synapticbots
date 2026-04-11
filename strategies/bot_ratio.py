@@ -133,7 +133,9 @@ def get_signals(kline_cache: dict, current_prices: dict) -> list:
     # ── BUY Signals (reversal: laggards expected to mean-revert up) ────────────
     for sym in long_candidates:
         score = scores[sym]
-        price = current_prices.get(sym, float(kline_cache[sym][-1]["close"]))
+        df = kline_cache[sym]
+        backup_price = float(df["close"].iloc[-1]) if hasattr(df, "iloc") else float(df[-1]["close"])
+        price = current_prices.get(sym, backup_price)
 
         # Conviction: lower the negative return, higher the reversal potential
         raw_conviction = MIN_CONVICTION + min(25, int(abs(score) * 150))
@@ -151,7 +153,9 @@ def get_signals(kline_cache: dict, current_prices: dict) -> list:
     # ── SELL Signals (momentum fade: leaders expected to revert down) ──────────
     for sym in short_candidates:
         score = scores[sym]
-        price = current_prices.get(sym, float(kline_cache[sym][-1]["close"]))
+        df = kline_cache[sym]
+        backup_price = float(df["close"].iloc[-1]) if hasattr(df, "iloc") else float(df[-1]["close"])
+        price = current_prices.get(sym, backup_price)
 
         raw_conviction = MIN_CONVICTION + min(20, int(abs(score) * 120))
         signals.append({
