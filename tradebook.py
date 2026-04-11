@@ -1194,9 +1194,21 @@ def get_tradebook():
 
 
 def get_active_trades():
-    """Return only active trades."""
+    """Return only active trades, securely isolated to the current engine mode."""
+    import config
     book = _load_book()
-    return [t for t in book["trades"] if t["status"] in ("ACTIVE", "OPEN")]
+    
+    expected_mode = "paper" if getattr(config, "PAPER_TRADE", True) else "live"
+    active_trades = []
+    
+    for t in book.get("trades", []):
+        if t.get("status") in ("ACTIVE", "OPEN"):
+            # Strong isolation: NEVER return a paper trade if engine is LIVE (and vice versa)
+            t_mode = (t.get("mode") or "paper").lower()
+            if t_mode.startswith(expected_mode):
+                active_trades.append(t)
+                
+    return active_trades
 
 
 def get_closed_trades():
