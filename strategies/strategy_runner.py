@@ -174,9 +174,9 @@ class StrategyRunner:
         if not bot_id or not price:
             return
 
-        # Fetch open trades for this bot
+        # Fetch open trades for this bot matching exact isolation mode
         all_active = tradebook.get_active_trades()
-        open_trades = [t for t in all_active if t.get("bot_id") == bot_id]
+        open_trades = [t for t in all_active if t.get("bot_id") == bot_id and t.get("mode", "paper").lower() == mode.lower()]
 
         # Risk gate
         can_open, reason = rm.can_deploy(sym, open_trades)
