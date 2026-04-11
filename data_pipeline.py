@@ -151,6 +151,59 @@ def get_cached_ticker():
     return _ticker_cache
 
 
+# ── Dynamic Systematic Universe Pool (15m TTL) ────────────────────────────
+_dynamic_pool_cache = []
+_dynamic_pool_ts = 0
+_DYNAMIC_POOL_TTL = 900 # 15 minutes
+
+def get_dynamic_systematic_universe(limit=100):
+    """
+    Returns the top `limit` USDT pairs by 24h quote volume from Binance.
+    Caches the list for 15 minutes to allow natural rotation without thrashing.
+    Used exclusively by systematic math bots (Pyxis, Axiom, Ratio).
+    """
+    global _dynamic_pool_cache, _dynamic_pool_ts
+    now = _cache_time.time()
+    
+    if _dynamic_pool_cache and (now - _dynamic_pool_ts) < _DYNAMIC_POOL_TTL:
+        return _dynamic_pool_cache
+
+    try:
+        tickers = get_cached_ticker()
+        if not tickers:
+            return _dynamic_pool_cache
+
+        # Filter for spot USDT pairs representing real coins
+        valid_tickers = []
+        stablecoins = {"USDCUSDT", "TUSDUSDT", "FDUSDUSDT", "BUSDUSDT", "EURUSDT"}
+        
+        for t in tickers:
+            sym = t.get("symbol", "")
+            if sym.endswith("USDT") and sym not in stablecoins and sym not in config.EXCLUDED_COINS:
+                # Discard leveraged tokens like BTCUPUSDT, BTCDOWNUSDT
+                if sym.endswith("UPUSDT") or sym.endswith("DOWNUSDT"):
+                    continue
+                valid_tickers.append(t)
+                
+        # Sort by 24h quote volume descending
+        valid_tickers.sort(key=lambda x: float(x.get("quoteVolume", 0)), reverse=True)
+        
+        # Extract top N symbols
+        top_coins = [t["symbol"] for t in valid_tickers[:limit]]
+        
+        if top_coins:
+            _dynamic_pool_cache = top_coins
+            _dynamic_pool_ts = now
+            logger.info("🌐 Dynamic Systematic Universe updated: Loaded %d top volume pairs (TTL 15m)", len(top_coins))
+            
+        return _dynamic_pool_cache
+
+    except Exception as e:
+        logger.error("Failed to fetch dynamic systematic universe: %s", e)
+        return _dynamic_pool_cache
+
+
+
 # ── Kline cache (per symbol+interval, weight=2 per call) ─────────────────────
 _kline_cache = {}           # key: "BTCUSDT:4h" → {"data": df, "ts": epoch}
 _KLINE_CACHE_TTL = {        # TTL per interval (seconds)

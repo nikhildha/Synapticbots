@@ -769,7 +769,19 @@ class RegimeMasterBot:
                 
                 logger.info("🔄 Refreshing Segment-First coin pool based on %d active bots (excluding %d blocked segments)...", 
                             len(config.ENGINE_ACTIVE_BOTS), len(blocked_segments))
-                self._full_coin_pool = get_active_bot_segment_pool(config.ENGINE_ACTIVE_BOTS, blocked_segments)
+                narrative_pool = get_active_bot_segment_pool(config.ENGINE_ACTIVE_BOTS, blocked_segments)
+                
+                # Expand pool with the Top 100 Dynamic Systematic Universe
+                from data_pipeline import get_dynamic_systematic_universe
+                systematic_pool = get_dynamic_systematic_universe(limit=100) or []
+                self._systematic_pool = systematic_pool # Save for the UI to read
+                
+                # Merge maintaining BTCUSDT at index 0
+                merged = set(narrative_pool + systematic_pool)
+                if config.PRIMARY_SYMBOL in merged:
+                    merged.remove(config.PRIMARY_SYMBOL)
+                self._full_coin_pool = [config.PRIMARY_SYMBOL] + sorted(list(merged))
+                
                 logger.info("📋 Full pool (%d coins): %s ...",
                             len(self._full_coin_pool), ", ".join(self._full_coin_pool[:8]))
 
@@ -1098,6 +1110,17 @@ class RegimeMasterBot:
                     break  # hit max deploys for this bot this cycle
 
                 sym      = top["symbol"]
+                
+                # ── BOT ROUTING GATE: SHIELD LLM BOTS FROM DYNAMIC VOLUME GARBAGE ──
+                is_systematic_bot = bot_type in ["Pyxis", "Axiom", "Ratio"]
+                is_narrative_coin = any(sym in coins for coins in config.CRYPTO_SEGMENTS.values())
+                
+                if not is_systematic_bot and not is_narrative_coin:
+                    logger.debug("⏭️  [%s] Skipping %s: Only Pyxis/Axiom/Ratio can execute the dynamic systematic pool.", bot_name, sym)
+                    self._coin_states.setdefault(sym, {}).setdefault("bot_deploy_statuses", {})[bot_id] = "FILTERED: Systematic universe only"
+                    continue
+                # ───────────────────────────────────────────────────────────────────
+
                 pos_key  = _build_pos_key(bot_id, sym)
                 seg_name = top.get("segment") or get_segment_for_coin(sym)  # for analytics / risk-manager only
 
@@ -3355,6 +3378,7 @@ class RegimeMasterBot:
                 }
                 for sym, entry in self._pending_signals.items()
             ],
+            "systematic_pool": getattr(self, "_systematic_pool", [])
         }
         try:
             with open(config.MULTI_STATE_FILE, "w") as f:

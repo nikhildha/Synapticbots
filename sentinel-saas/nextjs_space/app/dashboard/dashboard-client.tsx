@@ -7,7 +7,8 @@ import { BotCard } from '@/components/bot-card';
 import { SegmentPerformancePanel } from '@/components/segment-performance-panel';
 import { RegimeCard, PaperTradesCard, LiveTradesCard, ActivePositionsCard } from '@/components/dashboard/command-center';
 
-
+import { EngineTickers } from '@/components/dashboard/engine-tickers';
+import { AthenaIntelligenceFeed } from '@/components/dashboard/athena-stream';
 import { MarketStructurePanel } from '@/components/dashboard/market-structure';
 import { SegmentHeatmap } from '@/components/dashboard/segment-heatmap';
 import { Bot, TrendingUp, Activity, DollarSign, Zap } from 'lucide-react';
@@ -495,6 +496,8 @@ export function DashboardClient({ user, stats, bots, recentTrades, segmentPerf =
             </div>
           </motion.div>
 
+          <EngineTickers multi={botState?.multi} />
+
           {/* ═══ Row 1: Regime + P&L ═══ */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
@@ -689,17 +692,20 @@ export function DashboardClient({ user, stats, bots, recentTrades, segmentPerf =
 
 
 
-          {/* ═══ Row 4: Segment Heatmap ═══ */}
+          {/* ═══ Row 4: Segment Heatmap & Athena Intelligence ═══ */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.22 }}
             className="mb-8"
           >
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '20px', alignItems: 'start' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '20px', alignItems: 'start' }}>
               <SegmentHeatmap
                 heatmapData={botState?.heatmap || null}
               />
+              <div className="flex flex-col w-full">
+                <AthenaIntelligenceFeed vetoLog={botState?.multi?.veto_log || []} />
+              </div>
             </div>
           </motion.div>
 
