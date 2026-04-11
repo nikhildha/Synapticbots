@@ -8,6 +8,7 @@ import { SegmentPerformancePanel } from '@/components/segment-performance-panel'
 import { RegimeCard, PaperTradesCard, LiveTradesCard, ActivePositionsCard, BrainExecutionSummary } from '@/components/dashboard/command-center';
 
 import { AthenaPanel } from '@/components/dashboard/athena-panel';
+import { AthenaCockpit } from '@/components/dashboard/athena-cockpit';
 import { MarketStructurePanel } from '@/components/dashboard/market-structure';
 import { SegmentHeatmap } from '@/components/dashboard/segment-heatmap';
 import { Bot, TrendingUp, Activity, DollarSign, Zap } from 'lucide-react';
@@ -736,7 +737,7 @@ export function DashboardClient({ user, stats, bots, recentTrades, segmentPerf =
             </div>
 
             {bots && bots.length > 0 ? (
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '14px' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                 {bots.map((bot) => {
                   const botNameLower = (bot?.name || '').toLowerCase();
                   const botTrades = trades.filter((t: any) => {
@@ -771,6 +772,22 @@ export function DashboardClient({ user, stats, bots, recentTrades, segmentPerf =
                 </Link>
               </div>
             )}
+          </motion.div>
+
+          {/* ═══ Athena Cockpit — Bot Status + Reset All Bots ═══ */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.29 }}
+            className="mb-8"
+          >
+            <AthenaCockpit
+              bots={bots}
+              athena={botState?.athena}
+              trades={trades}
+              coinStates={multi?.coin_states}
+              multi={multi}
+            />
           </motion.div>
 
           {/* ═══ Segment Performance Panel (retired bots history) ═══ */}
