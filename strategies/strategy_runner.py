@@ -206,7 +206,7 @@ class StrategyRunner:
             exec_result = self.executor.execute_trade(
                 symbol=sym, side=side,
                 quantity=qty, leverage=rm.leverage,
-                atr=atr
+                atr=atr, stop_loss=sl, take_profit=tp
             )
             if not exec_result:
                 logger.error("🚫 [%s] LIVE Execution failed for %s. Aborting trade deployment.", strategy, sym)

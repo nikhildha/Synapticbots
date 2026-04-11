@@ -1736,6 +1736,8 @@ class RegimeMasterBot:
                         swing_l=top.get("swing_l"),
                         swing_h=top.get("swing_h"),
                         fallback_leverage=fallback_lev,
+                        stop_loss=fill_sl,
+                        take_profit=fill_tp,
                     )
                 except Exception as exec_err:
                     logger.error("🚨 EXECUTE CRASH [%s] %s: %s", bot_name, sym, exec_err, exc_info=True)
