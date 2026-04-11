@@ -881,7 +881,7 @@ def _update_single_trade(trade, book, prices, funding_rates):
                         )
 
                         # For LIVE trades: modify exchange SL order
-                        is_live_trail = trade.get("mode") == "LIVE"
+                        is_live_trail = str(trade.get("mode", "paper")).upper() == "LIVE"
                         if is_live_trail:
                             try:
                                 from execution_engine import ExecutionEngine
@@ -898,7 +898,7 @@ def _update_single_trade(trade, book, prices, funding_rates):
     # For LIVE trades, CoinDCX handles SL/TP/MAX_LOSS via exchange.
     # PAPER_TRADE override: if config.PAPER_TRADE=True the entire
     # engine is simulated — always auto-close regardless of mode stamp.
-    is_live = trade.get("mode") == "LIVE"
+    is_live = str(trade.get("mode", "paper")).upper() == "LIVE"
     should_auto_close = (not is_live) or config.PAPER_TRADE
 
     # ── Stamp exit guard state on trade (synced to DB + UI on next heartbeat) ──

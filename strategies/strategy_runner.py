@@ -56,6 +56,8 @@ class StrategyRunner:
     """
 
     def __init__(self):
+        self.executor = ExecutionEngine()
+        
         # ── Per-bot Risk Managers ─────────────────────────────────────────────
         # max_open_trades is per-bot-id (already filtered before can_deploy check).
         # With up to 6 active strategies per user, each bot can hold up to 10 simultaneous positions.
@@ -199,6 +201,26 @@ class StrategyRunner:
             strategy, side, sym, price, sl, tp, qty, rm.leverage, mode.upper()
         )
 
+        if str(mode).lower() == "live" and config.PAPER_TRADE is False:
+            logger.info("⚡ [%s] Executing LIVE execution logic via ExecutionEngine for %s", strategy, sym)
+            exec_result = self.executor.execute_trade(
+                symbol=sym, side=side, order_type="MARKET",
+                quantity=qty, leverage=rm.leverage,
+                stop_loss=sl, take_profit=tp
+            )
+            if not exec_result:
+                logger.error("🚫 [%s] LIVE Execution failed for %s. Aborting trade deployment.", strategy, sym)
+                return
+            
+            # Align with actual executed amounts/prices
+            price = exec_result.get("entry_price", price)
+            qty = exec_result.get("quantity", qty)
+            rm_id = exec_result.get("rm_id")
+            exchange = exec_result.get("exchange", "coindcx")
+        else:
+            rm_id = None
+            exchange = None
+
         # Write to tradebook — aligned with exact open_trade() signature
         try:
             tradebook.open_trade(
@@ -218,6 +240,8 @@ class StrategyRunner:
                 bot_name=bot.get("bot_name", strategy),
                 override_sl=sl,
                 override_tp=tp,
+                rm_id=rm_id,
+                exchange=exchange,
             )
         except Exception as e:
             logger.error("[%s] tradebook.open_trade failed for %s: %s", strategy, sym, e)
