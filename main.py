@@ -959,6 +959,7 @@ class RegimeMasterBot:
                     _btc_state = self._coin_states.get("BTCUSDT", {})
                     _btc_regime_str = _btc_state.get("regime", "UNKNOWN")
                     _btc_regime_int = _btc_state.get("regime_int")
+                    _btc_is_chop = False
                     
                     if _btc_regime_int is not None:
                         _btc_is_chop = (_btc_regime_int == config.REGIME_CHOP)
