@@ -69,7 +69,29 @@ export function BotsClient({ bots: initialBots }: BotsClientProps) {
       if (stateRes.ok) {
         const d = await stateRes.json();
         const trades = d?.tradebook?.trades || [];
-        setTradesByBot(d?.tradesByBot || {});
+        
+        // Group trades by bot ID so BotCard can calculate PnL properly
+        const grouped: Record<string, any[]> = {};
+        for (const t of trades) {
+            const botName = (t.bot_name || t.botName || '').toLowerCase();
+            const bId = t.bot_id || t.botId;
+            let matchingBot = initialBots.find(b => b.id === bId);
+            if (!matchingBot) {
+                const modelKeywords = ['adaptive', 'standard', 'conservative', 'aggressive'];
+                const tradeModel = modelKeywords.find(k => botName.includes(k));
+                matchingBot = initialBots.find(b => {
+                    const bName = (b.name || '').toLowerCase();
+                    const bModel = modelKeywords.find(k => bName.includes(k));
+                    if (tradeModel && bModel) return tradeModel === bModel;
+                    return bName.includes(botName) || botName.includes(bName);
+                });
+            }
+            if (matchingBot) {
+                if (!grouped[matchingBot.id]) grouped[matchingBot.id] = [];
+                grouped[matchingBot.id].push(t);
+            }
+        }
+        setTradesByBot(grouped);
         const cs = d?.multi?.coin_states || {};
         const prices: Record<string, number> = {};
         for (const [sym, state] of Object.entries(cs)) {
