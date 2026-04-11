@@ -50,12 +50,21 @@ def _compute_rolling_returns(price_series: np.ndarray, window: int) -> np.ndarra
     return np.array(returns)
 
 
-def _atr_from_candles(candles: list, period: int = 14) -> float:
+def _atr_from_candles(candles, period: int = 14) -> float:
     if len(candles) < period + 1:
+        if hasattr(candles, "iloc"):
+            return float(candles["close"].iloc[-1]) * 0.015
         return float(candles[-1]["close"]) * 0.015
-    highs  = np.array([float(c["high"])  for c in candles[-period:]])
-    lows   = np.array([float(c["low"])   for c in candles[-period:]])
-    closes = np.array([float(c["close"]) for c in candles[-(period + 1):-1]])
+        
+    if hasattr(candles, "iloc"):
+        highs  = candles["high"].values[-period:].astype(float)
+        lows   = candles["low"].values[-period:].astype(float)
+        closes = candles["close"].values[-(period + 1):-1].astype(float)
+    else:
+        highs  = np.array([float(c["high"])  for c in candles[-period:]])
+        lows   = np.array([float(c["low"])   for c in candles[-period:]])
+        closes = np.array([float(c["close"]) for c in candles[-(period + 1):-1]])
+    
     tr = np.maximum(highs - lows, np.abs(highs - closes))
     return float(tr.mean())
 
@@ -91,7 +100,10 @@ def get_signals(kline_cache: dict, current_prices: dict) -> list:
 
     for sym in available:
         candles = kline_cache[sym]
-        closes  = np.array([float(c["close"]) for c in candles])
+        if hasattr(candles, "iloc"):
+            closes = candles["close"].values.astype(float)
+        else:
+            closes  = np.array([float(c["close"]) for c in candles])
         atrs[sym] = _atr_from_candles(candles)
 
         # Composite: average of normalized returns across windows

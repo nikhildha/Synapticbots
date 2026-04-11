@@ -128,12 +128,12 @@ class StrategyRunner:
         """Extract latest close prices from 15m cache (best proxy for live price)."""
         prices = {}
         for sym, candles in self._cache_15m.items():
-            if candles:
-                prices[sym] = float(candles[-1]["close"])
+            if candles is not None and not candles.empty:
+                prices[sym] = float(candles["close"].iloc[-1])
         # Fall back to 1h cache for any missing
         for sym, candles in self._cache_1h.items():
-            if sym not in prices and candles:
-                prices[sym] = float(candles[-1]["close"])
+            if sym not in prices and candles is not None and not candles.empty:
+                prices[sym] = float(candles["close"].iloc[-1])
         return prices
 
     # ─── Bot Lookup ──────────────────────────────────────────────────────────

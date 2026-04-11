@@ -66,9 +66,14 @@ def get_signals(kline_cache: dict, current_prices: dict) -> list:
             if len(candles) < MIN_CANDLES:
                 continue
 
-            closes = np.array([float(c["close"]) for c in candles])
-            highs  = np.array([float(c["high"])  for c in candles])
-            lows   = np.array([float(c["low"])   for c in candles])
+            if hasattr(candles, "iloc"):
+                closes = candles["close"].values.astype(float)
+                highs  = candles["high"].values.astype(float)
+                lows   = candles["low"].values.astype(float)
+            else:
+                closes = np.array([float(c["close"]) for c in candles])
+                highs  = np.array([float(c["high"])  for c in candles])
+                lows   = np.array([float(c["low"])   for c in candles])
 
             # ── SMA Crossover ────────────────────────────────────────────────
             sma_fast_now  = closes[-SMA_FAST:].mean()
