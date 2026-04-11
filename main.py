@@ -1175,7 +1175,7 @@ class RegimeMasterBot:
             # If this user's named segment was already served this cycle, skip the
             # entire waterfall. This prevents 1 user's 10 bots all in "DeFi" from each
             # deploying a different DeFi coin via the waterfall in the same tick.
-            if bot_segment_filter and (user_id, bot_segment_filter) in deployed_segments:
+            if bot_segment_filter and bot_segment_filter != "ALL" and (user_id, bot_segment_filter) in deployed_segments:
                 logger.info(
                     "🔒 [%s] Segment '%s' already deployed this cycle for user %s — skip (Guard 4)",
                     bot_name, bot_segment_filter, user_id
