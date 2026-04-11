@@ -312,14 +312,14 @@ export function BotsClient({ bots: initialBots }: BotsClientProps) {
             </motion.div>
           )}
 
-          {/* ════ BOT CARDS GRID (4×4) ════ */}
+          {/* ════ BOT ROWS LIST ════ */}
           {activeBots.length > 0 && (
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 14, marginBottom: 40 }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 40 }}>
               {activeBots.map((bot, i) => {
                 const botSessions = allSessions.filter((s: any) => s.botId === bot?.id);
                 const displayTrades = tradesByBot[bot?.id] ?? [];
                 return (
-                  <motion.div key={bot?.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.06 }}>
+                  <motion.div key={bot?.id} initial={{ opacity: 0, x: -12 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: i * 0.05 }}>
                     <BotCard bot={bot} onToggle={handleBotToggle} onDelete={handleDeleteBot} onRetire={handleRetireBot} liveTradeCount={liveTradeCount} trades={displayTrades} sessions={botSessions} livePrices={livePrices} isToggling={!!togglingBots[bot?.id]} />
                   </motion.div>
                 );
@@ -383,19 +383,44 @@ export function BotsClient({ bots: initialBots }: BotsClientProps) {
 
                 <div style={{ overflowY: 'auto', padding: '20px 24px', flex: 1 }}>
                   
-                  {/* SIX TIER BOTS */}
+                  {/* SIX TIER BOTS — horizontal row selector */}
                   <div style={{ marginBottom: 24 }}>
                     <div style={{ fontSize: 'var(--text-xs)', fontWeight: 700, color: 'var(--color-text-muted)', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 12 }}>{selectedBots.length} BOTS WILL BE DEPLOYED</div>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-                      {availableBots.map(bot => (
-                        <div key={bot.id} onClick={() => setSelectedBots(prev => prev.includes(bot.id) ? prev.filter(b => b !== bot.id) : [...prev, bot.id])} style={{ cursor: 'pointer', display: 'flex', alignItems: 'flex-start', gap: 12, padding: '12px 14px', borderRadius: 'var(--radius-lg)', background: selectedBots.includes(bot.id) ? bot.bgRef : 'rgba(255,255,255,0.02)', border: selectedBots.includes(bot.id) ? `1px solid ${bot.borderRef}` : '1px solid var(--color-border)', transition: 'all 0.2s' }}>
-                          <div style={{ fontSize: 20, flexShrink: 0, opacity: selectedBots.includes(bot.id) ? 1 : 0.3, transition: 'all 0.2s' }}>{bot.icon}</div>
-                          <div style={{ opacity: selectedBots.includes(bot.id) ? 1 : 0.5, transition: 'all 0.2s' }}>
-                            <div style={{ fontWeight: 700, fontSize: 'var(--text-sm)', color: bot.color, marginBottom: 2 }}>{bot.name} <span style={{ color: 'var(--color-text-muted)', fontWeight: 400 }}>{bot.subtitle}</span></div>
-                            <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-secondary)', lineHeight: 1.4 }}>{bot.desc}</div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                      {availableBots.map(bot => {
+                        const selected = selectedBots.includes(bot.id);
+                        return (
+                          <div key={bot.id} onClick={() => setSelectedBots(prev => prev.includes(bot.id) ? prev.filter(b => b !== bot.id) : [...prev, bot.id])}
+                            style={{
+                              cursor: 'pointer',
+                              display: 'flex', alignItems: 'center', gap: 14,
+                              padding: '10px 14px', borderRadius: 'var(--radius-md)',
+                              background: selected ? bot.bgRef : 'rgba(255,255,255,0.02)',
+                              border: selected ? `1px solid ${bot.borderRef}` : '1px solid var(--color-border)',
+                              transition: 'all 0.18s',
+                              opacity: selected ? 1 : 0.55,
+                            }}
+                          >
+                            {/* Checkbox indicator */}
+                            <div style={{
+                              width: 18, height: 18, borderRadius: 5, flexShrink: 0,
+                              border: `2px solid ${selected ? bot.color : 'var(--color-border)'}`,
+                              background: selected ? bot.color + '30' : 'transparent',
+                              display: 'flex', alignItems: 'center', justifyContent: 'center',
+                              transition: 'all 0.18s',
+                              fontSize: 10,
+                            }}>
+                              {selected && '✓'}
+                            </div>
+                            <div style={{ fontSize: 18, flexShrink: 0 }}>{bot.icon}</div>
+                            <div style={{ flex: 1 }}>
+                              <span style={{ fontWeight: 700, fontSize: 'var(--text-sm)', color: bot.color }}>{bot.name}</span>
+                              <span style={{ color: 'var(--color-text-muted)', fontWeight: 400, fontSize: 'var(--text-sm)' }}> {bot.subtitle}</span>
+                            </div>
+                            <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-secondary)', lineHeight: 1.4, maxWidth: 280, textAlign: 'right' }}>{bot.desc}</div>
                           </div>
-                        </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   </div>
 
