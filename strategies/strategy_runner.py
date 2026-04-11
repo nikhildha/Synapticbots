@@ -115,7 +115,7 @@ class StrategyRunner:
         for sym in coins:
             try:
                 klines = fetch_klines(sym, interval=interval, limit=limit)
-                if klines and len(klines) > 0:
+                if klines is not None and not klines.empty:
                     cache_ref[sym] = klines
                     refreshed += 1
             except Exception as e:
