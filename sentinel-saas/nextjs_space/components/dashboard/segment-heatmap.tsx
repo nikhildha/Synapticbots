@@ -102,7 +102,7 @@ export function SegmentHeatmap({ heatmapData, loading = false }: SegmentHeatmapP
       </div>
 
       {/* Heatmap Grid */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-11 gap-2 overflow-x-auto pb-2">
         {sortedSegments.map((seg, i) => {
           const isHot = top2Targets.includes(seg.segment);
           const isCooldown = !!seg.is_cooldown;
@@ -121,7 +121,7 @@ export function SegmentHeatmap({ heatmapData, loading = false }: SegmentHeatmapP
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               transition={{ delay: i * 0.05 }}
-              className={`relative p-4 rounded-xl flex flex-col justify-between ${isCooldown ? 'opacity-50 grayscale select-none' : ''}`}
+              className={`relative p-2 py-3 rounded-xl flex flex-col justify-between ${isCooldown ? 'opacity-50 grayscale select-none' : ''}`}
               style={{
                 background: bgColor,
                 border: `1px solid ${borderColor}`,
@@ -129,28 +129,28 @@ export function SegmentHeatmap({ heatmapData, loading = false }: SegmentHeatmapP
               }}
             >
               {isHot && (
-                <div className="absolute -top-1.5 -right-1.5 w-3 h-3 rounded-full animate-ping" style={{ background: `${primaryColor}, 0.8)` }} />
+                <div className="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full animate-ping" style={{ background: `${primaryColor}, 0.8)` }} />
               )}
               {isHot && (
-                <div className="absolute -top-1.5 -right-1.5 w-3 h-3 rounded-full" style={{ background: `${primaryColor}, 1)` }} />
+                <div className="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full" style={{ background: `${primaryColor}, 1)` }} />
               )}
 
               <div className="flex flex-col items-center justify-center h-full gap-0.5 mt-1">
-                <span className="text-[10px] font-bold text-[var(--color-text)] tracking-wider uppercase truncate max-w-[80px] opacity-80">
+                <span className="text-[9px] font-bold text-[var(--color-text)] tracking-wider uppercase truncate max-w-full opacity-80" title={seg.segment}>
                   {seg.segment}
                 </span>
                 
                 <div className="flex items-center justify-center my-1">
-                   <span className={`text-xl font-black tracking-tight ${isCooldown ? 'text-gray-400' : (isPositive ? 'text-green-400' : 'text-red-400')}`}>
+                   <span className={`text-sm md:text-base font-black tracking-tight ${isCooldown ? 'text-gray-400' : (isPositive ? 'text-green-400' : 'text-red-400')}`}>
                     {isPositive && !isCooldown ? '+' : ''}{seg.blended_score.toFixed(1)}
                   </span>
                 </div>
 
-                <div className="flex items-center gap-1.5 mt-1">
-                   <div className="px-1.5 py-0.5 rounded bg-black/20 text-[9px] font-mono text-white/50 border border-white/5 whitespace-nowrap">
-                      {seg.coin_count !== undefined ? `${seg.coin_count} coins` : '...'}
+                <div className="flex flex-col items-center gap-1 mt-1">
+                   <div className="px-1 py-0.5 rounded bg-black/20 text-[8px] font-mono text-white/50 border border-white/5 whitespace-nowrap">
+                      {seg.coin_count !== undefined ? `${seg.coin_count}` : '...'}
                    </div>
-                   {isCooldown && <span className="px-1 py-0.5 rounded bg-red-900/40 border border-red-500/20 text-[8px] font-bold text-white/40 tracking-wider">COOL</span>}
+                   {isCooldown && <span className="px-1 py-0.5 rounded bg-red-900/40 border border-red-500/20 text-[7px] font-bold text-white/40 tracking-wider">COOL</span>}
                 </div>
               </div>
             </motion.div>
