@@ -1046,12 +1046,13 @@ class RegimeMasterBot:
         deployed = 0
         athena_calls_this_cycle = 0  # H4: track Athena calls to enforce LLM_MAX_CALLS_PER_CYCLE
         # Track same-bot same-tick coin dedup (prevents one bot firing same coin twice in one tick)
-        deployed_user_coins: set = set()  # (user_id, bot_id, sym)
+        deployed_user_coins: set = set()  # (user_id, bot_type, sym)
 
         for target in _tick_active_bots:
             bot_id   = target.get("bot_id", config.ENGINE_BOT_ID)
             bot_name = target.get("bot_name", "Synaptic Bot")
             user_id  = target.get("user_id", config.ENGINE_USER_ID)
+            bot_type = bot_name.split()[0] if bot_name else "BOT"
             # All bots trade ALL coins — segment routing removed (bots are strategy-based, not sector-based)
 
             # ── Clear stale deploy statuses from last cycle for this bot ──────────
@@ -1100,26 +1101,31 @@ class RegimeMasterBot:
                 pos_key  = _build_pos_key(bot_id, sym)
                 seg_name = top.get("segment") or get_segment_for_coin(sym)  # for analytics / risk-manager only
 
-                # ── DUPLICATE GUARD: skip if this bot already has this coin active ──
-                if pos_key in self._active_positions:
+                # ── BOT-TYPE DUPLICATE GUARD: skip if this bot TYPE already has this coin active for this user ──
+                already_active = any(
+                    pos.get("user_id") == user_id and
+                    pos.get("bot_name", "").split()[0] == bot_type and
+                    pos.get("symbol") == sym
+                    for pos in self._active_positions.values()
+                )
+
+                if already_active:
                     logger.debug(
-                        "⏭️  [%s] %s already active (pos_key=%s) — skip duplicate",
-                        bot_name, sym, pos_key
+                        "⏭️  [%s] %s already active for this bot type — skip duplicate",
+                        bot_name, sym
                     )
                     self._coin_states.setdefault(sym, {}).setdefault("bot_deploy_statuses", {})[bot_id] = (
                         "FILTERED: already active position"
                     )
                     continue
 
-                # ── USER-LEVEL DUPLICATE GUARD: prevent the SAME BOT from deploying a coin it already holds ──
-                # NOTE: cross-bot deployment of the same coin is ALLOWED — each strategy (Titan/Vanguard/Rogue
-                # vs Pyxis/Axiom/Ratio) uses a different model and the user gets diversified exposure.
-                # Only block (user_id, sym) within the SAME TICK to prevent double-fire of the very same
-                # bot-level position this cycle (deployed_user_coins tracks current-tick fires only).
-                if (user_id, bot_id, sym) in deployed_user_coins:
+                # ── USER-LEVEL DUPLICATE GUARD: prevent the SAME BOT TYPE from deploying a coin it already holds ──
+                # NOTE: cross-bot deployment of the same coin by DIFFERENT bot types is ALLOWED.
+                # Only block (user_id, bot_type, sym) within the SAME TICK to prevent double-fire.
+                if (user_id, bot_type, sym) in deployed_user_coins:
                     logger.debug(
-                        "⏭️  [%s] Bot %s already fired %s this tick for user %s — skip duplicate tick",
-                        bot_name, bot_id, sym, user_id
+                        "⏭️  [%s] Bot type %s already fired %s this tick for user %s — skip duplicate tick",
+                        bot_name, bot_type, sym, user_id
                     )
                     self._coin_states.setdefault(sym, {}).setdefault("bot_deploy_statuses", {})[bot_id] = (
                         "FILTERED: already fired this tick"
@@ -1828,8 +1834,9 @@ class RegimeMasterBot:
                     "leverage": fill_lev,
                     "entry_price": entry_price,
                     "quantity": fill_qty,
+                    "symbol": sym,
                 }
-                deployed_user_coins.add((user_id, bot_id, sym))
+                deployed_user_coins.add((user_id, bot_type, sym))
                 # ── Segment Cooldown: track deployment for churn detection (Rule 4) ──
                 self._record_segment_open(seg_name, user_id)
                 # Signal Queue: step 4 — dequeue successfully deployed coin
