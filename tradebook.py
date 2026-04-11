@@ -917,6 +917,17 @@ def _update_single_trade(trade, book, prices, funding_rates):
     if len(dca_phases) > current_level:
         next_phase = dca_phases[current_level]
         if pnl_pct <= next_phase["trigger_pnl_pct"]:
+            # --- DCA CONTAGION LOOPHOLE PATCH ---
+            # Count how many trades are already in deep DCA (Phase 2+) across the global book structure
+            # to prevent multiple simultaneous plunging assets from destroying all free margin.
+            dca_distress_count = sum(1 for t in book["trades"] if t["status"] in ("ACTIVE", "OPEN") and t.get("dca_level", 1) > 1)
+            if dca_distress_count >= getattr(config, "MAX_DCA_DISTRESS_TRADES", 2):
+                logger.warning(
+                    "❄️ DCA CONTAGION FREEZE: Refusing to execute DCA %s for %s. System already has %d distressed trades.",
+                    next_phase["name"], symbol, dca_distress_count
+                )
+                return  # Skip averaging down to protect capital
+
             # Trigger DCA! Calculate the quantity to add
             target_cap = trade.get("target_capital") or trade.get("capital", 100.0)
             alloc_pct = next_phase["alloc_pct"]

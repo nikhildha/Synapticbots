@@ -246,6 +246,7 @@ class RegimeMasterBot:
         self._cycle_count = 0
         self._last_cycle_duration = 0
         self._last_analysis_time = 0.0  # epoch — triggers immediate first run
+        self._deploying_locks = {}      # (user_id, bot_type, sym) -> timestamp
 
         # Multi-coin state
         self._coin_list = []
@@ -1057,8 +1058,10 @@ class RegimeMasterBot:
         deployed_trades = []
         deployed = 0
         athena_calls_this_cycle = 0  # H4: track Athena calls to enforce LLM_MAX_CALLS_PER_CYCLE
-        # Track same-bot same-tick coin dedup (prevents one bot firing same coin twice in one tick)
-        deployed_user_coins: set = set()  # (user_id, bot_type, sym)
+        
+        # ── Clear expired deploy locks (e.g. Binance API hung for > 15 seconds) ──
+        current_time = time.time()
+        self._deploying_locks = {k: v for k, v in self._deploying_locks.items() if current_time - v < 15.0}
 
         for target in _tick_active_bots:
             bot_id   = target.get("bot_id", config.ENGINE_BOT_ID)
@@ -1142,16 +1145,16 @@ class RegimeMasterBot:
                     )
                     continue
 
-                # ── USER-LEVEL DUPLICATE GUARD: prevent the SAME BOT TYPE from deploying a coin it already holds ──
-                # NOTE: cross-bot deployment of the same coin by DIFFERENT bot types is ALLOWED.
-                # Only block (user_id, bot_type, sym) within the SAME TICK to prevent double-fire.
-                if (user_id, bot_type, sym) in deployed_user_coins:
+                # ── GLOBAL DUPLICATE GUARD: cross-tick latency protection ──────────────────
+                # If Binance API lags, tradebook won't show the trade as ACTIVE yet.
+                # A rapid second tick will deploy it again unless we lock it in memory temporarily.
+                if (user_id, bot_type, sym) in self._deploying_locks:
                     logger.debug(
-                        "⏭️  [%s] Bot type %s already fired %s this tick for user %s — skip duplicate tick",
-                        bot_name, bot_type, sym, user_id
+                        "⏭️  [%s] System already deploying %s for user %s (waiting on API) — skip duplicate",
+                        bot_name, sym, user_id
                     )
                     self._coin_states.setdefault(sym, {}).setdefault("bot_deploy_statuses", {})[bot_id] = (
-                        "FILTERED: already fired this tick"
+                        "FILTERED: API sync lock active"
                     )
                     continue
 
@@ -1859,7 +1862,7 @@ class RegimeMasterBot:
                     "quantity": fill_qty,
                     "symbol": sym,
                 }
-                deployed_user_coins.add((user_id, bot_type, sym))
+                self._deploying_locks[(user_id, bot_type, sym)] = time.time()
                 # ── Segment Cooldown: track deployment for churn detection (Rule 4) ──
                 self._record_segment_open(seg_name, user_id)
                 # Signal Queue: step 4 — dequeue successfully deployed coin

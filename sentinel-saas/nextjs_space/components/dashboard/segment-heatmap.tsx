@@ -136,21 +136,21 @@ export function SegmentHeatmap({ heatmapData, loading = false }: SegmentHeatmapP
               )}
 
               <div className="flex flex-col items-center justify-center h-full gap-0.5 mt-1">
-                <span className="text-[9px] font-bold text-[var(--color-text)] tracking-wider uppercase truncate max-w-full opacity-80" title={seg.segment}>
+                <span className="text-[clamp(8px,0.8vw,12px)] font-bold text-[var(--color-text)] tracking-wider uppercase truncate max-w-full opacity-80" title={seg.segment}>
                   {seg.segment}
                 </span>
                 
                 <div className="flex items-center justify-center my-1">
-                   <span className={`text-sm md:text-base font-black tracking-tight ${isCooldown ? 'text-gray-400' : (isPositive ? 'text-green-400' : 'text-red-400')}`}>
+                   <span className={`text-[clamp(14px,1.2vw,20px)] font-black tracking-tight ${isCooldown ? 'text-gray-400' : (isPositive ? 'text-green-400' : 'text-red-400')}`}>
                     {isPositive && !isCooldown ? '+' : ''}{seg.blended_score.toFixed(1)}
                   </span>
                 </div>
 
                 <div className="flex flex-col items-center gap-1 mt-1">
-                   <div className="px-1 py-0.5 rounded bg-black/20 text-[8px] font-mono text-white/50 border border-white/5 whitespace-nowrap">
+                   <div className="px-1 py-0.5 rounded bg-black/20 text-[clamp(7px,0.6vw,10px)] font-mono text-white/50 border border-white/5 whitespace-nowrap">
                       {seg.coin_count !== undefined ? `${seg.coin_count}` : '...'}
                    </div>
-                   {isCooldown && <span className="px-1 py-0.5 rounded bg-red-900/40 border border-red-500/20 text-[7px] font-bold text-white/40 tracking-wider">COOL</span>}
+                   {isCooldown && <span className="px-1 py-0.5 rounded bg-red-900/40 border border-red-500/20 text-[clamp(6px,0.5vw,9px)] font-bold text-white/40 tracking-wider">COOL</span>}
                 </div>
               </div>
             </motion.div>
