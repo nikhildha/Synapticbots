@@ -2,7 +2,7 @@ import logging
 from datetime import datetime, timedelta
 import dateutil.parser as _dp
 import config
-from coin_scanner import get_segment_for_coin
+from segment_features import get_segment_for_coin
 
 logger = logging.getLogger("RiskManager")
 
