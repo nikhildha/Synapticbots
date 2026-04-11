@@ -1058,10 +1058,14 @@ class RegimeMasterBot:
             user_id  = target.get("user_id", config.ENGINE_USER_ID)
             
             raw_bot_segment = target.get("segment_filter", "ALL")
-            if not raw_bot_segment or raw_bot_segment == "ALL":
-                bot_segment_filter = _infer_segment_from_name(bot_name)
-            else:
+            # Only respect DB segment if it's an actual market category.
+            # Strategy-style names like "Titan", "Systematic", "Momentum", "Stat Arb"
+            # stored in older bot configs should fall through to name-inference → "ALL".
+            _REAL_MARKET_SEGMENTS = {"L1", "L2", "DeFi", "AI", "Meme", "RWA", "Gaming", "DePIN", "Modular", "Oracles"}
+            if raw_bot_segment and raw_bot_segment in _REAL_MARKET_SEGMENTS:
                 bot_segment_filter = raw_bot_segment
+            else:
+                bot_segment_filter = _infer_segment_from_name(bot_name)  # returns "ALL" for strategy names
 
             # ── Clear stale deploy statuses from last cycle for this bot ──────────
             # Without this, coins that were #1 last cycle (e.g. RONIN with "Conviction too low")
