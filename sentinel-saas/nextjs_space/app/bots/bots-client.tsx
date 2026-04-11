@@ -40,7 +40,7 @@ export function BotsClient({ bots: initialBots }: BotsClientProps) {
   const [deployExchange, setDeployExchange] = useState('binance');
   const [deployMode, setDeployMode] = useState('paper');
   const [deployMaxTrades, setDeployMaxTrades] = useState(10);
-  const [deployCapitalPerTrade, setDeployCapitalPerTrade] = useState(100);
+  const [deployCapitalPerTrade, setDeployCapitalPerTrade] = useState(3000);
   const [selectedBots, setSelectedBots] = useState<string[]>(['Titan', 'Vanguard', 'Rogue', 'Systematic', 'Momentum', 'Stat Arb']);
 
   const availableBots = [
