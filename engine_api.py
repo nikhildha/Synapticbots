@@ -335,6 +335,9 @@ def pull_active_bots_from_saas():
         return False  # Not configured — rely on push registration fallback
 
     mode = "paper" if config.PAPER_TRADE else "live"
+    if saas_url and not saas_url.startswith("http"):
+        saas_url = f"https://{saas_url}"
+        
     url = f"{saas_url.rstrip('/')}/api/internal/active-bots?mode={mode}"
     headers = {"X-Synaptic-Internal": "engine-pull"}
 
