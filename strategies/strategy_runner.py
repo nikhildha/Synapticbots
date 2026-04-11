@@ -57,29 +57,34 @@ class StrategyRunner:
 
     def __init__(self):
         # ── Per-bot Risk Managers ─────────────────────────────────────────────
+        # max_open_trades is per-bot-id (already filtered before can_deploy check).
+        # With up to 6 active strategies per user, each bot can hold up to 10 simultaneous positions.
+        _max_t = getattr(config, "STRATEGY_MAX_TRADES_PER_BOT", 10)
+        _cap   = getattr(config, "STRATEGY_BOT_CAPITAL", 100.0)
+
         self.rm_pyxis = StrategyRiskManager(
             bot_name="Pyxis",
-            max_open_trades=3,
-            capital_per_trade=getattr(config, "STRATEGY_BOT_CAPITAL", 1000.0),
-            leverage=5,
+            max_open_trades=_max_t,
+            capital_per_trade=_cap,
+            leverage=getattr(config, "FIXED_LEVERAGE", 10),
             sl_atr_mult=1.5,
             tp_atr_mult=3.0,
             max_daily_loss_pct=0.08,
         )
         self.rm_axiom = StrategyRiskManager(
             bot_name="Axiom",
-            max_open_trades=5,
-            capital_per_trade=getattr(config, "STRATEGY_BOT_CAPITAL", 1000.0),
-            leverage=7,
+            max_open_trades=_max_t,
+            capital_per_trade=_cap,
+            leverage=getattr(config, "FIXED_LEVERAGE", 10),
             sl_atr_mult=1.2,
             tp_atr_mult=2.5,
             max_daily_loss_pct=0.10,
         )
         self.rm_ratio = StrategyRiskManager(
             bot_name="Ratio",
-            max_open_trades=4,
-            capital_per_trade=getattr(config, "STRATEGY_BOT_CAPITAL", 1000.0),
-            leverage=3,
+            max_open_trades=_max_t,
+            capital_per_trade=_cap,
+            leverage=getattr(config, "FIXED_LEVERAGE", 10),
             sl_atr_mult=2.0,
             tp_atr_mult=4.0,
             max_daily_loss_pct=0.06,

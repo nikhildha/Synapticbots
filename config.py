@@ -135,7 +135,8 @@ LEVERAGE_NONE     =  1   # Observation mode
 
 # ─── Risk Constants ─────────────────────────────────────────────────────────────
 MAX_LOSS_PER_TRADE_PCT  : int   = 20   # Max % loss per trade before SL enforcement (used in Athena SL gate)
-STRATEGY_BOT_CAPITAL    : float = 1000.0  # Capital per trade for Pyxis/Axiom/Ratio independent bots
+STRATEGY_BOT_CAPITAL    : float = 100.0   # Capital per trade for Pyxis/Axiom/Ratio (aligned with $100/trade standard)
+STRATEGY_MAX_TRADES_PER_BOT: int = 10     # Max concurrent open trades per strategy bot-id (was 3/5/4 hardcoded)
 
 # ─── Confidence Thresholds ──────────────────────────────────────────────────────
 # FIX-C1: HMM margin confidence (best_prob - 2nd_best_prob) rarely exceeds 0.40
