@@ -7,7 +7,8 @@ const getEngineUrl = (mode: 'paper' | 'live' = 'live'): string => {
     if (mode === 'live' && process.env.LIVE_ORCHESTRATOR_URL) {
         return process.env.LIVE_ORCHESTRATOR_URL;
     }
-    return process.env.ORCHESTRATOR_URL || 'http://127.0.0.1:3001';
+    // Strict fallback directly pushing to Live Port 3001 to dodge paper mappings on local
+    return 'http://127.0.0.1:3001';
 };
 
 export async function GET(req: Request) {
