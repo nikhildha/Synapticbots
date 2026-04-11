@@ -40,7 +40,7 @@ export function BotsClient({ bots: initialBots }: BotsClientProps) {
   const [deployExchange, setDeployExchange] = useState('binance');
   const [deployMode, setDeployMode] = useState('paper');
   const [deployMaxTrades, setDeployMaxTrades] = useState(10);
-  const [deployCapitalPerTrade, setDeployCapitalPerTrade] = useState(3000);
+  const [deployCapitalPerTrade, setDeployCapitalPerTrade] = useState(100);
   const [selectedBots, setSelectedBots] = useState<string[]>(['Titan', 'Vanguard', 'Rogue', 'Systematic', 'Momentum', 'Stat Arb']);
 
   const availableBots = [
@@ -283,11 +283,9 @@ export function BotsClient({ bots: initialBots }: BotsClientProps) {
                 <button onClick={handlePurgeTrades} disabled={purgeTradesLoading} className="btn-ghost" style={{ fontSize: 'var(--text-sm)', padding: '10px 16px', color: purgeTradesConfirm ? '#FCD34D' : '#9CA3AF', border: `1px solid ${purgeTradesConfirm ? 'rgba(252,211,77,0.5)' : 'rgba(156,163,175,0.2)'}`, opacity: purgeTradesLoading ? 0.6 : 1, transition: 'all 0.2s' }}>
                   {purgeTradesLoading ? 'Purging…' : purgeTradesConfirm ? '⚠️ Confirm Purge Trades' : '🧹 Purge All Trades'}
                 </button>
-                {activeBots.length === 0 && (
-                  <button onClick={() => setShowDeployModal(true)} className="btn-success" style={{ fontSize: 'var(--text-base)', padding: '11px 22px' }}>
-                    <Rocket style={{ width: 16, height: 16 }} /> Deploy Launchpad
-                  </button>
-                )}
+                <button onClick={() => setShowDeployModal(true)} className="btn-success" style={{ fontSize: 'var(--text-base)', padding: '11px 22px' }}>
+                  <Rocket style={{ width: 16, height: 16 }} /> Deploy Launchpad
+                </button>
               </div>
             </div>
           </motion.div>
