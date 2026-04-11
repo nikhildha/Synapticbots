@@ -1,470 +1,210 @@
-"""
-Project Regime-Master — Risk Manager
-Position sizing, dynamic leverage, kill switch, and ATR-based stops.
-"""
-import json
 import logging
-import numpy as np
-from datetime import datetime
-
+from datetime import datetime, timedelta
+import dateutil.parser as _dp
 import config
+from coin_scanner import get_segment_for_coin
 
 logger = logging.getLogger("RiskManager")
 
-
 class RiskManager:
-    """
-    Enforces the "Anti-Liquidation" rules:
-      • 2% risk per trade
-      • Dynamic leverage based on HMM confidence
-      • Kill switch on 10% drawdown in 24h
-      • ATR-based stop-loss placement
-    """
+    def __init__(self, engine):
+        self.engine = engine
 
-    def __init__(self):
-        self.equity_history = []   # List of (timestamp, balance) tuples
-        self._killed = False
+    def apply_cooldown(self, sym: str, trade: dict) -> None:
+        if not getattr(config, "COOLDOWN_ENABLED", True):
+            return
 
-    # ─── Dynamic Leverage ────────────────────────────────────────────────────
+        now = datetime.utcnow()
+        exit_reason   = (trade.get("exit_reason") or "").upper()
+        realized_pnl  = float(trade.get("realized_pnl_pct") or trade.get("pnl_pct") or 0)
+        side          = (trade.get("position") or trade.get("side") or "").upper()
 
-    @staticmethod
-    def get_dynamic_leverage(confidence, regime):
-        """
-        Map HMM confidence and regime → leverage multiplier.
+        opened_at = trade.get("entry_time") or trade.get("created_at") or trade.get("open_time")
+        hold_mins = 9999
+        if opened_at:
+            try:
+                if isinstance(opened_at, str):
+                    opened_dt = _dp.parse(opened_at.replace("Z", "+00:00")).replace(tzinfo=None)
+                else:
+                    opened_dt = opened_at
+                hold_mins = (now - opened_dt).total_seconds() / 60
+            except Exception:
+                pass
 
-        Rules (updated):
-          • Crash regime → 0 (stay out)
-          • Chop regime  → 15x (mean reversion)
-          • Trend (Bull/Bear):
-              confidence ≥ 95%  → 35x
-              confidence 91–95% → 25x
-              confidence 85–90% → 15x
-              confidence < 85%  → 0 (DO NOT DEPLOY)
+        cooldown_mins = 0
+        rule_label    = ""
 
-        Parameters
-        ----------
-        confidence : float (0..1)
-        regime : int (config.REGIME_*)
+        flash_thresh = getattr(config, "COOLDOWN_FLASH_HOLD_THRESH", 15)
+        if realized_pnl < 0 and hold_mins < flash_thresh:
+            cooldown_mins = getattr(config, "COOLDOWN_FLASH_CLOSE_MIN", 120)
+            rule_label    = f"Rule3:FlashClose({hold_mins:.0f}min hold)"
 
-        Returns
-        -------
-        int : leverage value (0 = skip trade)
-        """
-        # NOTE: With HMM_N_STATES=3, CRASH is merged into BEAR — no separate check needed.
+        elif exit_reason in ("STOP_LOSS", "TRAILING_SL", "MAX_LOSS"):
+            cooldown_mins = getattr(config, "COOLDOWN_SL_MINUTES", 90)
+            rule_label    = f"Rule1:{exit_reason}"
 
-        # Chop regime → low leverage for mean reversion (still requires 85%+ confidence)
-        if regime == config.REGIME_CHOP:
-            return config.LEVERAGE_LOW if confidence >= config.CONFIDENCE_LOW else 0
+        elif realized_pnl < 0:
+            cooldown_mins = getattr(config, "COOLDOWN_LOSS_MINUTES", 45)
+            rule_label    = "Rule2:LossClose"
 
-        # Trend regimes (Bull / Bear) — scale by confidence
-        # > 95% → 35x
-        if confidence >= config.CONFIDENCE_HIGH:
-            return config.LEVERAGE_HIGH
-        # 91–95% → 25x
-        elif confidence >= config.CONFIDENCE_MEDIUM:
-            return config.LEVERAGE_MODERATE
-        # 85–90% → 15x
-        elif confidence >= config.CONFIDENCE_LOW:
-            return config.LEVERAGE_LOW
-        else:
-            return 0  # Below 85% — do not deploy
+        same_dir_mins = getattr(config, "COOLDOWN_SAME_DIR_MINUTES", 30)
+        if side and self.engine._coin_last_side.get(sym) == side:
+            if cooldown_mins < same_dir_mins:
+                cooldown_mins = same_dir_mins
+                rule_label    = rule_label or "Rule4:SameDirRepeat"
 
-    # ─── Position Sizing (2% Rule) ───────────────────────────────────────────
+        self.engine._coin_daily_trades.setdefault(sym, []).append(now)
+        cutoff = now - timedelta(hours=24)
+        self.engine._coin_daily_trades[sym] = [t for t in self.engine._coin_daily_trades[sym] if t >= cutoff]
 
-    @staticmethod
-    def calculate_position_size(balance, entry_price, atr, leverage=1, risk_pct=None):
-        """
-        Position size so that a 1-ATR adverse move ≤ risk_pct of balance.
-        
-        Formula:
-          risk_amount = balance * risk_pct
-          stop_distance = atr * ATR_SL_MULTIPLIER
-          raw_qty = risk_amount / stop_distance
-          leveraged_qty = raw_qty  (leverage amplifies PnL, not qty)
-        
-        Returns
-        -------
-        float : quantity in base asset
-        """
-        risk_pct = risk_pct or config.RISK_PER_TRADE
-        risk_amount = balance * risk_pct
-        stop_distance = atr * config.get_atr_multipliers(leverage)[0]
+        daily_cap = getattr(config, "COOLDOWN_DAILY_CAP_TRADES", 3)
+        if len(self.engine._coin_daily_trades[sym]) >= daily_cap:
+            midnight = (now + timedelta(days=1)).replace(hour=0, minute=0, second=0, microsecond=0)
+            mins_to_midnight = (midnight - now).total_seconds() / 60
+            if mins_to_midnight > cooldown_mins:
+                cooldown_mins = mins_to_midnight
+                rule_label    = "Rule5:DailyCap"
 
-        if stop_distance <= 0 or entry_price <= 0:
-            return config.DEFAULT_QUANTITY
+        if side:
+            self.engine._coin_last_side[sym] = side
 
-        quantity = risk_amount / stop_distance
-        # Ensure we don't exceed balance even with leverage
-        max_qty = (balance * leverage) / entry_price
-        quantity = min(quantity, max_qty)
-
-        # Round to reasonable precision
-        quantity = round(quantity, 6)
-        return max(quantity, 0.0001)  # Binance minimum
-
-    # ─── Margin-First Position Sizing ────────────────────────────────────────
-
-    @staticmethod
-    def calculate_margin_first_position(margin, price, atr, conviction_leverage,
-                                         max_risk_pct=None):
-        """
-        Margin-first position sizing: margin is fixed, leverage is reduced to
-        keep SL loss ≤ max_risk_pct.
-
-        Parameters
-        ----------
-        margin : float            User's capital_per_trade (e.g. $100)
-        price : float             Current entry price
-        atr : float               Current ATR value
-        conviction_leverage : int  Desired leverage from conviction score
-        max_risk_pct : float       Max loss % at SL (e.g. 15.0 = 15%)
-
-        Returns
-        -------
-        (quantity: float, final_leverage: int)
-            quantity=0 means trade should be skipped (risk too high even at floor)
-        """
-        max_risk = max_risk_pct or abs(config.MAX_LOSS_PER_TRADE_PCT)
-        leverage_tiers = [10, 5]  # Max 10x flat — no higher tiers permitted
-
-        final_leverage = 0
-        for lev in leverage_tiers:
-            if lev > conviction_leverage:
-                continue
-            sl_mult, _ = config.get_atr_multipliers(lev)
-            loss_at_sl = (atr * sl_mult / price) * lev * 100  # % of margin
-            if loss_at_sl <= max_risk:
-                final_leverage = lev
-                break
-
-        if final_leverage < config.MIN_LEVERAGE_FLOOR:
-            logger.info("⚠️ Leverage would be %dx (below floor %dx) — skipping trade "
-                        "(ATR=%.6f, price=%.2f, conviction_lev=%dx)",
-                        final_leverage, config.MIN_LEVERAGE_FLOOR, atr, price,
-                        conviction_leverage)
-            return 0.0, 0
-
-        notional = margin * final_leverage
-        quantity = notional / price
-        quantity = round(quantity, 6)
-        quantity = max(quantity, 0.0001)
-
-        if final_leverage < conviction_leverage:
-            logger.info("📉 Leverage reduced: %dx → %dx (ATR risk cap, "
-                        "ATR=%.6f, price=%.2f)", conviction_leverage,
-                        final_leverage, atr, price)
-
-        return quantity, final_leverage
-
-    # ─── ATR Stop Loss / Take Profit ─────────────────────────────────────────
-
-    @staticmethod
-    def calculate_atr_stops(entry_price, atr, side, leverage=1):
-        """
-        Compute SL and TP based on ATR, adjusted for leverage.
-        
-        Parameters
-        ----------
-        entry_price : float
-        atr : float
-        side : str ('BUY' or 'SELL')
-        leverage : int
-        
-        Returns
-        -------
-        (stop_loss: float, take_profit: float)
-        """
-        sl_mult, tp_mult = config.get_atr_multipliers(leverage)
-        sl_dist = atr * sl_mult
-        tp_dist = atr * tp_mult
-
-        # Adaptive precision: more decimals for cheaper coins
-        if entry_price >= 100:
-            decimals = 2
-        elif entry_price >= 1:
-            decimals = 4
-        else:
-            decimals = 6
-
-        if side == "BUY":
-            stop_loss   = round(entry_price - sl_dist, decimals)
-            take_profit = round(entry_price + tp_dist, decimals)
-        else:
-            stop_loss   = round(entry_price + sl_dist, decimals)
-            take_profit = round(entry_price - tp_dist, decimals)
-
-        return stop_loss, take_profit
-
-    @staticmethod
-    def calculate_optimal_stops(symbol, entry_price, atr, side, leverage=1, swing_l=None, swing_h=None):
-        """
-        Compute Stop Loss and Take Profit optimally selected per coin segment.
-        Returns (stop_loss, take_profit, rm_id).
-        """
-        rm_id = config.get_optimal_rm(symbol)
-        
-        if entry_price >= 100:
-            decimals = 2
-        elif entry_price >= 1:
-            decimals = 4
-        else:
-            decimals = 6
-
-        direction = 1 if side == "BUY" else -1
-
-        if rm_id == "RM1_Static":
-            sl = entry_price * (1 - direction * 0.05)
-            tp = entry_price * (1 + direction * 0.10)
-        elif rm_id == "RM2_ATR":
-            segment = None
-            for seg, coins in config.CRYPTO_SEGMENTS.items():
-                if symbol in coins:
-                    segment = seg
-                    break
-            m = 3.5 if segment in ["Meme", "AI"] else 2.5
-            sl = entry_price - direction * (m * atr)
-            tp = entry_price + direction * (m * 2.0 * atr)
-        elif rm_id == "RM3_Swing":
-            swing_lh = swing_l if side == "BUY" else swing_h
-            if swing_lh is not None and not np.isnan(swing_lh) and swing_lh > 0:
-                sl = swing_lh
-                # Ensure the swing stop isn't placed ON the wrong side of the entry price (highly unlikely but protects bounds)
-                if (side == "BUY" and sl >= entry_price) or (side == "SELL" and sl <= entry_price):
-                    sl = entry_price - direction * (3.0 * atr)
-            else:
-                sl = entry_price - direction * (3.0 * atr)
-            
-            risk_dist = abs(entry_price - sl)
-            tp = entry_price + direction * (risk_dist * 2.5) # Generous 2.5 RR for swings
-        elif rm_id == "RM5_Trailing":
-            sl = entry_price - direction * (1.5 * atr)
-            tp = entry_price + direction * (5.0 * atr) # Actual trailing happens dynamically in tradebook
-        else:
-            # Fallback
-            sl, tp = RiskManager.calculate_atr_stops(entry_price, atr, side, leverage)
-
-        # ─── DCA Catastrophic Buffer Override ─────────────────────────────────────
-        # Force physical exchange stop-loss to absolute max limit (-65% leveraged PnL).
-        # This replaces all tight ATR limits to give the DCA Engine room to average-down
-        # at -15% and -35% without the exchange forcefully closing the trade natively.
-        dca_safety_pct = 65.0
-        price_move = (dca_safety_pct / 100.0) / leverage
-        sl = entry_price * (1.0 - direction * price_move)
-
-        return round(sl, decimals), round(tp, decimals), rm_id
-
-    @staticmethod
-    def _clamp_sl_to_max_loss(entry_price: float, sl: float, side: str, leverage: int, capital: float = 100.0) -> float:
-        """Ensure the SL price never implies a loss deeper than MAX_LOSS_PER_TRADE_PCT.
-
-        If ATR-based SL is too wide, it's moved closer to entry.
-        Formula: max_sl_dist_pct = abs(MAX_LOSS_PER_TRADE_PCT) / leverage / 100
-        """
-        import logging as _log
-        _logger = _log.getLogger("RiskManager")
-        max_loss_pct = abs(config.MAX_LOSS_PER_TRADE_PCT)  # e.g. 25
-        max_sl_dist_pct = max_loss_pct / (leverage * 100)  # max fraction of entry price
-        max_sl_dist = entry_price * max_sl_dist_pct
-
-        direction = 1 if side == "BUY" else -1
-        max_sl_price = entry_price - direction * max_sl_dist  # worst acceptable SL price
-
-        # Clamp: SL must be on the right side AND not wider than max_sl_price
-        if side == "BUY":
-            if sl < max_sl_price:  # SL too far below entry
-                _logger.warning(
-                    "⚠️ SL clamped: entry=%.6f sl=%.6f → %.6f (would've been %.1f%% loss at %dx lev, max=%d%%)",
-                    entry_price, sl, max_sl_price,
-                    abs(entry_price - sl) / entry_price * leverage * 100,
-                    leverage, max_loss_pct
-                )
-                return max_sl_price
-        else:  # SELL
-            if sl > max_sl_price:  # SL too far above entry
-                _logger.warning(
-                    "⚠️ SL clamped: entry=%.6f sl=%.6f → %.6f (would've been %.1f%% loss at %dx lev, max=%d%%)",
-                    entry_price, sl, max_sl_price,
-                    abs(sl - entry_price) / entry_price * leverage * 100,
-                    leverage, max_loss_pct
-                )
-                return max_sl_price
-        return sl
-
-
-    # ─── Kill Switch ─────────────────────────────────────────────────────────
-
-    def record_equity(self, balance):
-        """Record current equity for drawdown monitoring."""
-        self.equity_history.append((datetime.utcnow(), balance))
-        # Keep only last 24h
-        cutoff = datetime.utcnow().timestamp() - 86400
-        self.equity_history = [
-            (t, b) for t, b in self.equity_history
-            if t.timestamp() > cutoff
-        ]
-
-    def check_kill_switch(self):
-        """
-        If portfolio dropped ≥ KILL_SWITCH_DRAWDOWN (10%) in the last 24h → KILL.
-        
-        Returns
-        -------
-        bool : True if kill switch triggered
-        """
-        if self._killed:
-            return True
-
-        if len(self.equity_history) < 2:
-            return False
-
-        peak = max(b for _, b in self.equity_history)
-        current = self.equity_history[-1][1]
-
-        drawdown = (peak - current) / peak if peak > 0 else 0
-
-        if drawdown >= config.KILL_SWITCH_DRAWDOWN:
-            logger.critical(
-                "KILL SWITCH TRIGGERED! Drawdown: %.2f%% (peak=%.2f, now=%.2f)",
-                drawdown * 100, peak, current,
+        if cooldown_mins > 0:
+            expiry = now + timedelta(minutes=cooldown_mins)
+            self.engine._coin_cooldowns[sym] = expiry
+            logger.info(
+                "⏳ COOLDOWN [%s] for %.0f min until %s UTC (%s, PnL=%.1f%%, hold=%.0fm)",
+                sym, cooldown_mins, expiry.strftime("%H:%M"), rule_label, realized_pnl, hold_mins
             )
-            self._killed = True
-            # Write kill command
-            self._write_kill_command()
-            return True
+            self.engine._coin_states.setdefault(sym, {})["cooldown_until"] = expiry.isoformat() + "Z"
+            self.engine._coin_states[sym]["cooldown_rule"] = rule_label
 
-        return False
+    def is_in_cooldown(self, sym: str) -> tuple[bool, str]:
+        if not getattr(config, "COOLDOWN_ENABLED", True):
+            return False, ""
+        expiry = self.engine._coin_cooldowns.get(sym)
+        if expiry is None:
+            return False, ""
+        now = datetime.utcnow()
+        if now < expiry:
+            remaining = (expiry - now).total_seconds() / 60
+            return True, f"cooldown {remaining:.0f}m (until {expiry.strftime('%H:%M')} UTC)"
+        del self.engine._coin_cooldowns[sym]
+        self.engine._coin_states.get(sym, {}).pop("cooldown_until", None)
+        self.engine._coin_states.get(sym, {}).pop("cooldown_rule", None)
+        return False, ""
 
-    def _write_kill_command(self):
-        """Persist kill command so dashboard can detect it."""
-        try:
-            with open(config.COMMANDS_FILE, "w") as f:
-                json.dump({"command": "KILL", "timestamp": datetime.utcnow().isoformat()}, f)
-        except Exception as e:
-            logger.error("Failed to write kill command: %s", e)
+    def apply_segment_cooldown(self, seg: str, trade: dict) -> None:
+        if not seg or not getattr(config, "SEG_COOLDOWN_ENABLED", True):
+            return
 
-    def reset_kill_switch(self):
-        """Manual reset (via dashboard)."""
-        self._killed = False
-        self.equity_history.clear()
-        logger.info("Kill switch reset.")
+        user_id = trade.get("user_id", getattr(config, "ENGINE_USER_ID", "default"))
+        seg_key = (user_id, seg)
 
-    @property
-    def is_killed(self):
-        return self._killed
+        now = datetime.utcnow()
+        exit_reason  = (trade.get("exit_reason") or "").upper()
+        realized_pnl = float(trade.get("realized_pnl_pct") or trade.get("pnl_pct") or 0)
+        is_loss      = realized_pnl < 0
+        is_sl        = exit_reason in ("STOP_LOSS", "TRAILING_SL", "MAX_LOSS")
+        is_tp        = exit_reason in ("TAKE_PROFIT", "TP")
 
-    # ─── Conviction Scoring (8-factor, 0-100) ─────────────────────────────────
+        if is_sl:
+            self.engine._seg_sl_events.setdefault(seg_key, []).append(now)
 
-    @staticmethod
-    def _score_hmm(confidence: float) -> float:
-        """Factor 1: HMM confidence quality (max 22 pts).
-        Higher confidence = stronger regime signal = higher score contribution."""
-        if confidence is None:
-            return 0.0
-        w = config.CONVICTION_WEIGHT_HMM
-        if confidence >= config.HMM_CONF_TIER_HIGH:
-            return w
-        elif confidence >= config.HMM_CONF_TIER_MED_HIGH:
-            return w * 0.85
-        elif confidence >= config.HMM_CONF_TIER_MED:
-            return w * 0.65
-        elif confidence >= config.HMM_CONF_TIER_LOW:
-            return w * 0.40
-        return 0.0  # below minimum confidence — no contribution
+        self.engine._seg_close_history.setdefault(seg_key, []).append((now, realized_pnl))
 
+        if is_loss and not is_tp:
+            self.engine._seg_consec_losses[seg_key] = self.engine._seg_consec_losses.get(seg_key, 0) + 1
+        elif not is_loss:
+            self.engine._seg_consec_losses[seg_key] = 0
 
+        cooldown_mins = 0
+        rule_label    = ""
 
-    @staticmethod
-    def _score_funding(funding_rate, side: str) -> float:
-        """Factor 3: Funding rate carry signal (max 12 pts).
-        Negative funding favours longs; positive funding favours shorts."""
-        w = config.CONVICTION_WEIGHT_FUNDING
-        if funding_rate is None:
-            return w * 0.50  # Missing data neutrality
-        if side == "BUY":
-            if funding_rate < config.FUNDING_NEG_STRONG:
-                return w       # longs paid — full score
-            if funding_rate < config.FUNDING_POS_MED:
-                return w * 0.55
-            return -config.CONVICTION_FUNDING_PENALTY  # crowded longs
-        else:  # SELL
-            if funding_rate > config.FUNDING_POS_STRONG:
-                return w       # shorts paid — full score
-            if funding_rate > config.FUNDING_NEG_MED:
-                return w * 0.55
-            return -config.CONVICTION_FUNDING_PENALTY
+        burst_window = getattr(config, "SEG_COOLDOWN_SL_BURST_WINDOW", 60)
+        burst_count  = getattr(config, "SEG_COOLDOWN_SL_BURST_COUNT", 2)
+        cutoff_r1    = now - timedelta(minutes=burst_window)
+        self.engine._seg_sl_events[seg_key] = [t for t in self.engine._seg_sl_events.get(seg_key, []) if t >= cutoff_r1]
+        if len(self.engine._seg_sl_events.get(seg_key, [])) >= burst_count:
+            r1_mins = getattr(config, "SEG_COOLDOWN_SL_BURST_MINS", 90)
+            if r1_mins > cooldown_mins:
+                cooldown_mins = r1_mins
+                rule_label    = f"SegRule1:SL_Burst({len(self.engine._seg_sl_events[seg_key])}x in {burst_window}m)"
 
-    @staticmethod
-    def _score_oi(oi_change, side: str) -> float:
-        """Factor 5: Open Interest change (max 8 pts).
-        Growing OI confirms fresh positioning; falling OI signals unwinding."""
-        w = config.CONVICTION_WEIGHT_OI
-        if oi_change is None:
-            return w * 0.50
-        if side == "BUY":
-            if oi_change > config.OI_CHANGE_HIGH:
-                return w       # OI growing → strong positioning
-            if oi_change > config.OI_CHANGE_MED:
-                return w * 0.60
-            if oi_change < config.OI_CHANGE_NEG_HIGH:
-                return -config.CONVICTION_OI_PENALTY  # OI falling → short-covering risk
-            return w * 0.30
-        else:  # SELL
-            if oi_change < config.OI_CHANGE_NEG_HIGH:
-                return w       # OI falling → shorts winning
-            if oi_change < config.OI_CHANGE_NEG_MED:
-                return w * 0.60
-            if oi_change > config.OI_CHANGE_HIGH:
-                return -config.CONVICTION_OI_PENALTY
-            return w * 0.30
+        cutoff_r2 = now - timedelta(hours=4)
+        recent_closes = [(t, pnl) for t, pnl in self.engine._seg_close_history.get(seg_key, []) if t >= cutoff_r2]
+        if len(recent_closes) >= 3:
+            loss_count = sum(1 for _, pnl in recent_closes if pnl < 0)
+            loss_pct   = (loss_count / len(recent_closes)) * 100
+            threshold  = getattr(config, "SEG_COOLDOWN_LOSS_RATE_PCT", 60)
+            if loss_pct >= threshold:
+                r2_mins = getattr(config, "SEG_COOLDOWN_LOSS_RATE_MINS", 120)
+                if r2_mins > cooldown_mins:
+                    cooldown_mins = r2_mins
+                    rule_label    = f"SegRule2:LossRate({loss_pct:.0f}%>{threshold}%)"
 
-    @staticmethod
-    def _score_orderflow(orderflow_score, side: str) -> float:
-        """Factor 8: Order-book flow alignment (max 10 pts).
-        Aligned taker flow confirms direction; opposing flow penalises."""
-        w = config.CONVICTION_WEIGHT_ORDERFLOW
-        if orderflow_score is None:
-            return w * 0.50  # Missing data neutrality
-        # Map to trade-aligned direction: positive = aligned with our side
-        aligned = orderflow_score if side == "BUY" else -orderflow_score
-        if aligned > 0.5:
-            return w           # strong flow confirmation
-        if aligned > 0.2:
-            return w * 0.70
-        if aligned > -0.2:
-            return w * 0.30    # neutral flow
-        if aligned > -0.5:
-            return -config.CONVICTION_FLOW_MILD_PENALTY
-        return -config.CONVICTION_FLOW_STRONG_PENALTY
+        consec_thresh = getattr(config, "SEG_COOLDOWN_CONSEC_LOSS", 3)
+        if self.engine._seg_consec_losses.get(seg_key, 0) >= consec_thresh:
+            r5_mins = getattr(config, "SEG_COOLDOWN_CONSEC_LOSS_MINS", 240)
+            if r5_mins > cooldown_mins:
+                cooldown_mins = r5_mins
+                rule_label    = f"SegRule5:ConsecLoss({self.engine._seg_consec_losses[seg_key]}x)"
 
-    @staticmethod
-    def compute_conviction_score(
-        confidence: float,
-        regime: int,
-        side: str,
-        funding_rate=None,
-        oi_change=None,
-        orderflow_score=None,
-    ) -> float:
-        """
-        Compute a 0–100 conviction score from 5 active factors.
+        prune_cutoff = now - timedelta(hours=24)
+        self.engine._seg_close_history[seg_key] = [(t, p) for t, p in self.engine._seg_close_history.get(seg_key, []) if t >= prune_cutoff]
 
-        Active Factors
-        ──────────────
-        1. HMM Confidence       (60 pts) — core signal quality (already includes BTC Macro)
-        2. Order Flow           (15 pts) — L2 depth + taker flow + cumDelta
-        3. Funding Rate         (15 pts) — perpetual swap carry signal
-        4. Open Interest Change (10 pts) — smart-money positioning
+        if cooldown_mins > 0:
+            expiry = now + timedelta(minutes=cooldown_mins)
+            existing = self.engine._seg_cooldowns.get(seg_key)
+            if existing is None or expiry > existing:
+                self.engine._seg_cooldowns[seg_key] = expiry
+                logger.info(
+                    "🔒 SEGMENT_COOLDOWN [%s] for %.0f min until %s UTC (%s, PnL=%.1f%%)",
+                    seg, cooldown_mins, expiry.strftime("%H:%M"), rule_label, realized_pnl
+                )
 
-        REMOVED: BTC Macro (Handled via ML), Sentiment (0 pts), S/R + VWAP (0 pts), Volatility (0 pts)
+    def is_segment_in_cooldown(self, seg: str, user_id: str = None) -> tuple:
+        if not seg or not getattr(config, "SEG_COOLDOWN_ENABLED", True):
+            return False, ""
+            
+        user_id = user_id or getattr(config, "ENGINE_USER_ID", "default")
+        seg_key = (user_id, seg)
 
-        Total max = 100 pts.
-        Conviction → leverage via get_conviction_leverage().
-        """
-        score = (
-            RiskManager._score_hmm(confidence)
-            + RiskManager._score_funding(funding_rate, side)
-            + RiskManager._score_oi(oi_change, side)
-            + RiskManager._score_orderflow(orderflow_score, side)
+        max_active = getattr(config, "SEG_COOLDOWN_MAX_ACTIVE", 3)
+        active_in_seg = sum(
+            1 for key, pos in self.engine._active_positions.items()
+            if get_segment_for_coin(key.split(":")[-1] if ":" in key else key) == seg
+            and pos.get("user_id") == user_id
         )
-        return float(max(0.0, min(100.0, score)))
+        if active_in_seg >= max_active:
+            return True, f"SegRule3:MaxActive({active_in_seg}/{max_active})"
 
+        churn_window = getattr(config, "SEG_COOLDOWN_CHURN_WINDOW", 360)
+        churn_count  = getattr(config, "SEG_COOLDOWN_CHURN_COUNT", 4)
+        now = datetime.utcnow()
+        cutoff_r4 = now - timedelta(minutes=churn_window)
+        self.engine._seg_open_count[seg_key] = [t for t in self.engine._seg_open_count.get(seg_key, []) if t >= cutoff_r4]
+        if len(self.engine._seg_open_count.get(seg_key, [])) >= churn_count:
+            churn_mins = getattr(config, "SEG_COOLDOWN_CHURN_MINS", 180)
+            expiry = now + timedelta(minutes=churn_mins)
+            existing = self.engine._seg_cooldowns.get(seg_key)
+            if existing is None or expiry > existing:
+                self.engine._seg_cooldowns[seg_key] = expiry
+                logger.info(
+                    "🔒 SEGMENT_COOLDOWN [%s] Rule4:Churn (%d opens in %dm) → %dm block",
+                    seg_key, len(self.engine._seg_open_count[seg_key]), churn_window, churn_mins
+                )
+
+        expiry = self.engine._seg_cooldowns.get(seg_key)
+        if expiry is None:
+            return False, ""
+        if now < expiry:
+            remaining = (expiry - now).total_seconds() / 60
+            return True, f"segment_cooldown {remaining:.0f}m (until {expiry.strftime('%H:%M')} UTC)"
+        del self.engine._seg_cooldowns[seg_key]
+        return False, ""
+
+    def record_segment_open(self, seg: str, user_id: str = None) -> None:
+        if seg and getattr(config, "SEG_COOLDOWN_ENABLED", True):
+            user_id = user_id or getattr(config, "ENGINE_USER_ID", "default")
+            seg_key = (user_id, seg)
+            self.engine._seg_open_count.setdefault(seg_key, []).append(datetime.utcnow())

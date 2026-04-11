@@ -23,6 +23,9 @@ from feature_engine import compute_all_features, compute_hmm_features, compute_t
 # ── Hoisted Local Imports ──
 from ai4trade_client import AI4TradeClient
 from coin_scanner import get_hottest_segments as _refresh_heatmap
+from state_manager import StateManager
+from coin_analyzer import CoinAnalyzer
+from risk_manager import RiskManager
 from data_pipeline import fetch_klines
 from data_pipeline import fetch_klines as _fk
 from data_pipeline import fetch_klines as _prefetch
@@ -255,6 +258,10 @@ class RegimeMasterBot:
         except Exception as e:
             logger.error("⚠️ Redis init failed: %s — state will not be broadcast to UI", e)
             self._redis = None
+            
+        self.state_manager = StateManager(self)
+        self.coin_analyzer = CoinAnalyzer(self)
+        self.risk_manager = RiskManager(self)
 
         # Multi-coin state
         self._coin_list = []
@@ -762,7 +769,7 @@ class RegimeMasterBot:
             # This keeps the dashboard heatmap live even when the pool is not being rebuilt
             try:
                 # Find which segments are currently blocked across the engine
-                blocked_segments = {seg for seg in config.CRYPTO_SEGMENTS.keys() if self._is_segment_in_cooldown(seg)[0]}
+                blocked_segments = {seg for seg in config.CRYPTO_SEGMENTS.keys() if self.risk_manager.is_segment_in_cooldown(seg)[0]}
 
                 _refresh_heatmap(getattr(config, "SEGMENT_SCAN_LIMIT", 2), blocked_segments)
             except Exception as _he:
@@ -774,7 +781,7 @@ class RegimeMasterBot:
             refresh_rotations = max(1, self._SCAN_POOL_SIZE // self._SCAN_BATCH_SIZE)
             if not self._full_coin_pool or self._cycle_count % max(1, config.SCAN_INTERVAL_CYCLES * refresh_rotations) == 1:
                 # Find which segments are currently blocked across the engine
-                blocked_segments = {seg for seg in config.CRYPTO_SEGMENTS.keys() if self._is_segment_in_cooldown(seg)[0]}
+                blocked_segments = {seg for seg in config.CRYPTO_SEGMENTS.keys() if self.risk_manager.is_segment_in_cooldown(seg)[0]}
                 
                 logger.info("🔄 Refreshing Segment-First coin pool based on %d active bots (excluding %d blocked segments)...", 
                             len(config.ENGINE_ACTIVE_BOTS), len(blocked_segments))
@@ -878,7 +885,7 @@ class RegimeMasterBot:
                 pass
             # Still run exits and state save, but skip new deployments
             self._check_exits(symbols)
-            self._save_multi_state(symbols, [], 0)
+            self.state_manager.save_multi_state(symbols, [], 0)
             return
 
         self.risk.record_equity(balance)
@@ -945,7 +952,7 @@ class RegimeMasterBot:
                 logger.info("🚫 Skipping %s (Exclusion List)", symbol)
                 continue
             try:
-                result = self._analyze_coin(symbol, balance, btc_flash_crash=btc_flash_crash)
+                result = self.coin_analyzer.analyze_coin(symbol, balance, btc_flash_crash=btc_flash_crash)
 
                 # ── NEW: Short-circuit optimization for BTC Chop ──
                 # If BTC evaluated to CHOP, do NOT waste 2-3 minutes analyzing 30 altcoins.
@@ -1389,7 +1396,7 @@ class RegimeMasterBot:
                 lev, fallback_lev = 10, 5
 
                 # ── Segment Cooldown Gate: block entire segment under cooldown ────────
-                _seg_blocked, _seg_reason = self._is_segment_in_cooldown(seg_name, user_id)
+                _seg_blocked, _seg_reason = self.risk_manager.is_segment_in_cooldown(seg_name, user_id)
                 if _seg_blocked:
                     logger.info("🔒 SEGMENT_COOLDOWN [%s] seg=%s %s — skipping deploy for [%s]",
                                 sym, seg_name, _seg_reason, bot_name)
@@ -1400,7 +1407,7 @@ class RegimeMasterBot:
                     continue
 
                 # ── Cooldown Gate: block redeployment per 5-rule policy ───────────────
-                _cd_blocked, _cd_reason = self._is_in_cooldown(sym)
+                _cd_blocked, _cd_reason = self.risk_manager.is_in_cooldown(sym)
                 if _cd_blocked:
                     logger.info("⏳ COOLDOWN [%s] %s — skipping deploy for [%s]", sym, _cd_reason, bot_name)
                     self._coin_states.setdefault(sym, {}).setdefault("bot_deploy_statuses", {})[bot_id] = (
@@ -1872,7 +1879,7 @@ class RegimeMasterBot:
                 }
                 self._deploying_locks[(user_id, bot_type, sym)] = time.time()
                 # ── Segment Cooldown: track deployment for churn detection (Rule 4) ──
-                self._record_segment_open(seg_name, user_id)
+                self.risk_manager.record_segment_open(seg_name, user_id)
                 # Signal Queue: step 4 — dequeue successfully deployed coin
                 if sym in self._pending_signals:
                     logger.info("✅ Signal queue: dequeuing %s (deployed after %d cycle(s) pending)",
@@ -1915,7 +1922,7 @@ class RegimeMasterBot:
         # ── 6. Save state for dashboard ──────────────────────────
         cycle_duration = time.time() - cycle_start
         self._last_cycle_duration = cycle_duration
-        self._save_multi_state(symbols, deployed_trades, deployed)
+        self.state_manager.save_multi_state(symbols, deployed_trades, deployed)
 
         # ── 7. Persist cycle snapshot to DB (background thread, non-blocking) ─
         threading.Thread(
@@ -2063,667 +2070,6 @@ class RegimeMasterBot:
     # ─── Per-Coin Analysis ───────────────────────────────────────────────────
 
 
-    def _analyze_coin(self, symbol, balance, btc_flash_crash=False):
-        """
-        Analyze a single coin. Returns a trade dict if eligible, else None.
-        Uses multi-timeframe analysis: 1h (primary) + 4h (macro confirmation).
-        """
-        # Fetch 1h data — with 1 retry + cache fallback for resilience
-        df_1h = fetch_klines(symbol, config.TIMEFRAME_CONFIRMATION, limit=config.HMM_LOOKBACK)
-        if (df_1h is None or len(df_1h) < 60) and symbol == "BTCUSDT":
-            # Retry once after a short delay before declaring STALE
-
-            _t.sleep(2)
-            df_1h = fetch_klines(symbol, config.TIMEFRAME_CONFIRMATION, limit=config.HMM_LOOKBACK)
-        if df_1h is None or len(df_1h) < 60:
-            if symbol == "BTCUSDT":
-                logger.error("🚨 BTC 1h data fetch failed or too short — regime STALE")
-                self._coin_states.setdefault("BTCUSDT", {})["last_fetch_error"] = datetime.utcnow().isoformat()
-            return None
-
-        # Get or create brain for this coin (1h)
-        brain = self._coin_brains.get(symbol)
-        if brain is None:
-            brain = HMMBrain(symbol=symbol)
-            self._coin_brains[symbol] = brain
-
-        # Compute features
-        df_1h_feat = compute_all_features(df_1h)
-
-        # Train if needed (1h brain — default TF floor)
-        if brain.needs_retrain(timeframe=config.TIMEFRAME_CONFIRMATION):
-            brain.train(df_1h_feat)
-
-        if not brain.is_trained:
-            if symbol == "BTCUSDT":
-                logger.error("🚨 BTC brain not trained — regime STALE")
-            return None
-
-        # Predict regime (1h)
-        regime, conf = brain.predict(df_1h_feat)
-        regime_name = brain.get_regime_name(regime)
-
-        # ── Multi-TF HMM Analysis (replaces single 1H + 4H) ──
-        if config.MULTI_TF_ENABLED:
-            # Get or create MultiTFBrain for this coin
-            mtf_brain = self._multi_tf_brains.get(symbol)
-            if mtf_brain is None:
-                mtf_brain = MultiTFHMMBrain(symbol)
-                self._multi_tf_brains[symbol] = mtf_brain
-
-            # Fetch and train each timeframe
-            tf_data = {}  # timeframe → feature DataFrame
-            for tf in config.MULTI_TF_TIMEFRAMES:
-                tf_key = f"{symbol}_{tf}"
-                tf_brain = self._coin_brains.get(tf_key)
-                if tf_brain is None:
-                    tf_brain = HMMBrain(symbol=symbol)
-                    self._coin_brains[tf_key] = tf_brain
-
-                try:
-                    df_tf = fetch_klines(symbol, tf, limit=config.MULTI_TF_CANDLE_LIMIT)
-                    if df_tf is not None and len(df_tf) >= 60:
-                        df_tf_feat = compute_all_features(df_tf)
-                        if tf_brain.needs_retrain(timeframe=tf):
-                            logger.info("🧠 [%s] Training %s TF brain (%d bars)...", symbol, tf, len(df_tf))
-                            tf_brain.train(df_tf_feat)
-                        if tf_brain.is_trained:
-                            mtf_brain.set_brain(tf, tf_brain)
-                            tf_data[tf] = df_tf_feat
-                        else:
-                            logger.warning("⚠️  [%s] %s TF brain failed to train", symbol, tf)
-                    else:
-                        logger.warning("⚠️  [%s] %s TF klines too short or None (got %s bars)",
-                                       symbol, tf, len(df_tf) if df_tf is not None else 0)
-                except Exception as e:
-                    logger.warning("⚠️  [%s] %s TF failed: %s", symbol, tf, e, exc_info=True)
-
-            # Check if enough models are ready
-            # Build a compact tf_breakdown dict for Athena context
-            tf_breakdown = {}
-            if hasattr(mtf_brain, '_predictions') and mtf_brain._predictions:
-                for _tf, (_r, _m) in mtf_brain._predictions.items():
-                    tf_breakdown[_tf] = {
-                        "regime": config.REGIME_NAMES.get(_r, "?"),
-                        "margin": round(_m, 3),
-                    }
-
-            if not mtf_brain.is_ready():
-                ready_tfs = list(mtf_brain._brains.keys())
-                logger.warning("⚠️  [%s] MTF not ready — only %d/%d TFs trained: %s",
-                               symbol, len(ready_tfs), len(config.MULTI_TF_TIMEFRAMES), ready_tfs)
-                self._coin_states[symbol] = {
-                    "symbol": symbol, "regime": "N/A", "confidence": 0,
-                    "price": 0, "action": "MTF_INSUFFICIENT_MODELS",
-                    "segment": get_segment_for_coin(symbol),
-                }
-                return None
-
-            # Predict across all timeframes
-            mtf_brain.predict(tf_data)
-            conviction, side, tf_agreement = mtf_brain.get_conviction()
-            regime_summary = mtf_brain.get_regime_summary()
-            # Log per-coin MTF result for visibility
-            tf_detail = " | ".join(
-                f"{tf}={config.REGIME_NAMES.get(r,'?')}({m:.2f})"
-                for tf, (r, m) in mtf_brain._predictions.items()
-            )
-            logger.info("🔍 [%s] MTF: %s → conv=%.0f dir=%s agree=%d/%d",
-                        symbol, tf_detail, conviction, side or "–",
-                        tf_agreement, len(config.MULTI_TF_TIMEFRAMES))
-
-
-            if side is None:
-                self._coin_states[symbol] = {
-                    "symbol": symbol, "regime": regime_summary,
-                    "confidence": 0, "price": 0, "action": "MTF_NO_CONSENSUS",
-                    "segment": get_segment_for_coin(symbol),
-                }
-                return None
-
-            # Macro Veto Block
-            if side == "BUY" and btc_flash_crash:
-                self._coin_states[symbol] = {
-                    "symbol": symbol, "regime": regime_summary,
-                    "confidence": 0, "price": 0, "action": "MACRO_VETO_BTC_CRASH",
-                    "segment": get_segment_for_coin(symbol),
-                }
-                return None
-
-            # Use 1H data for trade execution params (ATR, price, etc.)
-            # 1H should always be available since it's in MULTI_TF_TIMEFRAMES
-            df_1h_feat = tf_data.get("1h")
-            if df_1h_feat is None:
-                return None
-
-            current_price = float(df_1h_feat["close"].iloc[-1])
-            current_atr = float(df_1h_feat["atr"].iloc[-1]) if "atr" in df_1h_feat.columns else 0.0
-            
-            # Extract strict momentum and liquidity sweep indicators
-
-            
-            # User request: Check momentum trend on 5m timeframe for faster entry alignment
-            df_5m = fetch_klines(symbol, "5m", limit=100)
-            if df_5m is not None and len(df_5m) >= 60:
-                current_trend = compute_trend(df_5m)
-            else:
-                # Fallback to shortest available fetched TF if 5m fails
-                df_fallback = tf_data.get("15m") if "15m" in tf_data else df_1h_feat
-                current_trend = compute_trend(df_fallback)
-                
-            exhaustion_tail = float(df_1h_feat["exhaustion_tail"].iloc[-1]) if "exhaustion_tail" in df_1h_feat.columns else 0.0
-
-            regime = config.REGIME_BULL if side == "BUY" else config.REGIME_BEAR
-            regime_name = config.REGIME_NAMES.get(regime, "UNKNOWN")
-            # Use the average margin across agreeing TFs as confidence
-            conf = conviction / 100.0
-
-            # Get BTC Daily regime for brain switcher
-            btc_regime_str = "CHOP"
-            btc_margin = 0.0
-            btc_daily_key = "BTCUSDT_1d"
-            btc_brain = self._coin_brains.get(btc_daily_key)
-            # Only use tf_data["1d"] for BTC itself — for other coins tf_data["1d"] is their OWN
-            # daily data, not BTC's, so feeding it to btc_brain produces wrong macro context.
-            if btc_brain and btc_brain.is_trained and "1d" in tf_data and symbol == "BTCUSDT":
-                btc_r, btc_m = btc_brain.predict(tf_data["1d"])
-                if btc_r == config.REGIME_BULL:
-                    btc_regime_str = "BULL"
-                elif btc_r == config.REGIME_BEAR:
-                    btc_regime_str = "BEAR"
-                btc_margin = btc_m
-            elif symbol != "BTCUSDT":
-                # Try to use BTCUSDT's cached brain
-                btc_mtf = self._multi_tf_brains.get("BTCUSDT")
-                if btc_mtf and btc_mtf._predictions.get("1d"):
-                    btc_r, btc_m = btc_mtf._predictions["1d"]
-                    if btc_r == config.REGIME_BULL:
-                        btc_regime_str = "BULL"
-                    elif btc_r == config.REGIME_BEAR:
-                        btc_regime_str = "BEAR"
-                    btc_margin = btc_m
-
-            brain_cfg = {}  # sizing comes from CAPITAL_PER_TRADE in deploy loop
-            brain_id = "MultiTF-HMM"
-
-            # ── FIX: Signal type from real TF divergence (not hardcoded False) ──
-            # REVERSAL: 4h regime OPPOSES direction (macro counter-trend) while
-            # 1h + 15m are building momentum in trade direction.
-            # TREND_FOLLOW: all frames aligned (classic breakout continuation).
-            _tf_preds = mtf_brain._predictions  # {"4h": (regime_int, margin), ...}
-            _r4h  = _tf_preds.get("4h",  (config.REGIME_CHOP, 0))[0]
-            _r1h  = _tf_preds.get("1h",  (config.REGIME_CHOP, 0))[0]
-            _r15m = _tf_preds.get("15m", (config.REGIME_CHOP, 0))[0]
-            _macro_opposing = (
-                (side == "BUY"  and _r4h == config.REGIME_BEAR) or
-                (side == "SELL" and _r4h == config.REGIME_BULL)
-            )
-            _short_tfs_agree = (
-                _r1h  != config.REGIME_CHOP and
-                _r15m != config.REGIME_CHOP
-            )
-            _exhaustion_sig = exhaustion_tail > 1.5  # seller/buyer fatigue on 1h
-            _is_reversal = _macro_opposing and (_short_tfs_agree or _exhaustion_sig)
-
-            # ── FIX: Composite conviction — overlay funding rate + OI adjustments ──
-            # These signals are available in df_1h_feat but were previously
-            # only passed to Athena. Now they influence the conviction gate directly.
-            try:
-                _fr = float(df_1h_feat["funding_rate"].iloc[-1]) if "funding_rate" in df_1h_feat.columns else None
-                _oi = float(df_1h_feat["oi_change"].iloc[-1])    if "oi_change"    in df_1h_feat.columns else None
-                # Crowded longs (high +FR) → reduce conviction (crowded trade, mean-revert risk)
-                _fr_adj = -8 if (_fr is not None and side == "BUY"  and _fr >  0.0003) else \
-                           4 if (_fr is not None and side == "SELL" and _fr >  0.0003) else \
-                           4 if (_fr is not None and _fr < -0.0001) else 0
-                # OI rising in direction = institutional follow-through
-                _oi_adj =  5 if (_oi is not None and side == "BUY"  and _oi >  0.02) else \
-                          -5 if (_oi is not None and side == "BUY"  and _oi < -0.02) else \
-                           5 if (_oi is not None and side == "SELL" and _oi >  0.02) else \
-                          -5 if (_oi is not None and side == "SELL" and _oi < -0.02) else 0
-                conviction = float(max(0.0, min(100.0, conviction + _fr_adj + _oi_adj)))
-                if _fr_adj != 0 or _oi_adj != 0:
-                    logger.debug("📈 Conviction overlay [%s]: FR_adj=%+d OI_adj=%+d → conv=%.1f",
-                                 symbol, _fr_adj, _oi_adj, conviction)
-            except Exception as _conv_err:
-                logger.debug("Conviction overlay error [%s]: %s", symbol, _conv_err)
-
-            # Weekend skip
-            if config.WEEKEND_SKIP_ENABLED:
-                now_utc = datetime.now(timezone.utc)
-                if now_utc.weekday() in config.WEEKEND_SKIP_DAYS:
-                    self._coin_states[symbol] = {
-                        "symbol": symbol, "regime": regime_summary,
-                        "confidence": round(conf, 4), "price": current_price,
-                        "action": "WEEKEND_SKIP",
-                        "segment": get_segment_for_coin(symbol),
-                    }
-                    return None
-
-            # Volatility filter
-            if config.VOL_FILTER_ENABLED and current_atr > 0:
-                vol_ratio = current_atr / current_price
-                if vol_ratio < config.VOL_MIN_ATR_PCT:
-                    self._coin_states[symbol] = {
-                        "symbol": symbol, "regime": regime_summary,
-                        "confidence": round(conf, 4), "price": current_price,
-                        "action": "VOL_TOO_LOW",
-                        "segment": get_segment_for_coin(symbol),
-                    }
-                    return None
-                if vol_ratio > config.VOL_MAX_ATR_PCT:
-                    self._coin_states[symbol] = {
-                        "symbol": symbol, "regime": regime_summary,
-                        "confidence": round(conf, 4), "price": current_price,
-                        "action": "VOL_TOO_HIGH",
-                        "segment": get_segment_for_coin(symbol),
-                    }
-                    return None
-
-            # Conviction threshold check — single source: config.MIN_CONVICTION_FOR_DEPLOY
-            # (removed brain_cfg["conviction_min"] duplicate — was a second gate with same value)
-            # Conviction threshold check — dynamic routing handled in bot loop
-            conv_min = min(45, config.MIN_CONVICTION_FOR_DEPLOY - 15)
-            if conviction < conv_min:
-                self._coin_states[symbol] = {
-                    "symbol": symbol, "regime": regime_summary,
-                    "confidence": round(conf, 4), "price": current_price,
-                    "action": f"LOW_CONVICTION:{conviction:.1f}<{conv_min}",
-                    "brain": brain_id,
-                    "segment": get_segment_for_coin(symbol),
-                }
-                return None
-
-            # ── Athena pre-screening removed from scan phase ──
-            # Athena per-bot evaluation is handled in the deploy loop (lines 686-770).
-            # Running Athena here would veto signals FOR ALL BOTS (incl. adaptive ones)
-            # if any single athena-brained bot is active — silently blocking signals.
-            # The raw result is returned as-is; deploy loop applies Athena per-bot.
-            athena_action = None
-
-
-            # Stamp RSI on coin_states so the deploy waterfall RSI gate can read it
-            _rsi_1h = float(df_1h_feat["rsi"].iloc[-1]) if "rsi" in df_1h_feat.columns else 50.0
-
-            # Update coin state for dashboard
-            self._coin_states[symbol] = {
-                "symbol": symbol,
-                "regime": regime_name,
-                "regime_int": regime,          # FIX: integer constant for type-safe BTC chop veto
-                "confidence": round(conf, 4),
-                "price": current_price,
-                "action": f"ELIGIBLE_{side}",
-                "conviction": round(conviction, 1),
-                "brain": brain_id,
-                "tf_agreement": tf_agreement,
-                "regime_summary": regime_summary,
-                "athena": athena_action,
-                "segment": get_segment_for_coin(symbol),
-                "context": {"trend_alignment": current_trend},
-                "rsi_1h": round(_rsi_1h, 1),   # For RSI deploy gate
-                "signal_type": "REVERSAL_PULLBACK" if _is_reversal else "TREND_FOLLOW",
-            }
-
-            return {
-                "symbol": symbol,
-                "side": side,
-                "atr": current_atr,
-                "regime": regime,
-                "regime_name": regime_name,
-                "confidence": conf,
-                "conviction": conviction,
-                "brain_id": brain_id,
-                "brain_cfg": brain_cfg,
-                "tf_agreement": tf_agreement,
-                "athena": athena_action,
-                "trend_direction": current_trend,
-                "exhaustion_tail": exhaustion_tail,
-                "rsi_1h": _rsi_1h,
-                "signal_type": "REVERSAL_PULLBACK" if _is_reversal else "TREND_FOLLOW",
-                "reason": f"MultiTF-HMM | {regime_summary} | conv={conviction:.1f} TF={tf_agreement}/3",
-            }
-
-        # ── Legacy single-TF path (when MULTI_TF_ENABLED=False) ──
-        macro_regime_name = None
-
-        # Update coin state for dashboard
-        current_price = float(df_1h_feat["close"].iloc[-1])
-
-        # Extract latest HMM feature values for the feature heatmap
-        _features = {}
-        try:
-            last = df_1h_feat.iloc[-1]
-            
-            # Get real-time funding (if available)
-            cdx_pair = cdx.to_coindcx_pair(symbol)
-            live_info = self._live_prices.get(cdx_pair, {})
-            # 'fr' is official Funding Rate, 'efr' is Estimated Funding Rate
-            live_fund = float(live_info.get("fr", 0.0))
-            if live_fund == 0.0:
-                 live_fund = float(live_info.get("efr", 0.0))
-
-            _features = {
-                "log_return":    round(float(last.get("log_return", 0)), 6),
-                "volatility":    round(float(last.get("volatility", 0)), 6),
-                "volume_change": round(float(last.get("volume_change", 0)), 6),
-                "rsi_norm":      round(float(last.get("rsi_norm", 0)), 6),
-                "oi_change":     0.0, # Not available in API
-                "funding":       round(live_fund, 8),
-            }
-        except Exception as e:
-            try:
-                logger.debug('Exception caught: %s', e, exc_info=True)
-            except NameError:
-                pass
-            pass
-        # Fetch real Binance 24h volume for this coin
-        _volume_24h = 0.0
-        try:
-            client = _get_binance_client()
-            ticker = client.get_ticker(symbol=symbol)
-            _volume_24h = round(float(ticker.get("quoteVolume", 0)), 2)
-        except Exception as e:
-            try:
-                logger.debug('Exception caught: %s', e, exc_info=True)
-            except NameError:
-                pass
-            # Fallback: compute from 1h candles
-            try:
-                vol_col = "volume" if "volume" in df_1h_feat.columns else None
-                if vol_col:
-                    close_col = df_1h_feat["close"].tail(24)
-                    vol_vals = df_1h_feat[vol_col].tail(24)
-                    _volume_24h = round(float((close_col * vol_vals).sum()), 2)
-            except Exception as e:
-                try:
-                    logger.debug('Exception caught: %s', e, exc_info=True)
-                except NameError:
-                    pass
-                pass
-
-        self._coin_states[symbol] = {
-            "symbol":       symbol,
-            "regime":       regime_name,
-            "confidence":   round(conf, 4),
-            "price":        current_price,
-            "action":       "ANALYZING",
-            "macro_regime": macro_regime_name,
-            "features":     _features,
-            "volume_24h":   _volume_24h,
-            "segment":      get_segment_for_coin(symbol),   # ← was missing: shortlist card shows '—' without this
-        }
-
-        # ── Multi-Timeframe TA (1h / 15m / 5m) ──
-        try:
-            ta_multi = {"price": current_price}
-            # 1h — already have df_1h_feat
-            rsi_1h = float(df_1h_feat["rsi"].iloc[-1]) if "rsi" in df_1h_feat.columns else None
-            atr_1h = float(df_1h_feat["atr"].iloc[-1]) if "atr" in df_1h_feat.columns else None
-            ema20_1h = float(compute_ema(df_1h_feat["close"], 20).iloc[-1])
-            ema50_1h = float(compute_ema(df_1h_feat["close"], 50).iloc[-1])
-            ta_multi["1h"] = {
-                "rsi": round(rsi_1h, 2) if rsi_1h else None,
-                "atr": round(atr_1h, 4) if atr_1h else None,
-                "trend": compute_trend(df_1h_feat),
-            }
-            ta_multi["ema_20_1h"] = round(ema20_1h, 4)
-            ta_multi["ema_50_1h"] = round(ema50_1h, 4)
-
-            # 5m
-            try:
-                df_5m_ta = fetch_klines(symbol, config.TIMEFRAME_EXECUTION, limit=100)
-                if df_5m_ta is not None and len(df_5m_ta) >= 30:
-                    df_5m_ta = compute_all_features(df_5m_ta)
-                    ta_multi["5m"] = {
-                        "rsi": round(float(df_5m_ta["rsi"].iloc[-1]), 2) if "rsi" in df_5m_ta.columns else None,
-                        "atr": round(float(df_5m_ta["atr"].iloc[-1]), 4) if "atr" in df_5m_ta.columns else None,
-                        "trend": compute_trend(df_5m_ta),
-                    }
-            except Exception as e:
-                logger.debug("5m TA failed for %s: %s", symbol, e)
-
-            # 5m
-            try:
-                df_5m_ta = fetch_klines(symbol, "5m", limit=100)
-                if df_5m_ta is not None and len(df_5m_ta) >= 30:
-                    df_5m_ta = compute_all_features(df_5m_ta)
-                    ta_multi["5m"] = {
-                        "rsi": round(float(df_5m_ta["rsi"].iloc[-1]), 2) if "rsi" in df_5m_ta.columns else None,
-                        "atr": round(float(df_5m_ta["atr"].iloc[-1]), 4) if "atr" in df_5m_ta.columns else None,
-                        "trend": compute_trend(df_5m_ta),
-                    }
-            except Exception as e:
-                logger.debug("5m TA failed for %s: %s", symbol, e)
-
-            self._coin_states[symbol]["ta_multi"] = ta_multi
-        except Exception as e:
-            logger.debug("Multi-TF TA failed for %s: %s", symbol, e)
-
-        # NOTE: With HMM_N_STATES=3, CRASH is merged into BEAR. No separate CRASH check needed.
-
-        # ── Multi-TF Tiered Signal Logic ─────────────────────────────────────────
-        # Tier 1 (full consensus): 1H and 4H agree → normal full-conviction flow
-        # Tier 2 (reversal setup): 5m flips vs 1H/4H → gate entry on ATR pullback
-        #                          to 5m EMA20 before allowing through at reduced size
-        # Tier 3 (true noise):     1H vs 4H conflict (not just 5m) → hard block
-        _is_reversal_tier2 = False
-        if macro_regime_name:
-            # Hard block: 1H and 4H directly contradict each other (true noise)
-            # Note: macro_regime_name = 4H regime, regime_name = 5m regime (primary scan TF)
-            # 5m BULL + 4H BEAR = potential reversal, NOT noise → Tier 2
-            # We check 1H vs 4H conflict separately via tf_agreement being 1 (only one agrees)
-            one_h_predictions = (mtf_brain._predictions if mtf_brain else {})
-            regime_1h = one_h_predictions.get("1h", (None, 0))[0]
-            regime_4h = one_h_predictions.get("4h", (None, 0))[0]
-
-            tier1_conflict = (
-                regime_1h is not None and regime_4h is not None
-                and regime_1h != regime_4h
-                and regime_1h != config.REGIME_CHOP
-                and regime_4h != config.REGIME_CHOP
-            )
-            if tier1_conflict:
-                # 1H and 4H flatly disagree (e.g. 1H=BULL, 4H=BEAR) — Tier 3 noise block
-                self._coin_states[symbol]["action"] = "MTF_CONFLICT"
-                return None
-
-            # [DISABLED] Tier 2: 5m flipped but higher TFs haven't confirmed yet
-            # 5m says BUY but 1H/4H still BEAR (or vice versa) → reversal setup
-            primary_regime = regime  # 5m HMM
-            higher_tf_regimes = [r for r in [regime_1h, regime_4h] if r is not None]
-            higher_tf_bear = all(r == config.REGIME_BEAR for r in higher_tf_regimes)
-            higher_tf_bull = all(r == config.REGIME_BULL for r in higher_tf_regimes)
-
-            if ((primary_regime == config.REGIME_BULL and higher_tf_bear) or
-                    (primary_regime == config.REGIME_BEAR and higher_tf_bull)):
-                # Tier 2: early reversal detected
-                _is_reversal_tier2 = True
-                
-                # USER OVERRIDE: Tier 2 EMA20 pullback logic disabled.
-                # Proceeding with trade without waiting for pullback.
-                conviction = min(conviction, 55.0)
-                logger.info(
-                    "🔄 [%s] Tier2 REVERSAL detected — "
-                    "price=%.4f — proceeding at capped conviction %.1f (EMA Pullback logic DISABLED)",
-                    symbol, current_price, conviction,
-                )
-                self._coin_states[symbol]["action"] = "REVERSAL_TIER2_ACCEPTED_NO_PULLBACK"
-
-
-        # ── Tier 2B: 15m+4H agree, 1H lagging — gate on 1H EMA20 pullback ──────
-        # Cases 24 & 25: 5m=BULL + 4H=BULL + 1H=BEAR (or inverse SHORT version)
-        _is_tier2b = False
-        if regime_1h is not None and regime_4h is not None:
-            macro_direction_bull = (regime_4h == config.REGIME_BULL and regime == config.REGIME_BULL)
-            macro_direction_bear = (regime_4h == config.REGIME_BEAR and regime == config.REGIME_BEAR)
-            one_h_lagging_bear   = (regime_1h == config.REGIME_BEAR and macro_direction_bull)
-            one_h_lagging_bull   = (regime_1h == config.REGIME_BULL and macro_direction_bear)
-
-            if one_h_lagging_bear or one_h_lagging_bull:
-                # 5m and 4H agree; 1H is lagging opposite → Tier 2B
-                _is_tier2b = True
-                
-                # USER OVERRIDE: Tier 2B 1H EMA20 pullback logic disabled.
-                # Proceeding with trade without waiting for pullback.
-                conviction = min(conviction, 60.0)
-                logger.info(
-                    "📈 [%s] Tier2B TREND RESUME detected — "
-                    "price=%.4f — conviction capped %.1f (EMA Pullback logic DISABLED)",
-                    symbol, current_price, conviction,
-                )
-                self._coin_states[symbol]["action"] = "TIER2B_RESUME_ACCEPTED_NO_PULLBACK"
-
-        # ── TREND (BULL / BEAR) — 8-factor conviction flow ──────────────────────
-
-        # 1. Determine side first (needed for sentiment gate + conviction)
-        if regime == config.REGIME_BULL:
-            side = "BUY"
-        elif regime == config.REGIME_BEAR:
-            side = "SELL"
-        else:
-            return None
-
-        if side == "BUY" and btc_flash_crash:
-            self._coin_states[symbol]["action"] = "MACRO_VETO_BTC_CRASH"
-            return None
-
-        current_atr   = df_1h_feat["atr"].iloc[-1]   if "atr"   in df_1h_feat.columns else 0.0
-        current_price = float(df_1h_feat["close"].iloc[-1])
-        current_swing_l = float(df_1h_feat["swing_l"].iloc[-1]) if "swing_l" in df_1h_feat.columns else None
-        current_swing_h = float(df_1h_feat["swing_h"].iloc[-1]) if "swing_h" in df_1h_feat.columns else None
-
-        # 2. Volatility filter
-        if config.VOL_FILTER_ENABLED and current_atr > 0:
-            vol_ratio = current_atr / current_price
-            if vol_ratio < config.VOL_MIN_ATR_PCT:
-                self._coin_states[symbol]["action"] = "VOL_TOO_LOW"
-                return None
-            if vol_ratio > config.VOL_MAX_ATR_PCT:
-                self._coin_states[symbol]["action"] = "VOL_TOO_HIGH"
-                return None
-
-        # 3. 5m momentum filter + order flow (fetch df_5m once for both)
-        df_5m = None
-        orderflow_score = None
-        nearest_bullish_ob = None
-        nearest_bearish_ob = None
-        nearest_bid_wall   = None
-        nearest_ask_wall   = None
-        try:
-            df_5m = fetch_klines(symbol, config.TIMEFRAME_EXECUTION, limit=50)
-            if df_5m is not None and len(df_5m) >= 5:
-                df_5m_feat = compute_all_features(df_5m)
-                price_now   = float(df_5m_feat["close"].iloc[-1])
-                price_5_ago = float(df_5m_feat["close"].iloc[-5])
-        except Exception as e:
-            try:
-                logger.debug('Exception caught: %s', e, exc_info=True)
-            except NameError:
-                pass
-            pass
-
-        if self._orderflow:
-            try:
-                of_sig = self._orderflow.get_signal(symbol, df_5m)
-                if of_sig is not None:
-                    orderflow_score = of_sig.score
-                    nearest_bullish_ob = of_sig.nearest_bullish_ob
-                    nearest_bearish_ob = of_sig.nearest_bearish_ob
-                    nearest_bid_wall   = of_sig.nearest_bid_wall
-                    nearest_ask_wall   = of_sig.nearest_ask_wall
-                    # Export detailed metrics for dashboard (v2 — multi-exchange + OB)
-                    self._coin_states[symbol]["orderflow_details"] = {
-                        "score": round(of_sig.score, 2),
-                        "imbalance": round(of_sig.book_imbalance, 2),
-                        "taker_buy_ratio": round(of_sig.taker_buy_ratio, 2),
-                        "cumulative_delta": round(of_sig.cumulative_delta, 2),
-                        "ls_ratio": round(of_sig.ls_ratio, 2),
-                        "exchange_count": of_sig.exchange_count,
-                        "aggregated_bid_usd": round(of_sig.aggregated_bid_usd, 0),
-                        "aggregated_ask_usd": round(of_sig.aggregated_ask_usd, 0),
-                        "bid_walls": [
-                            {"price": w.price, "size": w.size_usd, "multiple": round(w.multiple, 1), "exchange": w.exchange} 
-                            for w in of_sig.bid_walls
-                        ],
-                        "ask_walls": [
-                            {"price": w.price, "size": w.size_usd, "multiple": round(w.multiple, 1), "exchange": w.exchange} 
-                            for w in of_sig.ask_walls
-                        ],
-                        "order_blocks": [ob.to_dict() for ob in of_sig.order_blocks],
-                        "nearest_bullish_ob": of_sig.nearest_bullish_ob,
-                        "nearest_bearish_ob": of_sig.nearest_bearish_ob,
-                    }
-
-                    if of_sig.bid_walls or of_sig.ask_walls:
-                        logger.info("🧱 %s order walls: %s", symbol, of_sig.note)
-                    if of_sig.order_blocks:
-                        logger.info("📦 %s order blocks: %d detected", symbol, len(of_sig.order_blocks))
-            except Exception as _oe:
-                logger.debug("OrderFlow fetch failed for %s: %s", symbol, _oe)
-
-        # ─── Post-OrderFlow Momentum Filter ───
-        if df_5m is not None and len(df_5m) >= 5:
-            try:
-                price_now   = float(df_5m_feat["close"].iloc[-1])
-                price_5_ago = float(df_5m_feat["close"].iloc[-5])
-                if side == "BUY"  and price_now <= price_5_ago:
-                    self._coin_states[symbol]["action"] = "5M_FILTER_SKIP"
-                    return None
-                if side == "SELL" and price_now >= price_5_ago:
-                    self._coin_states[symbol]["action"] = "5M_FILTER_SKIP"
-                    return None
-            except Exception as e:
-                try:
-                    logger.debug('Exception caught: %s', e, exc_info=True)
-                except NameError:
-                    pass
-                pass
-
-        # 5. Full 4-factor conviction score
-        funding     = df_1h_feat["funding_rate"].iloc[-1] if "funding_rate" in df_1h_feat.columns else None
-        oi_chg      = df_1h_feat["oi_change"].iloc[-1]    if "oi_change"    in df_1h_feat.columns else None
-
-        conviction = self.risk.compute_conviction_score(
-            confidence=conf,
-            regime=regime,
-            side=side,
-            funding_rate=funding,
-            oi_change=oi_chg,
-            orderflow_score=orderflow_score,
-        )
-        # Basic conviction floor — no profile will deploy below 40
-        if conviction < 40:
-            self._coin_states[symbol]["action"] = f"LOW_CONVICTION:{conviction:.1f}"
-            return None
-
-        of_note = f" | OF={orderflow_score:+.2f}" if orderflow_score is not None else ""
-        self._coin_states[symbol]["action"] = f"ELIGIBLE_{side}"
-        self._coin_states[symbol].update({
-            "conviction": round(conviction, 1),
-            "orderflow":  round(orderflow_score, 3) if orderflow_score is not None else None,
-        })
-        return {
-            "symbol": symbol,
-            "side": side,
-            "atr": current_atr,
-            "swing_l": current_swing_l,
-            "swing_h": current_swing_h,
-            "regime": regime,
-            "regime_name": regime_name,
-            "confidence": conf,
-            "conviction": conviction,
-            "funding_rate": round(funding, 6) if funding is not None else None,
-            "oi_change":    round(oi_chg, 4)  if oi_chg  is not None else None,
-            "orderflow_score": round(orderflow_score, 3) if orderflow_score is not None else None,
-            # ── Entry quality context for Athena ─────────────────────────────
-            "nearest_bullish_ob": nearest_bullish_ob,  # Demand zone from OB detector
-            "nearest_bearish_ob": nearest_bearish_ob,  # Supply zone from OB detector
-            "nearest_bid_wall":   nearest_bid_wall,    # Closest bid wall price (support)
-            "nearest_ask_wall":   nearest_ask_wall,    # Closest ask wall price (resistance)
-            "tf_breakdown":    tf_breakdown,   # ← passed to Athena context
-            "tf_agreement":    tf_agreement,
-            "reason": f"Trend {regime_name} | conf={conf:.0%} | conv={conviction:.1f}{of_note}",
-        }
-
     # ─── Profile Evaluation ──────────────────────────────────────────────────
 
     # ─── Exit & Sync Logic ────────────────────────────────────────────────────
@@ -2777,257 +2123,6 @@ class RegimeMasterBot:
             logger.warning("Could not load tradebook positions on startup: %s", e)
 
 
-    # ── Coin Cooldown Methods ──────────────────────────────────────────────────
-
-    def _apply_cooldown(self, sym: str, trade: dict) -> None:
-        """Evaluate all 5 cooldown rules for a just-closed trade and set expiry.
-
-        Rules (in priority order — highest duration wins):
-          1. SL/Trailing-SL/MAX_LOSS exit      → 90 min
-          2. Any loss close (non-SL)           → 45 min
-          3. Flash close  (loss + held < 15m)  → 120 min (overrides rule 1&2)
-          4. Same-direction repeat             → 30 min (additive if no harder rule)
-          5. Daily cap (≥ 3 closes in 24h)    → until UTC midnight
-        """
-        if not getattr(config, "COOLDOWN_ENABLED", True):
-            return
-
-        now = datetime.utcnow()
-        exit_reason   = (trade.get("exit_reason") or "").upper()
-        realized_pnl  = float(trade.get("realized_pnl_pct") or trade.get("pnl_pct") or 0)
-        side          = (trade.get("position") or trade.get("side") or "").upper()
-
-        # Hold time in minutes
-        opened_at = trade.get("entry_time") or trade.get("created_at") or trade.get("open_time")
-        hold_mins = 9999
-        if opened_at:
-            try:
-                if isinstance(opened_at, str):
-
-                    opened_dt = _dp.parse(opened_at.replace("Z", "+00:00")).replace(tzinfo=None)
-                else:
-                    opened_dt = opened_at
-                hold_mins = (now - opened_dt).total_seconds() / 60
-            except Exception as e:
-                try:
-                    logger.debug('Exception caught: %s', e, exc_info=True)
-                except NameError:
-                    pass
-                pass
-
-        cooldown_mins = 0
-        rule_label    = ""
-
-        # Rule 3 (highest priority): flash close = loss AND held < threshold
-        flash_thresh = getattr(config, "COOLDOWN_FLASH_HOLD_THRESH", 15)
-        if realized_pnl < 0 and hold_mins < flash_thresh:
-            cooldown_mins = getattr(config, "COOLDOWN_FLASH_CLOSE_MIN", 120)
-            rule_label    = f"Rule3:FlashClose({hold_mins:.0f}min hold)"
-
-        # Rule 1: SL / trailing-SL / max-loss exit
-        elif exit_reason in ("STOP_LOSS", "TRAILING_SL", "MAX_LOSS"):
-            cooldown_mins = getattr(config, "COOLDOWN_SL_MINUTES", 90)
-            rule_label    = f"Rule1:{exit_reason}"
-
-        # Rule 2: generic loss close
-        elif realized_pnl < 0:
-            cooldown_mins = getattr(config, "COOLDOWN_LOSS_MINUTES", 45)
-            rule_label    = "Rule2:LossClose"
-
-        # Rule 4: same-direction repeat (additive only — applies even to break-even)
-        same_dir_mins = getattr(config, "COOLDOWN_SAME_DIR_MINUTES", 30)
-        if side and self._coin_last_side.get(sym) == side:
-            if cooldown_mins < same_dir_mins:
-                cooldown_mins = same_dir_mins
-                rule_label    = rule_label or "Rule4:SameDirRepeat"
-
-        # Track close for Rule 5 (daily cap) regardless of PnL
-        self._coin_daily_trades.setdefault(sym, []).append(now)
-        # Prune entries older than 24h
-        cutoff = now - timedelta(hours=24)
-        self._coin_daily_trades[sym] = [t for t in self._coin_daily_trades[sym] if t >= cutoff]
-
-        # Rule 5: daily cap exceeded → block to UTC midnight
-        daily_cap = getattr(config, "COOLDOWN_DAILY_CAP_TRADES", 3)
-        if len(self._coin_daily_trades[sym]) >= daily_cap:
-
-            midnight = (now + timedelta(days=1)).replace(hour=0, minute=0, second=0, microsecond=0)
-            mins_to_midnight = (midnight - now).total_seconds() / 60
-            if mins_to_midnight > cooldown_mins:
-                cooldown_mins = mins_to_midnight
-                rule_label    = "Rule5:DailyCap"
-
-        # Store last side for Rule 4
-        if side:
-            self._coin_last_side[sym] = side
-
-        # Apply cooldown
-        if cooldown_mins > 0:
-            expiry = now + timedelta(minutes=cooldown_mins)
-            self._coin_cooldowns[sym] = expiry
-            logger.info(
-                "⏳ COOLDOWN [%s] for %.0f min until %s UTC (%s, PnL=%.1f%%, hold=%.0fm)",
-                sym, cooldown_mins, expiry.strftime("%H:%M"), rule_label, realized_pnl, hold_mins
-            )
-            # Update brain summary so dashboard shows the cooldown status
-            self._coin_states.setdefault(sym, {})["cooldown_until"] = expiry.isoformat() + "Z"
-            self._coin_states[sym]["cooldown_rule"] = rule_label
-
-    def _is_in_cooldown(self, sym: str) -> tuple[bool, str]:
-        """Return (True, reason) if the coin is under cooldown, else (False, '')."""
-        if not getattr(config, "COOLDOWN_ENABLED", True):
-            return False, ""
-        expiry = self._coin_cooldowns.get(sym)
-        if expiry is None:
-            return False, ""
-        now = datetime.utcnow()
-        if now < expiry:
-            remaining = (expiry - now).total_seconds() / 60
-            return True, f"cooldown {remaining:.0f}m (until {expiry.strftime('%H:%M')} UTC)"
-        # Expired — clean up
-        del self._coin_cooldowns[sym]
-        self._coin_states.get(sym, {}).pop("cooldown_until", None)
-        self._coin_states.get(sym, {}).pop("cooldown_rule", None)
-        return False, ""
-
-    # ── Segment Cooldown Methods ────────────────────────────────────────────────
-
-    def _apply_segment_cooldown(self, seg: str, trade: dict) -> None:
-        """Evaluate 5 segment cooldown rules for a just-closed trade, isolated by user_id."""
-        if not seg or not getattr(config, "SEG_COOLDOWN_ENABLED", True):
-            return
-
-        user_id = trade.get("user_id", getattr(config, "ENGINE_USER_ID", "default"))
-        seg_key = (user_id, seg)
-
-        now = datetime.utcnow()
-        exit_reason  = (trade.get("exit_reason") or "").upper()
-        realized_pnl = float(trade.get("realized_pnl_pct") or trade.get("pnl_pct") or 0)
-        is_loss      = realized_pnl < 0
-        is_sl        = exit_reason in ("STOP_LOSS", "TRAILING_SL", "MAX_LOSS")
-        is_tp        = exit_reason in ("TAKE_PROFIT", "TP")
-
-        # ── Track SL events (Rule 1) ──
-        if is_sl:
-            self._seg_sl_events.setdefault(seg_key, []).append(now)
-
-        # ── Track close history (Rule 2 + 5) ──
-        self._seg_close_history.setdefault(seg_key, []).append((now, realized_pnl))
-
-        # ── Consecutive loss counter (Rule 5) ──
-        if is_loss and not is_tp:
-            self._seg_consec_losses[seg_key] = self._seg_consec_losses.get(seg_key, 0) + 1
-        elif not is_loss:
-            # Reset on any non-loss close (TP, break-even, profit)
-            self._seg_consec_losses[seg_key] = 0
-
-        cooldown_mins = 0
-        rule_label    = ""
-
-        # ── Rule 1: SL Burst ──
-        burst_window = getattr(config, "SEG_COOLDOWN_SL_BURST_WINDOW", 60)
-        burst_count  = getattr(config, "SEG_COOLDOWN_SL_BURST_COUNT", 2)
-        cutoff_r1    = now - timedelta(minutes=burst_window)
-        self._seg_sl_events[seg_key] = [t for t in self._seg_sl_events.get(seg_key, []) if t >= cutoff_r1]
-        if len(self._seg_sl_events.get(seg_key, [])) >= burst_count:
-            r1_mins = getattr(config, "SEG_COOLDOWN_SL_BURST_MINS", 90)
-            if r1_mins > cooldown_mins:
-                cooldown_mins = r1_mins
-                rule_label    = f"SegRule1:SL_Burst({len(self._seg_sl_events[seg_key])}x in {burst_window}m)"
-
-        # ── Rule 2: Segment Loss Rate (4h window, min 3 trades) ──
-        cutoff_r2 = now - timedelta(hours=4)
-        recent_closes = [(t, pnl) for t, pnl in self._seg_close_history.get(seg_key, []) if t >= cutoff_r2]
-        if len(recent_closes) >= 3:
-            loss_count = sum(1 for _, pnl in recent_closes if pnl < 0)
-            loss_pct   = (loss_count / len(recent_closes)) * 100
-            threshold  = getattr(config, "SEG_COOLDOWN_LOSS_RATE_PCT", 60)
-            if loss_pct >= threshold:
-                r2_mins = getattr(config, "SEG_COOLDOWN_LOSS_RATE_MINS", 120)
-                if r2_mins > cooldown_mins:
-                    cooldown_mins = r2_mins
-                    rule_label    = f"SegRule2:LossRate({loss_pct:.0f}%>{threshold}%)"
-
-        # ── Rule 5: Consecutive Losses ──
-        consec_thresh = getattr(config, "SEG_COOLDOWN_CONSEC_LOSS", 3)
-        if self._seg_consec_losses.get(seg_key, 0) >= consec_thresh:
-            r5_mins = getattr(config, "SEG_COOLDOWN_CONSEC_LOSS_MINS", 240)
-            if r5_mins > cooldown_mins:
-                cooldown_mins = r5_mins
-                rule_label    = f"SegRule5:ConsecLoss({self._seg_consec_losses[seg_key]}x)"
-
-        # ── Prune old close history (keep last 24h) ──
-        prune_cutoff = now - timedelta(hours=24)
-        self._seg_close_history[seg_key] = [(t, p) for t, p in self._seg_close_history.get(seg_key, []) if t >= prune_cutoff]
-
-        # ── Apply cooldown if any rule triggered ──
-        if cooldown_mins > 0:
-            expiry = now + timedelta(minutes=cooldown_mins)
-            # Only extend, never shorten an existing cooldown
-            existing = self._seg_cooldowns.get(seg_key)
-            if existing is None or expiry > existing:
-                self._seg_cooldowns[seg_key] = expiry
-                logger.info(
-                    "🔒 SEGMENT_COOLDOWN [%s] for %.0f min until %s UTC (%s, PnL=%.1f%%)",
-                    seg, cooldown_mins, expiry.strftime("%H:%M"), rule_label, realized_pnl
-                )
-
-    def _is_segment_in_cooldown(self, seg: str, user_id: str = None) -> tuple:
-        """Return (True, reason) if segment is under cooldown for this user_id, else (False, '').
-        Also checks Rule 3 (max active) dynamically isolated to the user_id."""
-        if not seg or not getattr(config, "SEG_COOLDOWN_ENABLED", True):
-            return False, ""
-            
-        user_id = user_id or getattr(config, "ENGINE_USER_ID", "default")
-        seg_key = (user_id, seg)
-
-        # ── Rule 3: Overexposure (dynamic — checked at deploy time) ──
-        max_active = getattr(config, "SEG_COOLDOWN_MAX_ACTIVE", 3)
-        active_in_seg = sum(
-            1 for key, pos in self._active_positions.items()
-            if get_segment_for_coin(key.split(":")[-1] if ":" in key else key) == seg
-            and pos.get("user_id") == user_id
-        )
-        if active_in_seg >= max_active:
-            return True, f"SegRule3:MaxActive({active_in_seg}/{max_active})"
-
-        # ── Rule 4: Churn (checked at deploy time from _seg_open_count) ──
-        churn_window = getattr(config, "SEG_COOLDOWN_CHURN_WINDOW", 360)
-        churn_count  = getattr(config, "SEG_COOLDOWN_CHURN_COUNT", 4)
-        now = datetime.utcnow()
-        cutoff_r4 = now - timedelta(minutes=churn_window)
-        self._seg_open_count[seg_key] = [t for t in self._seg_open_count.get(seg_key, []) if t >= cutoff_r4]
-        if len(self._seg_open_count.get(seg_key, [])) >= churn_count:
-            churn_mins = getattr(config, "SEG_COOLDOWN_CHURN_MINS", 180)
-            expiry = now + timedelta(minutes=churn_mins)
-            existing = self._seg_cooldowns.get(seg_key)
-            if existing is None or expiry > existing:
-                self._seg_cooldowns[seg_key] = expiry
-                logger.info(
-                    "🔒 SEGMENT_COOLDOWN [%s] Rule4:Churn (%d opens in %dm) → %dm block",
-                    seg_key, len(self._seg_open_count[seg_key]), churn_window, churn_mins
-                )
-
-        # ── Time-based cooldown check (Rules 1, 2, 4, 5) ──
-        expiry = self._seg_cooldowns.get(seg_key)
-        if expiry is None:
-            return False, ""
-        if now < expiry:
-            remaining = (expiry - now).total_seconds() / 60
-            return True, f"segment_cooldown {remaining:.0f}m (until {expiry.strftime('%H:%M')} UTC)"
-        # Expired — clean up
-        del self._seg_cooldowns[seg_key]
-        return False, ""
-
-    def _record_segment_open(self, seg: str, user_id: str = None) -> None:
-        """Track a new deployment for segment churn detection (Rule 4), isolated per user."""
-        if seg and getattr(config, "SEG_COOLDOWN_ENABLED", True):
-            user_id = user_id or getattr(config, "ENGINE_USER_ID", "default")
-            seg_key = (user_id, seg)
-            self._seg_open_count.setdefault(seg_key, []).append(datetime.utcnow())
-
-
-
     def _sync_positions(self):
         """
         Remove entries from _active_positions that were auto-closed
@@ -3052,11 +2147,11 @@ class RegimeMasterBot:
             # Apply cooldown using the closed trade record
             closed_trade = recent_closed.get(key, {})
             if closed_trade:
-                self._apply_cooldown(sym, closed_trade)
+                self.risk_manager.apply_cooldown(sym, closed_trade)
                 # Apply segment cooldown alongside coin cooldown
                 seg = get_segment_for_coin(sym)
                 if seg:
-                    self._apply_segment_cooldown(seg, closed_trade)
+                    self.risk_manager.apply_segment_cooldown(seg, closed_trade)
             del self._active_positions[key]
 
 
@@ -3289,121 +2384,6 @@ class RegimeMasterBot:
                 json.dump(existing, f, indent=2)
         except Exception as e:
             logger.debug("Failed to save multi_bot_state during sync: %s", e)
-
-    def _get_orderflow_stats(self) -> dict:
-        """Aggregate order flow stats for dashboard (Whale Walls, Inst. Flow, OBs)."""
-        if not self._orderflow:
-            return {}
-        
-        walls_count = 0
-        inst_flow_count = 0
-        total_exchanges = 0
-        total_order_blocks = 0
-        total_agg_bid_usd = 0.0
-        total_agg_ask_usd = 0.0
-        
-        # Scan recently analyzed coins
-        for sym in self._coin_states.keys():
-            sig = self._orderflow.get_signal(sym)
-            if sig:
-                walls_count += len(sig.bid_walls) + len(sig.ask_walls)
-                if abs(sig.cumulative_delta) > 0.5 or abs(sig.taker_buy_ratio - 0.5) > 0.1:
-                    inst_flow_count += 1
-                total_exchanges = max(total_exchanges, sig.exchange_count)
-                total_order_blocks += len(sig.order_blocks)
-                total_agg_bid_usd += sig.aggregated_bid_usd
-                total_agg_ask_usd += sig.aggregated_ask_usd
-                
-        return {
-            "WhaleWalls": walls_count,
-            "Institutional": inst_flow_count,
-            "exchange_count": total_exchanges,
-            "order_blocks_detected": total_order_blocks,
-            "agg_bid_usd": round(total_agg_bid_usd, 0),
-            "agg_ask_usd": round(total_agg_ask_usd, 0),
-        }
-
-    # ─── State Persistence ───────────────────────────────────────────────────
-
-    def _save_multi_state(self, symbols_scanned, eligible, deployed_count):
-        """Save multi-coin bot state for the dashboard."""
-        # Also save legacy single-coin state (backward compat)
-        top_coin = self._coin_states.get(config.PRIMARY_SYMBOL, {})
-        legacy_state = {
-            "timestamp":    datetime.now(IST).replace(tzinfo=None).isoformat(),
-            "symbol":       config.PRIMARY_SYMBOL,
-            "regime":       top_coin.get("regime", "SCANNING"),
-            "confidence":   top_coin.get("confidence", 0),
-            "action":       top_coin.get("action", "MULTI_SCAN"),
-            "trade_count":  self._trade_count,
-            "paper_mode":   config.PAPER_TRADE,
-        }
-        try:
-            with open(config.STATE_FILE, "w") as f:
-                json.dump(legacy_state, f, indent=2)
-                
-            if self._redis:
-                self._redis.set("synaptic:legacy_state", json.dumps(legacy_state))
-        except Exception as e:
-            try:
-                logger.debug('Exception caught: %s', e, exc_info=True)
-            except NameError:
-                pass
-            pass
-
-        # Multi-coin state
-        now_utc = datetime.utcnow()
-        next_analysis = datetime.utcfromtimestamp(
-            self._last_analysis_time + config.ANALYSIS_INTERVAL_SECONDS
-        ) if self._last_analysis_time else None
-
-        multi_state = {
-            "timestamp":        datetime.now(IST).replace(tzinfo=None).isoformat(),
-            "cycle":            self._cycle_count,
-            "coins_scanned":    len(symbols_scanned),
-            "eligible_count":   len(eligible),
-            "deployed_count":   deployed_count,
-            "total_trades":     self._trade_count,
-            "active_positions": self._active_positions,
-            "max_concurrent_positions": config.MAX_CONCURRENT_POSITIONS,
-            "coin_states":      self._coin_states,
-            "orderflow_stats":  self._get_orderflow_stats(),
-            "paper_mode":       config.PAPER_TRADE,
-            "cycle_execution_time_seconds": getattr(self, '_last_cycle_duration', 0),
-            "analysis_interval_seconds": config.ANALYSIS_INTERVAL_SECONDS,
-            # Timing fields — written directly so dashboard always has them
-            "last_analysis_time": now_utc.isoformat() + "Z",
-            "next_analysis_time": (next_analysis.isoformat() + "Z") if next_analysis else None,
-            "active_bots":  [{"bot_id": b.get("bot_id"), "bot_name": b.get("bot_name"),
-                              "segment": b.get("segment_filter", "ALL")}
-                             for b in list(config.ENGINE_ACTIVE_BOTS)],
-            # Veto log — last 20 entries newest-first for cockpit Veto Log tab
-            "veto_log":              list(reversed(self._veto_log[-20:])),
-            # Signal queue — count + detail for Brain Execution Summary
-            "pending_signals_count": len(self._pending_signals),
-            "pending_signals_detail": [
-                {
-                    "symbol":         sym,
-                    "queue_reason":   entry.get("queue_reason", "unknown"),
-                    "cycles_pending": entry.get("cycles_pending", 1),
-                    "conviction":     entry.get("result", {}).get("conviction", 0),
-                    "side":           entry.get("result", {}).get("side", ""),
-                    "expires_in_sec": max(0, round(entry.get("expires_at", 0) - time.time())),
-                }
-                for sym, entry in self._pending_signals.items()
-            ],
-            "systematic_pool": getattr(self, "_systematic_pool", [])
-        }
-        try:
-            with open(config.MULTI_STATE_FILE, "w") as f:
-                json.dump(multi_state, f, indent=2)
-            
-            # --- PHASE 2A: REDIS STATE PUSH ---
-            if self._redis:
-                self._redis.set("synaptic:multi_bot_state", json.dumps(multi_state))
-                
-        except Exception as e:
-            logger.error("Failed to save multi state: %s", e)
 
     def _evict_brain_cache(self):
         """LRU eviction: cap HMM brain caches to prevent OOM kills on Railway."""
