@@ -170,11 +170,6 @@ def notify_batch_entries(trades):
     if not trades:
         return
 
-    count = len(trades)
-    header = f"📦 <b>{count} NEW TRADE{'S' if count > 1 else ''} DEPLOYED</b>"
-
-    lines = [header, "━━━━━━━━━━━━━━━━━━"]
-
     grouped = {}
     for trade in trades:
         sym = trade.get("symbol", "?")
@@ -190,6 +185,11 @@ def notify_batch_entries(trades):
         if key not in grouped:
             grouped[key] = []
         grouped[key].append(trade)
+
+    unique_coins = len(grouped)
+    header = f"📦 <b>{unique_coins} COIN{'S' if unique_coins > 1 else ''} DEPLOYED</b>"
+
+    lines = [header, "━━━━━━━━━━━━━━━━━━"]
 
     for (sym, pos, lev, regime), group in grouped.items():
         rep_trade = group[0]
@@ -261,15 +261,38 @@ def notify_athena_veto(sym, side, conviction_pct, reasoning, segment):
     send_message_async(msg)
 
 
+_close_batch = []
+_close_batch_lock = threading.Lock()
+
 def notify_trade_close(trade):
-    """Send notification when a trade is closed."""
-    if not config.TELEGRAM_NOTIFY_TRADES:
+    """Queue a trade close context for batched notification."""
+    if not _read_env_val("TELEGRAM_NOTIFY_TRADES", "true").lower() == "true":
+        return
+    with _close_batch_lock:
+        _close_batch.append(trade)
+
+def flush_trade_closes():
+    """Drains the close batch and sends them as one concatenated message per N closes."""
+    with _close_batch_lock:
+        trades = list(_close_batch)
+        _close_batch.clear()
+
+    if not trades:
         return
 
-    pnl = trade.get("realized_pnl", 0)
-    pnl_pct = trade.get("realized_pnl_pct", 0)
-    emoji = "✅" if pnl >= 0 else "❌"
-    pnl_color = "+" if pnl >= 0 else ""
+    grouped = {}
+    for trade in trades:
+        sym = trade.get("symbol", "?")
+        pos = trade.get("position", "?")
+        reason = trade.get("exit_reason", "UNKNOWN")
+        key = (sym, pos, reason)
+        if key not in grouped:
+            grouped[key] = []
+        grouped[key].append(trade)
+
+    unique_closes = len(grouped)
+    header = f"🏁 <b>{unique_closes} COIN{'S' if unique_closes > 1 else ''} CLOSED</b>"
+    lines = [header, "━━━━━━━━━━━━━━━━━━"]
 
     reason_map = {
         "STOP_LOSS": "🛑 Stop Loss",
@@ -281,21 +304,39 @@ def notify_trade_close(trade):
         "KILL_SWITCH": "🚨 Kill Switch",
         "MANUAL": "✋ Manual Close",
     }
-    reason = trade.get("exit_reason", "UNKNOWN")
-    reason_display = reason_map.get(reason, reason)
 
-    msg = (
-        f"{emoji} <b>TRADE CLOSED</b>\n"
-        f"━━━━━━━━━━━━━━━━━━\n"
-        f"📊 <b>{trade['symbol']}</b> | {trade.get('position', 'N/A')}\n"
-        f"📍 {reason_display}\n"
-        f"📈 Entry: <code>{trade.get('entry_price', 0):.6f}</code>\n"
-        f"📉 Exit: <code>{trade.get('exit_price', 0):.6f}</code>\n"
-        f"💰 P&L: <b>{pnl_color}${pnl:.2f}</b> ({pnl_color}{pnl_pct:.2f}%)\n"
-        f"⏱ Duration: <b>{trade.get('duration_minutes', 0):.0f}m</b>\n"
-        f"🕐 {datetime.utcnow().strftime('%H:%M:%S UTC')}"
-    )
-    send_message_async(msg)
+    for (sym, pos, reason), group in grouped.items():
+        rep_trade = group[0]
+        count_in_group = len(group)
+        
+        # Calculate averages for the display
+        avg_entry = sum(t.get("entry_price", 0) for t in group) / count_in_group
+        avg_exit = sum(t.get("exit_price", 0) for t in group) / count_in_group
+        avg_pnl = sum(t.get("realized_pnl", 0) for t in group) / count_in_group
+        avg_pnl_pct = sum(t.get("realized_pnl_pct", 0) for t in group) / count_in_group
+        avg_dur = sum(t.get("duration_minutes", 0) for t in group) / count_in_group
+
+        emoji = "✅" if avg_pnl >= 0 else "❌"
+        pnl_color = "+" if avg_pnl >= 0 else ""
+        reason_display = reason_map.get(reason, reason)
+
+        deployed_msg = ""
+        if count_in_group > 1:
+            users = set(t.get("user_id") for t in group if t.get("user_id"))
+            bots = set(t.get("bot_id") for t in group if t.get("bot_id"))
+            u_str = f"{len(users)} user{'s' if len(users) != 1 else ''}" if users else f"{count_in_group} users"
+            b_str = f"{len(bots)} bot{'s' if len(bots) != 1 else ''}" if bots else f"{count_in_group} bots"
+            deployed_msg = f"\n   👥 <i>Closed across {u_str} · {b_str}</i>"
+
+        lines.append(
+            f"{emoji} <b>{sym}</b> {pos} | {reason_display}{deployed_msg}\n"
+            f"   📈 Entry: <code>{avg_entry:.6f}</code>  📉 Exit: <code>{avg_exit:.6f}</code>\n"
+            f"   💰 P&L: <b>{pnl_color}${avg_pnl:.2f}</b> ({pnl_color}{avg_pnl_pct:.2f}%) | ⏱ {avg_dur:.0f}m"
+        )
+        lines.append("")
+
+    lines.append(f"🕐 {datetime.utcnow().strftime('%H:%M:%S UTC')}")
+    send_message_async("\n".join(lines))
 
 
 def notify_kill_switch(drawdown_pct, peak, current):
