@@ -410,11 +410,42 @@ def _auth_middleware():
 @app.route("/api/all", methods=["GET"])
 def api_all():
     """Return all engine state for the dashboard."""
-    multi = _read_json("multi_bot_state.json", {
-        "coin_states": {},
-        "last_analysis_time": None,
-    })
-    tradebook = _read_json("tradebook.json", {"trades": [], "summary": {}})
+    r = None
+    try:
+        import redis
+        r = redis.from_url(config.REDIS_URL, decode_responses=True)
+    except Exception:
+        pass
+        
+    # --- PHASE 2A: REDIS FETCH FOR MULTI_BOT_STATE ---
+    multi = None
+    if r:
+        try:
+            cached_multi = r.get("synaptic:multi_bot_state")
+            if cached_multi:
+                multi = json.loads(cached_multi)
+        except Exception:
+            pass
+            
+    if not multi:
+        multi = _read_json("multi_bot_state.json", {
+            "coin_states": {},
+            "last_analysis_time": None,
+        })
+        
+    # --- PHASE 2A: REDIS FETCH FOR TRADEBOOK ---
+    tradebook = None
+    if r:
+        try:
+            cached_tb = r.get("synaptic:tradebook")
+            if cached_tb:
+                tradebook = json.loads(cached_tb)
+        except Exception:
+            pass
+            
+    if not tradebook:
+        tradebook = _read_json("tradebook.json", {"trades": [], "summary": {}})
+        
     # ── Safeguard: auto-fix stale summary if trades array is empty ──
     tb_trades = tradebook.get("trades", [])
     tb_summary = tradebook.get("summary", {})
@@ -426,6 +457,7 @@ def api_all():
         tb._compute_summary(book)
         tb._save_book(book)
         tradebook = book
+        
     engine = _read_json("engine_state.json", {"status": "running"})
     heatmap = _read_json("segment_heatmap.json", {"segments": []})
 
@@ -440,7 +472,6 @@ def api_all():
         # Frontend uses this to detect de-registration and auto-re-push bots.
         "registered_bot_ids": [b["bot_id"] for b in config.ENGINE_ACTIVE_BOTS],
     })
-
 
 @app.route("/api/gemini-health", methods=["GET"])
 def api_gemini_health():

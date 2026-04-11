@@ -10,6 +10,7 @@ import time
 import logging
 import threading
 import urllib.request
+import redis
 from datetime import datetime, timezone, timedelta
 
 IST = timezone(timedelta(hours=5, minutes=30))
@@ -247,6 +248,13 @@ class RegimeMasterBot:
         self._last_cycle_duration = 0
         self._last_analysis_time = 0.0  # epoch — triggers immediate first run
         self._deploying_locks = {}      # (user_id, bot_type, sym) -> timestamp
+        
+        # Redis Client for state caching
+        try:
+            self._redis = redis.from_url(config.REDIS_URL, decode_responses=True)
+        except Exception as e:
+            logger.error("⚠️ Redis init failed: %s — state will not be broadcast to UI", e)
+            self._redis = None
 
         # Multi-coin state
         self._coin_list = []
@@ -3333,6 +3341,9 @@ class RegimeMasterBot:
         try:
             with open(config.STATE_FILE, "w") as f:
                 json.dump(legacy_state, f, indent=2)
+                
+            if self._redis:
+                self._redis.set("synaptic:legacy_state", json.dumps(legacy_state))
         except Exception as e:
             try:
                 logger.debug('Exception caught: %s', e, exc_info=True)
@@ -3386,6 +3397,11 @@ class RegimeMasterBot:
         try:
             with open(config.MULTI_STATE_FILE, "w") as f:
                 json.dump(multi_state, f, indent=2)
+            
+            # --- PHASE 2A: REDIS STATE PUSH ---
+            if self._redis:
+                self._redis.set("synaptic:multi_bot_state", json.dumps(multi_state))
+                
         except Exception as e:
             logger.error("Failed to save multi state: %s", e)
 

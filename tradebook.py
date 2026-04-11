@@ -9,6 +9,11 @@ import logging
 import threading
 from datetime import datetime, timezone
 from data_pipeline import get_current_price
+
+try:
+    import redis
+except ImportError:
+    redis = None
 import config
 import telegram as tg
 
@@ -42,6 +47,11 @@ def _save_book(book):
     try:
         with open(TRADEBOOK_FILE, "w") as f:
             json.dump(book, f, indent=2)
+            
+        # --- PHASE 2A: REDIS STATE PUSH ---
+        if redis:
+            r = redis.from_url(config.REDIS_URL, decode_responses=True)
+            r.set("synaptic:tradebook", json.dumps(book))
     except Exception as e:
         logger.error("Failed to save tradebook: %s", e)
 

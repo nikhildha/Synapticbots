@@ -81,6 +81,7 @@
     "embla-carousel-react": "8.3.0",
     "framer-motion": "10.18.0",
     "input-otp": "1.2.4",
+    "ioredis": "^5.10.1",
     "jsonwebtoken": "9.0.2",
     "lightweight-charts": "^4.2.3",
     "lucide-react": "0.446.0",

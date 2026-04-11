@@ -31,6 +31,7 @@ COINDCX_PUBLIC_URL = "https://public.coindcx.com"
 COINDCX_MARGIN_CURRENCY = os.getenv("COINDCX_MARGIN_CURRENCY", "USDT")
 EXCHANGE_LIVE = os.getenv("EXCHANGE_LIVE", "coindcx")  # "coindcx" (default) or "binance"
 BINANCE_FUTURES_TESTNET = os.getenv("BINANCE_FUTURES_TESTNET", "true").lower() == "true"
+REDIS_URL = os.getenv("REDIS_URL", "redis://default:arwwHDneBKbWLoVdqNcQvtKWKAUQzreP@redis.railway.internal:6379")
 
 # ─── Exchange Fees ──────────────────────────────────────────────────────────────
 TAKER_FEE = 0.0005            # 0.05% taker per leg (Binance & CoinDCX)
