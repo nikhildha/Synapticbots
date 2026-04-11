@@ -1634,12 +1634,11 @@ if __name__ == "__main__":
     # Install SIGTERM handler BEFORE starting anything else
     _setup_sigterm_handler()
 
-    # Start Flask API server
+    # Start Waitress WSGI production server
     port = int(os.environ.get("PORT", 3001))
-    logger.info("🌐 Engine API listening on port %d", port)
-    app.run(host="0.0.0.0", port=port, debug=False, use_reloader=False)
-
-
+    logger.info("🌐 Engine API listening on port %d (Waitress WSGI)", port)
+    from waitress import serve
+    serve(app, host="0.0.0.0", port=port, threads=8)
 # ─── Signal Validation System API ───────────────────────────────────────────
 
 @app.route("/api/signal-validation", methods=["GET"])
