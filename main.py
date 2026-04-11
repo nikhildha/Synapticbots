@@ -1648,7 +1648,11 @@ class RegimeMasterBot:
                 )
 
                 # ── Build trade dict ──────────────────────────────────────────────
-                base_capital = target.get("capital_per_trade") or getattr(config, "CAPITAL_PER_TRADE", 100.0)
+                # Base capital allocated per trade: 2% of total exchange wallet balance.
+                # Replaces static CAPITAL_PER_TRADE to ensure compounding & risk parity.
+                base_capital = balance * 0.02
+                if base_capital <= 0:
+                    base_capital = target.get("capital_per_trade") or getattr(config, "CAPITAL_PER_TRADE", 100.0)
                 
                 # Conviction-weighted sizing (+25% for high conviction, -25% for low)
                 if conviction >= 80:
