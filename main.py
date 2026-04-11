@@ -234,16 +234,16 @@ class RegimeMasterBot:
 
         # ── Critical deps — wrapped to prevent init crashes from burning retries ──
         try:
-            self.executor = ExecutionEngine()
+            self.executor = ExecutionEngine(engine=self)
         except Exception as e:
             logger.error("⚠️ ExecutionEngine init failed: %s — using fallback", e)
-            self.executor = ExecutionEngine()  # retry once
+            self.executor = ExecutionEngine(engine=self)  # retry once
 
         try:
-            self.risk = RiskManager()
+            self.risk = RiskManager(engine=self)
         except Exception as e:
             logger.error("⚠️ RiskManager init failed: %s — using fallback", e)
-            self.risk = RiskManager()
+            self.risk = RiskManager(engine=self)
 
         self._trade_count = 0
         self._cycle_count = 0

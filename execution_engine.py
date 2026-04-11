@@ -53,9 +53,10 @@ class ExecutionEngine:
     Paper mode routes to Binance (testnet, simulated).
     """
 
-    def __init__(self, client=None):
+    def __init__(self, client=None, engine=None):
         self._client = client  # Binance client (paper only)
-        self.risk = RiskManager()
+        self.engine = engine
+        self.risk = RiskManager(engine=engine)
 
     def _get_binance_client(self):
         """Lazy-init Binance client (paper mode only)."""
@@ -281,6 +282,7 @@ class ExecutionEngine:
         try:
             if exchange == 'coindcx':
                 import coindcx_client as cdx
+                from coindcx_exchange_client import CoinDCXExchangeClient
                 pair = cdx.to_coindcx_pair(symbol)
                 step = CoinDCXExchangeClient._qty_step(cdx.get_current_price(pair) or 1)
                 quantity = CoinDCXExchangeClient._round_to_step(quantity, step)
