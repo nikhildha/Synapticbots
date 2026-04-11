@@ -1,13 +1,13 @@
 import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
-import { authOptions } from '@/app/api/auth/[...nextauth]/route';
+import { authOptions } from '@/lib/auth-options';
 
 // Retrieve Orchestrator URL identically to bot-state
 const getEngineUrl = (mode: 'paper' | 'live' = 'live'): string => {
     if (mode === 'live' && process.env.LIVE_ORCHESTRATOR_URL) {
         return process.env.LIVE_ORCHESTRATOR_URL;
     }
-    return process.env.ORCHESTRATOR_URL || 'http://localhost:5000';
+    return process.env.ORCHESTRATOR_URL || 'http://127.0.0.1:3001';
 };
 
 export async function GET(req: Request) {
