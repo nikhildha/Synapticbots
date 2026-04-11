@@ -1521,6 +1521,20 @@ class RegimeMasterBot:
                         logger.info("🏛️ ATHENA [%s] %s → %s (conf=%.0f%%)",
                                     bot_name, sym, athena_decision.action,
                                     athena_decision.adjusted_confidence * 100)
+                        
+                        # ── Intelligence Log: record EVERY decision for the Dashboard ──
+                        self._veto_log.append({
+                            "symbol":     sym,
+                            "price":      current_price,
+                            "side":       top.get("side", ""),
+                            "conviction": top.get("conviction", 0),
+                            "reason":     (athena_decision.reasoning or "")[:200],
+                            "action":     athena_decision.action,
+                            "ts":         _dt.datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ"),
+                        })
+                        if len(self._veto_log) > self._VETO_LOG_MAX:
+                            self._veto_log = self._veto_log[-self._VETO_LOG_MAX:]
+                            
                     except Exception as e:
                         logger.warning("⚠️ Athena call failed for %s: %s — failing open (deploy anyway)", sym, e)
                         athena_decision = None  # fail open: treat as EXECUTE
@@ -1532,19 +1546,6 @@ class RegimeMasterBot:
                     _bcast("ATHENA_VETO", self._cycle_count, bot_name, bot_id, sym,
                            top["side"], seg_name, top.get("confidence", 0),
                            f"Athena vetoed: {athena_decision.action} — {athena_decision.reasoning[:80]}")
-                    # ── Veto Log: record for retrospective analysis ─────────────────────────
-
-                    self._veto_log.append({
-                        "symbol":     sym,
-                        "price":      current_price,
-                        "side":       top.get("side", ""),
-                        "conviction": top.get("conviction", 0),
-                        "reason":     (athena_decision.reasoning or "")[:200],
-                        "action":     athena_decision.action,
-                        "ts":         _dt.datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ"),
-                    })
-                    if len(self._veto_log) > self._VETO_LOG_MAX:
-                        self._veto_log = self._veto_log[-self._VETO_LOG_MAX:]
                     # ── Athena Decision Log (persistent JSONL) ─────────────────────────
                     _log_athena_decision(
                         cycle=self._cycle_count, symbol=sym, segment=seg_name,
