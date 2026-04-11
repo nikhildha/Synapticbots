@@ -7,7 +7,6 @@ import { BotCard } from '@/components/bot-card';
 import { SegmentPerformancePanel } from '@/components/segment-performance-panel';
 import { RegimeCard, PaperTradesCard, LiveTradesCard, ActivePositionsCard } from '@/components/dashboard/command-center';
 
-import { EngineTickers } from '@/components/dashboard/engine-tickers';
 import { AthenaIntelligenceFeed } from '@/components/dashboard/athena-stream';
 import { MarketStructurePanel } from '@/components/dashboard/market-structure';
 import { SegmentHeatmap } from '@/components/dashboard/segment-heatmap';
@@ -495,8 +494,6 @@ export function DashboardClient({ user, stats, bots, recentTrades, segmentPerf =
               </div>
             </div>
           </motion.div>
-
-          <EngineTickers multi={botState?.multi} />
 
           {/* ═══ Row 1: Regime + P&L ═══ */}
           <motion.div
