@@ -204,9 +204,9 @@ class StrategyRunner:
         if str(mode).lower() == "live" and config.PAPER_TRADE is False:
             logger.info("⚡ [%s] Executing LIVE execution logic via ExecutionEngine for %s", strategy, sym)
             exec_result = self.executor.execute_trade(
-                symbol=sym, side=side, order_type="MARKET",
+                symbol=sym, side=side,
                 quantity=qty, leverage=rm.leverage,
-                stop_loss=sl, take_profit=tp
+                atr=atr
             )
             if not exec_result:
                 logger.error("🚫 [%s] LIVE Execution failed for %s. Aborting trade deployment.", strategy, sym)
