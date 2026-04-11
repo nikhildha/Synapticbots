@@ -1045,27 +1045,14 @@ class RegimeMasterBot:
         deployed_trades = []
         deployed = 0
         athena_calls_this_cycle = 0  # H4: track Athena calls to enforce LLM_MAX_CALLS_PER_CYCLE
-        # ── GUARD 4: Per-user Per-segment tick lock ──────────────────────────────
-        # Prevents the waterfall from cascading multiple DeFi coins for the SAME USER
-        # in the same cycle. If User A has 2 DeFi bots, they only deploy 1 DeFi coin
-        # per tick. Other users' bots are isolated and will also receive the deployment.
-        deployed_segments: set = set()  # set of (user_id, segment) tuples
-        deployed_user_coins: set = set() # track (user_id, bot_id, sym) to prevent same-bot same-tick duplication
+        # Track same-bot same-tick coin dedup (prevents one bot firing same coin twice in one tick)
+        deployed_user_coins: set = set()  # (user_id, bot_id, sym)
 
         for target in _tick_active_bots:
             bot_id   = target.get("bot_id", config.ENGINE_BOT_ID)
             bot_name = target.get("bot_name", "Synaptic Bot")
             user_id  = target.get("user_id", config.ENGINE_USER_ID)
-            
-            raw_bot_segment = target.get("segment_filter", "ALL")
-            # Only respect DB segment if it's an actual market category.
-            # Strategy-style names like "Titan", "Systematic", "Momentum", "Stat Arb"
-            # stored in older bot configs should fall through to name-inference → "ALL".
-            _REAL_MARKET_SEGMENTS = {"L1", "L2", "DeFi", "AI", "Meme", "RWA", "Gaming", "DePIN", "Modular", "Oracles"}
-            if raw_bot_segment and raw_bot_segment in _REAL_MARKET_SEGMENTS:
-                bot_segment_filter = raw_bot_segment
-            else:
-                bot_segment_filter = _infer_segment_from_name(bot_name)  # returns "ALL" for strategy names
+            # All bots trade ALL coins — segment routing removed (bots are strategy-based, not sector-based)
 
             # ── Clear stale deploy statuses from last cycle for this bot ──────────
             # Without this, coins that were #1 last cycle (e.g. RONIN with "Conviction too low")
@@ -1074,91 +1061,21 @@ class RegimeMasterBot:
             for _cs in self._coin_states.values():
                 _cs.get("bot_deploy_statuses", {}).pop(bot_id, None)
 
-            # Build allowed-coin set for this bot's segment (including fallbacks if primary is blocked)
-            if bot_segment_filter == "ALL":
-                bot_allowed_coins = None  # no restriction
-                seg_results = list(raw_results)
-            else:
-                # ── SEGMENT FALLBACK LOGIC ──
-                # If primary segment is in cooldown, try the highest-ranked available segment
-                target_segment = bot_segment_filter
-                is_blocked, _ = self._is_segment_in_cooldown(target_segment, user_id)
-
-                if is_blocked:
-
-
-                    logger.info("🔄 [%s] Primary segment '%s' in cooldown, looking for fallback...", bot_name, target_segment)
-                    fallback_found = False
-                    
-                    # Read heatmap to get exact segment momentum rankings
-                    heatmap_path = os.path.join(config.DATA_DIR, "segment_heatmap.json")
-                    ranked_segments = []
-                    try:
-                        if os.path.exists(heatmap_path):
-                            with open(heatmap_path, "r") as f:
-                                heatmap_data = json.load(f)
-                                ranked_segments = [s["segment"] for s in sorted(heatmap_data.get("segments", []), key=lambda x: x["abs_score"], reverse=True)]
-                    except Exception as e:
-                        logger.error("Failed to parse heatmap for fallback routing: %s", e)
-
-                    if not ranked_segments:
-                        ranked_segments = list(config.CRYPTO_SEGMENTS.keys())
-
-                    for fallback_seg in ranked_segments:
-                        if fallback_seg == bot_segment_filter or fallback_seg == "ALL":
-                            continue
-                        f_blocked, _ = self._is_segment_in_cooldown(fallback_seg, user_id)
-                        if not f_blocked and (user_id, fallback_seg) not in deployed_segments:
-                            # ── Verify scanner provided coins for this fallback segment
-                            has_coins = any(r.get("segment", fallback_seg) == fallback_seg for r in raw_results if r["symbol"] in config.CRYPTO_SEGMENTS[fallback_seg])
-                            if has_coins:
-                                logger.info("✅ [%s] Found valid fallback target: '%s' (Highest ranked unblocked)", bot_name, fallback_seg)
-                                target_segment = fallback_seg
-                                fallback_found = True
-                                break
-                                
-                    if not fallback_found:
-                        logger.info("⏸️ [%s] Scanner capacity met (All available top segments claimed). Starving bot for this cycle.", bot_name)
-                        # Keep target_segment as original so it gracefully fails the cooldown gate below without crashing
-
-                bot_allowed_coins = set(config.CRYPTO_SEGMENTS.get(target_segment, []))
-                # Filter raw_results to this target segment
-                seg_results = [
-                    r for r in raw_results
-                    if r["symbol"] in bot_allowed_coins
-                    and r.get("segment", target_segment) == target_segment
-                ]
-                
-                # Update the bot's effective segment filter for this cycle so the rest of the loop uses the fallback
-                bot_segment_filter = target_segment
-
-
             # ── Waterfall: evaluate candidates in conviction order ─────────────────
-            # ATHENA_WATERFALL_DEPTH = how many coins per bot we'll send to Athena.
-            # If coin #1 is VETO'd → coin #2 gets evaluated, then #3, etc.
-            # One successful EXECUTE stops the waterfall for this bot.
+            # All bots receive the full ranked coin list — no sector restriction.
+            # Bot tier (STRICT/MODERATE/AGGRESSIVE) handles risk gates instead.
             waterfall_depth = getattr(config, "ATHENA_WATERFALL_DEPTH", 4)
-            waterfall_candidates = seg_results[:waterfall_depth]
+            waterfall_candidates = raw_results[:waterfall_depth]
 
             if not waterfall_candidates:
-                _all_syms = [r["symbol"] for r in raw_results]
-                _seg_mismatch = [
-                    f"{r['symbol']}({r.get('segment','?')})"
-                    for r in raw_results
-                    if r["symbol"] not in (bot_allowed_coins or set())
-                ][:5]
-                logger.info(
-                    "🔍 [%s] No HMM signals for segment '%s' this cycle | "
-                    "Total raw: %d | Segment mismatches (not shown): %s",
-                    bot_name, bot_segment_filter, len(_all_syms),
-                    _seg_mismatch or "none",
-                )
+                logger.info("🔍 [%s] No HMM signals this cycle | Total raw: %d",
+                            bot_name, len(raw_results))
                 continue
 
-            # Mark coins beyond the waterfall window as excluded (never evaluated)
-            for ignored in seg_results[waterfall_depth:]:
+            # Mark coins beyond the waterfall window as excluded
+            for ignored in raw_results[waterfall_depth:]:
                 sym = ignored["symbol"]
-                self._coin_states.setdefault(sym, {}).setdefault("bot_deploy_statuses", {})[bot_id] = "FILTERED: Not top coin in segment"
+                self._coin_states.setdefault(sym, {}).setdefault("bot_deploy_statuses", {})[bot_id] = "FILTERED: Outside waterfall depth"
 
             deploys_this_bot = 0  # counter: how many trades deployed this cycle for this bot
             max_deploys_bot = getattr(config, "MAX_DEPLOYS_PER_BOT_PER_CYCLE", 3)
@@ -1175,59 +1092,13 @@ class RegimeMasterBot:
                     self._coin_states.setdefault(top["symbol"], {}).setdefault("bot_deploy_statuses", {})[bot_id] = "FILTERED: DCA Contagion Freeze active"
                 continue  # Escapes bot processing, skipping new trades entirely
 
-            # ── GUARD 4: Segment tick lock ────────────────────────────────────
-            # If this user's named segment was already served this cycle, skip the
-            # entire waterfall. This prevents 1 user's 10 bots all in "DeFi" from each
-            # deploying a different DeFi coin via the waterfall in the same tick.
-            if bot_segment_filter and bot_segment_filter != "ALL" and (user_id, bot_segment_filter) in deployed_segments:
-                logger.info(
-                    "🔒 [%s] Segment '%s' already deployed this cycle for user %s — skip (Guard 4)",
-                    bot_name, bot_segment_filter, user_id
-                )
-                for _cs in self._coin_states.values():
-                    _cs.get("bot_deploy_statuses", {}).setdefault(bot_id, "FILTERED: segment already served this cycle")
-                # ── Signal Queue: queue top Athena-approved coin in this segment that got Guard-4-blocked ──
-                # We don't have Athena output yet (loop skipped), so queue the top HMM result
-                # for this bot's segment so it retries next cycle when the segment lock resets.
-                _seg_candidates = [r for r in raw_results if r.get("symbol") in (bot_allowed_coins or set())]
-                if not _seg_candidates and bot_allowed_coins is None:
-                    _seg_candidates = raw_results
-                if _seg_candidates:
-                    _top_blocked = _seg_candidates[0]
-                    _bsym = _top_blocked.get("symbol")
-                    if _bsym and _bsym not in self._pending_signals:
-                        self._pending_signals[_bsym] = {
-                            "result":         _top_blocked,
-                            "expires_at":     _now + self._SIGNAL_QUEUE_TTL_SECONDS,
-                            "queued_at":      _now,
-                            "cycles_pending": 1,
-                            "queue_reason":   "guard4_segment_locked",
-                        }
-                        logger.info("📥 Signal queue: queued %s (Guard 4 blocked segment %s)", _bsym, bot_segment_filter)
-                continue  # skip this bot entirely this cycle
-
             for _wf_idx, top in enumerate(waterfall_candidates):
                 if deploys_this_bot >= max_deploys_bot:
                     break  # hit max deploys for this bot this cycle
 
                 sym      = top["symbol"]
                 pos_key  = _build_pos_key(bot_id, sym)
-                seg_name = top.get("segment") or get_segment_for_coin(sym)
-
-                # ── SEGMENT GUARD: hard-validate coin segment vs bot segment ──
-                # Even though seg_results was pre-filtered, reinjected or waterfall
-                # candidates could slip through if CRYPTO_SEGMENTS is stale.
-                # This is the final enforcement gate — mismatched coins are skipped.
-                if bot_segment_filter not in ("ALL", None):
-                    if seg_name != bot_segment_filter:
-                        logger.warning(
-                            "🚫 SEGMENT MISMATCH [%s]: coin=%s segment=%s bot_segment=%s — skipping",
-                            bot_name, sym, seg_name, bot_segment_filter
-                        )
-                        self._coin_states.setdefault(sym, {}).setdefault("bot_deploy_statuses", {})[bot_id] = (
-                            f"FILTERED: segment mismatch ({seg_name} ≠ {bot_segment_filter})"
-                        )
-                        continue
+                seg_name = top.get("segment") or get_segment_for_coin(sym)  # for analytics / risk-manager only
 
                 # ── DUPLICATE GUARD: skip if this bot already has this coin active ──
                 if pos_key in self._active_positions:
@@ -1958,9 +1829,6 @@ class RegimeMasterBot:
                     "entry_price": entry_price,
                     "quantity": fill_qty,
                 }
-                # Guard 4: lock this segment for the rest of the cycle for THIS USER
-                if bot_segment_filter:
-                    deployed_segments.add((user_id, bot_segment_filter))
                 deployed_user_coins.add((user_id, bot_id, sym))
                 # ── Segment Cooldown: track deployment for churn detection (Rule 4) ──
                 self._record_segment_open(seg_name, user_id)
