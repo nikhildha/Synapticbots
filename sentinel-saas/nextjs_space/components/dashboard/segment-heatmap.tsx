@@ -11,6 +11,7 @@ interface SegmentData {
   abs_score: number;
   direction: string; // "LONG" | "SHORT"
   is_cooldown?: boolean;
+  coin_count?: number;
 }
 
 interface SegmentHeatmapProps {
@@ -101,7 +102,7 @@ export function SegmentHeatmap({ heatmapData, loading = false }: SegmentHeatmapP
       </div>
 
       {/* Heatmap Grid */}
-      <div className="grid grid-cols-2 gap-2">
+      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3">
         {sortedSegments.map((seg, i) => {
           const isHot = top2Targets.includes(seg.segment);
           const isCooldown = !!seg.is_cooldown;
@@ -134,29 +135,22 @@ export function SegmentHeatmap({ heatmapData, loading = false }: SegmentHeatmapP
                 <div className="absolute -top-1.5 -right-1.5 w-3 h-3 rounded-full" style={{ background: `${primaryColor}, 1)` }} />
               )}
 
-              <div className="flex justify-between items-start mb-3">
-                <div className="flex flex-col">
-                  <span className="text-sm font-bold text-[var(--color-text)] tracking-wide">{seg.segment}</span>
-                  {isCooldown && <span className="text-[9px] font-bold text-gray-400 tracking-wider">COOLDOWN</span>}
-                </div>
-                <div className="flex items-center gap-1">
-                  {!isCooldown && (isPositive ? <TrendingUp className="w-3.5 h-3.5 text-green-400" /> : <TrendingDown className="w-3.5 h-3.5 text-red-400" />)}
-                  <span className={`text-sm font-bold ${isCooldown ? 'text-gray-400' : (isPositive ? 'text-green-400' : 'text-red-400')}`}>
-                    {isPositive && !isCooldown ? '+' : ''}{seg.blended_score.toFixed(2)}
+              <div className="flex flex-col items-center justify-center h-full gap-0.5 mt-1">
+                <span className="text-[10px] font-bold text-[var(--color-text)] tracking-wider uppercase truncate max-w-[80px] opacity-80">
+                  {seg.segment}
+                </span>
+                
+                <div className="flex items-center justify-center my-1">
+                   <span className={`text-xl font-black tracking-tight ${isCooldown ? 'text-gray-400' : (isPositive ? 'text-green-400' : 'text-red-400')}`}>
+                    {isPositive && !isCooldown ? '+' : ''}{seg.blended_score.toFixed(1)}
                   </span>
                 </div>
-              </div>
 
-              <div className="space-y-1.5 mt-auto">
-                <div className="flex justify-between items-center text-[11px]">
-                  <span className="text-[var(--color-text-secondary)]">4h Return</span>
-                  <span className={`font-medium ${seg.vw_4h >= 0 ? 'text-green-400/80' : 'text-red-400/80'}`}>
-                    {seg.vw_4h >= 0 ? '+' : ''}{seg.vw_4h.toFixed(1)}%
-                  </span>
-                </div>
-                <div className="flex justify-between items-center text-[11px] pt-1 mt-1 border-t border-[var(--color-border)]">
-                  <span className="text-[var(--color-text-secondary)]">1h Breadth</span>
-                  <span className="text-[var(--color-text)] opacity-80 font-medium">{seg.breadth_1h.toFixed(0)}%</span>
+                <div className="flex items-center gap-1.5 mt-1">
+                   <div className="px-1.5 py-0.5 rounded bg-black/20 text-[9px] font-mono text-white/50 border border-white/5 whitespace-nowrap">
+                      {seg.coin_count !== undefined ? `${seg.coin_count} coins` : '...'}
+                   </div>
+                   {isCooldown && <span className="px-1 py-0.5 rounded bg-red-900/40 border border-red-500/20 text-[8px] font-bold text-white/40 tracking-wider">COOL</span>}
                 </div>
               </div>
             </motion.div>

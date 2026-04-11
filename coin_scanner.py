@@ -149,7 +149,16 @@ def get_hottest_segments(segment_limit=2, blocked_segments=None):
             pass
 
     segment_data = []
-    for segment, coins in config.CRYPTO_SEGMENTS.items():
+    
+    # Inject Virtual Segment: Sys 100
+    from data_pipeline import get_dynamic_systematic_universe
+    sys_pool = get_dynamic_systematic_universe(limit=100) or []
+    
+    segments_to_scan = dict(config.CRYPTO_SEGMENTS)
+    if sys_pool:
+        segments_to_scan["Sys 100"] = sys_pool
+        
+    for segment, coins in segments_to_scan.items():
         is_cooldown = segment in blocked_segments
             
         valid_coins = []
@@ -221,7 +230,8 @@ def get_hottest_segments(segment_limit=2, blocked_segments=None):
             "blended_score":    round(blended, 2),
             "abs_score":        abs(blended),
             "direction":        "LONG" if blended >= 0 else "SHORT",
-            "is_cooldown":      is_cooldown
+            "is_cooldown":      is_cooldown,
+            "coin_count":       len(valid_coins)
         })
 
     # Sort by hottest absolute score — direction agnostic
