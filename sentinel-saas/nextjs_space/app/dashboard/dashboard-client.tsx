@@ -726,7 +726,12 @@ export function DashboardClient({ user, stats, bots, recentTrades, segmentPerf =
               <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                 {bots.map((bot) => {
                   const botNameLower = (bot?.name || '').toLowerCase();
+                  const expectedMode = (bot?.config?.mode || 'paper').toLowerCase().startsWith('live') ? 'live' : 'paper';
+                  
                   const botTrades = trades.filter((t: any) => {
+                    const tradeMode = (t.mode || 'paper').toLowerCase().startsWith('live') ? 'live' : 'paper';
+                    if (tradeMode !== expectedMode) return false;
+                    
                     if (t.bot_id && bot?.id && t.bot_id === bot.id) return true;
                     if (t.botId && bot?.id && t.botId === bot.id) return true;
                     const tradeBotName = (t.bot_name || t.botName || '').toLowerCase();
@@ -738,8 +743,10 @@ export function DashboardClient({ user, stats, bots, recentTrades, segmentPerf =
                     return botNameLower.includes(tradeBotName) || tradeBotName.includes(botNameLower);
                   });
                   const displayTrades = botTrades.length > 0 ? botTrades : (bots.length === 1 ? trades : []);
+                  const botLiveActiveTrades = displayTrades.filter((t: any) => (t.status || '').toUpperCase() === 'ACTIVE');
+                  
                   return (
-                    <BotCard key={bot?.id} bot={bot} onToggle={handleBotToggle} onDelete={handleDeleteBot} onRetire={handleRetireBot} liveTradeCount={liveActiveTrades.length} trades={displayTrades} livePrices={livePrices} />
+                    <BotCard key={bot?.id} bot={bot} onToggle={handleBotToggle} onDelete={handleDeleteBot} onRetire={handleRetireBot} liveTradeCount={botLiveActiveTrades.length} trades={displayTrades} livePrices={livePrices} />
                   );
                 })}
               </div>
