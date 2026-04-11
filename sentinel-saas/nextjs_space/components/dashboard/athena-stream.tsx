@@ -6,7 +6,7 @@ import { ChevronDown, ChevronUp, Bot, ArrowRight, ShieldAlert } from 'lucide-rea
 export function AthenaIntelligenceFeed({ vetoLog }: { vetoLog: any[] }) {
   const [expandedId, setExpandedId] = useState<number | null>(null);
 
-  if (!vetoLog || vetoLog.length === 0) return null;
+  const isEmpty = !vetoLog || vetoLog.length === 0;
 
   return (
     <div className="flex flex-col w-full bg-[#0E1117] border border-[#222] rounded-xl overflow-hidden mb-8">
@@ -19,8 +19,15 @@ export function AthenaIntelligenceFeed({ vetoLog }: { vetoLog: any[] }) {
       </div>
 
       <div className="flex flex-col max-h-[300px] overflow-y-auto hide-scrollbar">
-        {vetoLog.slice(0, 10).map((log, i) => {
-          const isExpanded = expandedId === i;
+        {isEmpty ? (
+          <div className="flex flex-col items-center justify-center p-8 text-center bg-white/[0.01]">
+            <Bot size={32} className="text-blue-500/20 mb-3" />
+            <p className="text-sm font-semibold text-white/40">No recent verdicts.</p>
+            <p className="text-xs text-white/30 max-w-sm mt-1">Athena has not filtered any trades in the recent engine cycles.</p>
+          </div>
+        ) : (
+          vetoLog.slice(0, 10).map((log, i) => {
+            const isExpanded = expandedId === i;
           
           // Determine type based on reason
           const isExecute = log.reason?.toLowerCase().includes('execute') || log.reason?.toLowerCase().includes('approved');
@@ -91,7 +98,7 @@ export function AthenaIntelligenceFeed({ vetoLog }: { vetoLog: any[] }) {
               </AnimatePresence>
             </div>
           );
-        })}
+        }))}
       </div>
     </div>
   );

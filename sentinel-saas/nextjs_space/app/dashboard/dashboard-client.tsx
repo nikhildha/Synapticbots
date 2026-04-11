@@ -696,13 +696,11 @@ export function DashboardClient({ user, stats, bots, recentTrades, segmentPerf =
             transition={{ delay: 0.22 }}
             className="mb-8"
           >
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '20px', alignItems: 'start' }}>
+            <div className="flex flex-col gap-8 w-full">
               <SegmentHeatmap
                 heatmapData={botState?.heatmap || null}
               />
-              <div className="flex flex-col w-full">
-                <AthenaIntelligenceFeed vetoLog={botState?.multi?.veto_log || []} />
-              </div>
+              <AthenaIntelligenceFeed vetoLog={botState?.multi?.veto_log || []} />
             </div>
           </motion.div>
 
