@@ -1752,12 +1752,18 @@ class RegimeMasterBot:
                     if hasattr(athena_decision, "recommended_leverage") and athena_decision.recommended_leverage > 0:
                         lev = athena_decision.recommended_leverage
 
-                # ─── 3-Phase DCA Strategy ─────────────────────────────────────────
-                # Deploy ONLY Phase 1 capital upfront (the rest is loaded via tradebook DCA engine)
+                # DCA: Phase-1 capital for position sizing; record full base_capital for dashboard
                 dca_phases = getattr(config, "DCA_PHASES", [{"alloc_pct": 1.0}])
                 phase_1_capital = target_capital * dca_phases[0]["alloc_pct"]
                 
+                # Apply fixed leverage override (config.FIXED_LEVERAGE overrides HMM/Athena)
+                _fixed_lev = getattr(config, "FIXED_LEVERAGE", None)
+                if _fixed_lev:
+                    lev = _fixed_lev
                 qty         = (phase_1_capital * lev) / max(current_price, 0.0001)
+                # Record the full intended budget (not the DCA slice) so the dashboard
+                # shows $100/trade as configured, not $34 (30% of conviction-adjusted capital)
+                recorded_capital = base_capital
 
                 # SIGNAL_DISPATCH broadcast
                 _bcast("SIGNAL_DISPATCH", self._cycle_count, bot_name, bot_id, sym,
@@ -1824,7 +1830,7 @@ class RegimeMasterBot:
                 entry_price  = result.get("entry_price", 0) if result else 0
                 fill_qty     = result.get("quantity",   qty)    if result else qty
                 fill_lev     = result.get("leverage",   lev)    if result else lev
-                fill_capital = result.get("capital",    phase_1_capital) if result else phase_1_capital
+                fill_capital = base_capital  # full $100 per trade (DCA paused — do not use phase_1_capital)
                 fill_sl      = result.get("stop_loss",  0)      if result else 0
                 fill_tp      = result.get("take_profit", 0)     if result else 0
 
@@ -1865,7 +1871,7 @@ class RegimeMasterBot:
                                          sym, a_tp, entry_price, effective_side)
 
                     if athena_sl_used or athena_tp_used:
-                        logger.info("🏛️ Athena SL/TP override [%s]: SL=%s(%.4f) TP=%s(%.4f)%s",
+                        logger.info("🏛️ Athena SL/TP override [%s]: SL=%s(%.4f) TP=%s(%.4f)",
                                     sym,
                                     "ATHENA" if athena_sl_used else "ATR", fill_sl,
                                     "ATHENA" if athena_tp_used else "ATR", fill_tp,

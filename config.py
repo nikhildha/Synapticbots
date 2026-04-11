@@ -152,15 +152,20 @@ CAPITAL_PER_TRADE = 100        # $100 per trade, fixed
 RISK_PER_TRADE = 0.04
 KILL_SWITCH_DRAWDOWN = 0.10   # Pause bot if 10% drawdown in 24h
 
-# ─── 3-Phase DCA Strategy ──────────────────────────────────────────────────────────
+# ─── 3-Phase DCA Strategy (PAUSED — full $100 deployed on entry) ─────────────────
+DCA_PAUSED = True   # ← set False to re-enable multi-phase DCA
 DCA_PHASES = [
-    { "level": 1, "trigger_pnl_pct":   0.0, "alloc_pct": 0.30, "name": "Signal Entry" },
-    { "level": 2, "trigger_pnl_pct": -15.0, "alloc_pct": 0.30, "name": "Minor Sweep" },
-    { "level": 3, "trigger_pnl_pct": -35.0, "alloc_pct": 0.40, "name": "Deep Buy" }
+    { "level": 1, "trigger_pnl_pct":   0.0, "alloc_pct": 1.0,  "name": "Signal Entry (Full)" },
+    { "level": 2, "trigger_pnl_pct": -15.0, "alloc_pct": 0.30, "name": "Minor Sweep (paused)" },
+    { "level": 3, "trigger_pnl_pct": -35.0, "alloc_pct": 0.40, "name": "Deep Buy (paused)" }
 ]
 DCA_HARD_STOP_PCT = -60.0    # Catastrophic stop-loss applied to blended PnL
 MAX_PROFIT_PER_TRADE_PCT =  25   # Hard max-profit per trade: +25% of capital
-MIN_LEVERAGE_FLOOR = 3           # Skip trade if leverage must drop below this (lowered: 7x min is new floor)
+MIN_LEVERAGE_FLOOR = 3           # Minimum acceptable leverage
+
+# ─── Fixed Leverage Override ────────────────────────────────────────────────────────
+# Every bot uses exactly this leverage. Set to None for dynamic per-signal leverage.
+FIXED_LEVERAGE = 10   # ← 10× across all bots
 MIN_HOLD_MINUTES = 30         # Minimum hold time before regime-change exits
 DEFAULT_QUANTITY = 0.002      # BTC quantity (overridden by position sizer)
 MARGIN_TYPE = "ISOLATED"      # Never use CROSS for high leverage
