@@ -1290,11 +1290,17 @@ def sync_live_tpsl():
     book = _load_book()
     updated_count = 0
 
+    try:
+        physical_positions = cdx.list_positions()
+    except Exception as fetch_err:
+        logger.error("Watchdog failed to fetch physical positions: %s", fetch_err)
+        return
+
     for trade in book["trades"]:
         if trade["status"] != "ACTIVE":
-            continue   # BUG FIX: was `return` — exited entire loop on first non-active trade
+            continue   
         if trade.get("mode") != "LIVE":
-            continue   # BUG FIX: was `return` — exited entire loop on first non-live trade
+            continue   
 
         symbol = trade["symbol"]
         trailing_sl = trade.get("trailing_sl", trade["stop_loss"])
@@ -1304,34 +1310,43 @@ def sync_live_tpsl():
         last_sl = trade.get("_cdx_last_sl")
         last_tp = trade.get("_cdx_last_tp")
 
-        # Force initial push if never synced to CoinDCX
-        first_push = (last_sl is None or last_tp is None)
-
-        if not first_push:
-            sl_changed = abs(trailing_sl - last_sl) > 1e-8
-            tp_changed = abs(trailing_tp - last_tp) > 1e-8
-            if not sl_changed and not tp_changed:
-                continue
-
-        # Find CoinDCX position ID
+        # 1. Match Trade to Physical Pos
         pair = cdx.to_coindcx_pair(symbol)
+        pos_id = None
+        phys_sl = None
+        phys_tp = None
+        
+        for p in physical_positions:
+            if p.get("pair") == pair and float(p.get("active_pos", 0)) != 0:
+                pos_id = p["id"]
+                phys_sl = p.get("stop_loss_trigger")
+                phys_tp = p.get("take_profit_trigger")
+                break
+
+        if not pos_id:
+            logger.info("❌ Ghost trade detected for %s (missing on physical exchange). Shutting down local engine memory.", symbol)
+            exit_p = cdx.get_current_price(pair)
+            if not exit_p:
+                exit_p = trade["entry_price"]
+            _close_trade_inline(trade, exit_p, "EXCHANGE_CLOSED")
+            updated_count += 1
+            continue
+
+        # 2. Watchdog: Are physical TPSL bounds entirely missing externally?
+        missing_physical_limits = False
+        if phys_sl is None or phys_tp is None:
+            logger.warning("🛡️ WATCHDOG ACTIVE: %s is missing physical TP/SL limits on exchange! Forcing recreation.", symbol)
+            missing_physical_limits = True
+
+        # 3. Check Local Caching Drift
+        first_push = (last_sl is None or last_tp is None)
+        sl_changed = abs(trailing_sl - (last_sl or 0)) > 1e-8
+        tp_changed = abs(trailing_tp - (last_tp or 0)) > 1e-8
+
+        if not missing_physical_limits and not first_push and not sl_changed and not tp_changed:
+            continue
+
         try:
-            positions = cdx.list_positions()
-            pos_id = None
-            for p in positions:
-                if p.get("pair") == pair and float(p.get("active_pos", 0)) != 0:
-                    pos_id = p["id"]
-                    break
-
-            if not pos_id:
-                logger.info("❌ Ghost trade detected for %s (missing on physical exchange). Shutting down local engine memory.", symbol)
-                exit_p = cdx.get_current_price(pair)
-                if not exit_p:
-                    exit_p = trade["entry_price"]
-                _close_trade_inline(trade, exit_p, "EXCHANGE_CLOSED")
-                updated_count += 1
-                continue
-
             # Round to CoinDCX tick sizes
             rounded_sl = _price_round(trailing_sl)
             rounded_tp = _price_round(trailing_tp)
@@ -1349,7 +1364,7 @@ def sync_live_tpsl():
 
             logger.info(
                 "🔄 TPSL updated on CoinDCX for %s: SL=$%.6f → $%.6f | TP=$%.6f → $%.6f",
-                symbol, last_sl, rounded_sl, last_tp, rounded_tp,
+                symbol, (last_sl or 0), rounded_sl, (last_tp or 0), rounded_tp,
             )
 
         except Exception as e:
