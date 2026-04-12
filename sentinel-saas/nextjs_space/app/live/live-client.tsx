@@ -27,8 +27,8 @@ export function LiveClient() {
       const res = await fetch('/api/exchange-positions', { cache: 'no-store' });
       const data = await res.json();
       if (!res.ok) return;
-      const activePositions = (data.positions || []).filter((p: any) => Math.abs(parseFloat(p.active_pos)) > 0);
-      setPositions(activePositions);
+      // By strict instruction, load ALL exchange positions (Active AND Closed)
+      setPositions(data.positions || []);
     } catch (err: any) {
       console.error(err);
     } finally {
@@ -38,7 +38,7 @@ export function LiveClient() {
 
   useEffect(() => {
     fetchExchangePositions();
-    const t = setInterval(fetchExchangePositions, 3000);
+    const t = setInterval(fetchExchangePositions, 2000);
     return () => clearInterval(t);
   }, []);
 
