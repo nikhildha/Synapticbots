@@ -516,6 +516,23 @@ def api_exchange_positions():
         logger.error(f"Failed to fetch exchange positions: {e}")
         return jsonify({"positions": [], "mode": "live", "error": str(e)})
 
+@app.route("/api/exchange-orders", methods=["GET"])
+def api_exchange_orders():
+    """Securely proxy physical orderbook history directly from the exchange."""
+    if config.PAPER_TRADE:
+        return jsonify({"open_orders": [], "history": [], "mode": "paper", "message": "Cannot fetch exchange orders in Paper Mode"})
+    
+    try:
+        import coindcx_client as cdx
+        # Physical Open Limit / Stop Orders active in Exchange Orderbook
+        open_orders = cdx.get_order_history(status="open", size=50)
+        # Historical Closed states (profits/losses mapped inside orders)
+        history = cdx.get_order_history(status="filled,cancelled,rejected", size=100)
+        return jsonify({"open_orders": open_orders, "history": history, "mode": "live", "error": None})
+    except Exception as e:
+        logger.error(f"Failed to fetch exchange orders: {e}")
+        return jsonify({"open_orders": [], "history": [], "mode": "live", "error": str(e)})
+
 
 
 @app.route("/api/health", methods=["GET"])
