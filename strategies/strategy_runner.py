@@ -326,17 +326,23 @@ class StrategyRunner:
         while True:
             try:
                 now = time.time()
+                
+                # Dynamic Isolation Bypass: Validate physically running bots
+                active_bot_prefixes = {b.get("bot_name", "").split()[0].lower() for b in config.ENGINE_ACTIVE_BOTS}
 
                 if now - self._last_axiom >= AXIOM_INTERVAL_S:
-                    self._run_axiom()
+                    if "axiom" in active_bot_prefixes:
+                        self._run_axiom()
                     self._last_axiom = time.time()
 
                 if now - self._last_pyxis >= PYXIS_INTERVAL_S:
-                    self._run_pyxis()
+                    if "pyxis" in active_bot_prefixes:
+                        self._run_pyxis()
                     self._last_pyxis = time.time()
 
                 if now - self._last_ratio >= RATIO_INTERVAL_S:
-                    self._run_ratio()
+                    if "ratio" in active_bot_prefixes:
+                        self._run_ratio()
                     self._last_ratio = time.time()
 
             except Exception as e:

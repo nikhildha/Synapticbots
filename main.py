@@ -683,6 +683,13 @@ class RegimeMasterBot:
     def _tick(self):
         """Full analysis cycle — runs every ANALYSIS_INTERVAL_SECONDS."""
         cycle_start = time.time()
+
+        # Dynamic Isolation Bypass: Validate physically running bots
+        active_bot_prefixes = {b.get("bot_name", "").split()[0].lower() for b in config.ENGINE_ACTIVE_BOTS}
+        if not active_bot_prefixes or all(p in ["axiom", "pyxis", "ratio"] for p in active_bot_prefixes):
+            logger.info("💤 Skipping ML Regime _tick() — only isolated Systematic bots deployable.")
+            return
+
         self._cycle_count += 1
         _cycle_ts = datetime.utcnow().isoformat() + "Z"
 
