@@ -1128,22 +1128,24 @@ class RegimeMasterBot:
             deploys_this_bot = 0  # counter: how many trades deployed this cycle for this bot
             max_deploys_bot = getattr(config, "MAX_DEPLOYS_PER_BOT_PER_CYCLE", 3)
 
-            # ── Per-user-per-mode hard cap (same rule as strategy_runner) ─────────
-            # 10 TOTAL active trades per user per mode (paper/live) across ALL bots.
-            _MAX_USER_TRADES = getattr(config, "MAX_USER_TRADES_PER_MODE", 10)
-            _user_mode_count = sum(
+            # ── Per-bot-per-mode trade cap ─────────────────────────────────────
+            # Rule: each bot holds max 10 active trades per mode (paper/live).
+            # Titan paper=10, Vanguard paper=10, Rogue paper=10 — all independent.
+            # Same rule for live. Per-user isolation is automatic via bot_id.
+            _MAX_BOT_TRADES = getattr(config, "MAX_USER_TRADES_PER_MODE", 10)
+            _bot_mode_count = sum(
                 1 for t in tradebook.get_active_trades()
-                if t.get("user_id") == user_id
+                if t.get("bot_id") == bot_id
                 and str(t.get("mode", "paper")).lower() == bot_mode
             )
-            if _user_mode_count >= _MAX_USER_TRADES:
+            if _bot_mode_count >= _MAX_BOT_TRADES:
                 logger.info(
-                    "🚫 [%s] USER_TRADE_CAP reached: %d/%d %s trades for user %s — skipping deploy",
-                    bot_name, _user_mode_count, _MAX_USER_TRADES, bot_mode.upper(), user_id,
+                    "🚫 [%s] BOT_TRADE_CAP reached: %d/%d %s trades for bot %s — skipping deploy",
+                    bot_name, _bot_mode_count, _MAX_BOT_TRADES, bot_mode.upper(), bot_id,
                 )
                 for top in waterfall_candidates:
                     self._coin_states.setdefault(top["symbol"], {}).setdefault("bot_deploy_statuses", {})[bot_id] = (
-                        f"FILTERED: User {bot_mode.upper()} cap ({_user_mode_count}/{_MAX_USER_TRADES})"
+                        f"FILTERED: Bot {bot_mode.upper()} cap ({_bot_mode_count}/{_MAX_BOT_TRADES})"
                     )
                 continue
 
