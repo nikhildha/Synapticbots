@@ -160,7 +160,7 @@ class StrategyRunner:
 
     # ─── Trade Deployment ────────────────────────────────────────────────────
 
-    def _deploy_signal(self, signal: dict, bot: dict, rm: StrategyRiskManager, mode: str):
+    def _deploy_signal(self, signal: dict, bot: dict, rm: StrategyRiskManager, mode: str, _counter: list = None):
         """
         Attempt to deploy a single signal for a single bot registration.
         """
@@ -242,6 +242,10 @@ class StrategyRunner:
             exchange = None
             deployed_capital = user_capital
 
+        # Increment in-cycle deploy counter (shared mutable list from caller)
+        if _counter is not None:
+            _counter[0] += 1
+
         # Write to tradebook — aligned with exact open_trade() signature
         try:
             tradebook.open_trade(
@@ -296,9 +300,23 @@ class StrategyRunner:
 
         for mode in ("paper", "live"):
             bots = self._find_bots(PYXIS_KEYWORD, mode)
-            for signal in signals:
-                for bot in bots:
-                    self._deploy_signal(signal, bot, self.rm_pyxis, mode)
+            for bot in bots:
+                _MAX = getattr(config, "MAX_USER_TRADES_PER_MODE", 10)
+                _bot_id = bot.get("bot_id", "")
+                _existing = sum(
+                    1 for t in tradebook.get_active_trades()
+                    if t.get("bot_id") == _bot_id
+                    and str(t.get("mode", "paper")).lower() == mode.lower()
+                )
+                _counter = [0]
+                for signal in signals:
+                    if _existing + _counter[0] >= _MAX:
+                        logger.info(
+                            "🚫 [Pyxis] Cap reached (%d/%d %s) for bot %s — stopping",
+                            _existing + _counter[0], _MAX, mode.upper(), _bot_id,
+                        )
+                        break
+                    self._deploy_signal(signal, bot, self.rm_pyxis, mode, _counter)
 
         logger.info("✅ [Pyxis] Cycle complete — %d signals processed", len(signals))
 
@@ -310,9 +328,23 @@ class StrategyRunner:
 
         for mode in ("paper", "live"):
             bots = self._find_bots(AXIOM_KEYWORD, mode)
-            for signal in signals:
-                for bot in bots:
-                    self._deploy_signal(signal, bot, self.rm_axiom, mode)
+            for bot in bots:
+                _MAX = getattr(config, "MAX_USER_TRADES_PER_MODE", 10)
+                _bot_id = bot.get("bot_id", "")
+                _existing = sum(
+                    1 for t in tradebook.get_active_trades()
+                    if t.get("bot_id") == _bot_id
+                    and str(t.get("mode", "paper")).lower() == mode.lower()
+                )
+                _counter = [0]
+                for signal in signals:
+                    if _existing + _counter[0] >= _MAX:
+                        logger.info(
+                            "🚫 [Axiom] Cap reached (%d/%d %s) for bot %s — stopping",
+                            _existing + _counter[0], _MAX, mode.upper(), _bot_id,
+                        )
+                        break
+                    self._deploy_signal(signal, bot, self.rm_axiom, mode, _counter)
 
         logger.info("✅ [Axiom] Cycle complete — %d signals processed", len(signals))
 
@@ -324,9 +356,23 @@ class StrategyRunner:
 
         for mode in ("paper", "live"):
             bots = self._find_bots(RATIO_KEYWORD, mode)
-            for signal in signals:
-                for bot in bots:
-                    self._deploy_signal(signal, bot, self.rm_ratio, mode)
+            for bot in bots:
+                _MAX = getattr(config, "MAX_USER_TRADES_PER_MODE", 10)
+                _bot_id = bot.get("bot_id", "")
+                _existing = sum(
+                    1 for t in tradebook.get_active_trades()
+                    if t.get("bot_id") == _bot_id
+                    and str(t.get("mode", "paper")).lower() == mode.lower()
+                )
+                _counter = [0]
+                for signal in signals:
+                    if _existing + _counter[0] >= _MAX:
+                        logger.info(
+                            "🚫 [Ratio] Cap reached (%d/%d %s) for bot %s — stopping",
+                            _existing + _counter[0], _MAX, mode.upper(), _bot_id,
+                        )
+                        break
+                    self._deploy_signal(signal, bot, self.rm_ratio, mode, _counter)
 
         logger.info("✅ [Ratio] Cycle complete — %d signals processed", len(signals))
 
