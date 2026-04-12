@@ -178,21 +178,24 @@ class StrategyRunner:
 
         # ── Per-bot-per-mode trade cap ────────────────────────────────
         # Rule: each bot can hold max 10 active trades per mode (paper/live).
-        # Different bots for the same user are independent — Axiom paper can
-        # have 10 and Pyxis paper can also have 10 simultaneously.
-        # Different users are also fully isolated by bot_id.
+        # NOTE: The outer loop (in _run_axiom/_run_pyxis/_run_ratio) already
+        # enforces the cap via _counter + _existing check and breaks early.
+        # This inner check is a safety net that also uses _counter to avoid
+        # re-reading stale disk data within a fast signal loop.
         _MAX_BOT_TRADES = getattr(config, "MAX_USER_TRADES_PER_MODE", 10)
-        all_active = tradebook.get_active_trades()
+        all_active = tradebook.get_all_active_trades()  # mode-agnostic: per-bot mode filtering done below
         bot_mode_trades = [
             t for t in all_active
             if t.get("bot_id") == bot_id
             and str(t.get("mode", "paper")).lower() == mode.lower()
         ]
-        if len(bot_mode_trades) >= _MAX_BOT_TRADES:
+        # Add in-cycle deploys not yet written to disk (from _counter)
+        _in_cycle = _counter[0] if _counter is not None else 0
+        if len(bot_mode_trades) + _in_cycle >= _MAX_BOT_TRADES:
             logger.info(
-                "🚫 [%s] %s %s blocked: BOT_TRADE_CAP (%d/%d %s trades for bot %s)",
+                "🚫 [%s] %s %s blocked: BOT_TRADE_CAP (%d+%d/%d %s trades for bot %s)",
                 strategy, bot.get("bot_name"), sym,
-                len(bot_mode_trades), _MAX_BOT_TRADES, mode.upper(), bot_id,
+                len(bot_mode_trades), _in_cycle, _MAX_BOT_TRADES, mode.upper(), bot_id,
             )
             return
 
@@ -304,7 +307,7 @@ class StrategyRunner:
                 _MAX = getattr(config, "MAX_USER_TRADES_PER_MODE", 10)
                 _bot_id = bot.get("bot_id", "")
                 _existing = sum(
-                    1 for t in tradebook.get_active_trades()
+                    1 for t in tradebook.get_all_active_trades()  # mode-agnostic
                     if t.get("bot_id") == _bot_id
                     and str(t.get("mode", "paper")).lower() == mode.lower()
                 )
@@ -332,7 +335,7 @@ class StrategyRunner:
                 _MAX = getattr(config, "MAX_USER_TRADES_PER_MODE", 10)
                 _bot_id = bot.get("bot_id", "")
                 _existing = sum(
-                    1 for t in tradebook.get_active_trades()
+                    1 for t in tradebook.get_all_active_trades()  # mode-agnostic
                     if t.get("bot_id") == _bot_id
                     and str(t.get("mode", "paper")).lower() == mode.lower()
                 )
@@ -360,7 +363,7 @@ class StrategyRunner:
                 _MAX = getattr(config, "MAX_USER_TRADES_PER_MODE", 10)
                 _bot_id = bot.get("bot_id", "")
                 _existing = sum(
-                    1 for t in tradebook.get_active_trades()
+                    1 for t in tradebook.get_all_active_trades()  # mode-agnostic
                     if t.get("bot_id") == _bot_id
                     and str(t.get("mode", "paper")).lower() == mode.lower()
                 )

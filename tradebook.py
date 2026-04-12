@@ -1213,6 +1213,21 @@ def get_active_trades():
     return active_trades
 
 
+def get_all_active_trades():
+    """Return ALL active trades regardless of engine mode.
+
+    Use this when you need to count trades per specific bot_id across both
+    paper and live modes — e.g. the per-bot trade cap check in strategy_runner.
+    get_active_trades() is mode-gated by config.PAPER_TRADE and will miss
+    trades from the 'other' mode when bots have per-bot mode settings.
+    """
+    book = _load_book()
+    return [
+        t for t in book.get("trades", [])
+        if t.get("status") in ("ACTIVE", "OPEN")
+    ]
+
+
 def get_closed_trades():
     """Return only closed trades."""
     book = _load_book()
