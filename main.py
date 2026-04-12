@@ -1746,6 +1746,14 @@ class RegimeMasterBot:
                 # shows $100/trade as configured, not $34 (30% of conviction-adjusted capital)
                 recorded_capital = base_capital
 
+                # ── Pre-initialize fill_sl/fill_tp from Athena before execute_trade ──
+                # fill_sl/fill_tp are passed INTO execute_trade() as hints (paper mode uses them
+                # directly). They will be overwritten by the actual exchange fill values after
+                # the call completes. Without this initialization, any paper-mode path that
+                # doesn't assign them first causes an UnboundLocalError on line 1793.
+                fill_sl = _a_sl  # Athena suggested SL (0.0 if not provided)
+                fill_tp = _a_tp  # Athena suggested TP (0.0 if not provided)
+
                 # SIGNAL_DISPATCH broadcast
                 _bcast("SIGNAL_DISPATCH", self._cycle_count, bot_name, bot_id, sym,
                        effective_side, seg_name, final_conf,
