@@ -684,10 +684,14 @@ class RegimeMasterBot:
         """Full analysis cycle — runs every ANALYSIS_INTERVAL_SECONDS."""
         cycle_start = time.time()
 
-        # Dynamic Isolation Bypass: Validate physically running bots
+        # Dynamic Isolation: Only run the HMM ML engine for bots that are NOT
+        # handled by strategy_runner.py (Pyxis/Axiom/Ratio have their own runner).
+        # If ALL active bots are systematic bots → skip HMM _tick() entirely.
+        _SYSTEMATIC_PREFIXES = {"pyxis", "axiom", "ratio"}
         active_bot_prefixes = {b.get("bot_name", "").split()[0].lower() for b in config.ENGINE_ACTIVE_BOTS}
-        if not active_bot_prefixes or all(p in ["axiom", "pyxis", "ratio"] for p in active_bot_prefixes):
-            logger.info("💤 Skipping ML Regime _tick() — only isolated Systematic bots deployable.")
+        hmm_bot_prefixes = active_bot_prefixes - _SYSTEMATIC_PREFIXES
+        if not active_bot_prefixes or not hmm_bot_prefixes:
+            logger.info("💤 Skipping ML Regime _tick() — no HMM bots registered (only Pyxis/Axiom/Ratio are active).")
             return
 
         self._cycle_count += 1
@@ -1070,11 +1074,17 @@ class RegimeMasterBot:
         #   4. Execute if Athena approves
         # No per-bot position cap — only the duplicate check prevents re-entering the same coin.
 
-        _tick_active_bots = list(config.ENGINE_ACTIVE_BOTS)
+        _SYSTEMATIC_BOT_PREFIXES = {"pyxis", "axiom", "ratio"}
+        # Only iterate HMM bots — systematic bots (Pyxis/Axiom/Ratio) are deployed
+        # by strategy_runner.py and must NOT go through the HMM waterfall loop.
+        _tick_active_bots = [
+            b for b in config.ENGINE_ACTIVE_BOTS
+            if b.get("bot_name", "").split()[0].lower() not in _SYSTEMATIC_BOT_PREFIXES
+        ]
 
 
         if not _tick_active_bots:
-            logger.warning("⚠️  No bots registered in ENGINE_ACTIVE_BOTS — skipping deploy step")
+            logger.warning("⚠️  No HMM bots registered (Titan/Vanguard/Rogue) — HMM deploy loop skipped")
 
         deployed_trades = []
         deployed = 0
@@ -1088,6 +1098,7 @@ class RegimeMasterBot:
             bot_id   = target.get("bot_id", config.ENGINE_BOT_ID)
             bot_name = target.get("bot_name", "Synaptic Bot")
             user_id  = target.get("user_id", config.ENGINE_USER_ID)
+            bot_mode = target.get("mode", "paper").lower()   # ← per-bot mode from DB
             bot_type = bot_name.split()[0] if bot_name else "BOT"
             # All bots trade ALL coins — segment routing removed (bots are strategy-based, not sector-based)
 
@@ -1735,7 +1746,6 @@ class RegimeMasterBot:
                         side=effective_side,
                         leverage=lev,
                         quantity=qty,
-
                         atr=atr_val,
                         regime=top.get("regime", 0),
                         confidence=final_conf,
@@ -1745,6 +1755,7 @@ class RegimeMasterBot:
                         fallback_leverage=fallback_lev,
                         stop_loss=fill_sl,
                         take_profit=fill_tp,
+                        paper_override=(bot_mode == "paper"),  # ← per-bot paper/live override
                     )
                 except Exception as exec_err:
                     logger.error("🚨 EXECUTE CRASH [%s] %s: %s", bot_name, sym, exec_err, exc_info=True)
@@ -1842,6 +1853,7 @@ class RegimeMasterBot:
                     reason=reason_str,
                     capital=fill_capital,          # This is the Phase 1 deployed capital
                     target_capital=target_capital, # Handover Total intend capital to DCA tracker
+                    mode=bot_mode,                 # ← per-bot mode (paper/live) from DB, not global flag
                     user_id=user_id,
                     profile_id="segment",
                     bot_name=bot_name,

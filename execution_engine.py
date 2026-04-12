@@ -90,7 +90,8 @@ class ExecutionEngine:
 
     def execute_trade(self, symbol, side, leverage, quantity, atr,
                       regime=None, confidence=None, reason="", swing_l=None, swing_h=None,
-                      fallback_leverage=None, stop_loss=None, take_profit=None):
+                      fallback_leverage=None, stop_loss=None, take_profit=None,
+                      paper_override=None):
         """
         Execute a futures trade with protective SL/TP.
 
@@ -119,8 +120,14 @@ class ExecutionEngine:
 
         regime_name = config.REGIME_NAMES.get(regime, "UNKNOWN")
 
+        # Determine effective paper/live mode for THIS trade.
+        # paper_override=None  → respect global PAPER_TRADE (legacy behaviour)
+        # paper_override=True  → force paper simulation (bot DB mode = 'paper')
+        # paper_override=False → force live exchange  (bot DB mode = 'live')
+        is_paper = config.PAPER_TRADE if paper_override is None else bool(paper_override)
+
         # ── Paper Trade Mode ────────────────────────────────────────
-        if config.PAPER_TRADE:
+        if is_paper:
             # Use Binance WebSocket price (sub-100ms) — falls back to REST if WS not ready yet
             try:
                 from price_stream import get_price_stream

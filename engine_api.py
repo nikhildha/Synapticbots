@@ -326,40 +326,56 @@ def _save_active_bots():
 def pull_active_bots_from_saas():
     """
     Pull active bots from SaaS DB via the Next.js internal API.
-    This is the primary source of truth — no push/registration required.
-    Engine mode (paper/live) is determined by PAPER_TRADE env var.
+    Fetches BOTH paper and live bots so the outer engine gate knows
+    which bot names (Pyxis, Axiom, Ratio) are registered at all.
+    Trade deployment itself is still mode-isolated by _find_bots().
     Returns True if bots were refreshed, False on failure.
     """
     saas_url = config.SAAS_API_URL
     if not saas_url:
         return False  # Not configured — rely on push registration fallback
 
-    mode = "paper" if config.PAPER_TRADE else "live"
     if saas_url and not saas_url.startswith("http"):
         saas_url = f"https://{saas_url}"
-        
-    url = f"{saas_url.rstrip('/')}/api/internal/active-bots?mode={mode}"
-    headers = {"X-Synaptic-Internal": "engine-pull"}
 
-    try:
-        import urllib.request
-        req = urllib.request.Request(url, headers=headers)
-        with urllib.request.urlopen(req, timeout=8) as resp:
-            data = json.loads(resp.read().decode())
-        bots = data.get("bots", [])
-        if not isinstance(bots, list):
-            return False
-        config.ENGINE_ACTIVE_BOTS = bots
-        if bots:
-            config.ENGINE_BOT_ID = bots[-1].get("bot_id", config.ENGINE_BOT_ID)
-        else:
-            logger.warning("⚠️  SaaS returned 0 active %s bots — deploy loop will be skipped this cycle", mode)
+    headers = {"X-Synaptic-Internal": "engine-pull"}
+    all_bots = []
+    seen_ids = set()
+
+    for mode in ("paper", "live"):
+        url = f"{saas_url.rstrip('/')}/api/internal/active-bots?mode={mode}"
+        try:
+            import urllib.request
+            req = urllib.request.Request(url, headers=headers)
+            with urllib.request.urlopen(req, timeout=8) as resp:
+                data = json.loads(resp.read().decode())
+            bots = data.get("bots", [])
+            if isinstance(bots, list):
+                for b in bots:
+                    key = (b.get("bot_id"), b.get("mode", mode))
+                    if key not in seen_ids:
+                        seen_ids.add(key)
+                        all_bots.append(b)
+                logger.info("✅ Pulled %d %s bots from SaaS DB", len(bots), mode)
+            else:
+                logger.warning("⚠️  SaaS returned non-list for mode=%s", mode)
+        except Exception as e:
+            logger.warning("⚠️  SaaS %s bot pull failed (%s)", mode, e)
+
+    if all_bots:
+        config.ENGINE_ACTIVE_BOTS = all_bots
+        config.ENGINE_BOT_ID = all_bots[-1].get("bot_id", config.ENGINE_BOT_ID)
         _save_active_bots()
-        logger.info("✅ Pulled %d active %s bots from SaaS DB", len(bots), mode)
+        logger.info(
+            "✅ ENGINE_ACTIVE_BOTS populated: %d total bots (paper+live) | names: %s",
+            len(all_bots),
+            list({b.get('bot_name', '?') for b in all_bots}),
+        )
         return True
-    except Exception as e:
-        logger.warning("⚠️  SaaS bot pull failed (%s) — keeping existing %d bots", e, len(config.ENGINE_ACTIVE_BOTS))
+    else:
+        logger.warning("⚠️  SaaS returned 0 active bots (paper+live) — deploy loop will be skipped")
         return False
+
 
 # Startup: try SaaS pull first, fall back to disk cache
 if not pull_active_bots_from_saas():

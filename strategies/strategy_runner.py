@@ -34,9 +34,9 @@ from strategies import bot_pyxis, bot_axiom, bot_ratio
 logger = logging.getLogger("StrategyRunner")
 
 # ─── Frequencies ─────────────────────────────────────────────────────────────
-PYXIS_INTERVAL_S = 3600   # 60 minutes
-AXIOM_INTERVAL_S = 900    # 15 minutes
-RATIO_INTERVAL_S = 14400  # 4 hours
+PYXIS_INTERVAL_S = 300    # 5 minutes
+AXIOM_INTERVAL_S = 300    # 5 minutes
+RATIO_INTERVAL_S = 300    # 5 minutes
 
 # ─── Bot Name Keywords (must match SaaS DB bot names) ────────────────────────
 PYXIS_KEYWORD = "pyxis"
@@ -327,25 +327,53 @@ class StrategyRunner:
             try:
                 now = time.time()
                 
-                # Dynamic Isolation Bypass: Validate physically running bots
-                active_bot_prefixes = {b.get("bot_name", "").split()[0].lower() for b in config.ENGINE_ACTIVE_BOTS}
+                # Dynamic Isolation Bypass: Collect ALL registered bot names (paper + live).
+                # A bot name prefix must exist in the SaaS DB in ANY mode to be eligible to run.
+                # This prevents skipping Pyxis/Ratio paper cycles just because they aren't LIVE yet.
+                all_registered_prefixes = {
+                    b.get("bot_name", "").split()[0].lower()
+                    for b in config.ENGINE_ACTIVE_BOTS
+                }
+
+                if all_registered_prefixes:
+                    logger.debug(
+                        "[StrategyRunner] Active bot prefixes across all modes: %s",
+                        all_registered_prefixes,
+                    )
+                else:
+                    logger.warning(
+                        "[StrategyRunner] ENGINE_ACTIVE_BOTS is empty — no bots registered. "
+                        "Skipping all cycles. Check SaaS DB and /api/internal/active-bots."
+                    )
+
+                # Start staggered so bots don't all hammer klines simultaneously
+                if self._last_axiom == 0: self._last_axiom = time.time() - AXIOM_INTERVAL_S
+                if self._last_pyxis == 0: self._last_pyxis = time.time() - PYXIS_INTERVAL_S + 15
+                if self._last_ratio == 0: self._last_ratio = time.time() - RATIO_INTERVAL_S + 30
 
                 if now - self._last_axiom >= AXIOM_INTERVAL_S:
-                    if "axiom" in active_bot_prefixes:
+                    if AXIOM_KEYWORD in all_registered_prefixes:
                         self._run_axiom()
+                    else:
+                        logger.info("[StrategyRunner] ⏭ Axiom skipped — not registered in SaaS DB (paper or live)")
                     self._last_axiom = time.time()
 
                 if now - self._last_pyxis >= PYXIS_INTERVAL_S:
-                    if "pyxis" in active_bot_prefixes:
+                    if PYXIS_KEYWORD in all_registered_prefixes:
                         self._run_pyxis()
+                    else:
+                        logger.info("[StrategyRunner] ⏭ Pyxis skipped — not registered in SaaS DB (paper or live)")
                     self._last_pyxis = time.time()
 
                 if now - self._last_ratio >= RATIO_INTERVAL_S:
-                    if "ratio" in active_bot_prefixes:
+                    if RATIO_KEYWORD in all_registered_prefixes:
                         self._run_ratio()
+                    else:
+                        logger.info("[StrategyRunner] ⏭ Ratio skipped — not registered in SaaS DB (paper or live)")
                     self._last_ratio = time.time()
 
             except Exception as e:
                 logger.exception("StrategyRunner loop error: %s", e)
 
             time.sleep(60)  # Check every 60 seconds
+
