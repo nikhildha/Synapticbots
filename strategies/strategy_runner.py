@@ -201,24 +201,27 @@ class StrategyRunner:
             strategy, side, sym, price, sl, tp, qty, rm.leverage, mode.upper()
         )
 
-        if str(mode).lower() == "live" and config.PAPER_TRADE is False:
-            logger.info("⚡ [%s] Executing LIVE execution logic via ExecutionEngine for %s", strategy, sym)
+        if str(mode).lower() == "live":
+            logger.info("⚡ [%s] Executing LIVE order via ExecutionEngine for %s", strategy, sym)
             exec_result = self.executor.execute_trade(
                 symbol=sym, side=side,
                 quantity=qty, leverage=rm.leverage,
-                atr=atr, stop_loss=sl, take_profit=tp
+                atr=atr, stop_loss=sl, take_profit=tp,
+                paper_override=False,  # bot DB mode = 'live' → always hit exchange
             )
             if not exec_result:
                 logger.error("🚫 [%s] LIVE Execution failed for %s. Aborting trade deployment.", strategy, sym)
                 return
-            
-            # Align with actual executed amounts/prices
+
+            # Align with actual executed amounts/prices from exchange
             price = exec_result.get("entry_price", price)
             qty = exec_result.get("quantity", qty)
             rm_id = exec_result.get("rm_id")
             exchange = exec_result.get("exchange", "coindcx")
             deployed_capital = exec_result.get("capital", user_capital)
         else:
+            # Paper mode — simulate fill at current market price
+            logger.info("📝 [%s] Paper simulating %s %s", strategy, side, sym)
             rm_id = None
             exchange = None
             deployed_capital = user_capital
