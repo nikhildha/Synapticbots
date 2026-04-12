@@ -907,8 +907,10 @@ def _update_single_trade(trade, book, prices, funding_rates):
     trade["exit_check_at"]    = _dt.utcnow().isoformat() + "Z"
     trade["exit_check_price"] = round(float(current), 8)
 
-    # Diagnostic: promote to INFO so Railway logs show guard status without debug filter
-    logger.info(
+    # Diagnostic: demoted to DEBUG — with 60+ active trades this printed 60+
+    # lines per heartbeat cycle, flooding Railway logs and burying real signals.
+    # The guard state is stamped on the trade dict for dashboard inspection.
+    logger.debug(
         "Exit check [%s]: mode=%s is_live=%s guard=%s "
         "pnl=%.2f%% eff_sl=%.6f eff_tp=%.6f price=%.6f",
         trade.get("trade_id"), trade.get("mode"), is_live, should_auto_close,
@@ -1299,7 +1301,7 @@ def sync_live_tpsl():
     for trade in book["trades"]:
         if trade["status"] != "ACTIVE":
             continue   
-        if trade.get("mode") != "LIVE":
+        if str(trade.get("mode", "PAPER")).upper() != "LIVE":
             continue   
 
         symbol = trade["symbol"]

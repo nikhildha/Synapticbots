@@ -249,7 +249,7 @@ class RegimeMasterBot:
         self._cycle_count = 0
         self._last_cycle_duration = 0
         self._last_analysis_time = 0.0  # epoch — triggers immediate first run
-        self._deploying_locks = {}      # (user_id, bot_type, sym) -> timestamp
+        self._deploying_locks = {}      # (user_id, bot_id, sym) -> timestamp
         
         # Redis Client for state caching
         try:
@@ -977,8 +977,12 @@ class RegimeMasterBot:
                     else:
                         if "4h=SIDEWAYS/CHOP" in _btc_regime_str or "4h=CHOP" in _btc_regime_str:
                              _btc_is_chop = True
-                        elif _btc_regime_str in ("SIDEWAYS", "CHOP", "SIDEWAYS/CHOP", "UNKNOWN"):
+                        elif _btc_regime_str in ("SIDEWAYS", "CHOP", "SIDEWAYS/CHOP"):
                              _btc_is_chop = True
+                        # NOTE: UNKNOWN is NOT treated as CHOP — engine startup
+                        # produces UNKNOWN before BTC has been analyzed. Treating
+                        # UNKNOWN as chop triggers the short-circuit break and
+                        # skips ALL altcoin scanning for the entire first cycle.
                              
                     bots = config.ENGINE_ACTIVE_BOTS
                     bot_names = [b.get("bot_name", "").lower() for b in bots]
@@ -1100,6 +1104,10 @@ class RegimeMasterBot:
             user_id  = target.get("user_id", config.ENGINE_USER_ID)
             bot_mode = target.get("mode", "paper").lower()   # ← per-bot mode from DB
             bot_type = bot_name.split()[0] if bot_name else "BOT"
+            # NOTE: For bots named "Synaptic Titan" / "Synaptic Vanguard" / "Synaptic Rogue",
+            # split()[0] returns "Synaptic" for all — making bot_type non-unique.
+            # Use the FULL name for tier checks (done via bot_name_lower below) and
+            # use bot_id for duplicate guard to ensure each bot is independent.
             # All bots trade ALL coins — segment routing removed (bots are strategy-based, not sector-based)
 
             # ── Clear stale deploy statuses from last cycle for this bot ──────────
@@ -1168,23 +1176,27 @@ class RegimeMasterBot:
 
                 sym      = top["symbol"]
                 
-                # ── BOT ROUTING GATE: SHIELD LLM BOTS FROM DYNAMIC VOLUME GARBAGE ──
-                is_systematic_bot = bot_type in ["Pyxis", "Axiom", "Ratio"]
-                is_narrative_coin = any(sym in coins for coins in config.CRYPTO_SEGMENTS.values())
-                
-                if not is_systematic_bot and not is_narrative_coin:
-                    logger.debug("⏭️  [%s] Skipping %s: Only Pyxis/Axiom/Ratio can execute the dynamic systematic pool.", bot_name, sym)
-                    self._coin_states.setdefault(sym, {}).setdefault("bot_deploy_statuses", {})[bot_id] = "FILTERED: Systematic universe only"
-                    continue
+                # ── BOT ROUTING GATE: Block systematic bots from the HMM waterfall ──
+                # HMM bots (Titan/Vanguard/Rogue) trade ANY coin in the scan pool —
+                # both narrative segments AND dynamic systematic universe coins.
+                # Systematic bots (Pyxis/Axiom/Ratio) are already excluded above
+                # via _SYSTEMATIC_BOT_PREFIXES before the outer loop.
+                # NOTE: Do NOT gate HMM bots on is_narrative_coin — the dynamic
+                # systematic universe (top-100 volume) contains many coins not in
+                # CRYPTO_SEGMENTS, and filtering them here silently blocks all
+                # waterfall candidates whenever the dynamic pool dominates.
                 # ───────────────────────────────────────────────────────────────────
 
                 pos_key  = _build_pos_key(bot_id, sym)
                 seg_name = top.get("segment") or get_segment_for_coin(sym)  # for analytics / risk-manager only
 
-                # ── BOT-TYPE DUPLICATE GUARD: skip if this bot TYPE already has this coin active for this user ──
+                # ── BOT-ID DUPLICATE GUARD: skip if THIS SPECIFIC BOT already has this coin ──
+                # Uses bot_id (not bot_type) because all HMM bots share bot_type="Synaptic"
+                # when named "Synaptic Titan" / "Synaptic Vanguard" / "Synaptic Rogue".
+                # Using bot_type was silently blocking cross-bot deployment of the same coin.
                 already_active = any(
                     pos.get("user_id") == user_id and
-                    pos.get("bot_name", "").split()[0] == bot_type and
+                    pos.get("bot_id") == bot_id and
                     pos.get("symbol") == sym
                     for pos in self._active_positions.values()
                 )
@@ -1202,7 +1214,7 @@ class RegimeMasterBot:
                 # ── GLOBAL DUPLICATE GUARD: cross-tick latency protection ──────────────────
                 # If Binance API lags, tradebook won't show the trade as ACTIVE yet.
                 # A rapid second tick will deploy it again unless we lock it in memory temporarily.
-                if (user_id, bot_type, sym) in self._deploying_locks:
+                if (user_id, bot_id, sym) in self._deploying_locks:
                     logger.debug(
                         "⏭️  [%s] System already deploying %s for user %s (waiting on API) — skip duplicate",
                         bot_name, sym, user_id
@@ -1259,8 +1271,11 @@ class RegimeMasterBot:
                 else:
                     if "4h=SIDEWAYS/CHOP" in btc_regime_str or "4h=CHOP" in btc_regime_str:
                          _btc_is_chop = True
-                    elif btc_regime_str in ("SIDEWAYS", "CHOP", "SIDEWAYS/CHOP", "UNKNOWN"):
+                    elif btc_regime_str in ("SIDEWAYS", "CHOP", "SIDEWAYS/CHOP"):
                          _btc_is_chop = True
+                    # NOTE: UNKNOWN is NOT treated as CHOP — engine startup produces
+                    # UNKNOWN before BTC has been analyzed. Treating it as chop would
+                    # block ALL STRICT tier trades for the first full analysis cycle.
 
                 if _btc_is_chop:
                     if bot_tier in ("MODERATE", "AGGRESSIVE"):
@@ -1924,7 +1939,7 @@ class RegimeMasterBot:
                     "quantity": fill_qty,
                     "symbol": sym,
                 }
-                self._deploying_locks[(user_id, bot_type, sym)] = time.time()
+                self._deploying_locks[(user_id, bot_id, sym)] = time.time()
                 # ── Segment Cooldown: track deployment for churn detection (Rule 4) ──
                 self.risk_manager.record_segment_open(seg_name, user_id)
                 # Signal Queue: step 4 — dequeue successfully deployed coin
@@ -2329,10 +2344,21 @@ class RegimeMasterBot:
             logger.info("  → Registered as %s", trade_id)
 
         # ── 3. Push CoinDCX mark prices to tradebook ────────────────
-        # This ensures unrealized P&L uses the exchange price, not Binance
+        # Stamp current_price on LIVE trades using exchange mark prices.
+        # NOTE: We do NOT call update_unrealized() here — it runs the full
+        # SL/TP/MAX_LOSS exit-check pipeline which already fires once per
+        # heartbeat (line ~578) with WS prices.  Calling it a second time
+        # causes every trade's "Exit check" log to appear twice, doubles
+        # tradebook I/O, and blocks the HMM deploy thread.
+        # Instead, cheaply patch current_price for display accuracy only.
         if cdx_active:
-            cdx_prices = {sym: pos["mark_price"] for sym, pos in cdx_active.items()}
-            tradebook.update_unrealized(prices=cdx_prices)
+            _live_trades = tradebook.get_active_trades()
+            for _lt in _live_trades:
+                _sym = _lt.get("symbol")
+                if _sym and _sym in cdx_active:
+                    _mark = cdx_active[_sym].get("mark_price")
+                    if _mark:
+                        tradebook.update_trade(_lt["trade_id"], {"current_price": round(float(_mark), 6)})
 
         # ── 4. MERGE active-trade data into multi_bot_state for dashboard ──
         # CRITICAL: Read existing state first, then merge — do NOT overwrite.
