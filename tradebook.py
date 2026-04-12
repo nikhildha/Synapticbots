@@ -1324,7 +1324,12 @@ def sync_live_tpsl():
                     break
 
             if not pos_id:
-                logger.debug("No CoinDCX position for %s — skip TPSL sync", symbol)
+                logger.info("❌ Ghost trade detected for %s (missing on physical exchange). Shutting down local engine memory.", symbol)
+                exit_p = cdx.get_current_price(pair)
+                if not exit_p:
+                    exit_p = trade["entry_price"]
+                _close_trade_inline(trade, exit_p, "EXCHANGE_CLOSED")
+                updated_count += 1
                 continue
 
             # Round to CoinDCX tick sizes
