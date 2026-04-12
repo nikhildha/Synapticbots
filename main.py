@@ -1128,6 +1128,25 @@ class RegimeMasterBot:
             deploys_this_bot = 0  # counter: how many trades deployed this cycle for this bot
             max_deploys_bot = getattr(config, "MAX_DEPLOYS_PER_BOT_PER_CYCLE", 3)
 
+            # ── Per-user-per-mode hard cap (same rule as strategy_runner) ─────────
+            # 10 TOTAL active trades per user per mode (paper/live) across ALL bots.
+            _MAX_USER_TRADES = getattr(config, "MAX_USER_TRADES_PER_MODE", 10)
+            _user_mode_count = sum(
+                1 for t in tradebook.get_active_trades()
+                if t.get("user_id") == user_id
+                and str(t.get("mode", "paper")).lower() == bot_mode
+            )
+            if _user_mode_count >= _MAX_USER_TRADES:
+                logger.info(
+                    "🚫 [%s] USER_TRADE_CAP reached: %d/%d %s trades for user %s — skipping deploy",
+                    bot_name, _user_mode_count, _MAX_USER_TRADES, bot_mode.upper(), user_id,
+                )
+                for top in waterfall_candidates:
+                    self._coin_states.setdefault(top["symbol"], {}).setdefault("bot_deploy_statuses", {})[bot_id] = (
+                        f"FILTERED: User {bot_mode.upper()} cap ({_user_mode_count}/{_MAX_USER_TRADES})"
+                    )
+                continue
+
             # ── DCA Contagion Freeze Guard ────────────────────────────────────
             # If the user has multiple trades actively demanding DCA rescue margin,
             # freeze all NEW trade deployments to perfectly conserve capital.
@@ -1139,6 +1158,7 @@ class RegimeMasterBot:
                 for top in waterfall_candidates:
                     self._coin_states.setdefault(top["symbol"], {}).setdefault("bot_deploy_statuses", {})[bot_id] = "FILTERED: DCA Contagion Freeze active"
                 continue  # Escapes bot processing, skipping new trades entirely
+
 
             for _wf_idx, top in enumerate(waterfall_candidates):
                 if deploys_this_bot >= max_deploys_bot:

@@ -176,12 +176,30 @@ class StrategyRunner:
         if not bot_id or not price:
             return
 
-        # Fetch open trades for this bot matching exact isolation mode
+        # ── Per-user-per-mode trade cap (across ALL bots combined) ────────────
+        # A user may have Pyxis + Axiom + Ratio all firing simultaneously.
+        # The hard cap is 10 TOTAL active trades per user per mode (paper/live).
+        # This prevents a user from holding 30 paper trades across 3 bots.
+        _MAX_USER_TRADES = getattr(config, "MAX_USER_TRADES_PER_MODE", 10)
         all_active = tradebook.get_active_trades()
-        open_trades = [t for t in all_active if t.get("bot_id") == bot_id and t.get("mode", "paper").lower() == mode.lower()]
+        user_mode_trades = [
+            t for t in all_active
+            if t.get("user_id") == user_id
+            and str(t.get("mode", "paper")).lower() == mode.lower()
+        ]
+        if len(user_mode_trades) >= _MAX_USER_TRADES:
+            logger.info(
+                "🚫 [%s] %s %s blocked: USER_TRADE_CAP (%d/%d %s trades for user %s across all bots)",
+                strategy, bot.get("bot_name"), sym,
+                len(user_mode_trades), _MAX_USER_TRADES, mode.upper(), user_id,
+            )
+            return
 
-        # Risk gate
-        can_open, reason = rm.can_deploy(sym, open_trades)
+        # Within cap — check per-bot duplicate (same coin already open for this bot)
+        bot_mode_trades = [t for t in user_mode_trades if t.get("bot_id") == bot_id]
+
+        # Risk gate (includes same-coin duplicate check)
+        can_open, reason = rm.can_deploy(sym, bot_mode_trades)
         if not can_open:
             logger.info("🚫 [%s] %s %s blocked: %s", strategy, bot.get("bot_name"), sym, reason)
             return
