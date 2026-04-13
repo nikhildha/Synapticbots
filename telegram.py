@@ -539,3 +539,369 @@ def test_connection():
             "bot_username": bot.get("username", ""),
         }
     return {"ok": False, "error": "Failed to connect"}
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+#  TELEGRAM COMMAND HANDLER — polling-based bot menu
+#  Starts a background daemon thread that long-polls getUpdates and dispatches
+#  /commands.  No external libraries needed.
+# ═══════════════════════════════════════════════════════════════════════════════
+
+# Shared engine reference — set by register_engine_ref() at engine startup
+_engine_ref: dict = {
+    "engine":       None,   # Engine instance (cycle_count, _veto_log, etc.)
+    "paused":       False,  # deployment pause flag polled by main loop
+    "close_all_fn": None,   # callable(mode) injected by main.py
+}
+
+# Pending two-step confirmations: {chat_id: {"action": str, "expires": float}}
+_pending_confirms: dict = {}
+
+
+def register_engine_ref(engine, close_all_fn=None):
+    """Call once at engine startup so the command handler can read state."""
+    _engine_ref["engine"]       = engine
+    _engine_ref["close_all_fn"] = close_all_fn
+    logger.info("[TelegramMenu] Engine reference registered")
+
+
+def is_deployment_paused() -> bool:
+    """Main loop calls this each cycle to honour /pause."""
+    return bool(_engine_ref.get("paused"))
+
+
+# ─── Command Builders ────────────────────────────────────────────────────────
+
+def _cmd_status() -> str:
+    import config as _cfg
+    eng   = _engine_ref.get("engine")
+    mode  = "LIVE 🔴" if not getattr(_cfg, "PAPER_TRADE", True) else "PAPER 🔵"
+    cycle = eng._cycle_count if eng else "?"
+    dur   = f"{eng._last_cycle_duration:.1f}s" if eng and hasattr(eng, "_last_cycle_duration") else "?"
+    state = "⏸ PAUSED" if _engine_ref.get("paused") else "▶ RUNNING"
+    return (
+        f"🖥 <b>ENGINE STATUS</b>\n"
+        f"━━━━━━━━━━━━━━━━━━\n"
+        f"State:  <b>{state}</b>\n"
+        f"Mode:   <b>{mode}</b>\n"
+        f"Cycle:  <b>#{cycle}</b>\n"
+        f"Last:   <code>{dur}</code>\n"
+        f"🕐 {datetime.utcnow().strftime('%H:%M:%S UTC')}"
+    )
+
+
+def _cmd_trades() -> str:
+    import tradebook as _tb
+    trades = _tb.get_all_active_trades()
+    if not trades:
+        return "📭 <b>No active trades</b>\n🕐 " + datetime.utcnow().strftime('%H:%M:%S UTC')
+    by_bot: dict = {}
+    for t in trades:
+        bn = t.get("bot_name") or "Unknown"
+        by_bot.setdefault(bn, []).append(t)
+    total_pnl = sum(t.get("unrealized_pnl", 0) for t in trades)
+    sign = "+" if total_pnl >= 0 else ""
+    lines = [f"📊 <b>ACTIVE TRADES ({len(trades)})</b>", "━━━━━━━━━━━━━━━━━━"]
+    for bn, bts in sorted(by_bot.items()):
+        syms = ", ".join(t.get("symbol","?").replace("USDT","") for t in bts[:6])
+        if len(bts) > 6: syms += f" +{len(bts)-6}"
+        bp = sum(t.get("unrealized_pnl", 0) for t in bts)
+        bs = "+" if bp >= 0 else ""
+        lines.append(f"🤖 <b>{bn}</b> ({len(bts)}) · <code>{bs}${bp:.2f}</code>\n   {syms}")
+    lines.append(f"\n💰 Unrealized total: <b>{sign}${total_pnl:.2f}</b>")
+    lines.append("🕐 " + datetime.utcnow().strftime('%H:%M:%S UTC'))
+    return "\n".join(lines)
+
+
+def _cmd_pnl() -> str:
+    import tradebook as _tb
+    book  = _tb._load_book()
+    all_t = book.get("trades", [])
+    active  = [t for t in all_t if t.get("status") in ("ACTIVE","OPEN")]
+    closed  = [t for t in all_t if t.get("status") == "CLOSED"]
+    wins    = [t for t in closed if t.get("realized_pnl", 0) > 0]
+    realized   = sum(t.get("realized_pnl", 0) for t in closed)
+    unrealized = sum(t.get("unrealized_pnl", 0) for t in active)
+    fees       = sum(t.get("commission", 0) for t in closed)
+    wr = (len(wins) / len(closed) * 100) if closed else 0
+    combined = realized + unrealized
+    s = "+" if combined >= 0 else ""
+    return (
+        f"💹 <b>PORTFOLIO P&L</b>\n"
+        f"━━━━━━━━━━━━━━━━━━\n"
+        f"Total:      <b>{s}${combined:.2f}</b>\n"
+        f"Realized:   <code>{'+'if realized>=0 else ''}${realized:.2f}</code>\n"
+        f"Unrealized: <code>{'+'if unrealized>=0 else ''}${unrealized:.2f}</code>\n"
+        f"Fees paid:  <code>-${fees:.2f}</code>\n"
+        f"Win rate:   <b>{wr:.1f}%</b>  ({len(wins)}W / {len(closed)-len(wins)}L)\n"
+        f"Active: {len(active)}  Closed: {len(closed)}\n"
+        f"🕐 {datetime.utcnow().strftime('%H:%M:%S UTC')}"
+    )
+
+
+def _cmd_bots() -> str:
+    import tradebook as _tb
+    import config as _cfg
+    MAX    = getattr(_cfg, "MAX_USER_TRADES_PER_MODE", 10)
+    trades = _tb.get_all_active_trades()
+    by_bot: dict = {}
+    for t in trades:
+        key = t.get("bot_id") or t.get("bot_name") or "unknown"
+        by_bot.setdefault(key, []).append(t)
+    lines = ["🤖 <b>BOT STATUS</b>", "━━━━━━━━━━━━━━━━━━"]
+    if not by_bot:
+        lines.append("No active bot trades.")
+    for bid, bts in sorted(by_bot.items()):
+        bname = bts[0].get("bot_name") or bid
+        pnl   = sum(t.get("unrealized_pnl", 0) for t in bts)
+        sign  = "+" if pnl >= 0 else ""
+        bar   = "█" * len(bts) + "░" * max(0, MAX - len(bts))
+        lines.append(f"▶ <b>{bname}</b>  [{bar}] {len(bts)}/{MAX}  <code>{sign}${pnl:.2f}</code>")
+    lines.append("🕐 " + datetime.utcnow().strftime('%H:%M:%S UTC'))
+    return "\n".join(lines)
+
+
+def _cmd_veto() -> str:
+    eng   = _engine_ref.get("engine")
+    vetos = list(reversed(eng._veto_log))[:10] if eng and hasattr(eng, "_veto_log") else []
+    if not vetos:
+        return "✅ <b>No recent Athena vetoes</b>"
+    lines = [f"🚫 <b>RECENT VETOES ({len(vetos)})</b>", "━━━━━━━━━━━━━━━━━━"]
+    for v in vetos:
+        coin   = v.get("symbol","?").replace("USDT","")
+        side   = v.get("side","?")
+        conv   = int((v.get("conviction") or 0) * 100)
+        reason = (v.get("reason") or "")[:80]
+        emoji  = "🟢" if side in ("BUY","LONG") else "🔴"
+        lines.append(f"{emoji} <b>{coin}</b> · {v.get('action','VETO')} · {conv}%\n   <i>{reason}</i>")
+    lines.append("🕐 " + datetime.utcnow().strftime('%H:%M:%S UTC'))
+    return "\n".join(lines)
+
+
+def _cmd_users() -> str:
+    """Rank all users by realized + unrealized PnL."""
+    import tradebook as _tb
+    book  = _tb._load_book()
+    all_t = book.get("trades", [])
+    stats: dict = {}
+    for t in all_t:
+        uid = t.get("user_id") or "anonymous"
+        if uid not in stats:
+            stats[uid] = {"realized": 0.0, "unrealized": 0.0, "active": 0, "closed": 0, "wins": 0}
+        s = stats[uid]
+        st = (t.get("status") or "").upper()
+        if st in ("ACTIVE","OPEN"):
+            s["unrealized"] += t.get("unrealized_pnl", 0)
+            s["active"]     += 1
+        elif st == "CLOSED":
+            pnl = t.get("realized_pnl", 0)
+            s["realized"] += pnl
+            s["closed"]   += 1
+            if pnl > 0: s["wins"] += 1
+    if not stats:
+        return "📭 <b>No user data yet</b>"
+    ranked = sorted(stats.items(), key=lambda x: x[1]["realized"]+x[1]["unrealized"], reverse=True)
+    medals = ["🥇","🥈","🥉"]
+    lines  = [f"👥 <b>USER PnL RANKING ({len(ranked)} users)</b>", "━━━━━━━━━━━━━━━━━━"]
+    for i, (uid, s) in enumerate(ranked):
+        total = s["realized"] + s["unrealized"]
+        sign  = "+" if total >= 0 else ""
+        wr    = (s["wins"]/s["closed"]*100) if s["closed"] else 0
+        medal = medals[i] if i < 3 else f"{i+1}."
+        short = uid[-8:] if len(uid) > 8 else uid
+        lines.append(
+            f"{medal} <code>…{short}</code>  <b>{sign}${total:.2f}</b>\n"
+            f"   📈 realized {sign}${s['realized']:.2f} · {s['active']} open · {wr:.0f}% WR"
+        )
+    lines.append("🕐 " + datetime.utcnow().strftime('%H:%M:%S UTC'))
+    return "\n".join(lines)
+
+
+def _cmd_summary() -> str:
+    import tradebook as _tb
+    book  = _tb._load_book()
+    all_t = book.get("trades", [])
+    closed = [t for t in all_t if t.get("status") == "CLOSED"]
+    active = [t for t in all_t if t.get("status") in ("ACTIVE","OPEN")]
+    wins   = [t for t in closed if t.get("realized_pnl", 0) > 0]
+    realized   = sum(t.get("realized_pnl", 0) for t in closed)
+    unrealized = sum(t.get("unrealized_pnl", 0) for t in active)
+    wr   = (len(wins)/len(closed)*100) if closed else 0
+    e    = "📈" if realized >= 0 else "📉"
+    sign = "+" if realized >= 0 else ""
+    return (
+        f"📊 <b>PORTFOLIO SUMMARY</b>\n"
+        f"━━━━━━━━━━━━━━━━━━\n"
+        f"{e} Realized:   <b>{sign}${realized:.2f}</b>\n"
+        f"📊 Unrealized: <code>{'+'if unrealized>=0 else ''}${unrealized:.2f}</code>\n"
+        f"📋 Trades: <b>{len(all_t)}</b>  ({len(active)} active · {len(closed)} closed)\n"
+        f"✅ {len(wins)}W  ❌ {len(closed)-len(wins)}L  🎯 {wr:.1f}% WR\n"
+        f"🕐 {datetime.utcnow().strftime('%Y-%m-%d %H:%M UTC')}"
+    )
+
+
+# ─── Command table + help ───────────────────────────────────────────────────
+
+_COMMANDS_META = [
+    ("/status",   "Engine health, mode, cycle count"),
+    ("/trades",   "Active trades grouped by bot"),
+    ("/pnl",      "Full portfolio P&L breakdown"),
+    ("/bots",     "Bot-level status and capital usage"),
+    ("/veto",     "Last 10 Athena veto decisions"),
+    ("/users",    "All users ranked by P&L"),
+    ("/summary",  "Portfolio summary on demand"),
+    ("/pause",    "Pause new trade deployments"),
+    ("/resume",   "Resume deployments"),
+    ("/closeall", "Close ALL active trades (confirm required)"),
+    ("/help",     "Show this command menu"),
+]
+
+_HELP_TEXT = (
+    "🏛 <b>SYNAPTIC COMMANDS</b>\n"
+    "━━━━━━━━━━━━━━━━━━\n"
+    + "\n".join(f"<code>{cmd}</code> — {desc}" for cmd, desc in _COMMANDS_META)
+)
+
+
+def _dispatch(chat_id: str, text: str):
+    cmd = text.strip().lower().split()[0] if text.strip() else ""
+
+    # Two-step confirm check
+    pending = _pending_confirms.get(chat_id)
+    if pending and time.time() < pending["expires"]:
+        if text.strip().lower() == "confirm":
+            action = pending.get("action", "")
+            _pending_confirms.pop(chat_id, None)
+            if action == "closeall":
+                fn = _engine_ref.get("close_all_fn")
+                if fn:
+                    try:
+                        fn()
+                        return "✅ <b>All active trades closed.</b>"
+                    except Exception as e:
+                        return f"❌ Close all failed: {e}"
+                return "❌ close_all handler not registered."
+        else:
+            _pending_confirms.pop(chat_id, None)
+            return "↩️ Confirmation cancelled."
+
+    if cmd in ("/help", "/start"): return _HELP_TEXT
+    if cmd == "/status":   return _cmd_status()
+    if cmd == "/trades":   return _cmd_trades()
+    if cmd == "/pnl":      return _cmd_pnl()
+    if cmd == "/bots":     return _cmd_bots()
+    if cmd == "/veto":     return _cmd_veto()
+    if cmd == "/users":    return _cmd_users()
+    if cmd == "/summary":  return _cmd_summary()
+    if cmd == "/pause":
+        try:
+            import json as _j, os as _os
+            _state_path = _os.path.join(_os.path.dirname(_os.path.abspath(__file__)), "data", "engine_state.json")
+            _os.makedirs(_os.path.dirname(_state_path), exist_ok=True)
+            with open(_state_path, "w") as _f:
+                _j.dump({"status": "paused", "paused_by": "telegram",
+                          "paused_at": datetime.utcnow().isoformat() + "Z"}, _f, indent=2)
+        except Exception as _pe:
+            logger.warning("[TelegramMenu] /pause write failed: %s", _pe)
+        _engine_ref["paused"] = True
+        return "⏸ <b>Deployments PAUSED</b> — engine will skip new trades.\nSend /resume to restart."
+    if cmd == "/resume":
+        try:
+            import json as _j, os as _os
+            _state_path = _os.path.join(_os.path.dirname(_os.path.abspath(__file__)), "data", "engine_state.json")
+            with open(_state_path, "w") as _f:
+                _j.dump({"status": "running", "resumed_by": "telegram",
+                          "resumed_at": datetime.utcnow().isoformat() + "Z"}, _f, indent=2)
+        except Exception as _re:
+            logger.warning("[TelegramMenu] /resume write failed: %s", _re)
+        _engine_ref["paused"] = False
+        return "▶ <b>Deployments RESUMED</b>"
+    if cmd == "/closeall":
+        _pending_confirms[chat_id] = {"action": "closeall", "expires": time.time() + 30}
+        return (
+            "⚠️ <b>Close ALL active trades?</b>\n"
+            "Reply <code>confirm</code> within 30s.\n"
+            "Any other message cancels."
+        )
+    return None  # unknown — ignore
+
+
+# ─── BotFather registration ──────────────────────────────────────────────────
+
+def _register_bot_commands():
+    commands = [{"command": c.lstrip("/"), "description": d} for c, d in _COMMANDS_META]
+    result   = _send_request("setMyCommands", {"commands": commands})
+    if result and result.get("ok"):
+        logger.info("[TelegramMenu] Commands registered with BotFather ✅")
+    else:
+        logger.warning("[TelegramMenu] setMyCommands failed: %s", result)
+
+
+# ─── Polling loop ────────────────────────────────────────────────────────────
+
+def _poll_loop():
+    offset = None
+    try:
+        _register_bot_commands()
+    except Exception as e:
+        logger.warning("[TelegramMenu] register failed: %s", e)
+    logger.info("[TelegramMenu] Polling started")
+    while True:
+        try:
+            cfg = _get_live_config()
+            if not cfg["enabled"] or not cfg["token"]:
+                time.sleep(10)
+                continue
+            params: dict = {"timeout": 20, "allowed_updates": ["message"]}
+            if offset is not None:
+                params["offset"] = offset
+            url  = BASE_URL.format(token=cfg["token"], method="getUpdates")
+            data = json.dumps(params).encode()
+            req  = Request(url, data=data, headers={"Content-Type": "application/json"})
+            with urlopen(req, timeout=30) as resp:
+                body = json.loads(resp.read().decode())
+            if not body.get("ok"):
+                time.sleep(5)
+                continue
+            for update in body.get("result", []):
+                offset  = update["update_id"] + 1
+                msg     = update.get("message", {})
+                chat_id = str(msg.get("chat", {}).get("id", ""))
+                text    = msg.get("text", "")
+                if not chat_id or not text:
+                    continue
+                # Accept commands AND confirm reply (no slash needed for confirm)
+                if not text.startswith("/") and text.strip().lower() != "confirm":
+                    continue
+                try:
+                    reply = _dispatch(chat_id, text)
+                    if reply:
+                        _send_request("sendMessage", {
+                            "chat_id":    chat_id,
+                            "text":       reply,
+                            "parse_mode": "HTML",
+                        })
+                except Exception as e:
+                    logger.error("[TelegramMenu] dispatch error: %s", e)
+        except Exception as e:
+            logger.warning("[TelegramMenu] Poll error: %s", e)
+            time.sleep(5)
+
+
+_menu_thread_started = False
+_menu_thread_lock    = threading.Lock()
+
+
+def start_command_handler():
+    """
+    Launch the polling daemon thread. Idempotent — safe to call multiple times.
+    Call from main.py after engine init and register_engine_ref().
+    """
+    global _menu_thread_started
+    with _menu_thread_lock:
+        if _menu_thread_started:
+            return
+        _menu_thread_started = True
+    t = threading.Thread(target=_poll_loop, daemon=True, name="TelegramMenu")
+    t.start()
+    logger.info("[TelegramMenu] Command handler thread launched")

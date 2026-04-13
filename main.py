@@ -415,6 +415,24 @@ class RegimeMasterBot:
             config.LOOP_INTERVAL_SECONDS, config.ANALYSIS_INTERVAL_SECONDS,
         )
 
+        # ── Start Telegram command handler (menu / polling) ─────────────────────────
+        def _close_all_trades():
+            """Injected into the Telegram handler for /closeall confirm."""
+            import tradebook as _tb
+            active = _tb.get_all_active_trades()
+            for t in active:
+                try:
+                    _tb.close_trade(symbol=t["symbol"], reason="TELEGRAM_CLOSEALL")
+                except Exception as _ce:
+                    logger.error("closeall error for %s: %s", t.get("symbol"), _ce)
+            logger.warning("⚠️ /closeall via Telegram: closed %d trades", len(active))
+
+        try:
+            tg.register_engine_ref(self, close_all_fn=_close_all_trades)
+            tg.start_command_handler()
+        except Exception as _te:
+            logger.warning("Telegram command handler failed to start: %s", _te)
+
         while self._running:
             try:
                 self._heartbeat()
