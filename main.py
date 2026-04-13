@@ -2031,6 +2031,10 @@ class RegimeMasterBot:
             tg.flush_trade_closes()
         except Exception as e:
             logger.debug("Telegram close flush failed: %s", e)
+        try:
+            tg.flush_veto_batch()
+        except Exception as e:
+            logger.debug("Telegram veto flush failed: %s", e)
 
     def _post_cycle_snapshot(self, cycle_duration: float, deployed_trades: list, deployed: int):
         """POST per-cycle signal archive to dashboard /api/cycle-snapshot for DB persistence."""

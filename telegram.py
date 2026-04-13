@@ -235,30 +235,79 @@ def notify_batch_entries(trades):
 
 
 
+# ─── Veto batch (mirrors close-batch pattern) ────────────────────────────
+_veto_batch: list = []
+_veto_batch_lock = threading.Lock()
+
+
 def notify_athena_veto(sym, side, conviction_pct, reasoning, segment):
-    """Fire when Athena vetoes a coin — trade blocked."""
+    """
+    Queue a single veto so it is batched with others in the same cycle.
+    Drop-in replacement for the old fire-and-forget version.
+    Call flush_veto_batch() at the end of each engine cycle to send one
+    consolidated message instead of N per-user duplicates.
+    """
     if not _read_env_val("TELEGRAM_NOTIFY_TRADES", "true").lower() == "true":
         return
+    with _veto_batch_lock:
+        _veto_batch.append({
+            "symbol":         sym,
+            "side":           side,
+            "conviction_pct": conviction_pct,
+            "reasoning":      reasoning or "",
+            "segment":        segment or "",
+        })
 
-    emoji = "🟢" if side in ("BUY", "LONG") else "🔴"
-    dir_label = "LONG ↑" if side in ("BUY", "LONG") else "SHORT ↓"
-    # Use proper sentence boundary split — not '.' which hits decimal points
-    sentences = re.split(r'(?<=[\.!?])\s+', (reasoning or "").strip())
-    short_reason = " ".join(sentences[:2]).strip()
-    if len(short_reason) > 300:
-        short_reason = short_reason[:297] + "…"
-    coin_name = sym.replace('USDT', '')
 
-    msg = (
-        f"🚫 <b>ATHENA VETO</b>\n"
-        f"━━━━━━━━━━━━━━━━━━\n"
-        f"{emoji} <b>{coin_name}</b> · {dir_label} · <b>{conviction_pct:.0f}% conf</b>\n"
-        f"📂 Segment: {segment}\n"
-        f"\n"
-        f"❌ <i>{short_reason}</i>\n"
-        f"🕐 {datetime.utcnow().strftime('%H:%M:%S UTC')}"
-    )
-    send_message_async(msg)
+def flush_veto_batch():
+    """
+    Drain the veto batch and send ONE message per engine cycle.
+    Deduplicates by symbol so multiple-user engines don’t spam the same coin.
+    Call once at the end of each HMM cycle (e.g. after the coin loop).
+    """
+    with _veto_batch_lock:
+        entries = list(_veto_batch)
+        _veto_batch.clear()
+
+    if not entries:
+        return
+
+    # Deduplicate by symbol — keep highest-conviction entry per coin
+    seen: dict[str, dict] = {}
+    for e in entries:
+        sym = e["symbol"]
+        if sym not in seen or e["conviction_pct"] > seen[sym]["conviction_pct"]:
+            seen[sym] = e
+
+    unique = list(seen.values())
+    header = f"🚫 <b>{len(unique)} COIN{'S' if len(unique) > 1 else ''} VETOED BY ATHENA</b>"
+    lines = [header, "━" * 18]
+
+    for e in unique:
+        sym, side, conv, reasoning, segment = (
+            e["symbol"], e["side"], e["conviction_pct"], e["reasoning"], e["segment"]
+        )
+        emoji   = "🟢" if side in ("BUY", "LONG") else "🔴"
+        dir_lbl = "LONG ↑" if side in ("BUY", "LONG") else "SHORT ↓"
+        coin    = sym.replace("USDT", "")
+
+        sentences = re.split(r'(?<=[.!?])\s+', reasoning.strip())
+        short_rsn = " ".join(sentences[:2]).strip()
+        if len(short_rsn) > 300:
+            short_rsn = short_rsn[:297] + "…"
+
+        lines.append(
+            f"{emoji} <b>{coin}</b> · {dir_lbl} · <b>{conv:.0f}% conf</b>"
+            + (f" · {segment}" if segment else "")
+            + (f"\n   ❌ <i>{short_rsn}</i>" if short_rsn else "")
+        )
+
+    original_count = len(entries)
+    if original_count > len(unique):
+        lines.append(f"\n<i>👥 {original_count} veto signals → {len(unique)} unique coins (duplicates merged)</i>")
+
+    lines.append(f"🕐 {datetime.utcnow().strftime('%H:%M:%S UTC')}")
+    send_message_async("\n".join(lines))
 
 
 _close_batch = []
