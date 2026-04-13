@@ -159,136 +159,157 @@ def open_trade(symbol, side, leverage, quantity, entry_price, atr,
     -------
     str : trade_id
     """
-    book = _load_book()
+    with _book_lock:
+        book = _load_book()
 
-    # Guard 1: same BOT already has this symbol active — block regardless of direction.
-    # This is the tightest check and catches same-bot duplicates (e.g. two AR LONGs).
-    if bot_id:
-        bot_existing = [t for t in book["trades"]
-                        if t["symbol"] == symbol
-                        and t.get("bot_id", "") == bot_id
-                        and t["status"] in ("ACTIVE", "OPEN")]
-        if bot_existing:
-            logger.warning(
-                "⚠️ Skipping trade for %s [bot=%s] — this bot already has ACTIVE trade %s",
-                symbol, bot_id, bot_existing[0]["trade_id"]
+        # Guard 1: same BOT already has this symbol active — block regardless of direction.
+        # This is the tightest check and catches same-bot duplicates (e.g. two AR LONGs).
+        if bot_id:
+            bot_existing = [t for t in book["trades"]
+                            if t["symbol"] == symbol
+                            and t.get("bot_id", "") == bot_id
+                            and t["status"] in ("ACTIVE", "OPEN")]
+            if bot_existing:
+                logger.warning(
+                    "⚠️ Skipping trade for %s [bot=%s] — this bot already has ACTIVE trade %s",
+                    symbol, bot_id, bot_existing[0]["trade_id"]
+                )
+                return bot_existing[0]["trade_id"]
+
+        # Guard 2 (per-user cross-bot dedup) intentionally removed.
+        # It was blocking trades across different users who happened to trade the same coin.
+        # Per-bot dedup (Guard 1) is sufficient — each bot manages its own positions.
+
+        # ── Per-bot-per-mode trade cap (atomic Gate) ──────────────────────────────────
+        # CRITICAL: This must run inside _book_lock so concurrent open_trade() calls
+        # from the StrategyRunner signal loop can't all read the same stale count and
+        # each think they're under the cap. Without the lock, 50+ signals → 50+ trades.
+        _max_bot_trades = getattr(config, "MAX_USER_TRADES_PER_MODE", 10)
+        if bot_id and _max_bot_trades:
+            _trade_mode = (mode or ("paper" if config.PAPER_TRADE else "live")).lower()
+            _bot_active = sum(
+                1 for t in book["trades"]
+                if t.get("bot_id") == bot_id
+                and t["status"] in ("ACTIVE", "OPEN")
+                and str(t.get("mode", "paper")).lower() == _trade_mode
             )
-            return bot_existing[0]["trade_id"]
+            if _bot_active >= _max_bot_trades:
+                logger.warning(
+                    "🚫 open_trade BLOCKED for %s [bot=%s mode=%s]: trade cap hit (%d/%d active)",
+                    symbol, bot_id, _trade_mode, _bot_active, _max_bot_trades
+                )
+                return None
 
-    # Guard 2 (per-user cross-bot dedup) intentionally removed.
-    # It was blocking trades across different users who happened to trade the same coin.
-    # Per-bot dedup (Guard 1) is sufficient — each bot manages its own positions.
+        trade_id = _next_id(book)
+        position = "LONG" if side == "BUY" else "SHORT"
 
-    trade_id = _next_id(book)
-    position = "LONG" if side == "BUY" else "SHORT"
-
-    # Compute SL/TP based on ATR (adjusted for leverage)
-    if override_sl is not None and override_tp is not None:
-        stop_loss = round(override_sl, 6)
-        take_profit = round(override_tp, 6)
-        t1_price = None
-        t2_price = None
-        t3_price = None
-        
-        # RM5_Trailing locks 50% at 2% and trails the rest
-        if rm_id == "RM5_Trailing":
-            direction = 1 if position == "LONG" else -1
-            t1_price = round(entry_price + direction * (entry_price * 0.02), 6)
-    else:
-        sl_mult, tp_mult = config.get_atr_multipliers(leverage)
-
-        # ── Multi-Target System (0304_v1) ──
-        if getattr(config, 'MULTI_TARGET_ENABLED', False):
-            sl_dist = atr * sl_mult
-            t3_dist = sl_dist * config.MT_RR_RATIO  # 1:5 R:R
-            if position == "LONG":
-                stop_loss = round(entry_price - sl_dist, 6)
-                t1_price = round(entry_price + t3_dist * config.MT_T1_FRAC, 6)
-                t2_price = round(entry_price + t3_dist * config.MT_T2_FRAC, 6)
-                t3_price = round(entry_price + t3_dist, 6)
-            else:
-                stop_loss = round(entry_price + sl_dist, 6)
-                t1_price = round(entry_price - t3_dist * config.MT_T1_FRAC, 6)
-                t2_price = round(entry_price - t3_dist * config.MT_T2_FRAC, 6)
-                t3_price = round(entry_price - t3_dist, 6)
-            take_profit = t3_price  # TP = T3 for display
-        else:
-            if position == "LONG":
-                stop_loss = round(entry_price - atr * sl_mult, 6)
-                take_profit = round(entry_price + atr * tp_mult, 6)
-            else:
-                stop_loss = round(entry_price + atr * sl_mult, 6)
-                take_profit = round(entry_price - atr * tp_mult, 6)
+        # Compute SL/TP based on ATR (adjusted for leverage)
+        if override_sl is not None and override_tp is not None:
+            stop_loss = round(override_sl, 6)
+            take_profit = round(override_tp, 6)
             t1_price = None
             t2_price = None
             t3_price = None
+            
+            # RM5_Trailing locks 50% at 2% and trails the rest
+            if rm_id == "RM5_Trailing":
+                direction = 1 if position == "LONG" else -1
+                t1_price = round(entry_price + direction * (entry_price * 0.02), 6)
+        else:
+            sl_mult, tp_mult = config.get_atr_multipliers(leverage)
 
-    now_iso = datetime.now(timezone.utc).isoformat()
-    trade = {
-        "trade_id":         trade_id,
-        "entry_timestamp":  now_iso,
-        "exit_timestamp":   None,
-        "symbol":           symbol,
-        "position":         position,
-        "side":             side,
-        "regime":           regime,
-        "confidence":       round(confidence, 4) if confidence else 0,
-        "leverage":         leverage,
-        "capital":          capital,
-        "target_capital":   target_capital or capital,
-        "dca_level":        dca_level,
-        "quantity":         round(quantity, 6),
-        "entry_price":      round(entry_price, 6),
-        "exit_price":       None,
-        "current_price":    round(entry_price, 6),
-        "stop_loss":        stop_loss,
-        "take_profit":      take_profit,
-        "atr_at_entry":     round(atr, 6),
-        "trailing_sl":      stop_loss,
-        "trailing_tp":      take_profit,
-        "peak_price":       round(entry_price, 6),
-        "trailing_active":  False,
-        "trail_sl_count":   0,
-        "tp_extensions":    0,
-        # Multi-target fields
-        "t1_price":         t1_price,
-        "t2_price":         t2_price,
-        "t3_price":         t3_price,
-        "t1_hit":           False,
-        "t2_hit":           False,
-        "original_qty":     round(quantity, 6),
-        "original_capital": capital,
-        "status":           status,
-        "exit_reason":      None,
-        "realized_pnl":     0,
-        "realized_pnl_pct": 0,
-        "unrealized_pnl":   0,
-        "unrealized_pnl_pct": 0,
-        "max_favorable":    0,
-        "max_adverse":      0,
-        "duration_minutes":  0,
-        "mode":             mode if mode else ("PAPER" if config.PAPER_TRADE else "LIVE"),
-        "user_id":          user_id,
-        "commission":       0,
-        "funding_cost":     0,
-        "funding_payments": 0,
-        "last_funding_check": now_iso,
-        "profile_id":       profile_id,
-        "bot_name":         bot_name,
-        "bot_id":           bot_id or "",  # Stamp real bot_id for per-bot trade isolation
-        "all_bot_ids":      all_bot_ids or [],  # Multi-bot: list of all active bot IDs at trade time
-        # CoinDCX exchange tracking
-        "exchange":         exchange,
-        "pair":             pair,
-        "position_id":      position_id,
-        "rm_id":            rm_id,
-        "order_type":       order_type,
-        "athena_reasoning": athena_reasoning,
-    }
+            # ── Multi-Target System (0304_v1) ──
+            if getattr(config, 'MULTI_TARGET_ENABLED', False):
+                sl_dist = atr * sl_mult
+                t3_dist = sl_dist * config.MT_RR_RATIO  # 1:5 R:R
+                if position == "LONG":
+                    stop_loss = round(entry_price - sl_dist, 6)
+                    t1_price = round(entry_price + t3_dist * config.MT_T1_FRAC, 6)
+                    t2_price = round(entry_price + t3_dist * config.MT_T2_FRAC, 6)
+                    t3_price = round(entry_price + t3_dist, 6)
+                else:
+                    stop_loss = round(entry_price + sl_dist, 6)
+                    t1_price = round(entry_price - t3_dist * config.MT_T1_FRAC, 6)
+                    t2_price = round(entry_price - t3_dist * config.MT_T2_FRAC, 6)
+                    t3_price = round(entry_price - t3_dist, 6)
+                take_profit = t3_price  # TP = T3 for display
+            else:
+                if position == "LONG":
+                    stop_loss = round(entry_price - atr * sl_mult, 6)
+                    take_profit = round(entry_price + atr * tp_mult, 6)
+                else:
+                    stop_loss = round(entry_price + atr * sl_mult, 6)
+                    take_profit = round(entry_price - atr * tp_mult, 6)
+                t1_price = None
+                t2_price = None
+                t3_price = None
 
-    book["trades"].append(trade)
-    _compute_summary(book)
-    _save_book(book)
+        now_iso = datetime.now(timezone.utc).isoformat()
+        trade = {
+            "trade_id":         trade_id,
+            "entry_timestamp":  now_iso,
+            "exit_timestamp":   None,
+            "symbol":           symbol,
+            "position":         position,
+            "side":             side,
+            "regime":           regime,
+            "confidence":       round(confidence, 4) if confidence else 0,
+            "leverage":         leverage,
+            "capital":          capital,
+            "target_capital":   target_capital or capital,
+            "dca_level":        dca_level,
+            "quantity":         round(quantity, 6),
+            "entry_price":      round(entry_price, 6),
+            "exit_price":       None,
+            "current_price":    round(entry_price, 6),
+            "stop_loss":        stop_loss,
+            "take_profit":      take_profit,
+            "atr_at_entry":     round(atr, 6),
+            "trailing_sl":      stop_loss,
+            "trailing_tp":      take_profit,
+            "peak_price":       round(entry_price, 6),
+            "trailing_active":  False,
+            "trail_sl_count":   0,
+            "tp_extensions":    0,
+            # Multi-target fields
+            "t1_price":         t1_price,
+            "t2_price":         t2_price,
+            "t3_price":         t3_price,
+            "t1_hit":           False,
+            "t2_hit":           False,
+            "original_qty":     round(quantity, 6),
+            "original_capital": capital,
+            "status":           status,
+            "exit_reason":      None,
+            "realized_pnl":     0,
+            "realized_pnl_pct": 0,
+            "unrealized_pnl":   0,
+            "unrealized_pnl_pct": 0,
+            "max_favorable":    0,
+            "max_adverse":      0,
+            "duration_minutes":  0,
+            "mode":             mode if mode else ("PAPER" if config.PAPER_TRADE else "LIVE"),
+            "user_id":          user_id,
+            "commission":       0,
+            "funding_cost":     0,
+            "funding_payments": 0,
+            "last_funding_check": now_iso,
+            "profile_id":       profile_id,
+            "bot_name":         bot_name,
+            "bot_id":           bot_id or "",  # Stamp real bot_id for per-bot trade isolation
+            "all_bot_ids":      all_bot_ids or [],  # Multi-bot: list of all active bot IDs at trade time
+            # CoinDCX exchange tracking
+            "exchange":         exchange,
+            "pair":             pair,
+            "position_id":      position_id,
+            "rm_id":            rm_id,
+            "order_type":       order_type,
+            "athena_reasoning": athena_reasoning,
+        }
+
+        book["trades"].append(trade)
+        _compute_summary(book)
+        _save_book(book)
 
     logger.info("📗 Tradebook OPEN: %s %s %s @ %.6f | %dx | Capital: $%.0f",
                 trade_id, position, symbol, entry_price, leverage, capital)
