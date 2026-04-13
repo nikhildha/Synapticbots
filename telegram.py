@@ -388,10 +388,25 @@ def flush_trade_closes():
     send_message_async("\n".join(lines))
 
 
+# Kill switch: module-level cooldown so repeated cycles don't re-spam
+_kill_switch_last_sent: float = 0.0
+_KILL_SWITCH_COOLDOWN_SECS: int = 3600  # 1 hour
+
+
 def notify_kill_switch(drawdown_pct, peak, current):
-    """Send URGENT notification when kill switch triggers."""
+    """Send URGENT notification when kill switch triggers.
+
+    Silenced for _KILL_SWITCH_COOLDOWN_SECS after the first fire so a
+    sustained kill-switch state doesn't spam every engine cycle.
+    """
+    global _kill_switch_last_sent
     if not config.TELEGRAM_NOTIFY_ALERTS:
         return
+    now = time.time()
+    if now - _kill_switch_last_sent < _KILL_SWITCH_COOLDOWN_SECS:
+        logger.debug("[Telegram] kill-switch cooldown active — suppressing duplicate alert")
+        return
+    _kill_switch_last_sent = now
 
     msg = (
         f"🚨🚨🚨 <b>KILL SWITCH TRIGGERED</b> 🚨🚨🚨\n"
@@ -404,20 +419,68 @@ def notify_kill_switch(drawdown_pct, peak, current):
     send_message_async(msg)
 
 
+# ─── MAX_LOSS batch (same pattern as veto/close batches) ─────────────────────
+_max_loss_batch: list = []
+_max_loss_batch_lock = threading.Lock()
+
+# Per-symbol cooldown: avoid re-alerting same coin within 10 minutes
+_max_loss_last_sent: dict[str, float] = {}
+_MAX_LOSS_COOLDOWN_SECS: int = 600  # 10 minutes
+
+
 def notify_max_loss(symbol, pnl_pct, trade_id):
-    """Send notification when a trade hits MAX_LOSS limit."""
+    """Queue a MAX_LOSS alert for batched delivery at cycle end.
+
+    Multiple users closing the same coin at MAX_LOSS in one cycle are
+    collapsed into a single row by flush_max_loss_batch().
+    """
     if not config.TELEGRAM_NOTIFY_ALERTS:
         return
+    now = time.time()
+    if now - _max_loss_last_sent.get(symbol, 0) < _MAX_LOSS_COOLDOWN_SECS:
+        logger.debug("[Telegram] MAX_LOSS cooldown for %s — suppressing duplicate", symbol)
+        return
+    _max_loss_last_sent[symbol] = now
+    with _max_loss_batch_lock:
+        _max_loss_batch.append({
+            "symbol":   symbol,
+            "pnl_pct":  pnl_pct,
+            "trade_id": trade_id,
+        })
 
-    msg = (
-        f"🛑 <b>MAX LOSS AUTO-EXIT</b>\n"
-        f"━━━━━━━━━━━━━━━━━━\n"
-        f"📊 <b>{symbol}</b> (Trade {trade_id})\n"
-        f"📉 P&L: <b>{pnl_pct:.2f}%</b> (limit: {config.MAX_LOSS_PER_TRADE_PCT}%)\n"
-        f"⚠️ Trade auto-closed to prevent further loss\n"
-        f"🕐 {datetime.utcnow().strftime('%H:%M:%S UTC')}"
-    )
-    send_message_async(msg)
+
+def flush_max_loss_batch():
+    """Drain the MAX_LOSS batch and send one grouped alert per cycle."""
+    with _max_loss_batch_lock:
+        entries = list(_max_loss_batch)
+        _max_loss_batch.clear()
+
+    if not entries:
+        return
+
+    # Deduplicate by symbol — worst PnL wins (most alarming for the reader)
+    seen: dict[str, dict] = {}
+    for e in entries:
+        sym = e["symbol"]
+        if sym not in seen or e["pnl_pct"] < seen[sym]["pnl_pct"]:
+            seen[sym] = e
+
+    unique = list(seen.values())
+    header = f"🛑 <b>{len(unique)} MAX LOSS AUTO-EXIT{'S' if len(unique) > 1 else ''}</b>"
+    lines = [header, "━" * 18]
+
+    for e in unique:
+        lines.append(
+            f"📊 <b>{e['symbol'].replace('USDT','')}</b> · "
+            f"P&L: <b>{e['pnl_pct']:.2f}%</b> "
+            f"(limit: {config.MAX_LOSS_PER_TRADE_PCT}%)"
+        )
+
+    if len(entries) > len(unique):
+        lines.append(f"\n<i>👥 {len(entries)} alerts → {len(unique)} unique coins merged</i>")
+
+    lines.append(f"🕐 {datetime.utcnow().strftime('%H:%M:%S UTC')}")
+    send_message_async("\n".join(lines))
 
 
 def notify_daily_summary(summary):

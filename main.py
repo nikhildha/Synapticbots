@@ -323,6 +323,7 @@ class RegimeMasterBot:
         # so the cockpit can retrospectively check what happened to the vetoed coin.
         self._veto_log: list = []   # [{symbol, price, side, conviction, reason, ts}]
         self._VETO_LOG_MAX = 50     # keep last 50 vetoes
+        self._balance_alert_last_sent: float = 0.0  # cooldown for zero-balance spam
 
         # ── Startup: restore veto log from persisted state ──────────────────────
         # Without this, every restart wipes the veto history shown in the cockpit.
@@ -877,15 +878,21 @@ class RegimeMasterBot:
                 "Check CoinDCX API keys and wallet."
             )
             try:
-                tg.send_message(
-                    "🚨 *BALANCE ALERT*\n\n"
-                    "CoinDCX balance returned $0 after 3 retries.\n"
-                    "Deployments are PAUSED until balance is available.\n\n"
-                    "Possible causes:\n"
-                    "• Empty futures wallet\n"
-                    "• Invalid API keys\n"
-                    "• CoinDCX API downtime"
-                )
+                # Only alert once per hour — balance=0 can persist across many cycles
+                _now = time.time()
+                if _now - self._balance_alert_last_sent >= 3600:
+                    self._balance_alert_last_sent = _now
+                    tg.send_message(
+                        "\ud83d\udea8 <b>BALANCE ALERT</b>\n"
+                        "CoinDCX balance returned $0 after 3 retries.\n"
+                        "Deployments are PAUSED until balance is available.\n\n"
+                        "Possible causes:\n"
+                        "• Empty futures wallet\n"
+                        "• Invalid API keys\n"
+                        "• CoinDCX API downtime"
+                    )
+                else:
+                    logger.debug("[Telegram] balance-alert cooldown active — suppressed")
             except Exception as e:
                 try:
                     logger.debug('Exception caught: %s', e, exc_info=True)
@@ -2035,6 +2042,10 @@ class RegimeMasterBot:
             tg.flush_veto_batch()
         except Exception as e:
             logger.debug("Telegram veto flush failed: %s", e)
+        try:
+            tg.flush_max_loss_batch()
+        except Exception as e:
+            logger.debug("Telegram max-loss flush failed: %s", e)
 
     def _post_cycle_snapshot(self, cycle_duration: float, deployed_trades: list, deployed: int):
         """POST per-cycle signal archive to dashboard /api/cycle-snapshot for DB persistence."""
