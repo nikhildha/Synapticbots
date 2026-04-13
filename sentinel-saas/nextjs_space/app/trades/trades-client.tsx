@@ -202,6 +202,7 @@ export function TradesClient({ trades: initialTrades }: TradesClientProps) {
   const [pnlFilter, setPnlFilter] = useState<'all' | 'profit' | 'loss'>('all');
   const [modeFilter, setModeFilter] = useState<'all' | 'paper' | 'live'>('paper');
   const [sessionFilter, setSessionFilter] = useState<string>('all');
+  const [botFilter, setBotFilter] = useState<string>('all');
   const [isClearing, setIsClearing] = useState(false);
   const [clearSuccess, setClearSuccess] = useState<string | null>(null);
   const [confirmingClear, setConfirmingClear] = useState(false);
@@ -300,6 +301,7 @@ export function TradesClient({ trades: initialTrades }: TradesClientProps) {
       if (statusFilter === 'closed' && tradeIsActive) return false;
       if (modeFilter !== 'all' && tMode !== modeFilter) return false;
       if (sessionFilter !== 'all' && t.sessionId !== sessionFilter) return false;
+      if (botFilter !== 'all' && (t.botName || 'Unknown Bot') !== botFilter) return false;
       if (posFilter !== 'all') {
         const posMatch = posFilter === 'long'
           ? ['long', 'buy'].includes(tPos)
@@ -314,7 +316,7 @@ export function TradesClient({ trades: initialTrades }: TradesClientProps) {
       }
       return true;
     });
-  }, [trades, statusFilter, modeFilter, posFilter, coinSearch, pnlFilter, sessionFilter]);
+  }, [trades, statusFilter, modeFilter, posFilter, coinSearch, pnlFilter, sessionFilter, botFilter]);
 
   /* ── Portfolio Stats (respects master mode filter) ── */
   const CAPITAL_PER_TRADE = 100;
@@ -437,6 +439,16 @@ export function TradesClient({ trades: initialTrades }: TradesClientProps) {
       }
     });
     return Array.from(seen.keys());
+  }, [trades]);
+
+  // Unique bot names for the bot filter dropdown
+  const uniqueBotNames = useMemo(() => {
+    const seen = new Set<string>();
+    (trades ?? []).forEach(t => {
+      const name = t.botName || 'Unknown Bot';
+      seen.add(name);
+    });
+    return Array.from(seen).sort();
   }, [trades]);
 
   const clearAllTrades = async () => {
@@ -665,6 +677,20 @@ export function TradesClient({ trades: initialTrades }: TradesClientProps) {
                   <option value="all">All P&L</option>
                   <option value="profit">Profit Only</option>
                   <option value="loss">Loss Only</option>
+                </select>
+
+                {/* Bot Name filter */}
+                <select value={botFilter} onChange={e => setBotFilter(e.target.value)} style={{
+                  padding: '6px 10px', borderRadius: '8px', border: '1px solid var(--color-border)',
+                  background: botFilter !== 'all' ? 'rgba(8,145,178,0.15)' : 'var(--color-surface-light)',
+                  color: botFilter !== 'all' ? '#0EA5E9' : 'var(--color-text)',
+                  fontSize: '13px', fontWeight: botFilter !== 'all' ? 600 : 400,
+                  transition: 'all 0.2s',
+                }}>
+                  <option value="all">All Bots</option>
+                  {uniqueBotNames.map(name => (
+                    <option key={name} value={name}>{name}</option>
+                  ))}
                 </select>
 
 
