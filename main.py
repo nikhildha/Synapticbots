@@ -176,9 +176,18 @@ def _purge_old_athena_log(days: int = 30) -> None:
 _purge_old_athena_log()  # Run once at module load
 
 
-def _build_pos_key(bot_id: str, symbol: str) -> str:
-    """Build position key: 'bot_id:symbol' if bot_id is non-empty, else 'symbol'."""
-    return f"{bot_id}:{symbol}" if bot_id else symbol
+def _build_pos_key(bot_id: str, symbol: str, user_id: str = "") -> str:
+    """Build position key: 'user_id:bot_id:symbol' for full per-user isolation.
+
+    Including user_id ensures User A's BTTCUSDT does NOT block User B from
+    getting the same coin under the same bot — each user is fully independent.
+    Falls back gracefully when user_id is absent (legacy / single-user mode).
+    """
+    if user_id and bot_id:
+        return f"{user_id}:{bot_id}:{symbol}"
+    if bot_id:
+        return f"{bot_id}:{symbol}"
+    return symbol
 
 
 # ─── Bot name → segment mapping (fallback when segment_filter not in ENGINE_ACTIVE_BOTS) ──
@@ -1161,20 +1170,22 @@ class RegimeMasterBot:
             deploys_this_bot = 0  # counter: how many trades deployed this cycle for this bot
             max_deploys_bot = getattr(config, "MAX_DEPLOYS_PER_BOT_PER_CYCLE", 3)
 
-            # ── Per-bot-per-mode trade cap ─────────────────────────────────────
-            # Rule: each bot holds max 10 active trades per mode (paper/live).
-            # Titan paper=10, Vanguard paper=10, Rogue paper=10 — all independent.
-            # Same rule for live. Per-user isolation is automatic via bot_id.
+            # ── Per-bot-per-user-per-mode trade cap ────────────────────────────
+            # Rule: each (user, bot) pair holds max 10 active trades per mode.
+            # Uses get_all_active_trades() (mode-agnostic) so bots registered as
+            # 'live' are counted even when the engine runs in paper mode.
+            # Filtering by user_id ensures each user has their own independent cap.
             _MAX_BOT_TRADES = getattr(config, "MAX_USER_TRADES_PER_MODE", 10)
             _bot_mode_count = sum(
-                1 for t in tradebook.get_active_trades()
+                1 for t in tradebook.get_all_active_trades()
                 if t.get("bot_id") == bot_id
+                and t.get("user_id") == user_id           # ← per-user isolation
                 and str(t.get("mode", "paper")).lower() == bot_mode
             )
             if _bot_mode_count >= _MAX_BOT_TRADES:
                 logger.info(
-                    "🚫 [%s] BOT_TRADE_CAP reached: %d/%d %s trades for bot %s — skipping deploy",
-                    bot_name, _bot_mode_count, _MAX_BOT_TRADES, bot_mode.upper(), bot_id,
+                    "🚫 [%s] BOT_TRADE_CAP reached: %d/%d %s trades for bot %s user %s — skipping deploy",
+                    bot_name, _bot_mode_count, _MAX_BOT_TRADES, bot_mode.upper(), bot_id, user_id,
                 )
                 for top in waterfall_candidates:
                     self._coin_states.setdefault(top["symbol"], {}).setdefault("bot_deploy_statuses", {})[bot_id] = (
@@ -1212,13 +1223,13 @@ class RegimeMasterBot:
                 # waterfall candidates whenever the dynamic pool dominates.
                 # ───────────────────────────────────────────────────────────────────
 
-                pos_key  = _build_pos_key(bot_id, sym)
+                pos_key  = _build_pos_key(bot_id, sym, user_id)
                 seg_name = top.get("segment") or get_segment_for_coin(sym)  # for analytics / risk-manager only
 
-                # ── BOT-ID DUPLICATE GUARD: skip if THIS SPECIFIC BOT already has this coin ──
-                # Uses bot_id (not bot_type) because all HMM bots share bot_type="Synaptic"
-                # when named "Synaptic Titan" / "Synaptic Vanguard" / "Synaptic Rogue".
-                # Using bot_type was silently blocking cross-bot deployment of the same coin.
+                # ── BOT-ID + USER-ID DUPLICATE GUARD ──────────────────────────────────
+                # Skip if THIS SPECIFIC USER's BOT already holds this coin.
+                # Keyed on (user_id, bot_id, symbol) so users are independent:
+                # User A's BTTCUSDT does NOT block User B's BTTCUSDT.
                 already_active = any(
                     pos.get("user_id") == user_id and
                     pos.get("bot_id") == bot_id and
@@ -2163,17 +2174,23 @@ class RegimeMasterBot:
                 del self._active_positions[key]
 
     def _load_positions_from_tradebook(self):
-        """Load active tradebook entries into _active_positions on startup."""
+        """Load active tradebook entries into _active_positions on startup.
+
+        Uses get_all_active_trades() (mode-agnostic) so trades from bots
+        registered as 'live' are visible even when the engine starts in
+        paper mode, ensuring the duplicate guard works for all users.
+        """
         try:
-            active_trades = tradebook.get_active_trades()
+            active_trades = tradebook.get_all_active_trades()  # mode-agnostic: sees all users
             for t in active_trades:
-                sym = t["symbol"]
-                bot_id = t.get("bot_id", "")
+                sym     = t["symbol"]
+                bot_id  = t.get("bot_id", "")
                 user_id = t.get("user_id", getattr(config, "ENGINE_USER_ID", "default"))
-                pos_key = _build_pos_key(bot_id, sym)
+                pos_key = _build_pos_key(bot_id, sym, user_id)  # includes user_id
                 if pos_key not in self._active_positions:
                     self._active_positions[pos_key] = {
                         "user_id": user_id,
+                        "bot_id":  bot_id,
                         "regime": t.get("regime", "UNKNOWN"),
                         "confidence": t.get("confidence", 0),
                         "side": t.get("side", "BUY"),
@@ -2196,7 +2213,7 @@ class RegimeMasterBot:
         Remove entries from _active_positions that were auto-closed
         by the tradebook (e.g., SL/TP hit during paper-mode simulation).
         """
-        active_pos_keys = {_build_pos_key(t.get("bot_id", ""), t["symbol"]) for t in tradebook.get_active_trades()}
+        active_pos_keys = {_build_pos_key(t.get("bot_id", ""), t["symbol"], t.get("user_id", "")) for t in tradebook.get_all_active_trades()}
         # Get full closed trade data to pass to _apply_cooldown
         try:
             all_trades = tradebook.get_all_trades() if hasattr(tradebook, "get_all_trades") else []

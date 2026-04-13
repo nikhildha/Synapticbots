@@ -314,19 +314,21 @@ class StrategyRunner:
             bots = self._find_bots(PYXIS_KEYWORD, mode)
             for bot in bots:
                 _MAX = getattr(config, "MAX_USER_TRADES_PER_MODE", 10)
-                _bot_id = bot.get("bot_id", "")
+                _bot_id  = bot.get("bot_id", "")
+                _user_id = bot.get("user_id", "")          # per-user cap isolation
                 _counter = [0]  # Tracks in-cycle deploys not yet flushed to disk
                 for signal in signals:
                     # Re-read fresh disk count each signal — avoids stale _existing bug
                     _live_count = sum(
                         1 for t in tradebook.get_all_active_trades()
                         if t.get("bot_id") == _bot_id
+                        and t.get("user_id") == _user_id    # ← per-user isolation
                         and str(t.get("mode", "paper")).lower() == mode.lower()
                     )
                     if _live_count + _counter[0] >= _MAX:
                         logger.info(
-                            "🚫 [Pyxis] Cap reached (%d disk + %d in-cycle = %d/%d %s) for bot %s — stopping",
-                            _live_count, _counter[0], _live_count + _counter[0], _MAX, mode.upper(), _bot_id,
+                            "🚫 [Pyxis] Cap reached (%d disk + %d in-cycle = %d/%d %s) for bot %s user %s — stopping",
+                            _live_count, _counter[0], _live_count + _counter[0], _MAX, mode.upper(), _bot_id, _user_id,
                         )
                         break
                     self._deploy_signal(signal, bot, self.rm_pyxis, mode, _counter)
@@ -343,7 +345,8 @@ class StrategyRunner:
             bots = self._find_bots(AXIOM_KEYWORD, mode)
             for bot in bots:
                 _MAX = getattr(config, "MAX_USER_TRADES_PER_MODE", 10)
-                _bot_id = bot.get("bot_id", "")
+                _bot_id  = bot.get("bot_id", "")
+                _user_id = bot.get("user_id", "")          # per-user cap isolation
                 _counter = [0]  # Tracks in-cycle deploys not yet flushed to disk
                 for signal in signals:
                     # Re-read fresh disk count each signal — avoids stale _existing bug
@@ -351,12 +354,13 @@ class StrategyRunner:
                     _live_count = sum(
                         1 for t in tradebook.get_all_active_trades()
                         if t.get("bot_id") == _bot_id
+                        and t.get("user_id") == _user_id    # ← per-user isolation
                         and str(t.get("mode", "paper")).lower() == mode.lower()
                     )
                     if _live_count + _counter[0] >= _MAX:
                         logger.info(
-                            "🚫 [Axiom] Cap reached (%d disk + %d in-cycle = %d/%d %s) for bot %s — stopping",
-                            _live_count, _counter[0], _live_count + _counter[0], _MAX, mode.upper(), _bot_id,
+                            "🚫 [Axiom] Cap reached (%d disk + %d in-cycle = %d/%d %s) for bot %s user %s — stopping",
+                            _live_count, _counter[0], _live_count + _counter[0], _MAX, mode.upper(), _bot_id, _user_id,
                         )
                         break
                     self._deploy_signal(signal, bot, self.rm_axiom, mode, _counter)
@@ -373,19 +377,21 @@ class StrategyRunner:
             bots = self._find_bots(RATIO_KEYWORD, mode)
             for bot in bots:
                 _MAX = getattr(config, "MAX_USER_TRADES_PER_MODE", 10)
-                _bot_id = bot.get("bot_id", "")
+                _bot_id  = bot.get("bot_id", "")
+                _user_id = bot.get("user_id", "")          # per-user cap isolation
                 _counter = [0]  # Tracks in-cycle deploys not yet flushed to disk
                 for signal in signals:
                     # Re-read fresh disk count each signal — avoids stale _existing bug
                     _live_count = sum(
                         1 for t in tradebook.get_all_active_trades()
                         if t.get("bot_id") == _bot_id
+                        and t.get("user_id") == _user_id    # ← per-user isolation
                         and str(t.get("mode", "paper")).lower() == mode.lower()
                     )
                     if _live_count + _counter[0] >= _MAX:
                         logger.info(
-                            "🚫 [Ratio] Cap reached (%d disk + %d in-cycle = %d/%d %s) for bot %s — stopping",
-                            _live_count, _counter[0], _live_count + _counter[0], _MAX, mode.upper(), _bot_id,
+                            "🚫 [Ratio] Cap reached (%d disk + %d in-cycle = %d/%d %s) for bot %s user %s — stopping",
+                            _live_count, _counter[0], _live_count + _counter[0], _MAX, mode.upper(), _bot_id, _user_id,
                         )
                         break
                     self._deploy_signal(signal, bot, self.rm_ratio, mode, _counter)
