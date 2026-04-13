@@ -1,6 +1,6 @@
 'use client';
 
-import { Play, Square, Trash2, Settings, Archive } from 'lucide-react';
+import { Play, Square, Trash2, Settings, Archive, ChevronDown, ChevronUp } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useState } from 'react';
 
@@ -48,6 +48,7 @@ export function BotCard({ bot, onToggle, onDelete, onRetire, trades = [], livePr
   const [deleteConfirm, setDeleteConfirm] = useState(false);
   const [retireConfirm, setRetireConfirm] = useState(false);
   const [retiring, setRetiring] = useState(false);
+  const [showTrades, setShowTrades] = useState(false);
 
   const isRunning = bot?.isActive ?? false;
   const brainType = (bot?.config as any)?.brainType || 'adaptive';
@@ -275,6 +276,20 @@ export function BotCard({ bot, onToggle, onDelete, onRetire, trades = [], livePr
           </button>
 
           <button
+            onClick={(e) => { e.stopPropagation(); setShowTrades(!showTrades); setShowSettings(false); setDeleteConfirm(false); }}
+            title={showTrades ? "Hide active trades" : "Show active trades"}
+            style={{
+              width: 34, height: 34, borderRadius: 9, cursor: 'pointer',
+              background: showTrades ? 'rgba(0,229,255,0.1)' : 'var(--color-surface-light)',
+              color: showTrades ? '#00E5FF' : 'var(--color-text-secondary)',
+              border: `1px solid ${showTrades ? 'rgba(0,229,255,0.3)' : 'var(--color-border)'}`,
+              display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.2s',
+            }}
+          >
+            {showTrades ? <ChevronUp style={{ width: 16, height: 16 }} /> : <ChevronDown style={{ width: 16, height: 16 }} />}
+          </button>
+
+          <button
             onClick={(e) => { e.stopPropagation(); setShowSettings(!showSettings); setDeleteConfirm(false); }}
             title="Settings"
             style={{
@@ -390,6 +405,79 @@ export function BotCard({ bot, onToggle, onDelete, onRetire, trades = [], livePr
                   Cancel
                 </button>
               </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* ════ TRADES PANEL (expands below) ════ */}
+      <AnimatePresence>
+        {showTrades && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            style={{ overflow: 'hidden' }}
+          >
+            <div style={{
+              borderTop: '1px solid var(--color-border)',
+              padding: '14px 20px 16px 20px',
+              background: 'var(--color-surface-light)',
+              display: 'flex', flexDirection: 'column', gap: 12,
+            }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: '#00E5FF', letterSpacing: '0.8px', textTransform: 'uppercase' }}>
+                Active Trades ({activeTrades.length})
+              </div>
+              
+              {activeTrades.length === 0 ? (
+                <div style={{ fontSize: 13, color: 'var(--color-text-secondary)', padding: '10px 0' }}>
+                  No active trades.
+                </div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  {activeTrades.map((t: any) => {
+                    const sym = (t.symbol || (t.coin || '') + 'USDT').toUpperCase();
+                    const entry = t.entry_price || t.entryPrice || 0;
+                    const cp = livePrices[sym] || t.current_price || t.currentPrice || entry;
+                    const pos = (t.side || t.position || '').toUpperCase();
+                    const isLong = pos === 'LONG' || pos === 'BUY';
+                    const lev = t.leverage || 1;
+                    const cap = t.capital || t.position_size || 100;
+                    const rawDiff = isLong ? (cp - entry) : (entry - cp);
+                    const rawPnl = entry > 0 ? (rawDiff / entry * lev * cap) : 0;
+                    const pnlColorHex = Math.abs(rawPnl) < 0.01 ? '#9CA3AF' : (rawPnl >= 0 ? '#22C55E' : '#EF4444');
+                    
+                    return (
+                      <div key={t.id || t.trade_id} style={{ 
+                        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                        padding: '8px 12px', background: 'rgba(0,0,0,0.15)', borderRadius: 8,
+                        border: '1px solid rgba(255,255,255,0.03)'
+                      }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 12, minWidth: 120 }}>
+                           <span style={{ 
+                             fontSize: 10, fontWeight: 800, padding: '2px 6px', borderRadius: 4,
+                             background: isLong ? 'rgba(34,197,94,0.1)' : 'rgba(239,68,68,0.1)',
+                             color: isLong ? '#22C55E' : '#EF4444'
+                           }}>
+                             {isLong ? 'LONG' : 'SHORT'} {lev}x
+                           </span>
+                           <span style={{ fontSize: 13, fontWeight: 700, fontFamily: 'monospace' }}>{sym}</span>
+                        </div>
+                        
+                        <div style={{ display: 'flex', gap: 24, fontSize: 12, fontFamily: 'monospace', color: 'var(--color-text-secondary)' }}>
+                           <span>Entry: <strong style={{ color: 'var(--color-text)' }}>{entry.toFixed(4)}</strong></span>
+                           <span>Mark: <strong style={{ color: 'var(--color-text)' }}>{cp.toFixed(4)}</strong></span>
+                        </div>
+                        
+                        <div style={{ fontSize: 14, fontWeight: 800, fontFamily: 'monospace', color: pnlColorHex, minWidth: 80, textAlign: 'right' }}>
+                          {sign(rawPnl)}${Math.abs(rawPnl).toFixed(2)}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           </motion.div>
         )}
